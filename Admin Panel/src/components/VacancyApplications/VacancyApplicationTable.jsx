@@ -1,0 +1,200 @@
+import { motion } from 'framer-motion';
+import { Visibility } from '@mui/icons-material';
+
+const VacancyApplicationTable = ({ applications, loading, onView, pagination, onPageChange }) => {
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('uz-UZ', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getStatusBadge = (status) => {
+    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
+    switch (status) {
+      case 'pending':
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+      case 'reviewed':
+        return `${baseClasses} bg-blue-100 text-blue-800`;
+      case 'accepted':
+        return `${baseClasses} bg-green-100 text-green-800`;
+      case 'rejected':
+        return `${baseClasses} bg-red-100 text-red-800`;
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`;
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'Ko\'rib chiqilmoqda';
+      case 'reviewed':
+        return 'Ko\'rib chiqilgan';
+      case 'accepted':
+        return 'Qabul qilingan';
+      case 'rejected':
+        return 'Rad etilgan';
+      default:
+        return status;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-indigo-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (applications.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <p className="text-center text-gray-500">So'rovnomalar topilmadi</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                #
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Foydalanuvchi
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Telefon
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Yuborilgan
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Amallar
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {applications.map((application, index) => (
+              <motion.tr
+                key={application._id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="hover:bg-gray-50 transition-colors"
+              >
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {(pagination.page - 1) * pagination.limit + index + 1}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-900">
+                    {application.applicant?.firstName || ''} {application.applicant?.lastName || ''}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">{application.applicant?.phone || '-'}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={getStatusBadge(application.status)}>
+                    {getStatusLabel(application.status)}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatDate(application.createdAt)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
+                    onClick={() => onView(application)}
+                    className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                    title="Batafsil ko'rish"
+                  >
+                    <Visibility className="w-4 h-4" />
+                  </button>
+                </td>
+              </motion.tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Jami <span className="font-medium">{pagination.total}</span> ta so'rovnoma{' '}
+              <span className="font-medium">
+                {(pagination.page - 1) * pagination.limit + 1} -{' '}
+                {Math.min(pagination.page * pagination.limit, pagination.total)}
+              </span>{' '}
+              ko'rsatilmoqda
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onPageChange(pagination.page - 1)}
+                disabled={pagination.page === 1}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              >
+                Oldingi
+              </button>
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.pages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.pages - 2) {
+                    pageNum = pagination.pages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => onPageChange(pageNum)}
+                      className={`px-3 py-1 border rounded-md text-sm ${
+                        pageNum === pagination.page
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => onPageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.pages}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              >
+                Keyingi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default VacancyApplicationTable;
+
+

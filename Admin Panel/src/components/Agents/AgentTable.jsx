@@ -1,0 +1,257 @@
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Edit, Delete, Visibility } from '@mui/icons-material';
+import { agentAPI } from '../../services/api';
+import { useSnackbar } from '../../contexts/SnackbarContext';
+
+const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onPageChange, onStatusChange }) => {
+  const [updatingStatus, setUpdatingStatus] = useState({});
+  const { showSuccess, showError } = useSnackbar();
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('uz-UZ', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getAgentTypeLabel = (agentType) => {
+    switch (agentType) {
+      case 'viloyat':
+        return 'Viloyat Agent';
+      case 'tuman':
+        return 'Tuman Agent';
+      case 'mfy':
+        return 'MFY Agent';
+      default:
+        return agentType;
+    }
+  };
+
+  const getAgentTypeBadge = (agentType) => {
+    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
+    switch (agentType) {
+      case 'viloyat':
+        return `${baseClasses} bg-blue-100 text-blue-800`;
+      case 'tuman':
+        return `${baseClasses} bg-green-100 text-green-800`;
+      case 'mfy':
+        return `${baseClasses} bg-purple-100 text-purple-800`;
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`;
+    }
+  };
+
+  const handleStatusToggle = async (agent, newStatus) => {
+    setUpdatingStatus({ ...updatingStatus, [agent._id]: true });
+    try {
+      const response = await agentAPI.updateAgent(agent._id, { status: newStatus });
+      if (response.success) {
+        showSuccess(response.message || 'Status muvaffaqiyatli yangilandi');
+        onStatusChange?.();
+      }
+    } catch (error) {
+      showError(error.message || 'Status yangilashda xatolik');
+    } finally {
+      setUpdatingStatus({ ...updatingStatus, [agent._id]: false });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-indigo-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (agents.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <p className="text-center text-gray-500">Agentlar topilmadi</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                #
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Ism
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Telefon
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Agent turi
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Yaratilgan
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Amallar
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {agents.map((agent, index) => (
+              <motion.tr
+                key={agent._id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="hover:bg-gray-50 transition-colors"
+              >
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {(pagination.page - 1) * pagination.limit + index + 1}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">{agent.name || '-'}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">{agent.phone || '-'}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={getAgentTypeBadge(agent.agentType)}>
+                    {getAgentTypeLabel(agent.agentType)}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={agent.status === 'active'}
+                      onChange={(e) => {
+                        const newStatus = e.target.checked ? 'active' : 'inactive';
+                        handleStatusToggle(agent, newStatus);
+                      }}
+                      disabled={updatingStatus[agent._id]}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 disabled:opacity-50"></div>
+                    <span className="ml-3 text-sm text-gray-700">
+                      {agent.status === 'active' ? 'Faol' : 'Nofaol'}
+                    </span>
+                  </label>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatDate(agent.createdAt)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => onView(agent)}
+                      className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                      title="Batafsil ko'rish"
+                    >
+                      <Visibility className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onEdit(agent)}
+                      className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50 transition-colors"
+                      title="Tahrirlash"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(agent)}
+                      className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                      title="O'chirish"
+                    >
+                      <Delete className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </motion.tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Jami <span className="font-medium">{pagination.total}</span> ta agentdan{' '}
+              <span className="font-medium">
+                {(pagination.page - 1) * pagination.limit + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)}
+              </span>{' '}
+              ko'rsatilmoqda
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onPageChange(pagination.page - 1)}
+                disabled={pagination.page === 1}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              >
+                Oldingi
+              </button>
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.pages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.pages - 2) {
+                    pageNum = pagination.pages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => onPageChange(pageNum)}
+                      className={`px-3 py-1 border rounded-md text-sm ${
+                        pageNum === pagination.page
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => onPageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.pages}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              >
+                Keyingi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AgentTable;
+
+
+
+
+
+
+
+
