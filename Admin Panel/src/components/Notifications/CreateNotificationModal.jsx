@@ -12,6 +12,7 @@ const targetTypes = [
   { value: 'mfy_agents', label: 'MFY agentlari' },
   { value: 'marketplace_users', label: 'Marketplace foydalanuvchilari' },
   { value: 'contragents', label: 'Kontragentlar' },
+  { value: 'vacancy_applicants', label: 'Vakansiya nomzodlari' },
 ];
 
 const notificationTypes = [

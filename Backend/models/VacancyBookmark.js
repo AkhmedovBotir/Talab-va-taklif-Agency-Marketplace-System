@@ -29,3 +29,5 @@ const VacancyBookmark = mongoose.model('VacancyBookmark', vacancyBookmarkSchema)
 module.exports = VacancyBookmark;
 
 
+
+

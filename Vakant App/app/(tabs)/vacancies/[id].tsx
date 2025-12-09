@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/Button';
+import { DeltaRenderer } from '@/components/DeltaRenderer';
+import { Vacancy, vacancyApi } from '@/services/vacancyApi';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { vacancyApi, Vacancy } from '@/services/vacancyApi';
-import { DeltaRenderer } from '@/components/DeltaRenderer';
-import { Button } from '@/components/Button';
 
 export default function VacancyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

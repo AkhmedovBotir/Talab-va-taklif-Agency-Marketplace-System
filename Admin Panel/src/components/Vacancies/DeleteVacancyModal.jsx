@@ -112,3 +112,5 @@ const DeleteVacancyModal = ({ open, onClose, onSuccess, vacancy }) => {
 export default DeleteVacancyModal;
 
 
+
+

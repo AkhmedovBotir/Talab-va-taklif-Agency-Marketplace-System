@@ -267,3 +267,5 @@ const InterviewStageResultModal = ({ open, onClose, onSuccess, application, stag
 
 export default InterviewStageResultModal;
 
+
+

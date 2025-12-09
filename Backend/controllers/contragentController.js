@@ -438,42 +438,7 @@ const deleteContragent = async (req, res) => {
 // Get current contragent (me)
 const getMe = async (req, res) => {
   try {
-    // Get token from Authorization header
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token topilmadi',
-      });
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    // Verify and decode token
-    let decoded;
-    try {
-      decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-      );
-    } catch (error) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token noto\'g\'ri yoki muddati tugagan',
-      });
-    }
-
-    // Check if token is for contragent
-    if (decoded.type !== 'contragent') {
-      return res.status(403).json({
-        success: false,
-        message: 'Bu token contragent uchun emas',
-      });
-    }
-
-    // Find contragent by ID from token
-    const contragent = await Contragent.findById(decoded.id)
+    const contragent = await Contragent.findById(req.user.userId)
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
@@ -495,6 +460,155 @@ const getMe = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Ma\'lumotlarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Update current contragent profile (basic fields + optional logo)
+const updateMyProfile = async (req, res) => {
+  try {
+    const contragentId = req.user.userId;
+    const updateData = req.body;
+
+    // Validate logo if provided
+    if (updateData.logo) {
+      const base64Regex = /^data:image\/(png|jpg|jpeg|gif|webp);base64,/;
+      if (!base64Regex.test(updateData.logo)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Logo base64 formatida bo\'lishi kerak (data:image/png;base64,... yoki data:image/jpeg;base64,...)',
+        });
+      }
+    }
+
+    // If phone is being updated, check for duplicates
+    if (updateData.phone) {
+      const existingPhone = await Contragent.findOne({
+        phone: updateData.phone,
+        _id: { $ne: contragentId },
+      });
+      if (existingPhone) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu telefon raqami allaqachon mavjud',
+        });
+      }
+    }
+
+    // If INN is being updated, check for duplicates
+    if (updateData.inn) {
+      const existingINN = await Contragent.findOne({
+        inn: updateData.inn,
+        _id: { $ne: contragentId },
+      });
+      if (existingINN) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu INN allaqachon mavjud',
+        });
+      }
+    }
+
+    // Validate regions if being updated
+    if (updateData.viloyat || updateData.tuman || updateData.mfy) {
+      const Region = require('../models/Region');
+      const currentContragent = await Contragent.findById(contragentId);
+      const viloyatId = updateData.viloyat || currentContragent.viloyat;
+      const tumanId = updateData.tuman || currentContragent.tuman;
+      const mfyId = updateData.mfy || currentContragent.mfy;
+
+      const viloyatRegion = await Region.findById(viloyatId);
+      const tumanRegion = await Region.findById(tumanId);
+      const mfyRegion = await Region.findById(mfyId);
+
+      if (!viloyatRegion || viloyatRegion.type !== 'region') {
+        return res.status(400).json({
+          success: false,
+          message: 'Viloyat topilmadi yoki noto\'g\'ri tur',
+        });
+      }
+
+      if (!tumanRegion || tumanRegion.type !== 'district') {
+        return res.status(400).json({
+          success: false,
+          message: 'Tuman topilmadi yoki noto\'g\'ri tur',
+        });
+      }
+
+      if (!mfyRegion || mfyRegion.type !== 'mfy') {
+        return res.status(400).json({
+          success: false,
+          message: 'MFY topilmadi yoki noto\'g\'ri tur',
+        });
+      }
+
+      if (tumanRegion.parent?.toString() !== viloyatId.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tuman tanlangan viloyatga tegishli emas',
+        });
+      }
+
+      if (mfyRegion.parent?.toString() !== tumanId.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'MFY tanlangan tumanga tegishli emas',
+        });
+      }
+    }
+
+    const updated = await Contragent.findByIdAndUpdate(
+      contragentId,
+      updateData,
+      { new: true, runValidators: true }
+    )
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code')
+      .select('-password');
+
+    res.status(200).json({
+      success: true,
+      message: 'Profil yangilandi',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('Error updating contragent profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Profilni yangilashda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Update current contragent logo
+const updateMyLogo = async (req, res) => {
+  try {
+    const { logo } = req.body;
+    const contragentId = req.user.userId;
+
+    const updated = await Contragent.findByIdAndUpdate(
+      contragentId,
+      { logo },
+      { new: true, runValidators: true }
+    )
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code')
+      .select('-password');
+
+    res.status(200).json({
+      success: true,
+      message: 'Logo yangilandi',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('Error updating contragent logo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Logoni yangilashda xatolik yuz berdi',
       error: error.message,
     });
   }
@@ -590,5 +704,7 @@ module.exports = {
   deleteContragent,
   loginContragent,
   getMe,
+  updateMyProfile,
+  updateMyLogo,
 };
 

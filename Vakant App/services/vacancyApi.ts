@@ -345,7 +345,10 @@ class VacancyApiService {
       `/vacancies/${id}/bookmark`,
       { method: 'POST' }
     );
-    return response.data!.isBookmarked;
+    // Some responses may return the flag either at root or inside data
+    const isBookmarked =
+      (response.data as any)?.isBookmarked ?? (response as any)?.isBookmarked;
+    return Boolean(isBookmarked);
   }
 
   // Get bookmarks

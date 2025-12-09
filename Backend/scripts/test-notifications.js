@@ -18,7 +18,7 @@ const ADMIN_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5MzA2OTMyOD
 const notificationTypes = ['info', 'warning', 'success', 'error', 'announcement', 'promotion', 'update'];
 
 // Target types
-const targetTypes = ['all', 'punkts', 'viloyat_agents', 'tuman_agents', 'mfy_agents', 'marketplace_users', 'contragents'];
+const targetTypes = ['all', 'punkts', 'viloyat_agents', 'tuman_agents', 'mfy_agents', 'marketplace_users', 'contragents', 'vacancy_applicants'];
 
 // Test messages
 const testMessages = {
@@ -61,6 +61,7 @@ const targetDescriptions = {
   mfy_agents: 'MFY agentlari',
   marketplace_users: 'Marketplace foydalanuvchilari',
   contragents: 'Kontragentlar',
+  vacancy_applicants: 'Vakansiya nomzodlari',
 };
 
 async function sendNotification(type, targetType) {

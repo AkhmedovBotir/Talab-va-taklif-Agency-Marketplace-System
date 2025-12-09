@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   RefreshControl,
@@ -19,6 +21,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | undefined>(undefined);
 
   const fetchUnreadCount = async () => {
     try {
@@ -35,6 +39,12 @@ export default function ProfileScreen() {
     fetchUnreadCount();
   }, []);
 
+  useEffect(() => {
+    if (contragent) {
+      setLogoPreview(contragent.logo);
+    }
+  }, [contragent]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
@@ -44,6 +54,67 @@ export default function ProfileScreen() {
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const uploadLogo = async (source: 'camera' | 'library') => {
+    try {
+      setUploadingLogo(true);
+
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Ruxsat kerak', 'Kamera uchun ruxsat bering');
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Ruxsat kerak', 'Galereyaga ruxsat bering');
+          return;
+        }
+      }
+
+      const picker =
+        source === 'camera'
+          ? ImagePicker.launchCameraAsync
+          : ImagePicker.launchImageLibraryAsync;
+
+      const result = await picker({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.base64) {
+        const mimeType = result.assets[0].mimeType || 'image/jpeg';
+        const base64 = `data:${mimeType};base64,${result.assets[0].base64}`;
+        setLogoPreview(base64);
+
+        await apiService.updateLogo({ logo: base64 });
+        await refreshContragent();
+        Alert.alert('Muvaffaqiyatli', 'Logo yangilandi');
+      }
+    } catch (error: any) {
+      const message = error?.message || 'Logo yangilashda xatolik yuz berdi';
+      Alert.alert('Xatolik', message);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleChangeLogo = () => {
+    Alert.alert(
+      'Logoni almashtirish',
+      'Logoni qayerdan yuklaysiz?',
+      [
+        { text: 'Kamera', onPress: () => uploadLogo('camera') },
+        { text: 'Galereya', onPress: () => uploadLogo('library') },
+        { text: 'Bekor qilish', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
   };
 
   const handleLogout = () => {
@@ -76,16 +147,34 @@ export default function ProfileScreen() {
     >
       <View style={styles.content}>
         <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            {contragent?.logo ? (
-              <Image
-                source={{ uri: contragent.logo }}
-                style={styles.logoImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <Ionicons name="business" size={48} color="#007AFF" />
-            )}
+          <View style={styles.avatarWrapper}>
+            <View style={styles.avatarContainer}>
+              {logoPreview ? (
+                <Image
+                  source={{ uri: logoPreview }}
+                  style={styles.logoImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="business" size={48} color="#007AFF" />
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.editAvatarButton,
+                uploadingLogo && styles.editAvatarButtonDisabled,
+              ]}
+              onPress={handleChangeLogo}
+              disabled={uploadingLogo}
+              activeOpacity={0.85}
+            >
+              {uploadingLogo ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera" size={18} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
           </View>
           <Text style={styles.companyName}>{contragent?.name || 'Kontragent'}</Text>
           <Text style={styles.inn}>{contragent?.inn || ''}</Text>
@@ -123,6 +212,7 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
 
         <View style={styles.actionsCard}>
           <Text style={styles.sectionTitle}>Amallar</Text>
@@ -180,20 +270,33 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  avatarWrapper: {
+    width: 110,
+    height: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
     overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 4,
   },
   logoImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   companyName: {
     fontSize: 20,
@@ -205,6 +308,22 @@ const styles = StyleSheet.create({
   inn: {
     fontSize: 14,
     color: '#666',
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    bottom: 6,
+    right: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  editAvatarButtonDisabled: {
+    opacity: 0.6,
   },
   detailsCard: {
     backgroundColor: '#fff',

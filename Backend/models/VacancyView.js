@@ -29,3 +29,5 @@ const VacancyView = mongoose.model('VacancyView', vacancyViewSchema);
 module.exports = VacancyView;
 
 
+
+

@@ -35,6 +35,8 @@ const createNotification = async (req, res) => {
       targetRefModel = 'MarketplaceUser';
     } else if (targetType === 'contragents') {
       targetRefModel = 'Contragent';
+    } else if (targetType === 'vacancy_applicants') {
+      targetRefModel = 'VacancyApplicant';
     }
 
     const notification = await Notification.create({
@@ -83,6 +85,9 @@ const createNotification = async (req, res) => {
           break;
         case 'contragents':
           io.to('contragents').emit('notification:new', eventData);
+          break;
+        case 'vacancy_applicants':
+          io.to('vacancy_applicants').emit('notification:new', eventData);
           break;
       }
 
@@ -246,26 +251,13 @@ const getTargetTypes = (userType) => {
       return ['all', 'mfy_agents'];
     case 'marketplace_user':
       return ['all', 'marketplace_users'];
+    case 'vacancy_applicant':
+      return ['all', 'vacancy_applicants'];
     default:
       return [];
   }
 };
 
-// Helper function to get recipient type
-const getRecipientType = (userType) => {
-  switch (userType) {
-    case 'punkt':
-      return 'Punkt';
-    case 'viloyat_agent':
-    case 'tuman_agent':
-    case 'mfy_agent':
-      return 'Agent';
-    case 'marketplace_user':
-      return 'MarketplaceUser';
-    default:
-      return null;
-  }
-};
 
 // Get notifications for Punkt
 const getPunktNotifications = async (req, res) => {
@@ -826,6 +818,191 @@ const markAllMarketplaceNotificationsRead = async (req, res) => {
   }
 };
 
+// Get notifications for Vacancy Applicant
+const getVacancyNotifications = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { page = 1, limit = 20 } = req.query;
+    const targetTypes = ['all', 'vacancy_applicants'];
+
+    const notifications = await Notification.find({
+      isActive: true,
+      $or: [
+        { targetType: { $in: targetTypes }, targetIds: { $size: 0 } },
+        { targetIds: userId },
+      ],
+    })
+      .select('-readBy')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    const notificationsWithRead = await Promise.all(
+      notifications.map(async (n) => {
+        const fullNotification = await Notification.findById(n._id);
+        const isRead = fullNotification.readBy.some(
+          (r) => r.recipientId.toString() === userId.toString() && r.recipientType === 'VacancyApplicant'
+        );
+        return { ...n.toObject(), isRead };
+      })
+    );
+
+    const total = await Notification.countDocuments({
+      isActive: true,
+      $or: [
+        { targetType: { $in: targetTypes }, targetIds: { $size: 0 } },
+        { targetIds: userId },
+      ],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: notificationsWithRead,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Get vacancy notifications error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Notificationlarni olishda xatolik',
+      error: error.message,
+    });
+  }
+};
+
+// Get unread count for Vacancy Applicant
+const getVacancyUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const targetTypes = ['all', 'vacancy_applicants'];
+
+    const notifications = await Notification.find({
+      isActive: true,
+      $or: [
+        { targetType: { $in: targetTypes }, targetIds: { $size: 0 } },
+        { targetIds: userId },
+      ],
+    });
+
+    const unreadCount = notifications.filter(
+      (n) =>
+        !n.readBy.some(
+          (r) => r.recipientId.toString() === userId.toString() && r.recipientType === 'VacancyApplicant'
+        )
+    ).length;
+
+    res.status(200).json({
+      success: true,
+      data: { unreadCount },
+    });
+  } catch (error) {
+    console.error('Get vacancy unread count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Mark notification as read for Vacancy Applicant
+const markVacancyNotificationRead = async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.user.userId;
+
+    const notification = await Notification.findById(notificationId);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification topilmadi',
+      });
+    }
+
+    const alreadyRead = notification.readBy.some(
+      (r) => r.recipientId.toString() === userId.toString() && r.recipientType === 'VacancyApplicant'
+    );
+
+    if (!alreadyRead) {
+      notification.readBy.push({
+        recipientId: userId,
+        recipientType: 'VacancyApplicant',
+        readAt: new Date(),
+      });
+      await notification.save();
+
+      if (io) {
+        const unreadCount = await getUnreadCountForUser(userId, ['all', 'vacancy_applicants'], 'VacancyApplicant');
+        io.to(`user:${userId}`).emit('notification:unread_count', { unreadCount });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification o\'qildi deb belgilandi',
+    });
+  } catch (error) {
+    console.error('Mark vacancy notification read error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Mark all as read for Vacancy Applicant
+const markAllVacancyNotificationsRead = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const targetTypes = ['all', 'vacancy_applicants'];
+
+    const notifications = await Notification.find({
+      isActive: true,
+      $or: [
+        { targetType: { $in: targetTypes }, targetIds: { $size: 0 } },
+        { targetIds: userId },
+      ],
+    });
+
+    for (const notification of notifications) {
+      const alreadyRead = notification.readBy.some(
+        (r) => r.recipientId.toString() === userId.toString() && r.recipientType === 'VacancyApplicant'
+      );
+      if (!alreadyRead) {
+        notification.readBy.push({
+          recipientId: userId,
+          recipientType: 'VacancyApplicant',
+          readAt: new Date(),
+        });
+        await notification.save();
+      }
+    }
+
+    if (io) {
+      io.to(`user:${userId}`).emit('notification:unread_count', { unreadCount: 0 });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Barcha notificationlar o\'qildi deb belgilandi',
+    });
+  } catch (error) {
+    console.error('Mark all vacancy notifications read error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 // Helper function to get unread count
 const getUnreadCountForUser = async (userId, targetTypes, recipientType) => {
   const notifications = await Notification.find({
@@ -1180,6 +1357,11 @@ module.exports = {
   getMarketplaceUnreadCount,
   markMarketplaceNotificationRead,
   markAllMarketplaceNotificationsRead,
+  // Vacancy applicants
+  getVacancyNotifications,
+  getVacancyUnreadCount,
+  markVacancyNotificationRead,
+  markAllVacancyNotificationsRead,
   // Contragent
   getContragentNotifications,
   getContragentUnreadCount,

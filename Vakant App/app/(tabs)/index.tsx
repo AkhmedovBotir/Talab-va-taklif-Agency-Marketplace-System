@@ -20,9 +20,12 @@ import { RegionPicker } from '@/components/RegionPicker';
 import { Ionicons } from '@expo/vector-icons';
 import { profileApi, ApplicantProfile } from '@/services/profileApi';
 import { Region } from '@/services/api';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
+  const { unreadCount, refreshUnreadCount } = useNotifications();
   const [profile, setProfile] = useState<ApplicantProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editProfileModal, setEditProfileModal] = useState(false);
@@ -214,6 +217,31 @@ export default function ProfileScreen() {
             <Ionicons name="lock-closed-outline" size={22} color="#2563EB" />
             <Text style={styles.actionButtonText}>Parolni o'zgartirish</Text>
             <Ionicons name="chevron-forward" size={22} color="#9CA3AF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, { marginTop: 12 }]}
+            onPress={() => {
+              refreshUnreadCount();
+              router.push('/(tabs)/notifications');
+            }}
+          >
+            <Ionicons name="notifications-outline" size={22} color="#2563EB" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.actionButtonText}>Bildirishnomalar</Text>
+              <Text style={styles.actionSubtitle}>
+                Yangi xabarlar va eslatmalar
+              </Text>
+            </View>
+            {unreadCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            ) : (
+              <Ionicons name="chevron-forward" size={22} color="#9CA3AF" />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -838,6 +866,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
     fontWeight: '500',
+  },
+  actionSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  badge: {
+    minWidth: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
   },
   logoutButton: {
     marginTop: 8,

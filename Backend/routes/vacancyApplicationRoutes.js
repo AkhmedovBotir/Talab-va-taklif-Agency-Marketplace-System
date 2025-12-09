@@ -14,6 +14,12 @@ const {
   getBookmarkedVacancies,
   trackVacancyView,
 } = require('../controllers/vacancyApplicationController');
+const {
+  getVacancyNotifications,
+  getVacancyUnreadCount,
+  markVacancyNotificationRead,
+  markAllVacancyNotificationsRead,
+} = require('../controllers/notificationController');
 const { vacancyApplicantAuth } = require('../middleware/auth');
 
 // All routes require authentication
@@ -54,6 +60,12 @@ router.post('/vacancies/:id/bookmark', toggleBookmark);
 
 // Get bookmarked vacancies
 router.get('/bookmarks', getBookmarkedVacancies);
+
+// Notifications
+router.get('/notifications/list', getVacancyNotifications);
+router.get('/notifications/unread-count', getVacancyUnreadCount);
+router.post('/notifications/:notificationId/read', markVacancyNotificationRead);
+router.post('/notifications/read-all', markAllVacancyNotificationsRead);
 
 module.exports = router;
 

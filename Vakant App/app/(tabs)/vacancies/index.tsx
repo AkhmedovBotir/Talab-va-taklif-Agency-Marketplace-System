@@ -3,16 +3,17 @@ import { Vacancy, vacancyApi } from '@/services/vacancyApi';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function VacanciesScreen() {
@@ -62,6 +63,13 @@ export default function VacanciesScreen() {
       setRefreshing(false);
     }
   }, [searchQuery, filters]);
+
+  // Refresh list whenever screen gains focus (e.g., returning from detail)
+  useFocusEffect(
+    useCallback(() => {
+      loadVacancies(1, true);
+    }, [loadVacancies])
+  );
 
   // Debounced search effect
   useEffect(() => {

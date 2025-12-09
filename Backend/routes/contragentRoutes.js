@@ -8,6 +8,8 @@ const {
   deleteContragent,
   loginContragent,
   getMe,
+  updateMyProfile,
+  updateMyLogo,
 } = require('../controllers/contragentController');
 const {
   getContragentNotifications,
@@ -22,7 +24,13 @@ const { contragentAuth } = require('../middleware/auth');
 router.post('/login', validate(contragentValidationSchemas.login), loginContragent);
 
 // Get current contragent (me)
-router.get('/me', getMe);
+router.get('/me', contragentAuth, getMe);
+
+// Update current contragent profile
+router.put('/me', contragentAuth, validate(contragentValidationSchemas.updateProfile), updateMyProfile);
+
+// Update only logo
+router.patch('/me/logo', contragentAuth, validate(contragentValidationSchemas.updateLogo), updateMyLogo);
 
 // Create contragent
 router.post('/', validate(contragentValidationSchemas.create), createContragent);

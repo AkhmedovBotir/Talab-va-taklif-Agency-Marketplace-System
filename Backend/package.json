@@ -8,6 +8,7 @@
     "dev": "nodemon index.js",
     "create-admin": "node scripts/createGeneralAdmin.js",
     "create-notification": "node scripts/test-notifications.js",
+    "import-regions": "node scripts/importRegions.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -50,6 +50,22 @@ export interface GetMeResponse {
   data: Contragent;
 }
 
+export interface ContragentResponse {
+  success: boolean;
+  message?: string;
+  data: Contragent;
+}
+
+export interface ContragentUpdateRequest {
+  name?: string;
+  phone?: string;
+  inn?: string;
+  viloyat?: string;
+  tuman?: string;
+  mfy?: string;
+  logo?: string;
+}
+
 // Category interfaces
 export interface Category {
   _id: string;
@@ -396,6 +412,20 @@ class ApiService {
   async getMe(): Promise<GetMeResponse> {
     return this.request<GetMeResponse>('/api/contragents/me', {
       method: 'GET',
+    });
+  }
+
+  async updateProfile(data: ContragentUpdateRequest): Promise<ContragentResponse> {
+    return this.request<ContragentResponse>('/api/contragents/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateLogo(data: { logo: string }): Promise<ContragentResponse> {
+    return this.request<ContragentResponse>('/api/contragents/me/logo', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
   }
 

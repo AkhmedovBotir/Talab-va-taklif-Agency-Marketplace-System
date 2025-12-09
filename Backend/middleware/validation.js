@@ -188,6 +188,7 @@ const regionValidationSchemas = {
         'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
       }),
   }),
+
 };
 
 const contragentValidationSchemas = {
@@ -311,6 +312,52 @@ const contragentValidationSchemas = {
       .required()
       .messages({
         'string.empty': 'Parol kiritilishi shart',
+      }),
+  }),
+
+  updateProfile: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(200)
+      .trim()
+      .messages({
+        'string.min': 'Nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Nomi 200 ta belgidan oshmasligi kerak',
+      }),
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .messages({
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+      }),
+    inn: Joi.string()
+      .pattern(/^\d{9}$|^\d{12}$/)
+      .messages({
+        'string.pattern.base': 'INN 9 yoki 12 ta raqamdan iborat bo\'lishi kerak',
+      }),
+    viloyat: Joi.string().messages({
+      'string.base': 'Viloyat ID to\'g\'ri formatda bo\'lishi kerak',
+    }),
+    tuman: Joi.string().messages({
+      'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
+    }),
+    mfy: Joi.string().messages({
+      'string.base': 'MFY ID to\'g\'ri formatda bo\'lishi kerak',
+    }),
+    logo: Joi.string()
+      .pattern(/^data:image\/(png|jpg|jpeg|gif|webp);base64,/)
+      .allow(null, '')
+      .messages({
+        'string.pattern.base': 'Logo base64 formatida bo\'lishi kerak (data:image/png;base64,... yoki data:image/jpeg;base64,...)',
+      }),
+  }),
+
+  updateLogo: Joi.object({
+    logo: Joi.string()
+      .pattern(/^data:image\/(png|jpg|jpeg|gif|webp);base64,/)
+      .required()
+      .messages({
+        'any.required': 'Logo kiritilishi shart',
+        'string.pattern.base': 'Logo base64 formatida bo\'lishi kerak (data:image/png;base64,... yoki data:image/jpeg;base64,...)',
       }),
   }),
 };
@@ -1379,4 +1426,3 @@ module.exports = {
   partnershipRequestValidationSchemas,
   featuredContragentValidationSchemas,
 };
-

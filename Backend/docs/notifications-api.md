@@ -18,7 +18,7 @@ Foydalanuvchi o'z room'iga qo'shilish uchun.
 
 ```javascript
 socket.emit('join:room', {
-  userType: 'punkts', // 'punkts' | 'viloyat_agents' | 'tuman_agents' | 'mfy_agents' | 'marketplace_users'
+  userType: 'punkts', // 'punkts' | 'viloyat_agents' | 'tuman_agents' | 'mfy_agents' | 'marketplace_users' | 'vacancy_applicants'
   userId: '64abc123...' // Foydalanuvchi ID
 });
 ```
@@ -74,7 +74,7 @@ Content-Type: application/json
   "title": "Yangi aksiya!",
   "message": "Barcha mahsulotlarga 20% chegirma. Bu aksiya 1 hafta davom etadi.",
   "type": "promotion",
-  "targetType": "punkts",
+  "targetType": "vacancy_applicants",
   "targetIds": [],
   "viloyatId": null,
   "tumanId": null,
@@ -89,7 +89,7 @@ Content-Type: application/json
 | title | string | Yes | Xabar sarlavhasi (max 200 chars) |
 | message | string | Yes | Xabar matni (max 2000 chars) |
 | type | string | No | Xabar turi: `info`, `warning`, `success`, `error`, `announcement`, `promotion`, `update`. Default: `info` |
-| targetType | string | Yes | Qabul qiluvchilar turi: `all`, `punkts`, `viloyat_agents`, `tuman_agents`, `mfy_agents`, `marketplace_users` |
+| targetType | string | Yes | Qabul qiluvchilar turi: `all`, `punkts`, `viloyat_agents`, `tuman_agents`, `mfy_agents`, `marketplace_users`, `vacancy_applicants` |
 | targetIds | array | No | Aniq foydalanuvchilar ID lari (bo'sh bo'lsa, barcha targetType ga yuboriladi) |
 | viloyatId | ObjectId | No | Viloyat bo'yicha filter |
 | tumanId | ObjectId | No | Tuman bo'yicha filter |
@@ -105,7 +105,7 @@ Content-Type: application/json
     "title": "Yangi aksiya!",
     "message": "Barcha mahsulotlarga 20% chegirma...",
     "type": "promotion",
-    "targetType": "punkts",
+    "targetType": "vacancy_applicants",
     "targetIds": [],
     "sentBy": "64admin123...",
     "isActive": true,
@@ -293,7 +293,8 @@ Authorization: Bearer <admin_token>
       { "_id": "viloyat_agents", "count": 30, "activeCount": 25 },
       { "_id": "tuman_agents", "count": 35, "activeCount": 30 },
       { "_id": "mfy_agents", "count": 20, "activeCount": 15 },
-      { "_id": "marketplace_users", "count": 20, "activeCount": 10 }
+      { "_id": "marketplace_users", "count": 20, "activeCount": 10 },
+      { "_id": "vacancy_applicants", "count": 18, "activeCount": 12 }
     ]
   }
 }
@@ -313,7 +314,7 @@ Foydalanuvchi uchun xabarlarni olish.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| userType | string | `punkt`, `viloyat_agent`, `tuman_agent`, `mfy_agent`, `marketplace_user` |
+| userType | string | `punkt`, `viloyat_agent`, `tuman_agent`, `mfy_agent`, `marketplace_user`, `vacancy_applicant` |
 | userId | string | Foydalanuvchi ID |
 
 **Query Parameters:**
@@ -367,7 +368,7 @@ Xabarni o'qildi deb belgilash.
 }
 ```
 
-**recipientType values:** `Punkt`, `Agent`, `MarketplaceUser`, `Contragent`
+**recipientType values:** `Punkt`, `Agent`, `MarketplaceUser`, `Contragent`, `VacancyApplicant`
 
 **Response (200 OK):**
 ```json
@@ -390,6 +391,7 @@ Xabarni o'qildi deb belgilash.
 | `mfy_agents` | MFY agentlariga |
 | `marketplace_users` | Marketplace foydalanuvchilariga |
 | `contragents` | Kontragentlarga |
+| `vacancy_applicants` | Vakansiya nomzodlariga |
 
 ---
 

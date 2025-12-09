@@ -17,13 +17,14 @@ export default function VacanciesLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: 'Vakansiyalar',
           headerShown: false,
+          title: 'Vakansiyalar',
         }}
       />
       <Stack.Screen
         name="[id]"
         options={{
+          headerShown: true,
           title: 'Vakansiya',
         }}
       />

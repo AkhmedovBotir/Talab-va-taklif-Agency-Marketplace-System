@@ -415,3 +415,5 @@ curl -X PATCH "http://localhost:5000/api/vacancy-profile/me/location" \
 - Server xatosi
 - Ma'lumotlar bazasi xatosi
 
+
+

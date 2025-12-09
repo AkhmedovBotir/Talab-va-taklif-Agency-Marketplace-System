@@ -247,3 +247,5 @@ const VacancyApplications = () => {
 
 export default VacancyApplications;
 
+
+

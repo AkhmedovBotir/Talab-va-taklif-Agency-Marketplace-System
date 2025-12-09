@@ -174,3 +174,5 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
 
 export default FinalDecisionModal;
 
+
+

@@ -1,10 +1,12 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { unreadCount, refreshUnreadCount } = useNotifications();
 
   if (isLoading) {
     return (
@@ -22,7 +24,7 @@ export default function TabsLayout() {
     <Tabs
       initialRouteName="vacancies"
       screenOptions={{
-        headerShown: true,
+        headerShown: false,
         tabBarActiveTintColor: '#2563EB',
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: {
@@ -77,6 +79,26 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: '#EF4444',
+            color: '#FFFFFF',
+          },
+        }}
+      />
+      {/* <Tabs.Screen
+        name="notifications"
+        options={{
+          headerShown: false,
+          tabBarButton: () => null,
+          tabBarStyle: { display: 'none' },
+        }}
+      /> */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          headerShown: false,
+          href: null,
         }}
       />
     </Tabs>

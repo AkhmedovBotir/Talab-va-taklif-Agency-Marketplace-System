@@ -110,27 +110,18 @@ const ContragentTable = ({ contragents, loading, onEdit, onDelete, onView, pagin
                   <div className="text-sm text-gray-900">{contragent.phone || '-'}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
+                  <div className="text-sm text-gray-900 font-[500]">
                     {contragent.viloyat?.name || '-'}
-                    {contragent.viloyat?.code && (
-                      <span className="text-gray-500"> ({contragent.viloyat.code})</span>
-                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
+                  <div className="text-sm text-gray-900 font-[500]">
                     {contragent.tuman?.name || '-'}
-                    {contragent.tuman?.code && (
-                      <span className="text-gray-500"> ({contragent.tuman.code})</span>
-                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
+                  <div className="text-sm text-gray-900 font-[500]">
                     {contragent.mfy?.name || '-'}
-                    {contragent.mfy?.code && (
-                      <span className="text-gray-500"> ({contragent.mfy.code})</span>
-                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
