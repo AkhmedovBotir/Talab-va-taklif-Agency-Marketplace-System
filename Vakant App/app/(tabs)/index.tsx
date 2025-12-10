@@ -11,7 +11,7 @@ import {
   Modal,
   Platform,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
@@ -279,34 +279,52 @@ export default function ProfileScreen() {
 
   async function handleUpdateAvatar() {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (permissionResult.granted === false) {
-        Alert.alert('Ruxsat kerak', 'Rasm tanlash uchun ruxsat berishingiz kerak');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
+      const options = {
+        mediaType: 'photo' as MediaType,
+        includeBase64: true,
+        maxHeight: 2000,
+        maxWidth: 2000,
         quality: 0.8,
-        base64: true,
-      });
+      };
 
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        const base64Image = `data:image/${asset.uri.split('.').pop()};base64,${asset.base64}`;
-        
-        try {
-          const updated = await profileApi.updateAvatar({ avatar: base64Image });
-          setProfile(updated);
-          updateUser(updated as any);
-          Alert.alert('Muvaffaqiyat', 'Avatar yangilandi');
-        } catch (error: any) {
-          Alert.alert('Xatolik', error.message || 'Avatarni yangilashda xatolik');
+      launchImageLibrary(options, async (response: ImagePickerResponse) => {
+        if (response.didCancel) {
+          return;
         }
-      }
+
+        if (response.errorMessage) {
+          Alert.alert('Xatolik', response.errorMessage || 'Rasm tanlashda xatolik');
+          return;
+        }
+
+        if (response.assets && response.assets[0]) {
+          const asset = response.assets[0];
+          
+          if (!asset.uri) {
+            Alert.alert('Xatolik', 'Rasm tanlanmadi');
+            return;
+          }
+
+          let base64Image: string;
+          
+          if (asset.base64) {
+            const imageType = asset.type || `image/${asset.uri.split('.').pop()?.toLowerCase() || 'jpeg'}`;
+            base64Image = `data:${imageType};base64,${asset.base64}`;
+          } else {
+            // Fallback: use URI if base64 is not available
+            base64Image = asset.uri;
+          }
+          
+          try {
+            const updated = await profileApi.updateAvatar({ avatar: base64Image });
+            setProfile(updated);
+            updateUser(updated as any);
+            Alert.alert('Muvaffaqiyat', 'Avatar yangilandi');
+          } catch (error: any) {
+            Alert.alert('Xatolik', error.message || 'Avatarni yangilashda xatolik');
+          }
+        }
+      });
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Rasm tanlashda xatolik');
     }

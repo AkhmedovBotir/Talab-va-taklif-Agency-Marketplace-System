@@ -1,10 +1,17 @@
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 const Contragent = require('../models/Contragent');
+const Admin = require('../models/Admin');
+const Agent = require('../models/Agent');
+const Punkt = require('../models/Punkt');
 const Region = require('../models/Region');
 const SmsVerification = require('../models/SmsVerification');
 const VacancyApplicantCode = require('../models/VacancyApplicantCode');
 const MarketplaceUser = require('../models/MarketplaceUser');
+const Vacancy = require('../models/Vacancy');
+const VacancyApplicant = require('../models/VacancyApplicant');
+const VacancyApplication = require('../models/VacancyApplication');
+const PartnershipRequest = require('../models/PartnershipRequest');
 const Order = require('../models/Order');
 const mongoose = require('mongoose');
 
@@ -2287,6 +2294,144 @@ const getSalesStatsSummary = async (req, res) => {
   }
 };
 
+// Admin dashboard overview (cards + latest items)
+const getAdminDashboardOverview = async (req, res) => {
+  try {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      ordersTotalAgg,
+      ordersTodayAgg,
+      ordersMonthAgg,
+      totalMarketplaceUsers,
+      totalContragents,
+      totalPunkts,
+      totalAgents,
+      totalProducts,
+      totalCategories,
+      totalVacancies,
+      totalVacancyApplicants,
+      totalVacancyApplications,
+      totalAdmins,
+      openPartnershipRequests,
+      latestOrders,
+      latestVacancies,
+      latestApplications,
+    ] = await Promise.all([
+      Order.aggregate([
+        { $match: { status: 'confirmed_by_customer' } },
+        {
+          $group: {
+            _id: null,
+            totalOrders: { $sum: 1 },
+            totalRevenue: { $sum: '$totalPrice' },
+            totalItems: { $sum: '$itemCount' },
+            avgOrderValue: { $avg: '$totalPrice' },
+          },
+        },
+      ]),
+      Order.aggregate([
+        { $match: { status: 'confirmed_by_customer', createdAt: { $gte: todayStart } } },
+        {
+          $group: {
+            _id: null,
+            totalOrders: { $sum: 1 },
+            totalRevenue: { $sum: '$totalPrice' },
+          },
+        },
+      ]),
+      Order.aggregate([
+        { $match: { status: 'confirmed_by_customer', createdAt: { $gte: monthStart } } },
+        {
+          $group: {
+            _id: null,
+            totalOrders: { $sum: 1 },
+            totalRevenue: { $sum: '$totalPrice' },
+          },
+        },
+      ]),
+      MarketplaceUser.countDocuments(),
+      Contragent.countDocuments(),
+      Punkt.countDocuments(),
+      Agent.countDocuments(),
+      Product.countDocuments(),
+      Category.countDocuments(),
+      Vacancy.countDocuments(),
+      VacancyApplicant.countDocuments(),
+      VacancyApplication.countDocuments(),
+      Admin.countDocuments(),
+      PartnershipRequest.countDocuments({ contactStatus: { $ne: 'done' } }),
+      Order.find({})
+        .select('orderNumber totalPrice status createdAt')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      Vacancy.find({})
+        .select('name target type createdAt')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      VacancyApplication.find({})
+        .select('vacancy applicant status createdAt')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate('vacancy', 'name target type')
+        .populate('applicant', 'firstName lastName phone')
+        .lean(),
+    ]);
+
+    const total = ordersTotalAgg[0] || { totalOrders: 0, totalRevenue: 0, totalItems: 0, avgOrderValue: 0 };
+    const today = ordersTodayAgg[0] || { totalOrders: 0, totalRevenue: 0 };
+    const month = ordersMonthAgg[0] || { totalOrders: 0, totalRevenue: 0 };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        cards: {
+          orders: total.totalOrders,
+          revenue: Math.round(total.totalRevenue || 0),
+          products: totalProducts,
+          categories: totalCategories,
+          marketplaceUsers: totalMarketplaceUsers,
+          contragents: totalContragents,
+          punkts: totalPunkts,
+          agents: totalAgents,
+          admins: totalAdmins,
+          vacancies: totalVacancies,
+          vacancyApplicants: totalVacancyApplicants,
+          vacancyApplications: totalVacancyApplications,
+          openPartnershipRequests,
+          avgOrderValue: Math.round(total.avgOrderValue || 0),
+        },
+        period: {
+          today: {
+            orders: today.totalOrders || 0,
+            revenue: Math.round(today.totalRevenue || 0),
+          },
+          month: {
+            orders: month.totalOrders || 0,
+            revenue: Math.round(month.totalRevenue || 0),
+          },
+        },
+        latest: {
+          orders: latestOrders,
+          vacancies: latestVacancies,
+          vacancyApplications: latestApplications,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard overview:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Dashboard ma\'lumotlarini olishda xatolik',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllCategoriesForAdmin,
   getAllSubcategoriesForAdmin,
@@ -2313,5 +2458,6 @@ module.exports = {
   getSalesStatsByTumanId,
   getSalesStatsByMfyId,
   getSalesStatsSummary,
+  getAdminDashboardOverview,
 };
 

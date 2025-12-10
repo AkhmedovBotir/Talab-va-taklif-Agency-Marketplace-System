@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -250,24 +250,35 @@ export default function ProfileScreen() {
 
   const handlePickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Ruxsat kerak', 'Rasmlarni tanlash uchun ruxsat kerak');
+      const result: ImagePickerResponse = await new Promise((resolve) => {
+        launchImageLibrary(
+          {
+            mediaType: 'photo' as MediaType,
+            quality: 0.8,
+            includeBase64: true,
+            maxWidth: 1024,
+            maxHeight: 1024,
+          },
+          resolve
+        );
+      });
+
+      if (result.didCancel) {
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-        base64: true,
-      });
+      if (result.errorMessage) {
+        Alert.alert('Xatolik', result.errorMessage || 'Rasm tanlashda xatolik yuz berdi');
+        return;
+      }
 
-      if (!result.canceled && result.assets[0]) {
+      if (result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        const base64Image = `data:image/${asset.uri.split('.').pop()};base64,${asset.base64}`;
-        await handleUploadAvatar(base64Image);
+        if (asset.uri && asset.base64) {
+          const imageExtension = asset.type?.split('/')[1] || 'jpeg';
+          const base64Image = `data:image/${imageExtension};base64,${asset.base64}`;
+          await handleUploadAvatar(base64Image);
+        }
       }
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Rasm tanlashda xatolik yuz berdi');
@@ -371,7 +382,7 @@ export default function ProfileScreen() {
       >
         {/* Avatar Section */}
         <ImageBackground
-          source={require('../../assets/bg.png')}
+          source={require('../../assets/images/bg.webp')}
           style={styles.avatarSection}
           imageStyle={styles.avatarSectionBackground}
           resizeMode="cover"

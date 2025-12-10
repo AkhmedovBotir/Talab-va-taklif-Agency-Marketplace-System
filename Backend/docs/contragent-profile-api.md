@@ -112,3 +112,5 @@ Content-Type: application/json
 - Ushbu endpointlar kontragent tokeni bilan ishlaydi (`contragentAuth`).
 - Logo hajmi 5MB dan kichik saqlanishi tavsiya etiladi.
 
+
+

@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://192.168.1.6:5000/api/marketplace';
-const REGIONS_BASE_URL = 'http://192.168.1.6:5000/api';
-const REVIEWS_BASE_URL = 'http://192.168.1.6:5000/api/reviews';
+const BASE_URL = 'https://api.ttsa.uz/api/marketplace';
+const REGIONS_BASE_URL = 'https://api.ttsa.uz/api';
+const REVIEWS_BASE_URL = 'https://api.ttsa.uz/api/reviews';
 // Auth storage keys MUST match those used in AuthContext
 const TOKEN_KEY = '@marketplace:token';
 const USER_KEY = '@marketplace:user';

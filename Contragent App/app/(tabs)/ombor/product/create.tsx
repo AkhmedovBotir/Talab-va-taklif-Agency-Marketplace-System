@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     Image,
+    PermissionsAndroid,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -16,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QuillEditor, { QuillEditorRef } from '../../../../components/QuillEditor';
 import { apiService, Category, DeliveryRegion, DeltaFormat } from '../../../../services/api';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 export default function ProductCreateScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -79,28 +81,46 @@ export default function ProductCreateScreen() {
     loadCategories();
   }, [loadCategories]);
 
+  const requestGalleryPermission = async () => {
+    if (Platform.OS !== 'android') return true;
+
+    const permission =
+      Platform.Version >= 33
+        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+
+    const status = await PermissionsAndroid.request(permission, {
+      title: 'Ruxsat kerak',
+      message: 'Rasmlarni tanlash uchun ruxsat kerak',
+      buttonPositive: 'OK',
+    });
+
+    return status === PermissionsAndroid.RESULTS.GRANTED;
+  };
+
   const pickImage = async () => {
     if (images.length >= 5) {
       Alert.alert('Xatolik', 'Maksimal 5 ta rasm qo\'shish mumkin');
       return;
     }
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
+    const hasPermission = await requestGalleryPermission();
+    if (!hasPermission) {
       Alert.alert('Ruxsat kerak', 'Rasmlarni tanlash uchun ruxsat kerak');
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-      base64: true,
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      includeBase64: true,
+      selectionLimit: 1,
+      quality: 0.6,
     });
 
-    if (!result.canceled && result.assets[0]) {
-      const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+    if (!result.didCancel && result.assets?.[0]?.base64) {
+      const asset = result.assets[0];
+      const mimeType = asset.type || 'image/jpeg';
+      const base64 = `data:${mimeType};base64,${asset.base64}`;
       setImages([...images, base64]);
     }
   };

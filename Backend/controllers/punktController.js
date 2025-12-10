@@ -225,6 +225,54 @@ const updatePunkt = async (req, res) => {
       }
     }
 
+    // If password is being updated, we need to hash it first
+    // We'll use save() method instead of findByIdAndUpdate to trigger pre('save') hook
+    if (updateData.password) {
+      const punkt = await Punkt.findById(id);
+      
+      if (!punkt) {
+        return res.status(404).json({
+          success: false,
+          message: 'Punkt topilmadi',
+        });
+      }
+
+      // Update fields
+      Object.keys(updateData).forEach((key) => {
+        if (key !== 'password') {
+          punkt[key] = updateData[key];
+        }
+      });
+
+      // Set password (will be hashed by pre('save') hook)
+      punkt.password = updateData.password;
+      
+      // Save to trigger pre('save') hook for password hashing
+      await punkt.save();
+
+      // Populate viloyat and tuman
+      await punkt.populate([
+        { path: 'viloyat', select: 'name type code' },
+        { path: 'tuman', select: 'name type code' },
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Punkt muvaffaqiyatli yangilandi',
+        data: {
+          _id: punkt._id,
+          name: punkt.name,
+          phone: punkt.phone,
+          viloyat: punkt.viloyat,
+          tuman: punkt.tuman,
+          status: punkt.status,
+          createdAt: punkt.createdAt,
+          updatedAt: punkt.updatedAt,
+        },
+      });
+    }
+
+    // If password is not being updated, use findByIdAndUpdate
     const punkt = await Punkt.findByIdAndUpdate(
       id,
       updateData,

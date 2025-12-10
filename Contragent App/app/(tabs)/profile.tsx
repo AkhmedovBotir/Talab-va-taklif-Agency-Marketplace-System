@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  PermissionsAndroid,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,8 +14,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiService } from '../../services/api';
+
+const isValidImage = (value?: string) =>
+  !!value && /^data:image\/(jpeg|png|jpg);base64,/.test(value);
 
 export default function ProfileScreen() {
   const { contragent, logout, refreshContragent } = useAuth();
@@ -40,8 +45,10 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    if (contragent) {
+    if (contragent && isValidImage(contragent.logo)) {
       setLogoPreview(contragent.logo);
+    } else {
+      setLogoPreview(undefined);
     }
   }, [contragent]);
 
@@ -56,45 +63,53 @@ export default function ProfileScreen() {
     }
   };
 
-  const uploadLogo = async (source: 'camera' | 'library') => {
+  const requestGalleryPermission = async () => {
+    if (Platform.OS !== 'android') return true;
+
+    const permission =
+      Platform.Version >= 33
+        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+
+    const status = await PermissionsAndroid.request(permission, {
+      title: 'Ruxsat kerak',
+      message: 'Galereyadan rasm yuklash uchun ruxsat bering',
+      buttonPositive: 'OK',
+    });
+
+    return status === PermissionsAndroid.RESULTS.GRANTED;
+  };
+
+  const uploadLogo = async () => {
     try {
       setUploadingLogo(true);
 
-      if (source === 'camera') {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Ruxsat kerak', 'Kamera uchun ruxsat bering');
-          return;
-        }
-      } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Ruxsat kerak', 'Galereyaga ruxsat bering');
-          return;
-        }
+      const hasPermission = await requestGalleryPermission();
+      if (!hasPermission) {
+        Alert.alert('Ruxsat kerak', 'Galereyaga ruxsat bering');
+        return;
       }
 
-      const picker =
-        source === 'camera'
-          ? ImagePicker.launchCameraAsync
-          : ImagePicker.launchImageLibraryAsync;
-
-      const result = await picker({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-        base64: true,
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        includeBase64: true,
+        selectionLimit: 1,
+        quality: 0.6,
       });
 
-      if (!result.canceled && result.assets?.[0]?.base64) {
-        const mimeType = result.assets[0].mimeType || 'image/jpeg';
-        const base64 = `data:${mimeType};base64,${result.assets[0].base64}`;
-        setLogoPreview(base64);
+      if (!result.didCancel && result.assets?.[0]?.base64) {
+        const asset = result.assets[0];
+        const mimeType = asset.type || 'image/jpeg';
+        const base64 = `data:${mimeType};base64,${asset.base64}`;
 
-        await apiService.updateLogo({ logo: base64 });
-        await refreshContragent();
-        Alert.alert('Muvaffaqiyatli', 'Logo yangilandi');
+        if (isValidImage(base64)) {
+          setLogoPreview(base64);
+          await apiService.updateLogo({ logo: base64 });
+          await refreshContragent();
+          Alert.alert('Muvaffaqiyatli', 'Logo yangilandi');
+        } else {
+          Alert.alert('Xatolik', 'Rasm formati noto‘g‘ri');
+        }
       }
     } catch (error: any) {
       const message = error?.message || 'Logo yangilashda xatolik yuz berdi';
@@ -105,16 +120,7 @@ export default function ProfileScreen() {
   };
 
   const handleChangeLogo = () => {
-    Alert.alert(
-      'Logoni almashtirish',
-      'Logoni qayerdan yuklaysiz?',
-      [
-        { text: 'Kamera', onPress: () => uploadLogo('camera') },
-        { text: 'Galereya', onPress: () => uploadLogo('library') },
-        { text: 'Bekor qilish', style: 'cancel' },
-      ],
-      { cancelable: true }
-    );
+    uploadLogo();
   };
 
   const handleLogout = () => {
@@ -139,7 +145,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -149,7 +155,7 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.avatarWrapper}>
             <View style={styles.avatarContainer}>
-              {logoPreview ? (
+              {isValidImage(logoPreview) ? (
                 <Image
                   source={{ uri: logoPreview }}
                   style={styles.logoImage}
@@ -213,11 +219,10 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-
         <View style={styles.actionsCard}>
           <Text style={styles.sectionTitle}>Amallar</Text>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => router.push('/(tabs)/habarlar')}
           >
@@ -450,3 +455,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

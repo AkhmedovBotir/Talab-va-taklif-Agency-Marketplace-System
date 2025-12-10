@@ -33,6 +33,7 @@ const {
   getSalesStatsByTumanId,
   getSalesStatsByMfyId,
   getSalesStatsSummary,
+  getAdminDashboardOverview,
 } = require('../controllers/adminDataController');
 const {
   createKpiDistribution,
@@ -98,6 +99,9 @@ router.post('/', validate(adminValidationSchemas.create), createAdmin);
 router.get('/', getAllAdmins);
 
 // Admin data endpoints (require authentication) - MUST be before /:id route
+// Dashboard overview
+router.get('/dashboard/overview', adminAuth, getAdminDashboardOverview);
+
 // Get all categories (for admin)
 router.get('/data/categories', adminAuth, getAllCategoriesForAdmin);
 

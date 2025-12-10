@@ -8,7 +8,7 @@ import {
   NativeSyntheticEvent,
   TouchableOpacity,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface ImageCarouselProps {
@@ -87,7 +87,7 @@ export default function ImageCarousel({
         <Image
           source={{ uri: images[0] }}
           style={styles.singleImage}
-          contentFit="cover"
+          resizeMode="cover"
         />
       </TouchableOpacity>
     );
@@ -122,7 +122,7 @@ export default function ImageCarousel({
             <Image
               source={{ uri: image }}
               style={styles.image}
-              contentFit="cover"
+              resizeMode="cover"
             />
           </TouchableOpacity>
         ))}
