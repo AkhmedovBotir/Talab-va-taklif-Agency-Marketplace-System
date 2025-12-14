@@ -22,6 +22,9 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const vacancyAuthRoutes = require('./routes/vacancyAuthRoutes');
 const vacancyApplicationRoutes = require('./routes/vacancyApplicationRoutes');
 const vacancyProfileRoutes = require('./routes/vacancyProfileRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const agentFinanceRoutes = require('./routes/agentFinanceRoutes');
+const adminFinanceRoutes = require('./routes/adminFinanceRoutes');
 
 // Initialize Express app
 const app = express();
@@ -55,6 +58,9 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/vacancy-auth', vacancyAuthRoutes);
 app.use('/api/vacancy', vacancyApplicationRoutes);
 app.use('/api/vacancy-profile', vacancyProfileRoutes);
+app.use('/api/payment', paymentRoutes);
+app.use('/api/agent-finance', agentFinanceRoutes);
+app.use('/api/admin-finance', adminFinanceRoutes);
 // Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({

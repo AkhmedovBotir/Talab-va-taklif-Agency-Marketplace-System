@@ -34,6 +34,8 @@ const {
   getSalesStatsByMfyId,
   getSalesStatsSummary,
   getAdminDashboardOverview,
+  getAgentsInRegion,
+  getPunktsInRegion,
 } = require('../controllers/adminDataController');
 const {
   createKpiDistribution,
@@ -152,6 +154,12 @@ router.get('/data/orders/cancelled', adminAuth, getCancelledOrdersForAdmin);
 
 // Get order by ID (for admin) - MUST be last to avoid conflicts with specific routes
 router.get('/data/orders/:id', adminAuth, getOrderByIdForAdmin);
+
+// Get agents in region (o'z hududidagi agentlar)
+router.get('/data/agents', adminAuth, getAgentsInRegion);
+
+// Get punkts in region (o'z hududidagi punktlar)
+router.get('/data/punkts', adminAuth, getPunktsInRegion);
 
 // Sales Statistics endpoints
 router.get('/stats/sales/summary', adminAuth, getSalesStatsSummary);

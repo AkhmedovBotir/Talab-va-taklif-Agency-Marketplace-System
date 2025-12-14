@@ -1,4 +1,5 @@
 const Punkt = require('../models/Punkt');
+const Contragent = require('../models/Contragent');
 const jwt = require('jsonwebtoken');
 
 // Create new punkt
@@ -499,6 +500,62 @@ const getPunktsForSelection = async (req, res) => {
   }
 };
 
+// Get contragents in punkt's region (o'z hududidagi contragentlar)
+const getContragentsInRegion = async (req, res) => {
+  try {
+    const { punkt } = req.user;
+    const { status, page = 1, limit = 50 } = req.query;
+
+    const filter = {
+      viloyat: punkt.viloyat._id || punkt.viloyat,
+    };
+
+    // Filter by tuman if punkt has tuman
+    if (punkt.tuman) {
+      filter.tuman = punkt.tuman._id || punkt.tuman;
+    }
+
+    // Filter by status
+    if (status) {
+      filter.status = status;
+    } else {
+      filter.status = 'active';
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Contragent.countDocuments(filter);
+
+    const contragents = await Contragent.find(filter)
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code')
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    res.status(200).json({
+      success: true,
+      count: contragents.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      data: contragents,
+    });
+  } catch (error) {
+    console.error('Error fetching contragents in region:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Contragentlarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createPunkt,
   getAllPunkts,
@@ -507,6 +564,7 @@ module.exports = {
   deletePunkt,
   loginPunkt,
   getPunktsForSelection,
+  getContragentsInRegion,
 };
 
 

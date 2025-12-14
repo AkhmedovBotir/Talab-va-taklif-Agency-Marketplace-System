@@ -199,6 +199,9 @@ export default function OrdersHistoryScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Buyurtmalar tarixi</Text>
+      </View>
       {/* Filter Section */}
       <View style={styles.filterContainer}>
         <View style={styles.filterRow}>
@@ -318,9 +321,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  header: {
+    backgroundColor: '#fff',
+    padding: 16,
+    paddingTop: 30,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  headerTitle: {
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   filterContainer: {
     backgroundColor: '#fff',
     padding: 16,
+    paddingTop: 30,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },

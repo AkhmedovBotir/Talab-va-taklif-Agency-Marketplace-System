@@ -2432,6 +2432,129 @@ const getAdminDashboardOverview = async (req, res) => {
   }
 };
 
+// Get agents in admin's region (o'z hududidagi agentlar)
+const getAgentsInRegion = async (req, res) => {
+  try {
+    const { viloyat, tuman, agentType, status, page = 1, limit = 50 } = req.query;
+
+    const filter = {};
+
+    // Filter by viloyat
+    if (viloyat) {
+      filter.viloyat = viloyat;
+    }
+
+    // Filter by tuman
+    if (tuman) {
+      filter.tuman = tuman;
+    }
+
+    // Filter by agent type
+    if (agentType) {
+      if (agentType === 'mfy') {
+        filter.mfy = { $exists: true, $ne: null };
+      } else if (agentType === 'tuman') {
+        filter.tuman = { $exists: true, $ne: null };
+        filter.mfy = null;
+      } else if (agentType === 'viloyat') {
+        filter.viloyat = { $exists: true, $ne: null };
+        filter.tuman = null;
+        filter.mfy = null;
+      }
+    }
+
+    // Filter by status
+    if (status) {
+      filter.status = status;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Agent.countDocuments(filter);
+
+    const agents = await Agent.find(filter)
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    res.status(200).json({
+      success: true,
+      count: agents.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      data: agents,
+    });
+  } catch (error) {
+    console.error('Error fetching agents in region:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Agentlarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get punkts in admin's region (o'z hududidagi punktlar)
+const getPunktsInRegion = async (req, res) => {
+  try {
+    const { viloyat, tuman, status, page = 1, limit = 50 } = req.query;
+
+    const filter = {};
+
+    // Filter by viloyat
+    if (viloyat) {
+      filter.viloyat = viloyat;
+    }
+
+    // Filter by tuman
+    if (tuman) {
+      filter.tuman = tuman;
+    }
+
+    // Filter by status
+    if (status) {
+      filter.status = status;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Punkt.countDocuments(filter);
+
+    const punkts = await Punkt.find(filter)
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    res.status(200).json({
+      success: true,
+      count: punkts.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      data: punkts,
+    });
+  } catch (error) {
+    console.error('Error fetching punkts in region:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Punktlarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllCategoriesForAdmin,
   getAllSubcategoriesForAdmin,
@@ -2447,6 +2570,8 @@ module.exports = {
   getMarketplaceOrdersForAdmin,
   getOrdersDeliveredToPunktForAdmin,
   getOrdersAssignedToAgentsForAdmin,
+  getAgentsInRegion,
+  getPunktsInRegion,
   getOrdersConfirmedByAgentsForAdmin,
   getOrdersConfirmedByCustomersForAdmin,
   getCancelledOrdersForAdmin,
@@ -2459,5 +2584,7 @@ module.exports = {
   getSalesStatsByMfyId,
   getSalesStatsSummary,
   getAdminDashboardOverview,
+  getAgentsInRegion,
+  getPunktsInRegion,
 };
 

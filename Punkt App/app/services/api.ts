@@ -1,4 +1,4 @@
-const BASE_URL = 'https://api.ttsa.uz/api';
+const BASE_URL = 'http://192.168.1.6:5000/api';
 
 export interface LoginRequest {
   phone: string;
@@ -85,6 +85,11 @@ export interface Order {
   phoneNumber: string;
   punktRequests: PunktRequest[];
   punktToPunktRequests?: PunktToPunktRequest[];
+  contragentRequests?: Array<{
+    contragentId: Contragent | string;
+    status: 'pending' | 'accepted' | 'rejected' | 'delivered_to_punkt';
+    requestedAt: string;
+  }>;
   confirmedByPunkt: Punkt | null;
   punktStatus: 'pending' | 'confirmed' | 'rejected' | 'requested';
   assignedToAgent: Agent | null;

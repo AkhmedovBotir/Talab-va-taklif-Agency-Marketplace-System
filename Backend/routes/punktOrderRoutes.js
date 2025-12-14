@@ -18,7 +18,6 @@ const {
   getOrderContragentIds,
   getTodayOrders,
   getOrderHistory,
-  autoRouteOrderEndpoint,
 } = require('../controllers/punktOrderController');
 const {
   getMyKpiSummary,
@@ -47,9 +46,6 @@ router.get('/orders/:id/contragents', getOrderContragentIds);
 
 // Confirm order (buyurtmani tasdiqlash)
 router.post('/orders/:id/confirm', confirmOrder);
-
-// Auto-route order (buyurtmani avtomatik routing qilish)
-router.post('/orders/:id/auto-route', autoRouteOrderEndpoint);
 
 // Assign order to agent (buyurtmani agentga yuborish)
 router.post('/orders/:id/assign-to-agent', assignOrderToAgent);

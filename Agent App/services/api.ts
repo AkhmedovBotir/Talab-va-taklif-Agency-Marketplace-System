@@ -17,6 +17,26 @@ import type {
   MarkDeliveredResponse,
   OrderResponse,
   OrdersResponse,
+  // Agent Finance Types
+  MFYDailyReportResponse,
+  MFYPendingPaymentsResponse,
+  MFYCollectPaymentResponse,
+  MFYSubmitToDistrictRequest,
+  MFYSubmitToDistrictResponse,
+  MFYStatisticsResponse,
+  DistrictReportResponse,
+  DistrictSubmissionsResponse,
+  DistrictConfirmSubmissionResponse,
+  DistrictSubmitToProvinceRequest,
+  DistrictSubmitToProvinceResponse,
+  DistrictStatisticsResponse,
+  ProvinceReportResponse,
+  ProvinceSubmissionsResponse,
+  ProvinceConfirmSubmissionResponse,
+  ProvinceSubmitToFinanceRequest,
+  ProvinceSubmitToFinanceResponse,
+  ProvinceStatisticsResponse,
+  GetFinanceStatisticsParams,
 } from '../types/api';
 
 const TOKEN_KEY = '@agent_token';
@@ -198,6 +218,148 @@ class ApiService {
   // Mark All Notifications as Read
   async markAllNotificationsRead(): Promise<any> {
     const response = await this.api.post(API_ENDPOINTS.AGENT_NOTIFICATIONS_READ_ALL);
+    return response.data;
+  }
+
+  // ========== Agent Finance - MFY Agent ==========
+  
+  // Get MFY Daily Report
+  async getMFYDailyReport(date?: string): Promise<MFYDailyReportResponse> {
+    const params = date ? { date } : {};
+    const response = await this.api.get<MFYDailyReportResponse>(
+      API_ENDPOINTS.MFY_DAILY_REPORT,
+      { params }
+    );
+    return response.data;
+  }
+
+  // Get MFY Pending Payments
+  async getMFYPendingPayments(): Promise<MFYPendingPaymentsResponse> {
+    const response = await this.api.get<MFYPendingPaymentsResponse>(
+      API_ENDPOINTS.MFY_PENDING_PAYMENTS
+    );
+    return response.data;
+  }
+
+  // Collect Payment (MFY)
+  async collectPayment(transactionId: string): Promise<MFYCollectPaymentResponse> {
+    const response = await this.api.post<MFYCollectPaymentResponse>(
+      API_ENDPOINTS.MFY_COLLECT_PAYMENT(transactionId)
+    );
+    return response.data;
+  }
+
+  // Submit to District (MFY)
+  async submitToDistrict(data: MFYSubmitToDistrictRequest): Promise<MFYSubmitToDistrictResponse> {
+    const response = await this.api.post<MFYSubmitToDistrictResponse>(
+      API_ENDPOINTS.MFY_SUBMIT_TO_DISTRICT,
+      data
+    );
+    return response.data;
+  }
+
+  // Get MFY Statistics
+  async getMFYStatistics(params?: GetFinanceStatisticsParams): Promise<MFYStatisticsResponse> {
+    const response = await this.api.get<MFYStatisticsResponse>(
+      API_ENDPOINTS.MFY_STATISTICS,
+      { params }
+    );
+    return response.data;
+  }
+
+  // ========== Agent Finance - Tuman Agent ==========
+
+  // Get District Report
+  async getDistrictReport(date?: string): Promise<DistrictReportResponse> {
+    const params = date ? { date } : {};
+    const response = await this.api.get<DistrictReportResponse>(
+      API_ENDPOINTS.DISTRICT_REPORT,
+      { params }
+    );
+    return response.data;
+  }
+
+  // Get District Submissions
+  async getDistrictSubmissions(status?: 'pending' | 'confirmed' | 'rejected'): Promise<DistrictSubmissionsResponse> {
+    const params = status ? { status } : {};
+    const response = await this.api.get<DistrictSubmissionsResponse>(
+      API_ENDPOINTS.DISTRICT_SUBMISSIONS,
+      { params }
+    );
+    return response.data;
+  }
+
+  // Confirm Submission (District)
+  async confirmDistrictSubmission(submissionId: string): Promise<DistrictConfirmSubmissionResponse> {
+    const response = await this.api.post<DistrictConfirmSubmissionResponse>(
+      API_ENDPOINTS.DISTRICT_CONFIRM_SUBMISSION(submissionId)
+    );
+    return response.data;
+  }
+
+  // Submit to Province (District)
+  async submitToProvince(data: DistrictSubmitToProvinceRequest): Promise<DistrictSubmitToProvinceResponse> {
+    const response = await this.api.post<DistrictSubmitToProvinceResponse>(
+      API_ENDPOINTS.DISTRICT_SUBMIT_TO_PROVINCE,
+      data
+    );
+    return response.data;
+  }
+
+  // Get District Statistics
+  async getDistrictStatistics(params?: GetFinanceStatisticsParams): Promise<DistrictStatisticsResponse> {
+    const response = await this.api.get<DistrictStatisticsResponse>(
+      API_ENDPOINTS.DISTRICT_STATISTICS,
+      { params }
+    );
+    return response.data;
+  }
+
+  // ========== Agent Finance - Viloyat Agent ==========
+
+  // Get Province Report
+  async getProvinceReport(date?: string): Promise<ProvinceReportResponse> {
+    const params = date ? { date } : {};
+    const response = await this.api.get<ProvinceReportResponse>(
+      API_ENDPOINTS.PROVINCE_REPORT,
+      { params }
+    );
+    return response.data;
+  }
+
+  // Get Province Submissions
+  async getProvinceSubmissions(status?: 'pending' | 'confirmed' | 'rejected'): Promise<ProvinceSubmissionsResponse> {
+    const params = status ? { status } : {};
+    const response = await this.api.get<ProvinceSubmissionsResponse>(
+      API_ENDPOINTS.PROVINCE_SUBMISSIONS,
+      { params }
+    );
+    return response.data;
+  }
+
+  // Confirm Submission (Province)
+  async confirmProvinceSubmission(submissionId: string): Promise<ProvinceConfirmSubmissionResponse> {
+    const response = await this.api.post<ProvinceConfirmSubmissionResponse>(
+      API_ENDPOINTS.PROVINCE_CONFIRM_SUBMISSION(submissionId)
+    );
+    return response.data;
+  }
+
+  // Submit to Finance (Province)
+  async submitToFinance(data: ProvinceSubmitToFinanceRequest): Promise<ProvinceSubmitToFinanceResponse> {
+    const response = await this.api.post<ProvinceSubmitToFinanceResponse>(
+      API_ENDPOINTS.PROVINCE_SUBMIT_TO_FINANCE,
+      data
+    );
+    return response.data;
+  }
+
+  // Get Province Statistics
+  async getProvinceStatistics(params?: GetFinanceStatisticsParams): Promise<ProvinceStatisticsResponse> {
+    const response = await this.api.get<ProvinceStatisticsResponse>(
+      API_ENDPOINTS.PROVINCE_STATISTICS,
+      { params }
+    );
     return response.data;
   }
 }

@@ -12,10 +12,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  SafeAreaView,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiService } from '../../services/api';
-import type { GetOrdersParams, KPIDailyBalance, Order } from '../../types/api';
+import type { GetOrdersParams, KPIDailyBalance, Order, OrderStatus, PaymentStatus, PaymentMethod } from '../../types/api';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -39,13 +40,15 @@ export default function OrdersScreen() {
         ...filters,
         ...params,
         search: searchQuery || undefined,
+        page: params?.page || filters.page || 1,
+        limit: params?.limit || filters.limit || 20,
       };
       
-      const response = await apiService.getTodayOrders(queryParams);
+      const response = await apiService.getOrders(queryParams);
       if (response.success) {
-        setOrders(response.data);
-        setTotalPages(response.totalPages);
-        setCurrentPage(response.page);
+        setOrders(response.data || []);
+        setTotalPages(response.totalPages || 1);
+        setCurrentPage(response.page || 1);
       }
     } catch (error: any) {
       Alert.alert('Xatolik', error.response?.data?.message || 'Buyurtmalarni yuklashda xatolik');
@@ -92,6 +95,34 @@ export default function OrdersScreen() {
 
   const handleOrderPress = (orderId: string) => {
     router.push(`/order/${orderId}`);
+  };
+
+  const handleConfirmOrder = async (orderId: string) => {
+    if (role !== 'mfy') {
+      return;
+    }
+
+    Alert.alert(
+      'Buyurtmani tasdiqlash',
+      'Haqiqatan ham bu buyurtmani foydalanuvchiga yetkazganingizni tasdiqlaysizmi?',
+      [
+        { text: 'Bekor qilish', style: 'cancel' },
+        {
+          text: 'Tasdiqlash',
+          onPress: async () => {
+            try {
+              const response = await apiService.confirmOrder(orderId);
+              if (response.success) {
+                Alert.alert('Muvaffaqiyatli', response.message || 'Buyurtma muvaffaqiyatli tasdiqlandi');
+                loadOrders({ page: currentPage });
+              }
+            } catch (error: any) {
+              Alert.alert('Xatolik', error.response?.data?.message || 'Buyurtmani tasdiqlashda xatolik');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getStatusColor = (status: string) => {
@@ -199,6 +230,17 @@ export default function OrdersScreen() {
           </Text>
         </View>
       )}
+      
+      {/* MFY Agent uchun tasdiqlash tugmasi */}
+      {role === 'mfy' && item.status === 'assigned_to_agent' && !item.agentConfirmedAt && (
+        <TouchableOpacity
+          style={styles.confirmButton}
+          onPress={() => handleConfirmOrder(item._id)}
+        >
+          <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          <Text style={styles.confirmButtonText}>Tasdiqlash</Text>
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 
@@ -211,7 +253,11 @@ export default function OrdersScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Buyurtmalar</Text>
+        </View>
       {!loadingKPI && kpiBalance && (
         <TouchableOpacity 
           style={styles.kpiBalanceCard}
@@ -312,14 +358,33 @@ export default function OrdersScreen() {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingTop: 12,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  header: {
+    backgroundColor: '#fff',
+    padding: 16,
+    paddingTop: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  headerTitle: {
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
   centerContainer: {
     flex: 1,
@@ -512,6 +577,21 @@ const styles = StyleSheet.create({
     height: 40,
     backgroundColor: '#eee',
     marginHorizontal: 8,
+  },
+  confirmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#34C759',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8,
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

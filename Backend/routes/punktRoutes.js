@@ -8,6 +8,7 @@ const {
   deletePunkt,
   loginPunkt,
   getPunktsForSelection,
+  getContragentsInRegion,
 } = require('../controllers/punktController');
 const {
   getPunktNotifications,
@@ -38,6 +39,9 @@ router.put('/:id', validate(punktValidationSchemas.update), updatePunkt);
 
 // Delete punkt
 router.delete('/:id', deletePunkt);
+
+// Get contragents in punkt's region (o'z hududidagi contragentlar)
+router.get('/data/contragents', punktAuth, getContragentsInRegion);
 
 // Notification routes for Punkt
 router.get('/notifications/list', punktAuth, getPunktNotifications);

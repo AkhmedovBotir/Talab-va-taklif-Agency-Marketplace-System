@@ -20,7 +20,7 @@ export default function TabsLayout() {
       if (response.success) {
         setUnreadCount(response.data.unreadCount);
       }
-    } catch (error) {}
+    } catch (error) { }
   };
 
   return (
@@ -34,6 +34,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="orders"
         options={{
+          headerShown: false,
           title: 'Buyurtmalar',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="list" size={size} color={color} />
@@ -43,9 +44,20 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="orders-history"
         options={{
+          headerShown: false,
           title: 'Tarix',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="time" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="finance"
+        options={{
+          headerShown: false,
+          title: 'Moliya',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="wallet" size={size} color={color} />
           ),
         }}
       />

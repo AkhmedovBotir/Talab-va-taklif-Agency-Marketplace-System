@@ -36,6 +36,14 @@ import Contacts from './pages/Contacts/Contacts';
 import PartnershipRequests from './pages/PartnershipRequests/PartnershipRequests';
 import Vacancies from './pages/Vacancies/Vacancies';
 import VacancyApplications from './pages/Vacancies/VacancyApplications';
+import DailyReport from './pages/Finance/Reports/DailyReport';
+import WeeklyReport from './pages/Finance/Reports/WeeklyReport';
+import MonthlyReport from './pages/Finance/Reports/MonthlyReport';
+import YearlyReport from './pages/Finance/Reports/YearlyReport';
+import CustomReport from './pages/Finance/Reports/CustomReport';
+import Submissions from './pages/Finance/Submissions';
+import Transactions from './pages/Finance/Transactions';
+import FinanceStatistics from './pages/Finance/Statistics';
 import NotFound from './pages/NotFound/NotFound';
 
 function App() {
@@ -85,6 +93,14 @@ function App() {
               <Route path="partnership-requests" element={<PartnershipRequests />} />
               <Route path="vacancies" element={<Vacancies />} />
               <Route path="vacancies/:vacancyId/applications" element={<VacancyApplications />} />
+              <Route path="finance/reports/daily" element={<DailyReport />} />
+              <Route path="finance/reports/weekly" element={<WeeklyReport />} />
+              <Route path="finance/reports/monthly" element={<MonthlyReport />} />
+              <Route path="finance/reports/yearly" element={<YearlyReport />} />
+              <Route path="finance/reports/custom" element={<CustomReport />} />
+              <Route path="finance/submissions" element={<Submissions />} />
+              <Route path="finance/transactions" element={<Transactions />} />
+              <Route path="finance/statistics" element={<FinanceStatistics />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>

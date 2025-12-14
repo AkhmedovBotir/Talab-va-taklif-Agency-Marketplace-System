@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://api.ttsa.uz/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // Helper function to get token from localStorage
 const getToken = () => {
@@ -1641,6 +1641,147 @@ export const vacancyApplicationAPI = {
       method: 'POST',
       body: JSON.stringify(decisionData),
     });
+  },
+};
+
+// Finance API functions
+export const financeAPI = {
+  // Reports
+  // Daily report
+  getDailyReport: async (params = {}) => {
+    const { date } = params;
+    const queryParams = new URLSearchParams();
+    if (date) queryParams.append('date', date);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/reports/daily${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Weekly report
+  getWeeklyReport: async () => {
+    return apiRequest('/admin-finance/reports/weekly');
+  },
+
+  // Monthly report
+  getMonthlyReport: async (params = {}) => {
+    const { year, month } = params;
+    const queryParams = new URLSearchParams();
+    if (year) queryParams.append('year', year.toString());
+    if (month) queryParams.append('month', month.toString());
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/reports/monthly${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Yearly report
+  getYearlyReport: async (params = {}) => {
+    const { year } = params;
+    const queryParams = new URLSearchParams();
+    if (year) queryParams.append('year', year.toString());
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/reports/yearly${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Custom date range report
+  getCustomReport: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/reports/custom${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Submissions
+  // Get pending submissions
+  getPendingSubmissions: async () => {
+    return apiRequest('/admin-finance/submissions/pending');
+  },
+
+  // Confirm submission
+  confirmSubmission: async (submissionId) => {
+    return apiRequest(`/admin-finance/submissions/${submissionId}/confirm`, {
+      method: 'POST',
+    });
+  },
+
+  // Reject submission
+  rejectSubmission: async (submissionId, rejectionReason) => {
+    return apiRequest(`/admin-finance/submissions/${submissionId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason }),
+    });
+  },
+
+  // Transactions
+  // Get all transactions
+  getAllTransactions: async (params = {}) => {
+    const { 
+      status, 
+      paymentMethod, 
+      startDate, 
+      endDate, 
+      currentHolder, 
+      page = 1, 
+      limit = 50 
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) queryParams.append('status', status);
+    if (paymentMethod) queryParams.append('paymentMethod', paymentMethod);
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    if (currentHolder) queryParams.append('currentHolder', currentHolder);
+    
+    return apiRequest(`/admin-finance/transactions?${queryParams.toString()}`);
+  },
+
+  // Statistics
+  // Get general statistics
+  getStatistics: async () => {
+    return apiRequest('/admin-finance/statistics');
+  },
+
+  // Get region statistics
+  getRegionStatistics: async () => {
+    return apiRequest('/admin-finance/statistics/region');
+  },
+
+  // Get district statistics
+  getDistrictStatistics: async (params = {}) => {
+    const { regionId } = params;
+    const queryParams = new URLSearchParams();
+    if (regionId) queryParams.append('regionId', regionId);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/statistics/district${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get MFY statistics
+  getMfyStatistics: async (params = {}) => {
+    const { districtId } = params;
+    const queryParams = new URLSearchParams();
+    if (districtId) queryParams.append('districtId', districtId);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/statistics/mfy${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get agent performance statistics
+  getAgentPerformanceStatistics: async (params = {}) => {
+    const { agentType, startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (agentType) queryParams.append('agentType', agentType);
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/statistics/agent-performance${queryString ? `?${queryString}` : ''}`);
   },
 };
 

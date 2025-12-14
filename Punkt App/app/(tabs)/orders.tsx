@@ -45,7 +45,7 @@ export default function OrdersScreen() {
       if (filters.paymentMethod) params.paymentMethod = filters.paymentMethod;
       if (filters.search) params.search = filters.search;
 
-      const response = await apiService.getTodayOrders(params);
+      const response = await apiService.getOrders(params);
 
       if (reset) {
         setOrders(response.data);

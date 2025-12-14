@@ -70,9 +70,9 @@ export default function OrderDetailsScreen() {
     try {
       const response = await apiService.confirmOrder(id);
       if (response.success) {
-        // Update order data after confirmation
-        setOrder(response.data);
         Alert.alert('Muvaffaqiyatli', response.message || 'Buyurtma tasdiqlandi');
+        // Reload order data after confirmation
+        loadOrder();
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Buyurtmani tasdiqlashda xatolik';
@@ -106,9 +106,9 @@ export default function OrderDetailsScreen() {
     try {
       const response = await apiService.markOrderAsDelivered(id);
       if (response.success) {
-        // Update order data after marking as delivered
-        setOrder(response.data);
         Alert.alert('Muvaffaqiyatli', response.message || 'Buyurtma yetkazilgan deb belgilandi');
+        // Reload order data after marking as delivered
+        loadOrder();
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Buyurtmani yetkazilgan deb belgilashda xatolik';
@@ -119,11 +119,12 @@ export default function OrderDetailsScreen() {
   };
 
   const canConfirm = () => {
-    if (!order || !agent) return false;
+    if (!order) return false;
+    // MFY agent uchun: faqat assigned_to_agent status'ida va hali tasdiqlanmagan bo'lsa
     return (
       role === 'mfy' &&
-      order.assignedToAgent?._id === agent._id &&
-      !order.confirmedByAgent
+      order.status === 'assigned_to_agent' &&
+      !order.agentConfirmedAt
     );
   };
 

@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'https://api.ttsa.uz/api/marketplace';
-const REGIONS_BASE_URL = 'https://api.ttsa.uz/api';
-const REVIEWS_BASE_URL = 'https://api.ttsa.uz/api/reviews';
+const BASE_URL = 'http://192.168.1.6:5000/api/marketplace';
+const REGIONS_BASE_URL = 'http://192.168.1.6:5000/api';
+const REVIEWS_BASE_URL = 'http://192.168.1.6:5000/api/reviews';
+const PAYMENT_BASE_URL = 'http://192.168.1.6:5000/api/payment';
 // Auth storage keys MUST match those used in AuthContext
 const TOKEN_KEY = '@marketplace:token';
 const USER_KEY = '@marketplace:user';
@@ -253,6 +254,46 @@ export interface OrdersResponse {
   limit: number;
   totalPages: number;
   data: Order[];
+}
+
+// Payment Interfaces
+export interface TransactionPath {
+  holder: 'user' | 'mfy_agent' | 'district_agent' | 'province_agent' | 'finance';
+  holderId: string;
+  action: string;
+  timestamp: string;
+  note: string;
+}
+
+export interface PaymentTransaction {
+  _id: string;
+  order: string | Order;
+  user: string;
+  amount: number;
+  paymentMethod: 'cash' | 'card';
+  status: 'pending' | 'collected' | 'submitted' | 'received' | 'confirmed' | 'rejected';
+  collectedBy?: {
+    _id: string;
+    name: string;
+    phone: string;
+  } | null;
+  collectedAt?: string | null;
+  currentHolder: 'user' | 'mfy_agent' | 'district_agent' | 'province_agent' | 'finance';
+  transactionPath: TransactionPath[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentResponse {
+  success: boolean;
+  message: string;
+  transaction?: PaymentTransaction;
+}
+
+export interface PaymentStatusResponse {
+  success: boolean;
+  transaction?: PaymentTransaction;
+  message?: string;
 }
 
 export interface CreateOrderRequest {
@@ -1271,6 +1312,66 @@ class ApiService {
     return this.request<PartnershipRequest[]>('/partnership-requests', {
       method: 'GET',
     }, token) as any;
+  }
+
+  // Payment Methods
+  async payOrder(orderId: string, token: string): Promise<PaymentResponse> {
+    try {
+      const response = await fetch(`${PAYMENT_BASE_URL}/orders/${orderId}/pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = data.message || 'To\'lov qilishda xatolik yuz berdi';
+        throw new Error(errorMessage);
+      }
+
+      return data;
+    } catch (error: any) {
+      if (error.message) {
+        throw error;
+      }
+      throw new Error('To\'lov qilishda xatolik yuz berdi');
+    }
+  }
+
+  async getPaymentStatus(orderId: string, token: string): Promise<PaymentStatusResponse> {
+    try {
+      const response = await fetch(`${PAYMENT_BASE_URL}/orders/${orderId}/payment-status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // If payment transaction not found, return success: false but don't throw
+        if (response.status === 404) {
+          return {
+            success: false,
+            message: data.message || 'To\'lov transaksiyasi topilmadi',
+          };
+        }
+        const errorMessage = data.message || 'To\'lov holatini olishda xatolik yuz berdi';
+        throw new Error(errorMessage);
+      }
+
+      return data;
+    } catch (error: any) {
+      if (error.message) {
+        throw error;
+      }
+      throw new Error('To\'lov holatini olishda xatolik yuz berdi');
+    }
   }
 }
 

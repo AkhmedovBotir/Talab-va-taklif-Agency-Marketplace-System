@@ -346,12 +346,7 @@ const confirmOrder = async (req, res) => {
     await order.save();
 
     // Automatically route order based on product availability
-    try {
-      await autoRouteOrder(order._id, punkt);
-    } catch (error) {
-      console.error('Error in auto-routing after confirm:', error);
-      // Don't fail the confirmation if auto-routing fails
-    }
+    // Avtorouting o'chirilgan - punkt manual ravishda contragentga so'rov yuborishi kerak
 
     // Populate for response
     await order.populate('confirmedByPunkt', 'name phone viloyat tuman');
@@ -1200,12 +1195,7 @@ const receiveFromPunkt = async (req, res) => {
         
         await order.save();
 
-        // Automatically check and send requests to contragents in this punkt's tuman
-        try {
-          await autoRouteOrder(order._id, punkt);
-        } catch (error) {
-          console.error('Error in auto-routing after receive from punkt:', error);
-        }
+        // Avtorouting o'chirilgan - punkt manual ravishda contragentga so'rov yuborishi kerak
 
         // Populate for response
         await order.populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman');
@@ -1259,13 +1249,7 @@ const receiveFromPunkt = async (req, res) => {
     
     await order.save();
 
-    // Automatically check and send requests to contragents in this punkt's tuman
-    try {
-      await autoRouteOrder(order._id, punkt);
-    } catch (error) {
-      console.error('Error in auto-routing after receive from punkt:', error);
-      // Don't fail the receive if auto-routing fails
-    }
+    // Avtorouting o'chirilgan - punkt manual ravishda contragentga so'rov yuborishi kerak
 
     // Populate for response
     await order.populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman');
@@ -1512,14 +1496,7 @@ const respondToPunktToPunktRequest = async (req, res) => {
     await order.save();
 
     // If accepted, automatically route order based on product availability
-    if (response === 'accepted') {
-      try {
-        await autoRouteOrder(order._id, punkt);
-      } catch (error) {
-        console.error('Error in auto-routing after accepting request:', error);
-        // Don't fail the response if auto-routing fails
-      }
-    }
+    // Avtorouting o'chirilgan - punkt manual ravishda contragentga so'rov yuborishi kerak
 
     // Populate for response
     await order.populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman');
@@ -2238,7 +2215,6 @@ module.exports = {
   getTodayOrders,
   getOrderHistory,
   analyzeOrderProductsByTuman,
-  autoRouteOrder,
-  autoRouteOrderEndpoint,
+  // autoRouteOrder va autoRouteOrderEndpoint o'chirilgan - avtorouting kerak emas
 };
 

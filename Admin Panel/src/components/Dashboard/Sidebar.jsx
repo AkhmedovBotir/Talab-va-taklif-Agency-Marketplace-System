@@ -34,6 +34,11 @@ import {
   LocationCity,
   WorkOutline,
   Description,
+  AttachMoney,
+  Assessment,
+  History,
+  PendingActions,
+  TrendingUp,
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -94,6 +99,21 @@ const menuItems = [
   },
   { icon: LocationCity, label: 'Hududlar Statistikasi', path: '/dashboard/statistics' },
   { icon: Sms, label: 'SMS lar', path: '/dashboard/sms-verifications' },
+  {
+    icon: AttachMoney,
+    label: 'Moliya',
+    path: '/dashboard/finance',
+    children: [
+      { icon: Assessment, label: 'Kunlik hisobot', path: '/dashboard/finance/reports/daily' },
+      { icon: Assessment, label: 'Haftalik hisobot', path: '/dashboard/finance/reports/weekly' },
+      { icon: Assessment, label: 'Oylik hisobot', path: '/dashboard/finance/reports/monthly' },
+      { icon: Assessment, label: 'Yillik hisobot', path: '/dashboard/finance/reports/yearly' },
+      { icon: Assessment, label: 'Belgilangan muddat', path: '/dashboard/finance/reports/custom' },
+      { icon: PendingActions, label: 'Topshiruvlar', path: '/dashboard/finance/submissions' },
+      { icon: History, label: 'Transaksiyalar', path: '/dashboard/finance/transactions' },
+      { icon: TrendingUp, label: 'Statistika', path: '/dashboard/finance/statistics' },
+    ],
+  },
   {
     icon: RateReview,
     label: 'Baholar',

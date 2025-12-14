@@ -25,8 +25,6 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [requestModalVisible, setRequestModalVisible] = useState(false);
-  const [selectedPunkt, setSelectedPunkt] = useState<PunktSelection | null>(null);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentSelection | null>(null);
   const [requestToPunktModalVisible, setRequestToPunktModalVisible] = useState(false);
@@ -75,96 +73,7 @@ export default function OrderDetailScreen() {
     );
   };
 
-  const handleAutoRoute = () => {
-    Alert.alert(
-      'Avtomatik routing',
-      'Buyurtma maxsulotlar mavjudligiga qarab avtomatik routing qilinadi. Davom etasizmi?',
-      [
-        { text: 'Bekor qilish', style: 'cancel' },
-        {
-          text: 'Davom etish',
-          onPress: async () => {
-            setActionLoading(true);
-            try {
-              const response = await apiService.autoRouteOrder(id);
-              await loadOrder();
-              const message = response.data.routingResults.errors.length > 0
-                ? `Routing qilindi. Xatolar: ${response.data.routingResults.errors.join(', ')}`
-                : 'Buyurtma muvaffaqiyatli routing qilindi';
-              Alert.alert('Muvaffaqiyatli', message);
-            } catch (error: any) {
-              Alert.alert('Xatolik', error.message || 'Routing qilishda xatolik');
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ]
-    );
-  };
 
-  const handleRequestToPunkts = () => {
-    setRequestModalVisible(true);
-  };
-
-  const submitRequest = async () => {
-    if (!selectedPunkt) {
-      Alert.alert('Xatolik', 'Punktni tanlang');
-      return;
-    }
-
-    if (!selectedPunkt.tuman) {
-      Alert.alert('Xatolik', 'Tanlangan punktda tuman mavjud emas');
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      await apiService.requestToPunkts(id, { tumanIds: [selectedPunkt.tuman._id] });
-      Alert.alert('Muvaffaqiyatli', 'So\'rov yuborildi', [
-        { text: 'OK', onPress: () => {
-          setRequestModalVisible(false);
-          setSelectedPunkt(null);
-          loadOrder();
-        }},
-      ]);
-    } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'So\'rov yuborishda xatolik');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRespond = (response: 'accepted' | 'rejected') => {
-    const message = response === 'accepted' 
-      ? 'So\'rovni qabul qilishni xohlaysizmi?'
-      : 'So\'rovni rad etishni xohlaysizmi?';
-
-    Alert.alert('Javob berish', message, [
-      { text: 'Bekor qilish', style: 'cancel' },
-      {
-        text: response === 'accepted' ? 'Qabul qilish' : 'Rad etish',
-        onPress: async () => {
-          setActionLoading(true);
-          try {
-            // Check if this is a punkt-to-punkt request (new format)
-            if (hasPendingPunktToPunktRequest) {
-              await apiService.respondToPunktRequest(id, { response });
-            } else {
-              // Fall back to old format
-              await apiService.respondToRequest(id, { response });
-            }
-            await loadOrder();
-            Alert.alert('Muvaffaqiyatli', 'Javob yuborildi');
-          } catch (error: any) {
-            Alert.alert('Xatolik', error.message || 'Javob yuborishda xatolik');
-          } finally {
-            setActionLoading(false);
-          }
-        },
-      },
-    ]);
-  };
 
   const handleAssignToAgent = () => {
     setAssignModalVisible(true);
@@ -370,16 +279,7 @@ export default function OrderDetailScreen() {
     return null;
   }
 
-  // Status-based button visibility logic
-  const isMyPunkt = punkt?._id === order.confirmedByPunkt?._id;
-  
-  // Check if current punkt is the current punkt (after receiving from another punkt)
-  const currentPunktId = order.currentPunkt 
-    ? (typeof order.currentPunkt === 'object' ? order.currentPunkt._id : order.currentPunkt)
-    : null;
-  const isCurrentPunkt = punkt?._id && currentPunktId ? punkt._id === currentPunktId : false;
-  
-  // Check order status
+  // Status-based button visibility logic according to new API workflow
   const orderStatus = order.status;
   const isPending = orderStatus === 'pending';
   const isConfirmedByPunkt = orderStatus === 'confirmed_by_punkt';
@@ -388,21 +288,15 @@ export default function OrderDetailScreen() {
   const isDeliveredToPunkt = orderStatus === 'delivered_to_punkt';
   const isAssignedToAgent = orderStatus === 'assigned_to_agent';
   
-  // Check punktStatus for backward compatibility
-  const punktStatus = order.punktStatus;
-  const isPunktStatusPending = punktStatus === 'pending';
-  const isPunktStatusConfirmed = punktStatus === 'confirmed';
-  const isPunktStatusRejected = punktStatus === 'rejected';
-  const isPunktStatusRequested = punktStatus === 'requested';
+  // Check if this punkt confirmed the order
+  const isMyPunkt = punkt?._id === order.confirmedByPunkt?._id;
   
-  // Check if this punkt has a pending request to respond to (old format)
-  const hasPendingRequest = order.punktRequests.some(
-    (req) =>
-      typeof req.punktId === 'object' &&
-      req.punktId._id === punkt?._id &&
-      req.status === 'pending'
-  );
-
+  // Check if current punkt is this punkt
+  const currentPunktId = order.currentPunkt 
+    ? (typeof order.currentPunkt === 'object' ? order.currentPunkt._id : order.currentPunkt)
+    : null;
+  const isCurrentPunkt = punkt?._id && currentPunktId ? punkt._id === currentPunktId : false;
+  
   // Check if this punkt has a pending punkt-to-punkt request to respond to
   const hasPendingPunktToPunktRequest = order.punktToPunktRequests?.some(
     (req) =>
@@ -411,33 +305,7 @@ export default function OrderDetailScreen() {
       req.status === 'pending'
   ) || false;
   
-  // Step 1: If pending request to this punkt - show respond buttons
-  // Can respond if punktStatus is 'requested' or has pending request
-  const canRespondToRequest = hasPendingRequest || hasPendingPunktToPunktRequest;
-  
-  // Step 2: If pending and no request - show confirm or request to punkts
-  // Can confirm if order is pending and no pending request to this punkt
-  const canConfirm = (isPending || isPunktStatusPending) && !hasPendingRequest;
-  
-  // Can request to punkts if pending and cannot confirm directly
-  const canRequestToPunkts = (isPending || isPunktStatusPending) && !hasPendingRequest;
-  
-  // Step 3: If confirmed by this punkt - show assignment and request options
-  // Can assign to agent if confirmed/delivered by this punkt and not yet assigned
-  const canAssignToAgent = 
-    (isConfirmedByPunkt || isDeliveredToPunkt || isPunktStatusConfirmed) && 
-    (isMyPunkt || isCurrentPunkt) && 
-    !isAssignedToAgent &&
-    !order.assignedToAgent;
-  
-  // Can request to other punkt/contragent if confirmed/delivered by this punkt or current punkt and not assigned
-  const canRequestToOthers = 
-    (isConfirmedByPunkt || isDeliveredToPunkt || isPunktStatusConfirmed) && 
-    (isMyPunkt || isCurrentPunkt) && 
-    !isAssignedToAgent;
-  
-  // Step 4: Receive buttons
-  // Can receive from punkt if order has accepted punkt-to-punkt request
+  // Check if there's an accepted punkt-to-punkt request (can receive)
   const hasAcceptedPunktToPunktRequest = order.punktToPunktRequests?.some(
     (req) =>
       typeof req.toPunktId === 'object' &&
@@ -445,12 +313,54 @@ export default function OrderDetailScreen() {
       req.status === 'accepted'
   ) || false;
   
-  const canReceiveFromPunkt = 
-    hasAcceptedPunktToPunktRequest ||
-    ((isConfirmedByPunkt || isDeliveredToPunkt || isPunktStatusConfirmed) && !isMyPunkt);
+  // Check if contragent has accepted/delivered (can receive)
+  const hasAcceptedContragentRequest = order.contragentRequests?.some(
+    (req) => {
+      const status = typeof req === 'object' ? req.status : null;
+      return status === 'accepted' || status === 'delivered_to_punkt';
+    }
+  ) || false;
   
-  // Can receive from contragent if contragent has accepted
-  const canReceiveFromContragent = isAcceptedByContragent || isRequestedToContragent;
+  // Button visibility logic according to workflow:
+  // Step 1: Respond to punkt request (if pending request to this punkt)
+  const canRespondToPunktRequest = hasPendingPunktToPunktRequest;
+  
+  // Step 2: Confirm order (if pending and this is the current punkt)
+  const canConfirm = isPending && (isCurrentPunkt || !order.currentPunkt);
+  
+  // Step 3: Request to contragent (if confirmed by this punkt and not yet requested/assigned)
+  const canRequestToContragent = 
+    isConfirmedByPunkt && 
+    isMyPunkt && 
+    !isAssignedToAgent &&
+    !order.assignedToAgent;
+  
+  // Step 4: Request to punkt (if confirmed by this punkt and not yet requested/assigned)
+  const canRequestToPunkt = 
+    isConfirmedByPunkt && 
+    isMyPunkt && 
+    !isAssignedToAgent &&
+    !order.assignedToAgent;
+  
+  // Step 5: Receive from contragent (if contragent has accepted/delivered and this punkt requested it)
+  const canReceiveFromContragent = 
+    (isAcceptedByContragent || hasAcceptedContragentRequest) &&
+    isMyPunkt &&
+    !isDeliveredToPunkt &&
+    !isAssignedToAgent;
+  
+  // Step 6: Receive from punkt (if there's an accepted punkt-to-punkt request to this punkt)
+  const canReceiveFromPunkt = 
+    hasAcceptedPunktToPunktRequest &&
+    !isDeliveredToPunkt &&
+    !isAssignedToAgent;
+  
+  // Step 7: Assign to agent (if delivered to punkt and this punkt has it, and not yet assigned)
+  const canAssignToAgent = 
+    isDeliveredToPunkt &&
+    (isMyPunkt || isCurrentPunkt) &&
+    !isAssignedToAgent &&
+    !order.assignedToAgent;
 
   return (
     <View style={styles.container}>
@@ -593,6 +503,40 @@ export default function OrderDetailScreen() {
         </View>
       )}
 
+      {order.contragentRequests && order.contragentRequests.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Contragent so'rovlari</Text>
+          <View style={styles.card}>
+            {order.contragentRequests.map((req, index) => {
+              const contragent = typeof req.contragentId === 'object' ? req.contragentId : null;
+              const statusLabels: Record<string, string> = {
+                'pending': 'Kutilmoqda',
+                'accepted': 'Qabul qilindi',
+                'rejected': 'Rad etilgan',
+                'delivered_to_punkt': 'Punktga yetkazildi',
+              };
+              return (
+                <View key={index} style={styles.requestRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.requestPunktName}>
+                      {contragent?.name || 'Noma\'lum contragent'}
+                    </Text>
+                    <Text style={styles.requestStatus}>
+                      {statusLabels[req.status] || req.status}
+                    </Text>
+                    {req.requestedAt && (
+                      <Text style={styles.requestDate}>
+                        So'rov: {formatDate(req.requestedAt)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
       {order.confirmedByPunkt && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tasdiqlangan</Text>
@@ -646,19 +590,19 @@ export default function OrderDetailScreen() {
       )}
 
       <View style={styles.actions}>
-        {/* Step 1: If pending request to this punkt - show respond buttons */}
-        {canRespondToRequest && (
+        {/* Step 1: Respond to punkt request (if pending request to this punkt) */}
+        {canRespondToPunktRequest && (
           <>
             <Button
               title="Qabul qilish"
-              onPress={() => handleRespond('accepted')}
+              onPress={() => handleRespondToPunktRequest('accepted')}
               variant="secondary"
               loading={actionLoading}
               style={styles.actionButton}
             />
             <Button
               title="Rad etish"
-              onPress={() => handleRespond('rejected')}
+              onPress={() => handleRespondToPunktRequest('rejected')}
               variant="danger"
               loading={actionLoading}
               style={styles.actionButton}
@@ -666,75 +610,40 @@ export default function OrderDetailScreen() {
           </>
         )}
 
-        {/* Step 2: If pending and no request - show confirm or request to punkts */}
+        {/* Step 2: Confirm order (if pending) */}
         {canConfirm && (
           <Button
             title="Tasdiqlash"
             onPress={handleConfirm}
-            variant="secondary"
-            loading={actionLoading}
-            style={styles.actionButton}
-          />
-        )}
-
-        {canRequestToPunkts && (
-          <Button
-            title="Punktga so'rov yuborish"
-            onPress={handleRequestToPunkts}
-            variant="outline"
-            loading={actionLoading}
-            style={styles.actionButton}
-          />
-        )}
-
-        {/* Step 3: If confirmed/delivered by this punkt - show assignment and request options */}
-        {canAssignToAgent && (
-          <Button
-            title="Agentga yuborish"
-            onPress={handleAssignToAgent}
             variant="primary"
             loading={actionLoading}
             style={styles.actionButton}
           />
         )}
 
-        {canRequestToOthers && (
-          <>
-            <Button
-              title="Avtomatik routing"
-              onPress={handleAutoRoute}
-              variant="primary"
-              loading={actionLoading}
-              style={styles.actionButton}
-            />
-            <Button
-              title="Boshqa punktga so'rov yuborish"
-              onPress={handleRequestToPunkt}
-              variant="outline"
-              loading={actionLoading}
-              style={styles.actionButton}
-            />
-            <Button
-              title="Contragentga so'rov yuborish"
-              onPress={handleRequestToContragent}
-              variant="outline"
-              loading={actionLoading}
-              style={styles.actionButton}
-            />
-          </>
-        )}
-
-        {/* Step 4: Receive buttons - show when appropriate */}
-        {canReceiveFromPunkt && (
+        {/* Step 3: Request to contragent (if confirmed by this punkt) */}
+        {canRequestToContragent && (
           <Button
-            title="Punktdan qabul qilish"
-            onPress={handleReceiveFromPunkt}
-            variant="secondary"
+            title="Contragentga so'rov yuborish"
+            onPress={handleRequestToContragent}
+            variant="outline"
             loading={actionLoading}
             style={styles.actionButton}
           />
         )}
 
+        {/* Step 4: Request to punkt (if confirmed by this punkt) */}
+        {canRequestToPunkt && (
+          <Button
+            title="Boshqa punktga so'rov yuborish"
+            onPress={handleRequestToPunkt}
+            variant="outline"
+            loading={actionLoading}
+            style={styles.actionButton}
+          />
+        )}
+
+        {/* Step 5: Receive from contragent (if contragent has accepted/delivered) */}
         {canReceiveFromContragent && (
           <Button
             title="Contragentdan qabul qilish"
@@ -745,87 +654,47 @@ export default function OrderDetailScreen() {
           />
         )}
 
+        {/* Step 6: Receive from punkt (if there's an accepted punkt-to-punkt request) */}
+        {canReceiveFromPunkt && (
+          <Button
+            title="Punktdan qabul qilish"
+            onPress={handleReceiveFromPunkt}
+            variant="secondary"
+            loading={actionLoading}
+            style={styles.actionButton}
+          />
+        )}
+
+        {/* Step 7: Assign to agent (if delivered/received and not yet assigned) */}
+        {canAssignToAgent && (
+          <Button
+            title="Agentga yuborish"
+            onPress={handleAssignToAgent}
+            variant="primary"
+            loading={actionLoading}
+            style={styles.actionButton}
+          />
+        )}
+
         {/* If no actions available, show message */}
-        {!canRespondToRequest && 
+        {!canRespondToPunktRequest && 
          !canConfirm && 
-         !canRequestToPunkts && 
-         !canAssignToAgent && 
-         !canRequestToOthers && 
+         !canRequestToContragent && 
+         !canRequestToPunkt && 
+         !canReceiveFromContragent && 
          !canReceiveFromPunkt && 
-         !canReceiveFromContragent && (
+         !canAssignToAgent && (
           <View style={styles.noActionsContainer}>
             <Text style={styles.noActionsText}>
-              {isPunktStatusRejected && 'Buyurtma rad etilgan'}
-              {isPunktStatusRequested && !hasPendingRequest && 'So\'rov yuborilgan, javob kutilmoqda'}
               {isAssignedToAgent && 'Buyurtma agentga yuborilgan'}
-              {isConfirmedByPunkt && !isMyPunkt && 'Buyurtma boshqa punkt tomonidan tasdiqlangan'}
               {orderStatus === 'confirmed_by_agent' && 'Buyurtma agent tomonidan tasdiqlangan'}
               {orderStatus === 'confirmed_by_customer' && 'Buyurtma mijoz tomonidan tasdiqlangan'}
-              {!orderStatus && 'Hech qanday amal mavjud emas'}
+              {!isMyPunkt && isConfirmedByPunkt && 'Buyurtma boshqa punkt tomonidan tasdiqlangan'}
+              {!canConfirm && !canRequestToContragent && !canRequestToPunkt && 'Hech qanday amal mavjud emas'}
             </Text>
           </View>
         )}
       </View>
-
-      <Modal
-        visible={requestModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setRequestModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Punktga so'rov yuborish</Text>
-              <TouchableOpacity onPress={() => {
-                setRequestModalVisible(false);
-                setSelectedPunkt(null);
-              }}>
-                <Ionicons name="close" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalBody}>
-              <Text style={styles.modalLabel}>Punktni tanlang</Text>
-              <PunktPicker
-                selectedPunkt={selectedPunkt}
-                onSelect={setSelectedPunkt}
-                viloyatId={order?.deliveryViloyat._id}
-                tumanId={order?.deliveryTuman?._id}
-              />
-              {selectedPunkt && (
-                <View style={styles.selectedPunktInfo}>
-                  <Text style={styles.selectedPunktLabel}>Tanlangan punkt:</Text>
-                  <Text style={styles.selectedPunktName}>{selectedPunkt.name}</Text>
-                  <Text style={styles.selectedPunktDetails}>
-                    {selectedPunkt.phone} • {selectedPunkt.viloyat.name}
-                    {selectedPunkt.tuman && `, ${selectedPunkt.tuman.name}`}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.modalFooter}>
-              <Button
-                title="Bekor qilish"
-                onPress={() => {
-                  setRequestModalVisible(false);
-                  setSelectedPunkt(null);
-                }}
-                variant="outline"
-                style={styles.modalButton}
-              />
-              <Button
-                title="Yuborish"
-                onPress={submitRequest}
-                loading={actionLoading}
-                disabled={!selectedPunkt}
-                style={styles.modalButton}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={assignModalVisible}
