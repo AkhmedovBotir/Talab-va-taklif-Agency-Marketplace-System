@@ -88,6 +88,7 @@ const KPISettings = () => {
         viloyatAgent: Number(payload.distribution.viloyatAgent) || 0,
         tumanAgent: Number(payload.distribution.tumanAgent) || 0,
         mfyAgent: Number(payload.distribution.mfyAgent) || 0,
+        finance: Number(payload.distribution.finance) || 0,
         punktTransfer: Number(payload.distribution.punktTransfer) || 0,
       },
       isActive: payload.isActive,

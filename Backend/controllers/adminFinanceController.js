@@ -5,6 +5,7 @@ const AgentDailyReport = require('../models/AgentDailyReport');
 const Order = require('../models/Order');
 const Agent = require('../models/Agent');
 const Region = require('../models/Region');
+const KpiBonusTransaction = require('../models/KpiBonusTransaction');
 
 // ==================== KUNLIK HISOBOT ====================
 
@@ -927,6 +928,352 @@ const getAgentPerformance = async (req, res) => {
   }
 };
 
+// ==================== MOLIYA BALANSLARI ====================
+
+// Umumiy balans (Umumiy tushgan summa, Tarqatilgan summa, Moliya bo'limiga ajratilgan summa)
+const getFinanceBalance = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Sana filtri
+    const dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.createdAt.$lte = end;
+      }
+    }
+
+    // 1. Umumiy tushgan summa (Moliya bo'limiga tasdiqlangan to'lovlar)
+    const confirmedSubmissions = await FinanceSubmission.find({
+      toAgentType: 'finance',
+      status: 'confirmed',
+      ...(dateFilter.createdAt && {
+        confirmedAt: dateFilter.createdAt,
+      }),
+    });
+
+    const totalReceived = confirmedSubmissions.reduce((sum, s) => sum + s.amount, 0);
+
+    // 2. Tarqatilgan summa (KPI bonuslar - punkt, agentlar)
+    const kpiTransactions = await KpiBonusTransaction.find({
+      orderStatus: 'confirmed_by_customer',
+      ...dateFilter,
+    });
+
+    const totalDistributed = kpiTransactions.reduce((sum, t) => {
+      return (
+        sum +
+        (t.amounts.punkt || 0) +
+        (t.amounts.viloyatAgent || 0) +
+        (t.amounts.tumanAgent || 0) +
+        (t.amounts.mfyAgent || 0) +
+        (t.amounts.punktTransfer || 0)
+      );
+    }, 0);
+
+    // 3. Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
+    const totalFinanceKpi = kpiTransactions.reduce((sum, t) => sum + (t.amounts.finance || 0), 0);
+
+    // 4. Umumiy balans (Tushgan - Tarqatilgan)
+    const totalBalance = totalReceived - totalDistributed;
+
+    // 5. Moliya bo'limi umumiy balansi (Tushgan + KPI bonus)
+    const financeTotalBalance = totalReceived + totalFinanceKpi;
+
+    // 6. Tafsilotlar
+    const details = {
+      punkt: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punkt || 0), 0),
+      viloyatAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.viloyatAgent || 0), 0),
+      tumanAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.tumanAgent || 0), 0),
+      mfyAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.mfyAgent || 0), 0),
+      punktTransfer: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punktTransfer || 0), 0),
+      finance: totalFinanceKpi,
+    };
+
+    res.status(200).json({
+      success: true,
+      balance: {
+        period: {
+          startDate: dateFilter.createdAt?.$gte || null,
+          endDate: dateFilter.createdAt?.$lte || null,
+        },
+        totalReceived, // Umumiy tushgan summa
+        totalDistributed, // Tarqatilgan summa
+        totalFinanceKpi, // Moliya bo'limiga ajratilgan summa (KPI)
+        totalBalance, // Umumiy balans (Tushgan - Tarqatilgan)
+        financeTotalBalance, // Moliya bo'limi umumiy balansi (Tushgan + KPI bonus)
+        details, // Tafsilotlar
+      },
+    });
+  } catch (error) {
+    console.error('Error in getFinanceBalance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Moliya balansini olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Umumiy tushgan summa
+const getTotalReceived = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.confirmedAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.confirmedAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.confirmedAt.$lte = end;
+      }
+    }
+
+    const confirmedSubmissions = await FinanceSubmission.find({
+      toAgentType: 'finance',
+      status: 'confirmed',
+      ...dateFilter,
+    });
+
+    const totalReceived = confirmedSubmissions.reduce((sum, s) => sum + s.amount, 0);
+    const totalOrders = confirmedSubmissions.reduce((sum, s) => sum + s.transactionsCount, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        period: {
+          startDate: dateFilter.confirmedAt?.$gte || null,
+          endDate: dateFilter.confirmedAt?.$lte || null,
+        },
+        totalReceived,
+        totalOrders,
+        submissionsCount: confirmedSubmissions.length,
+      },
+    });
+  } catch (error) {
+    console.error('Error in getTotalReceived:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Umumiy tushgan summani olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Tarqatilgan summa (KPI bonuslar)
+const getTotalDistributed = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.createdAt.$lte = end;
+      }
+    }
+
+    const kpiTransactions = await KpiBonusTransaction.find({
+      orderStatus: 'confirmed_by_customer',
+      ...dateFilter,
+    });
+
+    const totalDistributed = kpiTransactions.reduce((sum, t) => {
+      return (
+        sum +
+        (t.amounts.punkt || 0) +
+        (t.amounts.viloyatAgent || 0) +
+        (t.amounts.tumanAgent || 0) +
+        (t.amounts.mfyAgent || 0) +
+        (t.amounts.punktTransfer || 0)
+      );
+    }, 0);
+
+    const details = {
+      punkt: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punkt || 0), 0),
+      viloyatAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.viloyatAgent || 0), 0),
+      tumanAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.tumanAgent || 0), 0),
+      mfyAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.mfyAgent || 0), 0),
+      punktTransfer: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punktTransfer || 0), 0),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        period: {
+          startDate: dateFilter.createdAt?.$gte || null,
+          endDate: dateFilter.createdAt?.$lte || null,
+        },
+        totalDistributed,
+        transactionsCount: kpiTransactions.length,
+        details,
+      },
+    });
+  } catch (error) {
+    console.error('Error in getTotalDistributed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Tarqatilgan summani olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
+const getFinanceKpiAmount = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.createdAt.$lte = end;
+      }
+    }
+
+    const kpiTransactions = await KpiBonusTransaction.find({
+      orderStatus: 'confirmed_by_customer',
+      ...dateFilter,
+    });
+
+    const totalFinanceKpi = kpiTransactions.reduce((sum, t) => sum + (t.amounts.finance || 0), 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        period: {
+          startDate: dateFilter.createdAt?.$gte || null,
+          endDate: dateFilter.createdAt?.$lte || null,
+        },
+        totalFinanceKpi,
+        transactionsCount: kpiTransactions.length,
+      },
+    });
+  } catch (error) {
+    console.error('Error in getFinanceKpiAmount:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Moliya bo\'limiga ajratilgan summani olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Umumiy balans (Tushgan - Tarqatilgan)
+const getTotalBalance = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Tushgan summa
+    const receivedDateFilter = {};
+    if (startDate || endDate) {
+      receivedDateFilter.confirmedAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        receivedDateFilter.confirmedAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        receivedDateFilter.confirmedAt.$lte = end;
+      }
+    }
+
+    const confirmedSubmissions = await FinanceSubmission.find({
+      toAgentType: 'finance',
+      status: 'confirmed',
+      ...receivedDateFilter,
+    });
+
+    const totalReceived = confirmedSubmissions.reduce((sum, s) => sum + s.amount, 0);
+
+    // Tarqatilgan summa
+    const distributedDateFilter = {};
+    if (startDate || endDate) {
+      distributedDateFilter.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        distributedDateFilter.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        distributedDateFilter.createdAt.$lte = end;
+      }
+    }
+
+    const kpiTransactions = await KpiBonusTransaction.find({
+      orderStatus: 'confirmed_by_customer',
+      ...distributedDateFilter,
+    });
+
+    const totalDistributed = kpiTransactions.reduce((sum, t) => {
+      return (
+        sum +
+        (t.amounts.punkt || 0) +
+        (t.amounts.viloyatAgent || 0) +
+        (t.amounts.tumanAgent || 0) +
+        (t.amounts.mfyAgent || 0) +
+        (t.amounts.punktTransfer || 0)
+      );
+    }, 0);
+
+    // Umumiy balans
+    const totalBalance = totalReceived - totalDistributed;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        period: {
+          startDate: startDate ? new Date(startDate) : null,
+          endDate: endDate ? new Date(endDate) : null,
+        },
+        totalReceived,
+        totalDistributed,
+        totalBalance,
+      },
+    });
+  } catch (error) {
+    console.error('Error in getTotalBalance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Umumiy balansni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   // Hisobotlar
   getDailyReport,
@@ -946,5 +1293,11 @@ module.exports = {
   getStatisticsByDistrict,
   getStatisticsByMfy,
   getAgentPerformance,
+  // Moliya balanslari
+  getFinanceBalance,
+  getTotalReceived,
+  getTotalDistributed,
+  getFinanceKpiAmount,
+  getTotalBalance,
 };
 

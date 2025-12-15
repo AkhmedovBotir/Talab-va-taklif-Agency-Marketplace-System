@@ -169,3 +169,4 @@ export const formatYearMonth = (year, month) => {
   return `${monthNames.uz[month - 1]} ${year}`;
 };
 
+

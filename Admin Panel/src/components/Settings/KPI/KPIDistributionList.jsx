@@ -112,30 +112,44 @@ const KPIDistributionList = ({
                       </p>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-700">
-                      <div className="flex flex-wrap gap-2">
-                        {['punkt', 'viloyatAgent', 'tumanAgent', 'mfyAgent', 'punktTransfer'].map(
-                          (key) => (
-                            <span
-                              key={key}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-gray-200 text-xs"
-                            >
-                              <span className="font-medium text-gray-600">
-                                {key === 'punkt'
-                                  ? 'Punkt'
-                                  : key === 'viloyatAgent'
-                                  ? 'Viloyat'
-                                  : key === 'tumanAgent'
-                                  ? 'Tuman'
-                                  : key === 'mfyAgent'
-                                  ? 'MFY'
-                                  : 'Transfer'}
-                                :
+                      <div className="space-y-2">
+                        {/* Asosiy taqsimlashlar */}
+                        <div className="flex flex-wrap gap-2">
+                          {['punkt', 'viloyatAgent', 'tumanAgent', 'mfyAgent', 'finance'].map(
+                            (key) => (
+                              <span
+                                key={key}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-indigo-200 bg-indigo-50 text-xs"
+                              >
+                                <span className="font-medium text-indigo-700">
+                                  {key === 'punkt'
+                                    ? 'Punkt'
+                                    : key === 'viloyatAgent'
+                                    ? 'Viloyat'
+                                    : key === 'tumanAgent'
+                                    ? 'Tuman'
+                                    : key === 'mfyAgent'
+                                    ? 'MFY'
+                                    : 'Moliya'}
+                                  :
+                                </span>
+                                <span className="text-indigo-900 font-semibold">
+                                  {distribution.distribution?.[key] ?? 0}%
+                                </span>
                               </span>
-                              <span className="text-gray-900">
-                                {distribution.distribution?.[key] ?? 0}%
+                            ),
+                          )}
+                        </div>
+                        {/* Punkt Transfer (qo'shimcha) */}
+                        {distribution.distribution?.punktTransfer > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-blue-200 bg-blue-50 text-xs">
+                              <span className="font-medium text-blue-700">Transfer:</span>
+                              <span className="text-blue-900 font-semibold">
+                                {distribution.distribution.punktTransfer}%
                               </span>
                             </span>
-                          ),
+                          </div>
                         )}
                       </div>
                     </td>

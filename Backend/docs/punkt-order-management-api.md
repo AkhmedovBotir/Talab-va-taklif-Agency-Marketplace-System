@@ -640,3 +640,4 @@ curl -X POST "http://localhost:5000/api/punkt/orders/65a1b2c3d4e5f6g7h8i9j0k1/as
 **Yaratilgan:** 2024  
 **Versiya:** 1.0.0
 
+

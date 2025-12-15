@@ -6,6 +6,7 @@ const initialDistribution = {
   viloyatAgent: 0,
   tumanAgent: 0,
   mfyAgent: 0,
+  finance: 0,
   punktTransfer: 0,
 };
 
@@ -28,12 +29,13 @@ const KPIDistributionForm = ({
   const notes = defaults?.notes || [];
 
   const sumOfBasePercents = useMemo(() => {
-    const { punkt, viloyatAgent, tumanAgent, mfyAgent } = formState.distribution;
+    const { punkt, viloyatAgent, tumanAgent, mfyAgent, finance } = formState.distribution;
     return (
       Number(punkt || 0) +
       Number(viloyatAgent || 0) +
       Number(tumanAgent || 0) +
-      Number(mfyAgent || 0)
+      Number(mfyAgent || 0) +
+      Number(finance || 0)
     );
   }, [formState.distribution]);
 
@@ -92,9 +94,9 @@ const KPIDistributionForm = ({
       ...prev,
       distribution: {
         ...prev.distribution,
-        mfyAgent: Math.max(
+        finance: Math.max(
           0,
-          Math.min(100, Number(prev.distribution.mfyAgent || 0) + remainingPercent),
+          Math.min(100, Number(prev.distribution.finance || 0) + remainingPercent),
         ),
       },
     }));
@@ -104,7 +106,7 @@ const KPIDistributionForm = ({
     event.preventDefault();
     if (sumOfBasePercents !== 100) {
       setLocalError(
-        `Asosiy to'rtta foiz (punkt, viloyat, tuman, MFY) yig'indisi 100% bo'lishi kerak. Hozir: ${sumOfBasePercents || 0}%`,
+        `Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance) yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: ${sumOfBasePercents || 0}%`,
       );
       return;
     }
@@ -182,39 +184,74 @@ const KPIDistributionForm = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {['punkt', 'viloyatAgent', 'tumanAgent', 'mfyAgent', 'punktTransfer'].map((field) => (
-          <div key={field}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {field === 'punkt'
-                ? 'Punkt (%)'
-                : field === 'viloyatAgent'
-                ? 'Viloyat Agent (%)'
-                : field === 'tumanAgent'
-                ? 'Tuman Agent (%)'
-                : field === 'mfyAgent'
-                ? 'MFY Agent (%)'
-                : 'Punkt Transfer (%)'}
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={formState.distribution[field]}
-              onChange={(e) => handleDistributionChange(field, e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+      <div className="space-y-4">
+        {/* Asosiy taqsimlashlar */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Asosiy Taqsimlashlar (Yig'indi 100% bo'lishi kerak)</h4>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {['punkt', 'viloyatAgent', 'tumanAgent', 'mfyAgent', 'finance'].map((field) => (
+              <div key={field}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {field === 'punkt'
+                    ? 'Punkt (%)'
+                    : field === 'viloyatAgent'
+                    ? 'Viloyat Agent (%)'
+                    : field === 'tumanAgent'
+                    ? 'Tuman Agent (%)'
+                    : field === 'mfyAgent'
+                    ? 'MFY Agent (%)'
+                    : 'Moliya (%)'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formState.distribution[field] || 0}
+                  onChange={(e) => handleDistributionChange(field, e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+
+        {/* Punkt Transfer (qo'shimcha) */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Punkt Transfer (Qo'shimcha)</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Punkt Transfer (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={formState.distribution.punktTransfer || 0}
+                onChange={(e) => handleDistributionChange('punktTransfer', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Qo'shimcha bonus. Agar &gt; 0 bo'lsa, avtomatik 50/50 ga bo'linadi (fromPunkt/toPunkt)
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-md px-4 py-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <InfoOutlined className="w-4 h-4 text-indigo-500" />
-            <span>Asosiy foizlar yig‘indisi: </span>
-            <span className="font-semibold text-gray-800">{sumOfBasePercents}%</span>
+            <span>Asosiy taqsimlashlar yig'indisi: </span>
+            <span className={`font-semibold ${sumOfBasePercents === 100 ? 'text-green-600' : 'text-gray-800'}`}>
+              {sumOfBasePercents}%
+            </span>
+            {sumOfBasePercents === 100 && (
+              <span className="text-xs text-green-600">✓</span>
+            )}
           </div>
           {remainingPercent !== 0 && (
             <div className="flex items-center gap-2 text-xs">
@@ -232,9 +269,15 @@ const KPIDistributionForm = ({
                   onClick={handleBalanceDistribution}
                   className="text-indigo-600 hover:text-indigo-800 text-xs underline"
                 >
-                  MFY ga qo‘shish
+                  Moliya ga qo'shish
                 </button>
               )}
+            </div>
+          )}
+          {formState.distribution.punktTransfer > 0 && (
+            <div className="flex items-center gap-2 text-xs text-blue-600 mt-1">
+              <InfoOutlined className="w-3 h-3" />
+              <span>Punkt Transfer: {formState.distribution.punktTransfer}% (avtomatik 50/50 bo'linadi)</span>
             </div>
           )}
         </div>

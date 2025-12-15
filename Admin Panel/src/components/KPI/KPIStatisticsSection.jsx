@@ -158,7 +158,7 @@ const KPIStatisticsSection = () => {
       {/* Distribution Stats */}
       <div>
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Taqsimlash bo'yicha</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <StatCard
             icon={Store}
             label="Punktlar"
@@ -182,6 +182,12 @@ const KPIStatisticsSection = () => {
             label="MFY agentlari"
             value={`${formatNumber(statistics?.totalMfyAgent)} so'm`}
             color="bg-teal-100 text-teal-600"
+          />
+          <StatCard
+            icon={AccountBalance}
+            label="Moliya"
+            value={`${formatNumber(statistics?.totalFinance)} so'm`}
+            color="bg-green-100 text-green-600"
           />
           <StatCard
             icon={SwapHoriz}

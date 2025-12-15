@@ -21,3 +21,4 @@ const FinanceReportCard = ({ title, value, icon: Icon, color = 'bg-blue-500', su
 
 export default FinanceReportCard;
 
+

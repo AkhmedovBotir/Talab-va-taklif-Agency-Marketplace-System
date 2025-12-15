@@ -104,14 +104,12 @@ const menuItems = [
     label: 'Moliya',
     path: '/dashboard/finance',
     children: [
-      { icon: Assessment, label: 'Kunlik hisobot', path: '/dashboard/finance/reports/daily' },
-      { icon: Assessment, label: 'Haftalik hisobot', path: '/dashboard/finance/reports/weekly' },
-      { icon: Assessment, label: 'Oylik hisobot', path: '/dashboard/finance/reports/monthly' },
-      { icon: Assessment, label: 'Yillik hisobot', path: '/dashboard/finance/reports/yearly' },
-      { icon: Assessment, label: 'Belgilangan muddat', path: '/dashboard/finance/reports/custom' },
+      { icon: AccountBalance, label: 'Balans', path: '/dashboard/finance/balance' },
+      { icon: Assessment, label: 'Hisobotlar', path: '/dashboard/finance/reports' },
       { icon: PendingActions, label: 'Topshiruvlar', path: '/dashboard/finance/submissions' },
       { icon: History, label: 'Transaksiyalar', path: '/dashboard/finance/transactions' },
       { icon: TrendingUp, label: 'Statistika', path: '/dashboard/finance/statistics' },
+      { icon: CreditCard, label: 'KPI To\'lovlar', path: '/dashboard/finance/kpi-payments' },
     ],
   },
   {

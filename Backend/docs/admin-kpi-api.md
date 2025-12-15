@@ -62,13 +62,14 @@ All endpoints require admin authentication using JWT token from Admin login.
   "_id": "string (MongoDB ObjectId)",
   "name": "string (unique, required)",
   "description": "string (optional)",
-  "distribution": {
-    "punkt": "number (0-100, required)",
-    "viloyatAgent": "number (0-100, required)",
-    "tumanAgent": "number (0-100, required)",
-    "mfyAgent": "number (0-100, required)",
-    "punktTransfer": "number (0-100, optional, default: 0)"
-  },
+    "distribution": {
+      "punkt": "number (0-100, required)",
+      "viloyatAgent": "number (0-100, required)",
+      "tumanAgent": "number (0-100, required)",
+      "mfyAgent": "number (0-100, required)",
+      "finance": "number (0-100, required)",
+      "punktTransfer": "number (0-100, optional, default: 0)"
+    },
   "isActive": "boolean (default: true)",
   "createdBy": "ObjectId (reference to Admin)",
   "createdAt": "string (ISO 8601 date)",
@@ -77,7 +78,7 @@ All endpoints require admin authentication using JWT token from Admin login.
 ```
 
 **Important:** 
-- The sum of `punkt`, `viloyatAgent`, `tumanAgent`, and `mfyAgent` must equal 100%.
+- The sum of `punkt`, `viloyatAgent`, `tumanAgent`, `mfyAgent`, and `finance` must equal 100%.
 - `punktTransfer` is optional and represents additional bonus percentage for inter-punkt transfers.
 - If `punktTransfer` > 0, this percentage is automatically split 50/50 between `fromPunkt` and `toPunkt` (no separate distribution config needed).
 
@@ -98,11 +99,12 @@ All endpoints require admin authentication using JWT token from Admin login.
   "distributionConfig": "ObjectId (reference to KpiBonusDistribution)",
   "amounts": {
     "punkt": "number",
-    "viloyatAgent": "number",
-    "tumanAgent": "number",
-    "mfyAgent": "number",
-    "punktTransfer": "number"
-  },
+      "viloyatAgent": "number",
+      "tumanAgent": "number",
+      "mfyAgent": "number",
+      "finance": "number",
+      "punktTransfer": "number"
+    },
   "recipients": {
     "punkt": "ObjectId (reference to Punkt, optional)",
     "viloyatAgent": "ObjectId (reference to Agent, optional)",
@@ -146,10 +148,11 @@ Get default/initial KPI distribution values that admin can use to prefill the cr
     "name": "Default KPI Distribution",
     "description": "Tavsiyaviy boshlang'ich taqsimlash. Admin kerak bo'lsa qiymatlarni o'zgartirishi mumkin.",
         "distribution": {
-          "punkt": 20,
-          "viloyatAgent": 20,
-          "tumanAgent": 20,
-          "mfyAgent": 40,
+          "punkt": 15,
+          "viloyatAgent": 15,
+          "tumanAgent": 15,
+          "mfyAgent": 35,
+          "finance": 20,
           "punktTransfer": 0
         },
         "notes": [
@@ -200,11 +203,11 @@ Create a new KPI bonus distribution configuration.
 
 **Validation Rules:**
 - `name`: Required, unique
-- **Asosiy taqsimlashlar:** `distribution.punkt + viloyatAgent + tumanAgent + mfyAgent` must equal 100
+- **Asosiy taqsimlashlar:** `distribution.punkt + viloyatAgent + tumanAgent + mfyAgent + finance` must equal 100
 - `punktTransfer`: Optional, 0-100. If > 0, automatically split 50/50 between fromPunkt and toPunkt
 - **Faqat bitta active distribution:** Agar yangi distribution `isActive: true` bo'lsa, boshqa barcha distributionlar avtomatik `isActive: false` bo'ladi
 
-> **Eslatma:** `punktTransfer` qo'shimcha bonus bo'lib, asosiy foizlar yig'indisiga kirmaydi. Avvalo `punkt + viloyatAgent + tumanAgent + mfyAgent = 100%` ekanligiga ishonch hosil qiling, so'ng zaruratga qarab `punktTransfer` qo'shing.
+> **Eslatma:** `punktTransfer` qo'shimcha bonus bo'lib, asosiy foizlar yig'indisiga kirmaydi. Avvalo `punkt + viloyatAgent + tumanAgent + mfyAgent + finance = 100%` ekanligiga ishonch hosil qiling, so'ng zaruratga qarab `punktTransfer` qo'shing.
 
 **Success Response (201 Created):**
 
@@ -217,10 +220,11 @@ Create a new KPI bonus distribution configuration.
     "name": "Standard Distribution",
     "description": "Standard KPI bonus distribution for all orders",
     "distribution": {
-      "punkt": 20,
-      "viloyatAgent": 20,
-      "tumanAgent": 20,
-      "mfyAgent": 40,
+      "punkt": 15,
+      "viloyatAgent": 15,
+      "tumanAgent": 15,
+      "mfyAgent": 35,
+      "finance": 20,
       "punktTransfer": 10
     },
     "isActive": true,
@@ -232,7 +236,7 @@ Create a new KPI bonus distribution configuration.
 
 **Error Responses:**
 - **400 Bad Request** - Validation error:
-  - `Asosiy taqsimlashlar yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: X%` - Asosiy 4 ta foiz (punkt, viloyatAgent, tumanAgent, mfyAgent) yig'indisi 100% bo'lishi kerak
+  - `Asosiy taqsimlashlar yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: X%` - Asosiy 5 ta foiz (punkt, viloyatAgent, tumanAgent, mfyAgent, finance) yig'indisi 100% bo'lishi kerak
   - Duplicate name error
 - **401 Unauthorized** - Token missing or invalid
 - **500 Internal Server Error** - Server error
@@ -310,10 +314,11 @@ Get a specific KPI bonus distribution configuration.
     "name": "Standard Distribution",
     "description": "Standard KPI bonus distribution",
     "distribution": {
-      "punkt": 20,
-      "viloyatAgent": 20,
-      "tumanAgent": 20,
-      "mfyAgent": 40
+      "punkt": 15,
+      "viloyatAgent": 15,
+      "tumanAgent": 15,
+      "mfyAgent": 35,
+      "finance": 20
     },
     "isActive": true,
     "createdBy": {
@@ -371,10 +376,11 @@ Update an existing KPI bonus distribution configuration.
     "_id": "507f1f77bcf86cd799439011",
     "name": "Updated Distribution",
     "distribution": {
-      "punkt": 20,
-      "viloyatAgent": 20,
-      "tumanAgent": 20,
-      "mfyAgent": 40
+      "punkt": 15,
+      "viloyatAgent": 15,
+      "tumanAgent": 15,
+      "mfyAgent": 35,
+      "finance": 20
     },
     "isActive": true,
     "updatedAt": "2024-01-15T11:00:00.000Z"
@@ -472,10 +478,11 @@ Get all KPI bonus transactions with filters.
         "name": "Standard Distribution"
       },
         "amounts": {
-          "punkt": 600,
-          "viloyatAgent": 600,
-          "tumanAgent": 600,
-          "mfyAgent": 1200,
+          "punkt": 450,
+          "viloyatAgent": 450,
+          "tumanAgent": 450,
+          "mfyAgent": 1050,
+          "finance": 600,
           "punktTransfer": 0
         },
         "recipients": {
@@ -534,10 +541,11 @@ Get a specific KPI bonus transaction.
         },
         "totalKpiAmount": 3000,
         "amounts": {
-          "punkt": 600,
-          "viloyatAgent": 600,
-          "tumanAgent": 600,
-          "mfyAgent": 1200
+          "punkt": 450,
+          "viloyatAgent": 450,
+          "tumanAgent": 450,
+          "mfyAgent": 1050,
+          "finance": 600
         },
         "recipients": {
           "punkt": {
@@ -1023,10 +1031,11 @@ Aniq bir punktning batafsil KPI ma'lumotlari va transaksiyalarini olish.
 2. **Distribution:**
    - Each recipient gets their percentage of `totalKpiAmount`
    - **Example:** If `totalKpiAmount = 100` and distribution is:
-     - `punkt = 20%` → `punktAmount = 20`
-     - `viloyatAgent = 20%` → `viloyatAgentAmount = 20`
-     - `tumanAgent = 20%` → `tumanAgentAmount = 20`
-     - `mfyAgent = 40%` → `mfyAgentAmount = 40`
+     - `punkt = 15%` → `punktAmount = 15`
+     - `viloyatAgent = 15%` → `viloyatAgentAmount = 15`
+     - `tumanAgent = 15%` → `tumanAgentAmount = 15`
+     - `mfyAgent = 35%` → `mfyAgentAmount = 35`
+     - `finance = 20%` → `financeAmount = 20`
 
 3. **Punkt Transfer Bonus:**
    - If `punktTransfer > 0` and order has `punktToPunktRequests`:
@@ -1043,6 +1052,7 @@ Aniq bir punktning batafsil KPI ma'lumotlari va transaksiyalarini olish.
    - **Viloyat Agent:** Active agent for the delivery viloyat (no tuman, no mfy)
    - **Tuman Agent:** Active agent for the delivery tuman (no mfy)
    - **MFY Agent:** The agent assigned to the order (`assignedToAgent`)
+   - **Finance (Moliya Bo'limi):** Avtomatik ajratiladi (distribution.finance foiziga qarab)
    - **Punkt Transfer:** From `punktToPunktRequests` if order was transferred between punkts (50/50 split)
 
 ---
@@ -1081,11 +1091,11 @@ curl -X POST http://localhost:5000/api/admins/kpi/distributions \
     "name": "Standard Distribution",
     "description": "Standard KPI bonus distribution",
     "distribution": {
-      "contragent": 20,
-      "punkt": 20,
-      "viloyatAgent": 20,
-      "tumanAgent": 25,
-      "mfyAgent": 35
+      "punkt": 15,
+      "viloyatAgent": 15,
+      "tumanAgent": 15,
+      "mfyAgent": 35,
+      "finance": 20
     }
   }'
 ```
@@ -1119,7 +1129,7 @@ curl -X GET "http://localhost:5000/api/admins/kpi/transactions?orderId=507f1f77b
 5. **Payment Tracking:** Use the `isPaid` field to track which bonuses have been paid out. This can be updated manually or through a separate payment API.
 
 6. **Validation Messages:**
-   - Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent) yig'indisi 100% bo'lishi shart
+   - Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance) yig'indisi 100% bo'lishi shart
    - Punkt transfer foizi alohida va 0-100% orasida bo'lishi mumkin
    - Punkt transfer > 0 bo'lsa, bu foizning yarmi avtomatik fromPunkt ga, yarmi toPunkt ga ajratiladi (50/50 split)
 

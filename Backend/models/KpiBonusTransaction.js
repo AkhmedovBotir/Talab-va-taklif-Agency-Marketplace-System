@@ -65,6 +65,11 @@ const kpiBonusTransactionSchema = new mongoose.Schema(
         default: 0,
         min: 0,
       },
+      finance: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
       punktTransfer: {
         type: Number,
         default: 0,

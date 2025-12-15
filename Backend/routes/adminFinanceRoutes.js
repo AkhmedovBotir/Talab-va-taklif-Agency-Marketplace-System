@@ -19,6 +19,11 @@ const {
   getStatisticsByDistrict,
   getStatisticsByMfy,
   getAgentPerformance,
+  getFinanceBalance,
+  getTotalReceived,
+  getTotalDistributed,
+  getFinanceKpiAmount,
+  getTotalBalance,
 } = require('../controllers/adminFinanceController');
 const { adminAuth } = require('../middleware/auth');
 
@@ -71,6 +76,23 @@ router.get('/statistics/mfy', adminAuth, getStatisticsByMfy);
 
 // Agentlar faolligi
 router.get('/statistics/agent-performance', adminAuth, getAgentPerformance);
+
+// ==================== MOLIYA BALANSLARI ====================
+
+// Umumiy balans (Umumiy tushgan summa, Tarqatilgan summa, Moliya bo'limiga ajratilgan summa)
+router.get('/balance', adminAuth, getFinanceBalance);
+
+// Umumiy tushgan summa
+router.get('/balance/total-received', adminAuth, getTotalReceived);
+
+// Tarqatilgan summa (KPI bonuslar)
+router.get('/balance/total-distributed', adminAuth, getTotalDistributed);
+
+// Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
+router.get('/balance/finance-kpi', adminAuth, getFinanceKpiAmount);
+
+// Umumiy balans (Tushgan - Tarqatilgan)
+router.get('/balance/total-balance', adminAuth, getTotalBalance);
 
 module.exports = router;
 

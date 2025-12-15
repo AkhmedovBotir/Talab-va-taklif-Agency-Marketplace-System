@@ -1783,5 +1783,150 @@ export const financeAPI = {
     const queryString = queryParams.toString();
     return apiRequest(`/admin-finance/statistics/agent-performance${queryString ? `?${queryString}` : ''}`);
   },
+
+  // Balance API functions
+  // Get overall balance
+  getBalance: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/balance${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get total received amount
+  getTotalReceived: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/balance/total-received${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get total distributed amount
+  getTotalDistributed: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/balance/total-distributed${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get finance KPI amount
+  getFinanceKpi: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/balance/finance-kpi${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get total balance
+  getTotalBalance: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/balance/total-balance${queryString ? `?${queryString}` : ''}`);
+  },
+};
+
+// KPI Payment Distribution API
+export const kpiPaymentAPI = {
+  // Get unpaid payments
+  getUnpaidPayments: async (params = {}) => {
+    const { 
+      recipientType, 
+      agentType, 
+      viloyatId, 
+      tumanId, 
+      mfyId, 
+      page = 1, 
+      limit = 50 
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (recipientType) queryParams.append('recipientType', recipientType);
+    if (agentType) queryParams.append('agentType', agentType);
+    if (viloyatId) queryParams.append('viloyatId', viloyatId);
+    if (tumanId) queryParams.append('tumanId', tumanId);
+    if (mfyId) queryParams.append('mfyId', mfyId);
+    
+    return apiRequest(`/admin-kpi-payments/unpaid?${queryParams.toString()}`);
+  },
+
+  // Get unpaid payments (grouped)
+  getUnpaidPaymentsGrouped: async (params = {}) => {
+    const { recipientType, agentType } = params;
+    const queryParams = new URLSearchParams();
+    
+    if (recipientType) queryParams.append('recipientType', recipientType);
+    if (agentType) queryParams.append('agentType', agentType);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-kpi-payments/unpaid/grouped${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Mark payments as paid
+  markAsPaid: async (paymentIds, notes) => {
+    return apiRequest('/admin-kpi-payments/mark-as-paid', {
+      method: 'POST',
+      body: JSON.stringify({ paymentIds, notes }),
+    });
+  },
+
+  // Get statistics
+  getStatistics: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-kpi-payments/statistics${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get paid payments
+  getPaidPayments: async (params = {}) => {
+    const { 
+      recipientType, 
+      agentType, 
+      startDate, 
+      endDate, 
+      page = 1, 
+      limit = 50 
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (recipientType) queryParams.append('recipientType', recipientType);
+    if (agentType) queryParams.append('agentType', agentType);
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    return apiRequest(`/admin-kpi-payments/paid?${queryParams.toString()}`);
+  },
+
+  // Sync payments
+  syncPayments: async () => {
+    return apiRequest('/admin-kpi-payments/sync', {
+      method: 'POST',
+    });
+  },
 };
 

@@ -630,3 +630,4 @@ export default PaymentComponent;
 **Yaratilgan:** 2024  
 **Versiya:** 1.0.0
 
+

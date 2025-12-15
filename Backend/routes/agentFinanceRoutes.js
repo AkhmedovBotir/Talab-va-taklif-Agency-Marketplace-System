@@ -75,3 +75,4 @@ router.get('/province/statistics', agentAuth, getProvinceStatistics);
 
 module.exports = router;
 
+

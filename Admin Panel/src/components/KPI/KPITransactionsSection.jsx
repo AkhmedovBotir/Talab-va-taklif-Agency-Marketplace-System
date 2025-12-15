@@ -140,6 +140,10 @@ const TransactionDetailModal = ({ transaction, open, onClose }) => {
                   <span className="text-gray-600">MFY agent:</span>
                   <span className="font-medium">{formatNumber(transaction.amounts?.mfyAgent)} so'm</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Moliya:</span>
+                  <span className="font-medium">{formatNumber(transaction.amounts?.finance)} so'm</span>
+                </div>
                 {transaction.amounts?.punktTransfer > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Punkt transfer:</span>
@@ -395,9 +399,29 @@ const KPITransactionsSection = () => {
                             P: {formatNumber(transaction.amounts.punkt)}
                           </span>
                         )}
+                        {transaction.amounts?.viloyatAgent > 0 && (
+                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
+                            V: {formatNumber(transaction.amounts.viloyatAgent)}
+                          </span>
+                        )}
+                        {transaction.amounts?.tumanAgent > 0 && (
+                          <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded">
+                            T: {formatNumber(transaction.amounts.tumanAgent)}
+                          </span>
+                        )}
                         {transaction.amounts?.mfyAgent > 0 && (
                           <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded">
                             M: {formatNumber(transaction.amounts.mfyAgent)}
+                          </span>
+                        )}
+                        {transaction.amounts?.finance > 0 && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                            F: {formatNumber(transaction.amounts.finance)}
+                          </span>
+                        )}
+                        {transaction.amounts?.punktTransfer > 0 && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                            TR: {formatNumber(transaction.amounts.punktTransfer)}
                           </span>
                         )}
                       </div>

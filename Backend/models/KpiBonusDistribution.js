@@ -42,6 +42,13 @@ const kpiBonusDistributionSchema = new mongoose.Schema(
         max: [100, 'MFY agent foizi 100 dan katta bo\'la olmaydi'],
         default: 0,
       },
+      finance: {
+        type: Number,
+        required: true,
+        min: [0, 'Moliya bo\'limi foizi 0 dan kichik bo\'la olmaydi'],
+        max: [100, 'Moliya bo\'limi foizi 100 dan katta bo\'la olmaydi'],
+        default: 0,
+      },
       // Punktlar orasida almashishda qo'shimcha foiz
       // Bu foizning yarmi fromPunkt ga, yarmi toPunkt ga ajratiladi
       punktTransfer: {
@@ -73,7 +80,8 @@ kpiBonusDistributionSchema.pre('save', function (next) {
     this.distribution.punkt +
     this.distribution.viloyatAgent +
     this.distribution.tumanAgent +
-    this.distribution.mfyAgent;
+    this.distribution.mfyAgent +
+    this.distribution.finance;
 
   if (total !== 100) {
     return next(
