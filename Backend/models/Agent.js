@@ -42,6 +42,14 @@ const agentSchema = new mongoose.Schema(
       enum: ['active', 'inactive'],
       default: 'active',
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -90,8 +98,16 @@ agentSchema.methods.toJSON = function () {
 agentSchema.index({ viloyat: 1 });
 agentSchema.index({ tuman: 1 });
 agentSchema.index({ mfy: 1 });
-agentSchema.index({ phone: 1 }, { unique: true });
+// Unique index for phone - only for non-deleted agents
+// Note: MongoDB partialFilterExpression doesn't support $or, so we handle duplicates in code
+// This index allows multiple deleted agents to have the same phone
+agentSchema.index({ phone: 1 }, { 
+  unique: true, 
+  partialFilterExpression: { isDeleted: false } 
+});
 agentSchema.index({ status: 1 });
+agentSchema.index({ isDeleted: 1 });
+agentSchema.index({ deletedAt: 1 });
 
 const Agent = mongoose.model('Agent', agentSchema);
 

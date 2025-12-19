@@ -6,7 +6,7 @@ import TransactionTable from '../../components/Finance/TransactionTable';
 import ViewTransactionModal from '../../components/Finance/ViewTransactionModal';
 import { History, Search, Clear } from '@mui/icons-material';
 
-const Transactions = () => {
+const Transactions = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -101,19 +101,21 @@ const Transactions = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
-            <History className="text-indigo-600" />
-            Transaksiyalar
-          </h1>
-          <p className="text-gray-600">Barcha to'lov transaksiyalari</p>
-        </div>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+              <History className="text-indigo-600" />
+              Transaksiyalar
+            </h1>
+            <p className="text-gray-600">Barcha to'lov transaksiyalari</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Filters */}
       <motion.div

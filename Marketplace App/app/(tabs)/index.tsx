@@ -14,17 +14,20 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
+import LocationSelector from '../../components/LocationSelector';
 import PartnershipBlock from '../../components/PartnershipBlock';
 import ProductCard from '../../components/ui/ProductCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useLocation } from '../../contexts/LocationContext';
 import apiService, { FeaturedContragent, Product } from '../../services/api';
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { unreadCount } = useNotification();
+  const { selectedTuman } = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,10 +52,23 @@ export default function HomeScreen() {
         status: 'active',
       });
 
+      // Filter products by selected tuman
+      let filteredProducts = response.data;
+      if (selectedTuman) {
+        filteredProducts = response.data.filter((product) => {
+          if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
+            return false; // Hide products without delivery regions
+          }
+          return product.deliveryRegions.some((region) => {
+            return region.tuman?._id === selectedTuman._id;
+          });
+        });
+      }
+
       if (append) {
-        setProducts((prev) => [...prev, ...response.data]);
+        setProducts((prev) => [...prev, ...filteredProducts]);
       } else {
-        setProducts(response.data);
+        setProducts(filteredProducts);
       }
 
       setPage(response.page);
@@ -65,7 +81,7 @@ export default function HomeScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [selectedTuman]);
 
   const loadFeaturedContragents = useCallback(async () => {
     try {
@@ -109,6 +125,13 @@ export default function HomeScreen() {
     loadFeaturedContragents();
   }, [loadProducts, loadFeaturedContragents]);
 
+  // Reload products when location changes
+  useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+    loadProducts(1, false);
+  }, [selectedTuman]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     setPage(1);
@@ -128,7 +151,7 @@ export default function HomeScreen() {
   };
 
   const { isAuthenticated } = useAuth();
-  const { addToCart } = useCart();
+  const { addToCart, getCartItemQuantity } = useCart();
 
   const handleAddToCart = async (product: Product) => {
     if (!isAuthenticated) {
@@ -182,13 +205,17 @@ export default function HomeScreen() {
     );
   };
 
-  const renderItem = ({ item }: { item: Product }) => (
-    <ProductCard
-      product={item}
-      onPress={handleProductPress}
-      onAddToCart={handleAddToCart}
-    />
-  );
+  const renderItem = ({ item }: { item: Product }) => {
+    const isInCart = getCartItemQuantity(item._id) > 0;
+    return (
+      <ProductCard
+        product={item}
+        onPress={handleProductPress}
+        onAddToCart={handleAddToCart}
+        isInCart={isInCart}
+      />
+    );
+  };
 
   const renderFooter = () => {
     if (!loadingMore) return null;
@@ -298,7 +325,12 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="Bosh sahifa" onNotificationPress={handleNotificationPress} unreadCount={unreadCount} />
+      <Header 
+        title="Marketplace" 
+        onNotificationPress={handleNotificationPress} 
+        unreadCount={unreadCount}
+      />
+      <LocationSelector />
       
       {loading && products.length === 0 ? (
         <View style={styles.loadingContainer}>

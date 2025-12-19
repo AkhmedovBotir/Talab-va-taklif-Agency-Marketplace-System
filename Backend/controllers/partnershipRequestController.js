@@ -44,21 +44,26 @@ const createPartnershipRequest = async (req, res) => {
       });
     }
 
-    // Check if user already has a pending request
-    const existingRequest = await PartnershipRequest.findOne({
-      marketplaceUser: req.user.userId,
-      status: 'pending',
-    });
-
-    if (existingRequest) {
-      return res.status(400).json({
-        success: false,
-        message: 'Sizda allaqachon ko\'rib chiqilayotgan hamkorlik so\'rovi mavjud',
+    // Check if user already has a pending request (only if authenticated)
+    let marketplaceUserId = null;
+    if (req.user && req.user.userId) {
+      marketplaceUserId = req.user.userId;
+      
+      const existingRequest = await PartnershipRequest.findOne({
+        marketplaceUser: marketplaceUserId,
+        status: 'pending',
       });
+
+      if (existingRequest) {
+        return res.status(400).json({
+          success: false,
+          message: 'Sizda allaqachon ko\'rib chiqilayotgan hamkorlik so\'rovi mavjud',
+        });
+      }
     }
 
     const partnershipRequest = await PartnershipRequest.create({
-      marketplaceUser: req.user.userId,
+      marketplaceUser: marketplaceUserId || null,
       companyName,
       inn,
       mfo,

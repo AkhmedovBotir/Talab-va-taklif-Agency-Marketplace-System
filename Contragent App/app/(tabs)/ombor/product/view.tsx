@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import ImageViewer from '../../../../components/ImageViewer';
 import { apiService, Product } from '../../../../services/api';
+import { formatNumberDisplay } from '../../../../utils/formatNumber';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -358,14 +359,14 @@ export default function ProductViewScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Narx</Text>
             <Text style={[styles.infoValue, styles.priceValue]}>
-              {product.price.toLocaleString()} so'm
+              {formatNumberDisplay(product.price)} so'm
             </Text>
           </View>
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Asl narx</Text>
             <Text style={styles.infoValue}>
-              {product.originalPrice.toLocaleString()} so'm
+              {formatNumberDisplay(product.originalPrice)} so'm
             </Text>
           </View>
 

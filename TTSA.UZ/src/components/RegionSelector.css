@@ -1,0 +1,153 @@
+.region-selector {
+  position: relative;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.region-selector-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.required {
+  color: #e74c3c;
+}
+
+.region-selector-input-wrapper {
+  position: relative;
+}
+
+.region-selector-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  background: white;
+  transition: border-color 0.3s;
+}
+
+.region-selector-input:hover {
+  border-color: #3498db;
+}
+
+.region-selector-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.region-selector-arrow {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.region-selector-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  margin-top: 0.25rem;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.region-selector-search {
+  padding: 0.75rem;
+  border-bottom: 1px solid #eee;
+}
+
+.region-selector-search-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.region-selector-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 250px;
+}
+
+.region-selector-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.region-selector-item:hover {
+  background-color: #f8f9fa;
+}
+
+.region-selector-item.selected {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.region-selector-loading,
+.region-selector-empty,
+.region-selector-error {
+  padding: 1.5rem;
+  text-align: center;
+  color: #666;
+}
+
+.region-selector-error {
+  color: #e74c3c;
+}
+
+.region-selector-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-top: 1px solid #eee;
+  background-color: #f8f9fa;
+}
+
+.region-selector-pagination-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.region-selector-pagination-btn:hover:not(:disabled) {
+  background-color: #3498db;
+  color: white;
+  border-color: #3498db;
+}
+
+.region-selector-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.region-selector-pagination-info {
+  font-size: 0.9rem;
+  color: #666;
+}
+

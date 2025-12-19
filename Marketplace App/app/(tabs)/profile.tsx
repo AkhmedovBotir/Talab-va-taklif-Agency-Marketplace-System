@@ -248,41 +248,32 @@ export default function ProfileScreen() {
     }
   };
 
-  const handlePickImage = async () => {
-    try {
-      const result: ImagePickerResponse = await new Promise((resolve) => {
-        launchImageLibrary(
-          {
-            mediaType: 'photo' as MediaType,
-            quality: 0.8,
-            includeBase64: true,
-            maxWidth: 1024,
-            maxHeight: 1024,
-          },
-          resolve
-        );
-      });
+  const handlePickImage = () => {
+    const options = {
+      mediaType: 'photo' as MediaType,
+      quality: 0.8,
+      includeBase64: true,
+    };
 
-      if (result.didCancel) {
+    launchImageLibrary(options, (response: ImagePickerResponse) => {
+      if (response.didCancel) {
         return;
       }
 
-      if (result.errorMessage) {
-        Alert.alert('Xatolik', result.errorMessage || 'Rasm tanlashda xatolik yuz berdi');
+      if (response.errorMessage) {
+        Alert.alert('Xatolik', response.errorMessage || 'Rasm tanlashda xatolik yuz berdi');
         return;
       }
 
-      if (result.assets && result.assets[0]) {
-        const asset = result.assets[0];
+      if (response.assets && response.assets[0]) {
+        const asset = response.assets[0];
         if (asset.uri && asset.base64) {
-          const imageExtension = asset.type?.split('/')[1] || 'jpeg';
-          const base64Image = `data:image/${imageExtension};base64,${asset.base64}`;
-          await handleUploadAvatar(base64Image);
+          const mimeType = asset.type || 'image/jpeg';
+          const base64Image = `data:${mimeType};base64,${asset.base64}`;
+          handleUploadAvatar(base64Image);
         }
       }
-    } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Rasm tanlashda xatolik yuz berdi');
-    }
+    });
   };
 
   const handleUploadAvatar = async (base64Image: string) => {
@@ -938,3 +929,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

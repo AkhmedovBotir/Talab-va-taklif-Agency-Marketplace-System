@@ -1,4 +1,5 @@
 const Region = require('../models/Region');
+const { cacheInvalidators } = require('../middleware/cache');
 
 // Create new region
 const createRegion = async (req, res) => {
@@ -35,6 +36,9 @@ const createRegion = async (req, res) => {
 
     // Populate parent if exists
     await region.populate('parent', 'name type code');
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateRegionCache();
 
     res.status(201).json({
       success: true,
@@ -198,6 +202,9 @@ const updateRegion = async (req, res) => {
       });
     }
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateRegionCache();
+
     res.status(200).json({
       success: true,
       message: 'Xudud muvaffaqiyatli yangilandi',
@@ -252,6 +259,9 @@ const deleteRegion = async (req, res) => {
 
     // Delete the region itself
     await Region.findByIdAndDelete(id);
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateRegionCache();
 
     res.status(200).json({
       success: true,
@@ -399,6 +409,9 @@ const updateRegionStatus = async (req, res) => {
         message: 'Xudud topilmadi',
       });
     }
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateRegionCache();
 
     res.status(200).json({
       success: true,

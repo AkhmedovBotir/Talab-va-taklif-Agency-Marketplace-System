@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { apiService, Product } from '../../../services/api';
+import { formatNumberDisplay } from '../../../utils/formatNumber';
 
 export default function MaxsulotlarScreen() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -187,7 +188,7 @@ export default function MaxsulotlarScreen() {
               <View style={styles.productDetails}>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Narx:</Text>
-                  <Text style={styles.detailValue}>{item.price.toLocaleString()} so'm</Text>
+                  <Text style={styles.detailValue}>{formatNumberDisplay(item.price)} so'm</Text>
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Miqdor:</Text>

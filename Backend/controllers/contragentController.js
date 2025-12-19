@@ -94,6 +94,9 @@ const createContragent = async (req, res) => {
     await contragent.populate('tuman', 'name type code');
     await contragent.populate('mfy', 'name type code');
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateContragentCache();
+
     res.status(201).json({
       success: true,
       message: 'Kontragent muvaffaqiyatli yaratildi',
@@ -336,6 +339,9 @@ const updateContragent = async (req, res) => {
       await contragent.populate('tuman', 'name type code');
       await contragent.populate('mfy', 'name type code');
 
+      // Invalidate cache
+      await cacheInvalidators.invalidateContragentCache();
+
       return res.status(200).json({
         success: true,
         message: 'Kontragent muvaffaqiyatli yangilandi',
@@ -376,6 +382,9 @@ const updateContragent = async (req, res) => {
       });
     }
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateContragentCache();
+
     res.status(200).json({
       success: true,
       message: 'Kontragent muvaffaqiyatli yangilandi',
@@ -412,6 +421,9 @@ const deleteContragent = async (req, res) => {
         message: 'Kontragent topilmadi',
       });
     }
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateContragentCache();
 
     res.status(200).json({
       success: true,
@@ -568,6 +580,9 @@ const updateMyProfile = async (req, res) => {
       .populate('mfy', 'name type code')
       .select('-password');
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateContragentCache();
+
     res.status(200).json({
       success: true,
       message: 'Profil yangilandi',
@@ -598,6 +613,9 @@ const updateMyLogo = async (req, res) => {
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
       .select('-password');
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateContragentCache();
 
     res.status(200).json({
       success: true,

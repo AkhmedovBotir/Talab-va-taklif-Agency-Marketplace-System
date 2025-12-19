@@ -51,7 +51,7 @@ export default function Header({
           <View style={styles.backButtonPlaceholder} />
         )}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>
+          <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
         </View>
@@ -81,17 +81,17 @@ export default function Header({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e7',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
       },
       android: {
-        elevation: 4,
+        elevation: 2,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
       },
     }),
   },
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     minHeight: 56,
   },
   titleContainer: {
@@ -111,12 +111,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     pointerEvents: 'none',
+    paddingHorizontal: 60,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   backButton: {
     width: 40,
@@ -125,6 +127,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     zIndex: 10,
+    backgroundColor: '#f5f5f5',
   },
   backButtonPlaceholder: {
     width: 40,
@@ -136,25 +139,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     position: 'relative',
+    backgroundColor: '#f5f5f5',
   },
   badge: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: 4,
+    right: 4,
     backgroundColor: '#FF3B30',
-    borderRadius: 10,
+    borderRadius: 9,
     minWidth: 18,
     height: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
     borderWidth: 2,
     borderColor: '#fff',
   },
   badgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 });
 

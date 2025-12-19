@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { kpiAPI, regionAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import RegionSelect from '../Regions/RegionSelect';
 import { Visibility } from '@mui/icons-material';
 import KPIAgentDetailModal from './KPIAgentDetailModal';
 
@@ -14,7 +15,6 @@ const KPIViloyatAgentsSection = () => {
   const { showError } = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [agents, setAgents] = useState([]);
-  const [viloyatlar, setViloyatlar] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -29,17 +29,6 @@ const KPIViloyatAgentsSection = () => {
   });
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-
-  const fetchViloyatlar = async () => {
-    try {
-      const response = await regionAPI.getRegionsByType('viloyat', { status: 'active' });
-      if (response.success) {
-        setViloyatlar(response.data || []);
-      }
-    } catch (error) {
-      console.error('Viloyatlarni yuklashda xatolik:', error);
-    }
-  };
 
   const fetchAgents = async ({ page, limit } = {}) => {
     setLoading(true);
@@ -75,7 +64,6 @@ const KPIViloyatAgentsSection = () => {
   };
 
   useEffect(() => {
-    fetchViloyatlar();
     fetchAgents({ page: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -108,17 +96,13 @@ const KPIViloyatAgentsSection = () => {
       {/* Filters */}
       <div className="flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Viloyat</label>
-          <select
+          <RegionSelect
+            name="viloyatId"
             value={filters.viloyatId}
             onChange={(e) => handleFilterChange('viloyatId', e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Barchasi</option>
-            {viloyatlar.map((v) => (
-              <option key={v._id} value={v._id}>{v.name}</option>
-            ))}
-          </select>
+            label="Viloyat"
+            type="region"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">To'lov holati</label>

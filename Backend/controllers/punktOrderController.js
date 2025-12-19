@@ -5,6 +5,98 @@ const Region = require('../models/Region');
 const Agent = require('../models/Agent');
 const Contragent = require('../models/Contragent');
 
+// Helper function to handle deleted punkt references in order object
+// Keep deleted punkts but ensure they are properly marked
+// This function handles both populated objects and ID strings
+const removeDeletedPunktsFromOrder = async (orderObj) => {
+  // Helper to check if a punkt is deleted (handles both populated objects and ID strings)
+  const isPunktDeleted = async (punktRef) => {
+    if (!punktRef) return false;
+    
+    // If it's a populated object, check isDeleted property
+    if (typeof punktRef === 'object' && punktRef._id) {
+      // If it's populated but doesn't have _id, it means populate failed (deleted)
+      if (!punktRef._id) return true;
+      // Check isDeleted property
+      if (punktRef.isDeleted === true) return true;
+      // If populated successfully, it's not deleted
+      return false;
+    }
+    
+    // If it's an ID string or ObjectId, check in database
+    if (typeof punktRef === 'string' || (punktRef && punktRef.toString)) {
+      try {
+        const punktId = typeof punktRef === 'string' ? punktRef : punktRef.toString();
+        const punktDoc = await Punkt.findById(punktId).select('isDeleted');
+        return punktDoc && punktDoc.isDeleted === true;
+      } catch (error) {
+        // If error finding punkt, assume it's deleted
+        return true;
+      }
+    }
+    
+    return false;
+  };
+  
+  // Ensure deleted punkts are marked (but keep them, don't remove)
+  // Since we now populate with isDeleted, populated objects will have this flag
+  // We only need to handle cases where populate might have failed
+  if (orderObj.currentPunkt && typeof orderObj.currentPunkt === 'object' && !orderObj.currentPunkt.isDeleted) {
+    const deleted = await isPunktDeleted(orderObj.currentPunkt);
+    if (deleted && orderObj.currentPunkt._id) {
+      orderObj.currentPunkt.isDeleted = true;
+    }
+  }
+  
+  if (orderObj.confirmedByPunkt && typeof orderObj.confirmedByPunkt === 'object' && !orderObj.confirmedByPunkt.isDeleted) {
+    const deleted = await isPunktDeleted(orderObj.confirmedByPunkt);
+    if (deleted && orderObj.confirmedByPunkt._id) {
+      orderObj.confirmedByPunkt.isDeleted = true;
+    }
+  }
+  
+  if (orderObj.assignedByPunkt && typeof orderObj.assignedByPunkt === 'object' && !orderObj.assignedByPunkt.isDeleted) {
+    const deleted = await isPunktDeleted(orderObj.assignedByPunkt);
+    if (deleted && orderObj.assignedByPunkt._id) {
+      orderObj.assignedByPunkt.isDeleted = true;
+    }
+  }
+  
+  // Keep punktRequests from deleted punkts but mark them
+  if (orderObj.punktRequests && Array.isArray(orderObj.punktRequests)) {
+    for (const req of orderObj.punktRequests) {
+      if (req.punktId) {
+        if (typeof req.punktId === 'object' && req.punktId._id && !req.punktId.isDeleted) {
+          const deleted = await isPunktDeleted(req.punktId);
+          if (deleted) {
+            req.punktId.isDeleted = true;
+          }
+        }
+      }
+    }
+  }
+  
+  // Keep punktToPunktRequests from deleted punkts but mark them
+  if (orderObj.punktToPunktRequests && Array.isArray(orderObj.punktToPunktRequests)) {
+    for (const req of orderObj.punktToPunktRequests) {
+      if (req.fromPunktId && typeof req.fromPunktId === 'object' && req.fromPunktId._id && !req.fromPunktId.isDeleted) {
+        const deleted = await isPunktDeleted(req.fromPunktId);
+        if (deleted) {
+          req.fromPunktId.isDeleted = true;
+        }
+      }
+      if (req.toPunktId && typeof req.toPunktId === 'object' && req.toPunktId._id && !req.toPunktId.isDeleted) {
+        const deleted = await isPunktDeleted(req.toPunktId);
+        if (deleted) {
+          req.toPunktId.isDeleted = true;
+        }
+      }
+    }
+  }
+  
+  return orderObj;
+};
+
 // Get orders for punkt (o'z hududidagi buyurtmalar)
 const getMyOrders = async (req, res) => {
   try {
@@ -22,6 +114,13 @@ const getMyOrders = async (req, res) => {
       page = 1,
       limit = 50,
     } = req.query;
+
+    // Get list of deleted punkt IDs (excluding current user's punkt)
+    const deletedPunkts = await Punkt.find({ 
+      isDeleted: true,
+      _id: { $ne: punkt._id } // Exclude current user's punkt
+    }).select('_id');
+    const deletedPunktIds = deletedPunkts.map(p => p._id);
 
     // Build filter - include orders in punkt's region OR orders where punkt is involved
     const orConditions = [];
@@ -48,6 +147,47 @@ const getMyOrders = async (req, res) => {
     const filter = {
       $or: orConditions,
     };
+
+    // Exclude orders where currentPunkt, confirmedByPunkt, or assignedByPunkt is a deleted punkt (and not current user)
+    if (deletedPunktIds.length > 0) {
+      const andConditions = [
+        {
+          $or: [
+            { currentPunkt: { $nin: deletedPunktIds } },
+            { currentPunkt: punkt._id },
+            { currentPunkt: null },
+          ]
+        },
+        {
+          $or: [
+            { confirmedByPunkt: { $nin: deletedPunktIds } },
+            { confirmedByPunkt: punkt._id },
+            { confirmedByPunkt: null },
+          ]
+        },
+        {
+          $or: [
+            { assignedByPunkt: { $nin: deletedPunktIds } },
+            { assignedByPunkt: punkt._id },
+            { assignedByPunkt: null },
+          ]
+        }
+      ];
+      
+      // Exclude orders where punktToPunktRequests only involve deleted punkts (and not current user)
+      // If order has punktToPunktRequests, at least one should involve current user or non-deleted punkt
+      andConditions.push({
+        $or: [
+          { punktToPunktRequests: { $size: 0 } }, // No requests
+          { 'punktToPunktRequests.fromPunktId': punkt._id }, // Current user is fromPunkt
+          { 'punktToPunktRequests.toPunktId': punkt._id }, // Current user is toPunkt
+          // If all requests involve deleted punkts, MongoDB will filter them out
+          // We'll do additional filtering in shouldExcludeOrder
+        ]
+      });
+      
+      filter.$and = andConditions;
+    }
 
     // Additional filters
     if (status) {
@@ -126,16 +266,122 @@ const getMyOrders = async (req, res) => {
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
-      .populate('confirmedByPunkt', 'name phone viloyat tuman')
-      .populate('punktRequests.punktId', 'name phone viloyat tuman')
+      .populate({
+        path: 'confirmedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktRequests.punktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktToPunktRequests.fromPunktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktToPunktRequests.toPunktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'currentPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .populate('assignedToAgent', 'name phone viloyat tuman mfy')
-      .populate('assignedByPunkt', 'name phone viloyat tuman')
+      .populate({
+        path: 'assignedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    // Remove kpiBonusPercent from products
-    const ordersWithoutKpi = orders.map((order) => {
+    // Helper function to check if order should be excluded (belongs to deleted punkt that is not current punkt)
+    const shouldExcludeOrder = (orderObj) => {
+      // Check currentPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.currentPunkt && orderObj.currentPunkt.isDeleted === true) {
+        const currentPunktId = orderObj.currentPunkt._id?.toString() || orderObj.currentPunkt.toString();
+        if (currentPunktId !== punkt._id.toString()) {
+          return true; // Exclude - belongs to deleted punkt that is not current user
+        }
+      }
+      
+      // Check confirmedByPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.confirmedByPunkt && orderObj.confirmedByPunkt.isDeleted === true) {
+        const confirmedPunktId = orderObj.confirmedByPunkt._id?.toString() || orderObj.confirmedByPunkt.toString();
+        if (confirmedPunktId !== punkt._id.toString()) {
+          return true; // Exclude - confirmed by deleted punkt that is not current user
+        }
+      }
+      
+      // Check assignedByPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.assignedByPunkt && orderObj.assignedByPunkt.isDeleted === true) {
+        const assignedPunktId = orderObj.assignedByPunkt._id?.toString() || orderObj.assignedByPunkt.toString();
+        if (assignedPunktId !== punkt._id.toString()) {
+          return true; // Exclude - assigned by deleted punkt that is not current user
+        }
+      }
+      
+      // Check punktToPunktRequests - if all requests involve deleted punkts (and not current user), exclude
+      if (orderObj.punktToPunktRequests && Array.isArray(orderObj.punktToPunktRequests) && orderObj.punktToPunktRequests.length > 0) {
+        let hasValidRequest = false;
+        for (const req of orderObj.punktToPunktRequests) {
+          const fromPunktId = req.fromPunktId?._id?.toString() || req.fromPunktId?.toString() || req.fromPunktId;
+          const toPunktId = req.toPunktId?._id?.toString() || req.toPunktId?.toString() || req.toPunktId;
+          
+          // If request involves current user, it's valid
+          if (fromPunktId === punkt._id.toString() || toPunktId === punkt._id.toString()) {
+            hasValidRequest = true;
+            break;
+          }
+          
+          // If both punkts in request are deleted, skip this request
+          const fromDeleted = req.fromPunktId?.isDeleted === true;
+          const toDeleted = req.toPunktId?.isDeleted === true;
+          
+          // If neither punkt is deleted, it's a valid request
+          if (!fromDeleted && !toDeleted) {
+            hasValidRequest = true;
+            break;
+          }
+        }
+        
+        // If order only has requests with deleted punkts (and not involving current user), exclude
+        if (!hasValidRequest) {
+          return true;
+        }
+      }
+      
+      // Check punktRequests - if all requests involve deleted punkts (and not current user), exclude
+      if (orderObj.punktRequests && Array.isArray(orderObj.punktRequests) && orderObj.punktRequests.length > 0) {
+        let hasValidRequest = false;
+        for (const req of orderObj.punktRequests) {
+          const punktId = req.punktId?._id?.toString() || req.punktId?.toString() || req.punktId;
+          
+          // If request involves current user, it's valid
+          if (punktId === punkt._id.toString()) {
+            hasValidRequest = true;
+            break;
+          }
+          
+          // If punkt is not deleted, it's a valid request
+          if (req.punktId && req.punktId.isDeleted !== true) {
+            hasValidRequest = true;
+            break;
+          }
+        }
+        
+        // If order only has requests with deleted punkts (and not involving current user), exclude
+        if (!hasValidRequest) {
+          return true;
+        }
+      }
+      
+      return false; // Don't exclude
+    };
+
+    // Remove kpiBonusPercent from products and filter out orders from deleted punkts
+    const ordersWithoutKpi = [];
+    for (const order of orders) {
       const orderObj = order.toObject();
       if (orderObj.items) {
         orderObj.items = orderObj.items.map((item) => {
@@ -145,16 +391,22 @@ const getMyOrders = async (req, res) => {
           return item;
         });
       }
-      return orderObj;
-    });
+      // Handle deleted punkts
+      await removeDeletedPunktsFromOrder(orderObj);
+      
+      // Exclude orders that belong to deleted punkts (unless it's the current user's punkt)
+      if (!shouldExcludeOrder(orderObj)) {
+        ordersWithoutKpi.push(orderObj);
+      }
+    }
 
     res.status(200).json({
       success: true,
       count: ordersWithoutKpi.length,
-      total,
+      total: ordersWithoutKpi.length, // Update total to reflect filtered count
       page: pageNum,
       limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
+      totalPages: Math.ceil(ordersWithoutKpi.length / limitNum),
       data: ordersWithoutKpi,
     });
   } catch (error) {
@@ -194,14 +446,32 @@ const getOrderById = async (req, res) => {
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
-      .populate('confirmedByPunkt', 'name phone viloyat tuman')
-      .populate('punktRequests.punktId', 'name phone viloyat tuman')
+      .populate({
+        path: 'confirmedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktRequests.punktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .populate('assignedToAgent', 'name phone viloyat tuman mfy')
-      .populate('assignedByPunkt', 'name phone viloyat tuman')
+      .populate({
+        path: 'assignedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .populate('contragentRequests.contragentId', 'name inn phone viloyat tuman mfy')
-      .populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman')
-      .populate('punktToPunktRequests.toPunktId', 'name phone viloyat tuman')
-      .populate('currentPunkt', 'name phone viloyat tuman')
+      .populate({
+        path: 'punktToPunktRequests.fromPunktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktToPunktRequests.toPunktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'currentPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .populate('confirmedByAgent', 'name phone viloyat tuman mfy');
 
     if (!order) {
@@ -214,7 +484,7 @@ const getOrderById = async (req, res) => {
     // Punkt bo'lsa, har qanday buyurtmani ko'ra oladi (hech qanday cheklov yo'q)
     // Faqat punkt autentifikatsiyasi o'tgan bo'lsa, buyurtmani ko'ra oladi
 
-    // Remove kpiBonusPercent from products
+    // Remove kpiBonusPercent from products and remove deleted punkts
     const orderObj = order.toObject();
     if (orderObj.items) {
       orderObj.items = orderObj.items.map((item) => {
@@ -224,6 +494,8 @@ const getOrderById = async (req, res) => {
         return item;
       });
     }
+    // Remove deleted punkts
+    await removeDeletedPunktsFromOrder(orderObj);
 
     res.status(200).json({
       success: true,
@@ -345,11 +617,14 @@ const confirmOrder = async (req, res) => {
     order.currentPunkt = punkt._id;
     await order.save();
 
-    // Automatically route order based on product availability
-    // Avtorouting o'chirilgan - punkt manual ravishda contragentga so'rov yuborishi kerak
+    // Auto-routing removed - punkt must manually request from contragents or other punkts
 
     // Populate for response
-    await order.populate('confirmedByPunkt', 'name phone viloyat tuman');
+    await order.populate({
+      path: 'confirmedByPunkt',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
     await order.populate({
       path: 'items.product',
       populate: [
@@ -359,7 +634,7 @@ const confirmOrder = async (req, res) => {
       ],
     });
 
-    // Remove kpiBonusPercent from products
+    // Remove kpiBonusPercent from products and remove deleted punkts
     const orderObj = order.toObject();
     if (orderObj.items) {
       orderObj.items = orderObj.items.map((item) => {
@@ -369,6 +644,8 @@ const confirmOrder = async (req, res) => {
         return item;
       });
     }
+    // Remove deleted punkts
+    await removeDeletedPunktsFromOrder(orderObj);
 
     res.status(200).json({
       success: true,
@@ -490,7 +767,11 @@ const requestToPunkts = async (req, res) => {
     await order.save();
 
     // Populate for response
-    await order.populate('punktRequests.punktId', 'name phone viloyat tuman');
+    await order.populate({
+      path: 'punktRequests.punktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
 
     res.status(200).json({
       success: true,
@@ -557,7 +838,10 @@ const getPunktRequests = async (req, res) => {
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
-      .populate('punktRequests.punktId', 'name phone viloyat tuman')
+      .populate({
+        path: 'punktRequests.punktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -659,7 +943,11 @@ const respondToRequest = async (req, res) => {
     await order.save();
 
     // Populate for response
-    await order.populate('confirmedByPunkt', 'name phone viloyat tuman');
+    await order.populate({
+      path: 'confirmedByPunkt',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
     await order.populate({
       path: 'items.product',
       populate: [
@@ -669,7 +957,7 @@ const respondToRequest = async (req, res) => {
       ],
     });
 
-    // Remove kpiBonusPercent from products
+    // Remove kpiBonusPercent from products and remove deleted punkts
     const orderObj = order.toObject();
     if (orderObj.items) {
       orderObj.items = orderObj.items.map((item) => {
@@ -679,6 +967,8 @@ const respondToRequest = async (req, res) => {
         return item;
       });
     }
+    // Remove deleted punkts
+    await removeDeletedPunktsFromOrder(orderObj);
 
     res.status(200).json({
       success: true,
@@ -719,7 +1009,15 @@ const assignOrderToAgent = async (req, res) => {
 
     const order = await Order.findById(id)
       .populate('deliveryViloyat', 'name type code')
-      .populate('deliveryTuman', 'name type code');
+      .populate('deliveryTuman', 'name type code')
+      .populate({
+        path: 'currentPunkt',
+        select: '_id isDeleted',
+      })
+      .populate({
+        path: 'confirmedByPunkt',
+        select: '_id isDeleted',
+      });
 
     if (!order) {
       return res.status(404).json({
@@ -728,22 +1026,28 @@ const assignOrderToAgent = async (req, res) => {
       });
     }
 
-    // Check if order belongs to punkt's region
-    if (
-      order.deliveryViloyat._id.toString() !== punkt.viloyat._id.toString() ||
-      (punkt.tuman && order.deliveryTuman && order.deliveryTuman._id.toString() !== punkt.tuman._id.toString())
-    ) {
+    // Check if order belongs to punkt's region OR punkt is currentPunkt
+    const isInRegion = 
+      order.deliveryViloyat._id.toString() === punkt.viloyat._id.toString() &&
+      (!punkt.tuman || !order.deliveryTuman || order.deliveryTuman._id.toString() === punkt.tuman._id.toString());
+
+    // Check if order is confirmed by this punkt OR current punkt is this punkt
+    const isConfirmedByThisPunkt =
+      order.confirmedByPunkt && order.confirmedByPunkt._id.toString() === punkt._id.toString();
+    
+    // Check if punkt is currentPunkt (handle both populated and non-populated cases)
+    const currentPunktId = order.currentPunkt 
+      ? (order.currentPunkt._id ? order.currentPunkt._id.toString() : order.currentPunkt.toString())
+      : null;
+    const isCurrentPunkt = currentPunktId === punkt._id.toString();
+
+    // Allow if in region OR confirmed by this punkt OR is current punkt
+    if (!isInRegion && !isConfirmedByThisPunkt && !isCurrentPunkt) {
       return res.status(403).json({
         success: false,
         message: 'Bu buyurtma sizning hududingizga tegishli emas',
       });
     }
-
-    // Check if order is confirmed by this punkt OR current punkt is this punkt
-    const isConfirmedByThisPunkt =
-      order.confirmedByPunkt && order.confirmedByPunkt.toString() === punkt._id.toString();
-    const isCurrentPunkt =
-      order.currentPunkt && order.currentPunkt.toString() === punkt._id.toString();
 
     if (!isConfirmedByThisPunkt && !isCurrentPunkt) {
       return res.status(403).json({
@@ -761,8 +1065,11 @@ const assignOrderToAgent = async (req, res) => {
       });
     }
 
-    // Validate agent exists and is active
-    const agent = await Agent.findById(agentId)
+    // Validate agent exists, is active, and not deleted
+    const agent = await Agent.findOne({
+      _id: agentId,
+      isDeleted: { $ne: true },
+    })
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code');
@@ -770,7 +1077,7 @@ const assignOrderToAgent = async (req, res) => {
     if (!agent) {
       return res.status(404).json({
         success: false,
-        message: 'Agent topilmadi',
+        message: 'Agent topilmadi yoki o\'chirilgan',
       });
     }
 
@@ -795,7 +1102,11 @@ const assignOrderToAgent = async (req, res) => {
 
     // Populate for response
     await order.populate('assignedToAgent', 'name phone viloyat tuman mfy');
-    await order.populate('assignedByPunkt', 'name phone viloyat tuman');
+    await order.populate({
+      path: 'assignedByPunkt',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
     await order.populate({
       path: 'items.product',
       populate: [
@@ -805,7 +1116,7 @@ const assignOrderToAgent = async (req, res) => {
       ],
     });
 
-    // Remove kpiBonusPercent from products
+    // Remove kpiBonusPercent from products and remove deleted punkts
     const orderObj = order.toObject();
     if (orderObj.items) {
       orderObj.items = orderObj.items.map((item) => {
@@ -815,6 +1126,8 @@ const assignOrderToAgent = async (req, res) => {
         return item;
       });
     }
+    // Remove deleted punkts
+    await removeDeletedPunktsFromOrder(orderObj);
 
     res.status(200).json({
       success: true,
@@ -862,7 +1175,11 @@ const requestToContragent = async (req, res) => {
         },
       })
       .populate('deliveryViloyat', 'name type code')
-      .populate('deliveryTuman', 'name type code');
+      .populate('deliveryTuman', 'name type code')
+      .populate({
+        path: 'currentPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      });
 
     if (!order) {
       return res.status(404).json({
@@ -871,14 +1188,22 @@ const requestToContragent = async (req, res) => {
       });
     }
 
-    // Check if order belongs to punkt's region
-    if (
-      order.deliveryViloyat._id.toString() !== punkt.viloyat._id.toString() ||
-      (punkt.tuman && order.deliveryTuman && order.deliveryTuman._id.toString() !== punkt.tuman._id.toString())
-    ) {
+    // Check if order belongs to punkt's region OR punkt is currentPunkt
+    // This allows punkt that received order from another punkt to request contragents
+    const isInRegion = 
+      order.deliveryViloyat._id.toString() === punkt.viloyat._id.toString() &&
+      (!punkt.tuman || !order.deliveryTuman || order.deliveryTuman._id.toString() === punkt.tuman._id.toString());
+    
+    // Check if punkt is currentPunkt (handle both populated and non-populated cases)
+    const currentPunktId = order.currentPunkt 
+      ? (order.currentPunkt._id ? order.currentPunkt._id.toString() : order.currentPunkt.toString())
+      : null;
+    const isCurrentPunkt = currentPunktId === punkt._id.toString();
+    
+    if (!isInRegion && !isCurrentPunkt) {
       return res.status(403).json({
         success: false,
-        message: 'Bu buyurtma sizning hududingizga tegishli emas',
+        message: 'Bu buyurtma sizning hududingizga tegishli emas yoki siz hozirgi punkt emassiz',
       });
     }
 
@@ -914,9 +1239,26 @@ const requestToContragent = async (req, res) => {
       });
     }
 
-    // Add contragent request
+    // Filter items that belong to this contragent
+    const contragentItemIndices = [];
+    order.items.forEach((item, index) => {
+      if (item.product && item.product.contragent && 
+          item.product.contragent._id.toString() === contragentId.toString()) {
+        contragentItemIndices.push(index);
+      }
+    });
+
+    if (contragentItemIndices.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu buyurtmada tanlangan contragentning mahsulotlari yo\'q',
+      });
+    }
+
+    // Add contragent request with item indices
     order.contragentRequests.push({
       contragentId: contragent._id,
+      itemIds: contragentItemIndices,
       status: 'pending',
       requestedAt: new Date(),
     });
@@ -1048,8 +1390,16 @@ const requestToPunkt = async (req, res) => {
     await order.save();
 
     // Populate for response
-    await order.populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman');
-    await order.populate('punktToPunktRequests.toPunktId', 'name phone viloyat tuman');
+    await order.populate({
+      path: 'punktToPunktRequests.fromPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
+    await order.populate({
+      path: 'punktToPunktRequests.toPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
 
     res.status(200).json({
       success: true,
@@ -1089,7 +1439,7 @@ const receiveFromPunkt = async (req, res) => {
     const { id } = req.params;
     const { punkt } = req.user;
 
-    const order = await Order.findById(id)
+    let order = await Order.findById(id)
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code');
 
@@ -1228,32 +1578,55 @@ const receiveFromPunkt = async (req, res) => {
       }
       order.confirmedByPunkt = punkt._id;
       order.punktStatus = 'confirmed';
+      
+      // Update request status to delivered
+      order.punktToPunktRequests[requestIndex].status = 'delivered';
+      order.punktToPunktRequests[requestIndex].deliveredAt = new Date();
+      
+      // Update current punkt
+      order.currentPunkt = punkt._id;
+      
+      // Update order status to delivered_to_punkt if not already
+      if (order.status !== 'delivered_to_punkt' && order.status !== 'assigned_to_agent' && order.status !== 'confirmed_by_agent' && order.status !== 'confirmed_by_customer') {
+        order.status = 'delivered_to_punkt';
+      }
+      
+      await order.save();
+      
+      // Auto-routing removed - punkt must manually request from contragents
     } else if (request.status !== 'accepted') {
       return res.status(400).json({
         success: false,
         message: 'Bu so\'rov hali qabul qilinmagan yoki allaqachon qayta ishlangan',
       });
+    } else {
+      // Request is already accepted, just update to delivered
+      // Update request status to delivered
+      order.punktToPunktRequests[requestIndex].status = 'delivered';
+      order.punktToPunktRequests[requestIndex].deliveredAt = new Date();
+
+      // Update current punkt
+      order.currentPunkt = punkt._id;
+      
+      // Update order status to delivered_to_punkt if not already
+      if (order.status !== 'delivered_to_punkt' && order.status !== 'assigned_to_agent' && order.status !== 'confirmed_by_agent' && order.status !== 'confirmed_by_customer') {
+        order.status = 'delivered_to_punkt';
+      }
+      
+      await order.save();
     }
-
-    // Update request status to delivered
-    order.punktToPunktRequests[requestIndex].status = 'delivered';
-    order.punktToPunktRequests[requestIndex].deliveredAt = new Date();
-
-    // Update current punkt
-    order.currentPunkt = punkt._id;
-    
-    // Update order status to delivered_to_punkt if not already
-    if (order.status !== 'delivered_to_punkt' && order.status !== 'assigned_to_agent' && order.status !== 'confirmed_by_agent' && order.status !== 'confirmed_by_customer') {
-      order.status = 'delivered_to_punkt';
-    }
-    
-    await order.save();
-
-    // Avtorouting o'chirilgan - punkt manual ravishda contragentga so'rov yuborishi kerak
 
     // Populate for response
-    await order.populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman');
-    await order.populate('punktToPunktRequests.toPunktId', 'name phone viloyat tuman');
+    await order.populate({
+      path: 'punktToPunktRequests.fromPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
+    await order.populate({
+      path: 'punktToPunktRequests.toPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
 
     res.status(200).json({
       success: true,
@@ -1273,6 +1646,171 @@ const receiveFromPunkt = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Buyurtmani qabul qilishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Send order to another punkt (boshqa punktga buyurtma yuborish)
+// This is used when B punkt receives from contragent and needs to send back to A punkt
+const sendToPunkt = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { punkt } = req.user;
+    const { toPunktId } = req.body;
+
+    if (!toPunktId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Punkt ID kiritilishi shart',
+      });
+    }
+
+    const order = await Order.findById(id)
+      .populate('deliveryViloyat', 'name type code')
+      .populate('deliveryTuman', 'name type code')
+      .populate({
+        path: 'currentPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'confirmedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Buyurtma topilmadi',
+      });
+    }
+
+    // Check if this punkt is currentPunkt
+    if (!order.currentPunkt || order.currentPunkt._id.toString() !== punkt._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Siz hozirgi punkt emassiz. Faqat hozirgi punkt buyurtmani boshqa punktga yubora oladi',
+      });
+    }
+
+    // Validate toPunkt exists and is active
+    const toPunkt = await Punkt.findById(toPunktId)
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code');
+
+    if (!toPunkt) {
+      return res.status(404).json({
+        success: false,
+        message: 'Punkt topilmadi',
+      });
+    }
+
+    if (toPunkt.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Punkt faol emas',
+      });
+    }
+
+    // Check if there's already a delivered request to this punkt
+    const existingDeliveredRequest = order.punktToPunktRequests.find(
+      (req) => 
+        req.toPunktId.toString() === toPunktId.toString() && 
+        req.fromPunktId.toString() === punkt._id.toString() &&
+        req.status === 'delivered'
+    );
+
+    if (existingDeliveredRequest) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu punktga allaqachon buyurtma yuborilgan',
+      });
+    }
+
+    // Check if there's an accepted request - if so, mark it as delivered
+    const existingAcceptedRequest = order.punktToPunktRequests.find(
+      (req) => 
+        req.toPunktId.toString() === toPunktId.toString() && 
+        req.fromPunktId.toString() === punkt._id.toString() &&
+        req.status === 'accepted'
+    );
+
+    if (existingAcceptedRequest) {
+      // Update existing request to delivered
+      const requestIndex = order.punktToPunktRequests.findIndex(
+        (req) => req._id.toString() === existingAcceptedRequest._id.toString()
+      );
+      order.punktToPunktRequests[requestIndex].status = 'delivered';
+      order.punktToPunktRequests[requestIndex].deliveredAt = new Date();
+    } else {
+      // Create new request
+      order.punktToPunktRequests.push({
+        fromPunktId: punkt._id,
+        toPunktId: toPunkt._id,
+        status: 'delivered',
+        requestedAt: new Date(),
+        respondedAt: new Date(),
+        deliveredAt: new Date(),
+      });
+    }
+
+    // Update current punkt to toPunkt
+    order.currentPunkt = toPunkt._id;
+    
+    // Update order status if not already advanced
+    if (order.status !== 'assigned_to_agent' && 
+        order.status !== 'confirmed_by_agent' && 
+        order.status !== 'confirmed_by_customer') {
+      order.status = 'delivered_to_punkt';
+    }
+    
+    await order.save();
+
+    // Populate for response
+    await order.populate({
+      path: 'punktToPunktRequests.fromPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
+    await order.populate({
+      path: 'punktToPunktRequests.toPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
+    await order.populate({
+      path: 'currentPunkt',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Buyurtma muvaffaqiyatli punktga yuborildi',
+      data: {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        toPunkt: {
+          _id: toPunkt._id,
+          name: toPunkt.name,
+          phone: toPunkt.phone,
+        },
+        currentPunkt: order.currentPunkt,
+        punktToPunktRequests: order.punktToPunktRequests,
+      },
+    });
+  } catch (error) {
+    console.error('Error sending to punkt:', error);
+
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Noto\'g\'ri buyurtma yoki punkt ID',
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmani punktga yuborishda xatolik yuz berdi',
       error: error.message,
     });
   }
@@ -1387,8 +1925,14 @@ const getPunktToPunktRequests = async (req, res) => {
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
-      .populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman')
-      .populate('punktToPunktRequests.toPunktId', 'name phone viloyat tuman')
+      .populate({
+        path: 'punktToPunktRequests.fromPunktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktToPunktRequests.toPunktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -1495,12 +2039,19 @@ const respondToPunktToPunktRequest = async (req, res) => {
 
     await order.save();
 
-    // If accepted, automatically route order based on product availability
-    // Avtorouting o'chirilgan - punkt manual ravishda contragentga so'rov yuborishi kerak
+    // Auto-routing removed - punkt must manually request from contragents or other punkts
 
     // Populate for response
-    await order.populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman');
-    await order.populate('punktToPunktRequests.toPunktId', 'name phone viloyat tuman');
+    await order.populate({
+      path: 'punktToPunktRequests.fromPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
+    await order.populate({
+      path: 'punktToPunktRequests.toPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
 
     res.status(200).json({
       success: true,
@@ -1526,8 +2077,39 @@ const respondToPunktToPunktRequest = async (req, res) => {
 };
 
 // Analyze order products and group by tuman (buyurtmadagi maxsulotlarni tuman bo'yicha tahlil qilish)
+// Helper function to check if product can be delivered to order's delivery region
+const checkProductDeliveryRegion = (product, orderViloyatId, orderTumanId) => {
+  if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
+    return false;
+  }
+
+  const orderViloyatIdStr = orderViloyatId?.toString();
+  const orderTumanIdStr = orderTumanId?.toString();
+
+  for (const region of product.deliveryRegions) {
+    const regionViloyatId = region.viloyat?._id?.toString() || region.viloyat?.toString();
+    const regionTumanId = region.tuman?._id?.toString() || region.tuman?.toString();
+
+    // Check viloyat match
+    if (regionViloyatId === orderViloyatIdStr) {
+      // If product region has tuman specified
+      if (regionTumanId) {
+        // Order must have tuman and it must match
+        if (orderTumanIdStr && regionTumanId === orderTumanIdStr) {
+          return true;
+        }
+      } else {
+        // Product region is only viloyat level, so it can be delivered anywhere in viloyat
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
 const analyzeOrderProductsByTuman = async (order, punkt) => {
-  // Populate products with contragents if not already populated
+  // Populate products with contragents and delivery regions if not already populated
   if (!order.items || order.items.length === 0) {
     return {
       ownTumanContragents: [],
@@ -1536,31 +2118,58 @@ const analyzeOrderProductsByTuman = async (order, punkt) => {
     };
   }
 
-  // Ensure products are populated
+  // Ensure products are populated with contragents and delivery regions
   await order.populate({
     path: 'items.product',
-    populate: {
-      path: 'contragent',
-      select: '_id name inn phone viloyat tuman mfy status',
-      populate: [
-        { path: 'viloyat', select: 'name type code' },
-        { path: 'tuman', select: 'name type code' },
-        { path: 'mfy', select: 'name type code' },
-      ],
-    },
+    populate: [
+      {
+        path: 'contragent',
+        select: '_id name inn phone viloyat tuman mfy status',
+        populate: [
+          { path: 'viloyat', select: 'name type code' },
+          { path: 'tuman', select: 'name type code' },
+          { path: 'mfy', select: 'name type code' },
+        ],
+      },
+      {
+        path: 'deliveryRegions.viloyat',
+        select: 'name type code',
+      },
+      {
+        path: 'deliveryRegions.tuman',
+        select: 'name type code',
+      },
+    ],
   });
 
-  const ownTumanContragents = new Map(); // contragentId -> { contragent, products: [] }
-  const otherTumanPunkts = new Map(); // tumanId -> { tuman, contragents: Map(), products: [] }
+  // Populate order delivery regions
+  await order.populate('deliveryViloyat', 'name type code');
+  await order.populate('deliveryTuman', 'name type code');
 
-  // Group products by contragent tuman
-  for (const item of order.items) {
+  const ownTumanContragents = new Map(); // contragentId -> { contragent, products: [], itemIds: [] }
+  const otherTumanPunkts = new Map(); // tumanId -> { tuman, contragents: Map(), itemIds: [] }
+
+  // Group products by contragent tuman and check delivery regions
+  for (let itemIndex = 0; itemIndex < order.items.length; itemIndex++) {
+    const item = order.items[itemIndex];
     if (!item.product || !item.product.contragent) {
       continue;
     }
 
     const contragent = item.product.contragent;
     const contragentTumanId = contragent.tuman?._id?.toString();
+    
+    // Check if product can be delivered to order's delivery region
+    const canDeliverToOrderRegion = checkProductDeliveryRegion(
+      item.product,
+      order.deliveryViloyat?._id,
+      order.deliveryTuman?._id
+    );
+
+    // Skip products that cannot be delivered to order's delivery region
+    if (!canDeliverToOrderRegion) {
+      continue;
+    }
 
     // Check if contragent is in punkt's own tuman
     if (
@@ -1568,7 +2177,7 @@ const analyzeOrderProductsByTuman = async (order, punkt) => {
       punkt.tuman &&
       contragentTumanId === punkt.tuman._id.toString()
     ) {
-      // Product is in punkt's own tuman
+      // Product is in punkt's own tuman and can be delivered
       const contragentId = contragent._id.toString();
       if (!ownTumanContragents.has(contragentId)) {
         ownTumanContragents.set(contragentId, {
@@ -1583,24 +2192,28 @@ const analyzeOrderProductsByTuman = async (order, punkt) => {
             status: contragent.status,
           },
           products: [],
+          itemIds: [],
         });
       }
-      ownTumanContragents.get(contragentId).products.push({
+      const contragentData = ownTumanContragents.get(contragentId);
+      contragentData.products.push({
         _id: item.product._id,
         name: item.product.name,
         quantity: item.quantity,
         price: item.price,
       });
+      contragentData.itemIds.push(itemIndex);
     } else if (
       contragent.viloyat._id.toString() === punkt.viloyat._id.toString() &&
       contragentTumanId
     ) {
-      // Product is in another tuman of the same viloyat
+      // Product is in another tuman of the same viloyat and can be delivered
+      // We need to request from that tuman's punkt
       if (!otherTumanPunkts.has(contragentTumanId)) {
         otherTumanPunkts.set(contragentTumanId, {
           tuman: contragent.tuman,
           contragents: new Map(),
-          products: [],
+          itemIds: [],
         });
       }
 
@@ -1620,15 +2233,19 @@ const analyzeOrderProductsByTuman = async (order, punkt) => {
             status: contragent.status,
           },
           products: [],
+          itemIds: [],
         });
       }
 
-      tumanData.contragents.get(contragentId).products.push({
+      const contragentData = tumanData.contragents.get(contragentId);
+      contragentData.products.push({
         _id: item.product._id,
         name: item.product.name,
         quantity: item.quantity,
         price: item.price,
       });
+      contragentData.itemIds.push(itemIndex);
+      tumanData.itemIds.push(itemIndex);
     }
   }
 
@@ -1637,7 +2254,7 @@ const analyzeOrderProductsByTuman = async (order, punkt) => {
   const otherTumanPunktsArray = Array.from(otherTumanPunkts.values()).map((tumanData) => ({
     tuman: tumanData.tuman,
     contragents: Array.from(tumanData.contragents.values()),
-    products: tumanData.products,
+    itemIds: tumanData.itemIds,
   }));
 
   // Check if all products are covered
@@ -1681,6 +2298,7 @@ const autoRouteOrder = async (orderId, punkt) => {
   // 1. Send requests to contragents in own tuman
   for (const contragentData of analysis.ownTumanContragents) {
     const contragentId = contragentData.contragent._id;
+    const itemIds = contragentData.itemIds || [];
 
     // Check if request already exists (pending, accepted, yoki delivered_to_punkt bo'lsa, yana yubormaymiz)
     const existingRequest = order.contragentRequests.find(
@@ -1692,18 +2310,21 @@ const autoRouteOrder = async (orderId, punkt) => {
     if (!existingRequest) {
       order.contragentRequests.push({
         contragentId: contragentId,
+        itemIds: itemIds,
         status: 'pending',
         requestedAt: new Date(),
       });
       results.ownTumanRequests.push({
         contragentId: contragentId,
         contragentName: contragentData.contragent.name,
+        itemIds: itemIds,
         status: 'requested',
       });
     } else {
       results.ownTumanRequests.push({
         contragentId: contragentId,
         contragentName: contragentData.contragent.name,
+        itemIds: existingRequest.itemIds || [],
         status: existingRequest.status,
       });
     }
@@ -1801,7 +2422,15 @@ const getOrderContragentIds = async (req, res) => {
         },
       })
       .populate('deliveryViloyat', 'name type code')
-      .populate('deliveryTuman', 'name type code');
+      .populate('deliveryTuman', 'name type code')
+      .populate({
+        path: 'currentPunkt',
+        select: '_id isDeleted',
+      })
+      .populate({
+        path: 'confirmedByPunkt',
+        select: '_id isDeleted',
+      });
 
     if (!order) {
       return res.status(404).json({
@@ -1810,11 +2439,18 @@ const getOrderContragentIds = async (req, res) => {
       });
     }
 
-    // Check if order belongs to punkt's region
-    if (
-      order.deliveryViloyat._id.toString() !== punkt.viloyat._id.toString() ||
-      (punkt.tuman && order.deliveryTuman && order.deliveryTuman._id.toString() !== punkt.tuman._id.toString())
-    ) {
+    // Check if order belongs to punkt's region OR punkt confirmed it OR punkt is currentPunkt
+    const isInRegion = 
+      order.deliveryViloyat._id.toString() === punkt.viloyat._id.toString() &&
+      (!punkt.tuman || !order.deliveryTuman || order.deliveryTuman._id.toString() === punkt.tuman._id.toString());
+    
+    const isConfirmedByThisPunkt = 
+      order.confirmedByPunkt && order.confirmedByPunkt._id.toString() === punkt._id.toString();
+    
+    const isCurrentPunkt = 
+      order.currentPunkt && order.currentPunkt._id.toString() === punkt._id.toString();
+
+    if (!isInRegion && !isConfirmedByThisPunkt && !isCurrentPunkt) {
       return res.status(403).json({
         success: false,
         message: 'Bu buyurtma sizning hududingizga tegishli emas',
@@ -1920,6 +2556,13 @@ const getTodayOrders = async (req, res) => {
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
 
+    // Get list of deleted punkt IDs (excluding current user's punkt)
+    const deletedPunkts = await Punkt.find({ 
+      isDeleted: true,
+      _id: { $ne: punkt._id } // Exclude current user's punkt
+    }).select('_id');
+    const deletedPunktIds = deletedPunkts.map(p => p._id);
+
     // Build filter - include orders in punkt's region OR orders where punkt is involved
     const orConditions = [];
 
@@ -1947,6 +2590,47 @@ const getTodayOrders = async (req, res) => {
       $or: orConditions,
     };
 
+    // Exclude orders where currentPunkt, confirmedByPunkt, or assignedByPunkt is a deleted punkt (and not current user)
+    if (deletedPunktIds.length > 0) {
+      const andConditions = [
+        {
+          $or: [
+            { currentPunkt: { $nin: deletedPunktIds } },
+            { currentPunkt: punkt._id },
+            { currentPunkt: null },
+          ]
+        },
+        {
+          $or: [
+            { confirmedByPunkt: { $nin: deletedPunktIds } },
+            { confirmedByPunkt: punkt._id },
+            { confirmedByPunkt: null },
+          ]
+        },
+        {
+          $or: [
+            { assignedByPunkt: { $nin: deletedPunktIds } },
+            { assignedByPunkt: punkt._id },
+            { assignedByPunkt: null },
+          ]
+        }
+      ];
+      
+      // Exclude orders where punktToPunktRequests only involve deleted punkts (and not current user)
+      // If order has punktToPunktRequests, at least one should involve current user or non-deleted punkt
+      andConditions.push({
+        $or: [
+          { punktToPunktRequests: { $size: 0 } }, // No requests
+          { 'punktToPunktRequests.fromPunktId': punkt._id }, // Current user is fromPunkt
+          { 'punktToPunktRequests.toPunktId': punkt._id }, // Current user is toPunkt
+          // If all requests involve deleted punkts, MongoDB will filter them out
+          // We'll do additional filtering in shouldExcludeOrder
+        ]
+      });
+      
+      filter.$and = andConditions;
+    }
+
     if (status) {
       filter.status = status;
     }
@@ -1970,13 +2654,123 @@ const getTodayOrders = async (req, res) => {
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
-      .populate('confirmedByPunkt', 'name phone viloyat tuman')
+      .populate({
+        path: 'confirmedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktRequests.punktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktToPunktRequests.fromPunktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'punktToPunktRequests.toPunktId',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'currentPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .populate('assignedToAgent', 'name phone viloyat tuman mfy')
+      .populate({
+        path: 'assignedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate('confirmedByAgent', 'name phone viloyat tuman mfy')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    const ordersWithoutKpi = orders.map((order) => {
+    // Helper function to check if order should be excluded (belongs to deleted punkt that is not current punkt)
+    const shouldExcludeOrder = (orderObj) => {
+      // Check currentPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.currentPunkt && orderObj.currentPunkt.isDeleted === true) {
+        const currentPunktId = orderObj.currentPunkt._id?.toString() || orderObj.currentPunkt.toString();
+        if (currentPunktId !== punkt._id.toString()) {
+          return true; // Exclude - belongs to deleted punkt that is not current user
+        }
+      }
+      
+      // Check confirmedByPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.confirmedByPunkt && orderObj.confirmedByPunkt.isDeleted === true) {
+        const confirmedPunktId = orderObj.confirmedByPunkt._id?.toString() || orderObj.confirmedByPunkt.toString();
+        if (confirmedPunktId !== punkt._id.toString()) {
+          return true; // Exclude - confirmed by deleted punkt that is not current user
+        }
+      }
+      
+      // Check assignedByPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.assignedByPunkt && orderObj.assignedByPunkt.isDeleted === true) {
+        const assignedPunktId = orderObj.assignedByPunkt._id?.toString() || orderObj.assignedByPunkt.toString();
+        if (assignedPunktId !== punkt._id.toString()) {
+          return true; // Exclude - assigned by deleted punkt that is not current user
+        }
+      }
+      
+      // Check punktToPunktRequests - if all requests involve deleted punkts (and not current user), exclude
+      if (orderObj.punktToPunktRequests && Array.isArray(orderObj.punktToPunktRequests) && orderObj.punktToPunktRequests.length > 0) {
+        let hasValidRequest = false;
+        for (const req of orderObj.punktToPunktRequests) {
+          const fromPunktId = req.fromPunktId?._id?.toString() || req.fromPunktId?.toString() || req.fromPunktId;
+          const toPunktId = req.toPunktId?._id?.toString() || req.toPunktId?.toString() || req.toPunktId;
+          
+          // If request involves current user, it's valid
+          if (fromPunktId === punkt._id.toString() || toPunktId === punkt._id.toString()) {
+            hasValidRequest = true;
+            break;
+          }
+          
+          // If both punkts in request are deleted, skip this request
+          const fromDeleted = req.fromPunktId?.isDeleted === true;
+          const toDeleted = req.toPunktId?.isDeleted === true;
+          
+          // If neither punkt is deleted, it's a valid request
+          if (!fromDeleted && !toDeleted) {
+            hasValidRequest = true;
+            break;
+          }
+        }
+        
+        // If order only has requests with deleted punkts (and not involving current user), exclude
+        if (!hasValidRequest) {
+          return true;
+        }
+      }
+      
+      // Check punktRequests - if all requests involve deleted punkts (and not current user), exclude
+      if (orderObj.punktRequests && Array.isArray(orderObj.punktRequests) && orderObj.punktRequests.length > 0) {
+        let hasValidRequest = false;
+        for (const req of orderObj.punktRequests) {
+          const punktId = req.punktId?._id?.toString() || req.punktId?.toString() || req.punktId;
+          
+          // If request involves current user, it's valid
+          if (punktId === punkt._id.toString()) {
+            hasValidRequest = true;
+            break;
+          }
+          
+          // If punkt is not deleted, it's a valid request
+          if (req.punktId && req.punktId.isDeleted !== true) {
+            hasValidRequest = true;
+            break;
+          }
+        }
+        
+        // If order only has requests with deleted punkts (and not involving current user), exclude
+        if (!hasValidRequest) {
+          return true;
+        }
+      }
+      
+      return false; // Don't exclude
+    };
+
+    // Remove kpiBonusPercent from products and filter out orders from deleted punkts
+    const ordersWithoutKpi = [];
+    for (const order of orders) {
       const orderObj = order.toObject();
       if (orderObj.items) {
         orderObj.items = orderObj.items.map((item) => {
@@ -1986,16 +2780,22 @@ const getTodayOrders = async (req, res) => {
           return item;
         });
       }
-      return orderObj;
-    });
+      // Handle deleted punkts
+      await removeDeletedPunktsFromOrder(orderObj);
+      
+      // Exclude orders that belong to deleted punkts (unless it's the current user's punkt)
+      if (!shouldExcludeOrder(orderObj)) {
+        ordersWithoutKpi.push(orderObj);
+      }
+    }
 
     res.status(200).json({
       success: true,
       count: ordersWithoutKpi.length,
-      total,
+      total: ordersWithoutKpi.length, // Update total to reflect filtered count
       page: pageNum,
       limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
+      totalPages: Math.ceil(ordersWithoutKpi.length / limitNum),
       data: ordersWithoutKpi,
     });
   } catch (error) {
@@ -2031,6 +2831,13 @@ const getOrderHistory = async (req, res) => {
       }
     }
 
+    // Get list of deleted punkt IDs (excluding current user's punkt)
+    const deletedPunkts = await Punkt.find({ 
+      isDeleted: true,
+      _id: { $ne: punkt._id } // Exclude current user's punkt
+    }).select('_id');
+    const deletedPunktIds = deletedPunkts.map(p => p._id);
+
     // Build filter - include orders in punkt's region OR orders where punkt is involved
     const orConditions = [];
 
@@ -2058,6 +2865,47 @@ const getOrderHistory = async (req, res) => {
       $or: orConditions,
     };
 
+    // Exclude orders where currentPunkt, confirmedByPunkt, or assignedByPunkt is a deleted punkt (and not current user)
+    if (deletedPunktIds.length > 0) {
+      const andConditions = [
+        {
+          $or: [
+            { currentPunkt: { $nin: deletedPunktIds } },
+            { currentPunkt: punkt._id },
+            { currentPunkt: null },
+          ]
+        },
+        {
+          $or: [
+            { confirmedByPunkt: { $nin: deletedPunktIds } },
+            { confirmedByPunkt: punkt._id },
+            { confirmedByPunkt: null },
+          ]
+        },
+        {
+          $or: [
+            { assignedByPunkt: { $nin: deletedPunktIds } },
+            { assignedByPunkt: punkt._id },
+            { assignedByPunkt: null },
+          ]
+        }
+      ];
+      
+      // Exclude orders where punktToPunktRequests only involve deleted punkts (and not current user)
+      // If order has punktToPunktRequests, at least one should involve current user or non-deleted punkt
+      andConditions.push({
+        $or: [
+          { punktToPunktRequests: { $size: 0 } }, // No requests
+          { 'punktToPunktRequests.fromPunktId': punkt._id }, // Current user is fromPunkt
+          { 'punktToPunktRequests.toPunktId': punkt._id }, // Current user is toPunkt
+          // If all requests involve deleted punkts, MongoDB will filter them out
+          // We'll do additional filtering in shouldExcludeOrder
+        ]
+      });
+      
+      filter.$and = andConditions;
+    }
+
     if (status) {
       filter.status = status;
     }
@@ -2081,13 +2929,110 @@ const getOrderHistory = async (req, res) => {
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
-      .populate('confirmedByPunkt', 'name phone viloyat tuman')
+      .populate({
+        path: 'confirmedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
+      .populate({
+        path: 'currentPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .populate('assignedToAgent', 'name phone viloyat tuman mfy')
+      .populate({
+        path: 'assignedByPunkt',
+        select: 'name phone viloyat tuman isDeleted',
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    const ordersWithoutKpi = orders.map((order) => {
+    // Helper function to check if order should be excluded (belongs to deleted punkt that is not current punkt)
+    const shouldExcludeOrder = (orderObj) => {
+      // Check currentPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.currentPunkt && orderObj.currentPunkt.isDeleted === true) {
+        const currentPunktId = orderObj.currentPunkt._id?.toString() || orderObj.currentPunkt.toString();
+        if (currentPunktId !== punkt._id.toString()) {
+          return true; // Exclude - belongs to deleted punkt that is not current user
+        }
+      }
+      
+      // Check confirmedByPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.confirmedByPunkt && orderObj.confirmedByPunkt.isDeleted === true) {
+        const confirmedPunktId = orderObj.confirmedByPunkt._id?.toString() || orderObj.confirmedByPunkt.toString();
+        if (confirmedPunktId !== punkt._id.toString()) {
+          return true; // Exclude - confirmed by deleted punkt that is not current user
+        }
+      }
+      
+      // Check assignedByPunkt - if it's deleted and not the current user's punkt, exclude
+      if (orderObj.assignedByPunkt && orderObj.assignedByPunkt.isDeleted === true) {
+        const assignedPunktId = orderObj.assignedByPunkt._id?.toString() || orderObj.assignedByPunkt.toString();
+        if (assignedPunktId !== punkt._id.toString()) {
+          return true; // Exclude - assigned by deleted punkt that is not current user
+        }
+      }
+      
+      // Check punktToPunktRequests - if all requests involve deleted punkts (and not current user), exclude
+      if (orderObj.punktToPunktRequests && Array.isArray(orderObj.punktToPunktRequests) && orderObj.punktToPunktRequests.length > 0) {
+        let hasValidRequest = false;
+        for (const req of orderObj.punktToPunktRequests) {
+          const fromPunktId = req.fromPunktId?._id?.toString() || req.fromPunktId?.toString() || req.fromPunktId;
+          const toPunktId = req.toPunktId?._id?.toString() || req.toPunktId?.toString() || req.toPunktId;
+          
+          // If request involves current user, it's valid
+          if (fromPunktId === punkt._id.toString() || toPunktId === punkt._id.toString()) {
+            hasValidRequest = true;
+            break;
+          }
+          
+          // If both punkts in request are deleted, skip this request
+          const fromDeleted = req.fromPunktId?.isDeleted === true;
+          const toDeleted = req.toPunktId?.isDeleted === true;
+          
+          // If neither punkt is deleted, it's a valid request
+          if (!fromDeleted && !toDeleted) {
+            hasValidRequest = true;
+            break;
+          }
+        }
+        
+        // If order only has requests with deleted punkts (and not involving current user), exclude
+        if (!hasValidRequest) {
+          return true;
+        }
+      }
+      
+      // Check punktRequests - if all requests involve deleted punkts (and not current user), exclude
+      if (orderObj.punktRequests && Array.isArray(orderObj.punktRequests) && orderObj.punktRequests.length > 0) {
+        let hasValidRequest = false;
+        for (const req of orderObj.punktRequests) {
+          const punktId = req.punktId?._id?.toString() || req.punktId?.toString() || req.punktId;
+          
+          // If request involves current user, it's valid
+          if (punktId === punkt._id.toString()) {
+            hasValidRequest = true;
+            break;
+          }
+          
+          // If punkt is not deleted, it's a valid request
+          if (req.punktId && req.punktId.isDeleted !== true) {
+            hasValidRequest = true;
+            break;
+          }
+        }
+        
+        // If order only has requests with deleted punkts (and not involving current user), exclude
+        if (!hasValidRequest) {
+          return true;
+        }
+      }
+      
+      return false; // Don't exclude
+    };
+
+    // Remove kpiBonusPercent from products and filter out orders from deleted punkts
+    const ordersWithoutKpi = [];
+    for (const order of orders) {
       const orderObj = order.toObject();
       if (orderObj.items) {
         orderObj.items = orderObj.items.map((item) => {
@@ -2097,16 +3042,22 @@ const getOrderHistory = async (req, res) => {
           return item;
         });
       }
-      return orderObj;
-    });
+      // Handle deleted punkts
+      await removeDeletedPunktsFromOrder(orderObj);
+      
+      // Exclude orders that belong to deleted punkts (unless it's the current user's punkt)
+      if (!shouldExcludeOrder(orderObj)) {
+        ordersWithoutKpi.push(orderObj);
+      }
+    }
 
     res.status(200).json({
       success: true,
       count: ordersWithoutKpi.length,
-      total,
+      total: ordersWithoutKpi.length, // Update total to reflect filtered count
       page: pageNum,
       limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
+      totalPages: Math.ceil(ordersWithoutKpi.length / limitNum),
       data: ordersWithoutKpi,
     });
   } catch (error) {
@@ -2156,8 +3107,16 @@ const autoRouteOrderEndpoint = async (req, res) => {
 
     // Reload order to get updated data
     await order.populate('contragentRequests.contragentId', 'name inn phone viloyat tuman mfy');
-    await order.populate('punktToPunktRequests.fromPunktId', 'name phone viloyat tuman');
-    await order.populate('punktToPunktRequests.toPunktId', 'name phone viloyat tuman');
+    await order.populate({
+      path: 'punktToPunktRequests.fromPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
+    await order.populate({
+      path: 'punktToPunktRequests.toPunktId',
+      select: 'name phone viloyat tuman',
+      match: { isDeleted: { $ne: true } },
+    });
 
     res.status(200).json({
       success: true,
@@ -2207,6 +3166,7 @@ module.exports = {
   assignOrderToAgent,
   requestToContragent,
   requestToPunkt,
+  sendToPunkt,
   receiveFromPunkt,
   receiveFromContragent,
   getPunktToPunktRequests,

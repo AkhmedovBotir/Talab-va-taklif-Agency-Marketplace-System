@@ -4,7 +4,7 @@ import { Edit, Delete, Visibility } from '@mui/icons-material';
 import { agentAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 
-const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onPageChange, onStatusChange }) => {
+const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onPageChange, onStatusChange, activeTab }) => {
   const [updatingStatus, setUpdatingStatus] = useState({});
   const { showSuccess, showError } = useSnackbar();
 
@@ -95,14 +95,39 @@ const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onP
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Telefon
               </th>
+              {activeTab === 'viloyat' && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Viloyat
+                </th>
+              )}
+              {activeTab === 'tuman' && (
+                <>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Viloyat
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Tuman
+                  </th>
+                </>
+              )}
+              {activeTab === 'mfy' && (
+                <>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Viloyat
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Tuman
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    MFY
+                  </th>
+                </>
+              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Agent turi
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Yaratilgan
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Amallar
@@ -127,6 +152,49 @@ const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onP
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{agent.phone || '-'}</div>
                 </td>
+                {activeTab === 'viloyat' && (
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {agent.viloyat?.name || '-'}
+                    </div>
+                  </td>
+                )}
+                {activeTab === 'tuman' && (
+                  <>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {agent.viloyat?.name || '-'}
+                        
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {agent.tuman?.name || '-'}
+                      </div>
+                    </td>
+                  </>
+                )}
+                {activeTab === 'mfy' && (
+                  <>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {agent.viloyat?.name || '-'}
+                        
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {agent.tuman?.name || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {agent.mfy?.name || '-'}
+                        
+                      </div>
+                    </td>
+                  </>
+                )}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={getAgentTypeBadge(agent.agentType)}>
                     {getAgentTypeLabel(agent.agentType)}
@@ -149,9 +217,6 @@ const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onP
                       {agent.status === 'active' ? 'Faol' : 'Nofaol'}
                     </span>
                   </label>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(agent.createdAt)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2">

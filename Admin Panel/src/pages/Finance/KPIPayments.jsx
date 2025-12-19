@@ -19,23 +19,25 @@ const tabs = [
   { id: 'sync', label: 'Sinxronlashtirish', icon: Sync },
 ];
 
-const KPIPayments = () => {
+const KPIPayments = ({ hideHeader = false }) => {
   const [activeTab, setActiveTab] = useState('unpaid');
 
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex items-center gap-3 mb-2">
-          <CreditCard className="text-indigo-600" />
-          <h1 className="text-3xl font-bold text-gray-800">KPI To'lovlar Tarqatish</h1>
-        </div>
-        <p className="text-gray-600">KPI bonuslarini tarqatish va boshqarish</p>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <CreditCard className="text-indigo-600" />
+            <h1 className="text-3xl font-bold text-gray-800">KPI To'lovlar Tarqatish</h1>
+          </div>
+          <p className="text-gray-600">KPI bonuslarini tarqatish va boshqarish</p>
+        </motion.div>
+      )}
 
       {/* Tabs Navigation */}
       <motion.div

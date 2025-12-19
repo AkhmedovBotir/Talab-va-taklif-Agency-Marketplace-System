@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,22 +24,21 @@ export default function OrderDetailScreen() {
   const { token } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<{ productId: string; productName: string } | null>(null);
 
-  useEffect(() => {
-    if (id && token) {
-      loadOrder();
-    }
-  }, [id, token]);
-
-  const loadOrder = async () => {
+  const loadOrder = useCallback(async (isRefresh: boolean = false) => {
     if (!id || !token) return;
 
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const response = await apiService.getOrderById(id, token);
       if (response.success && response.data) {
         setOrder(response.data);
@@ -46,11 +46,33 @@ export default function OrderDetailScreen() {
       }
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Buyurtmani yuklashda xatolik yuz berdi');
-      router.back();
+      router.push('/order' as any);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [id, token]);
+
+  useEffect(() => {
+    if (id && token) {
+      loadOrder(false);
+    }
+  }, [id, token, loadOrder]);
+
+  // Auto refresh when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (id && token) {
+        loadOrder(false);
+      }
+    }, [id, token, loadOrder])
+  );
+
+  const handleRefresh = useCallback(() => {
+    if (id && token) {
+      loadOrder(true);
+    }
+  }, [id, token, loadOrder]);
 
   const handleCancelOrder = () => {
     if (!order) return;
@@ -193,7 +215,7 @@ export default function OrderDetailScreen() {
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: insets.top }]}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.push('/order' as any)}>
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Buyurtma</Text>
@@ -210,7 +232,7 @@ export default function OrderDetailScreen() {
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: insets.top }]}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.push('/order' as any)}>
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Buyurtma</Text>
@@ -226,7 +248,7 @@ export default function OrderDetailScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.push('/order' as any)}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Buyurtma #{order.orderNumber}</Text>
@@ -240,6 +262,14 @@ export default function OrderDetailScreen() {
           { paddingBottom: insets.bottom + 24 },
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#007AFF"
+            colors={['#007AFF']}
+          />
+        }
       >
         {/* Status Card */}
         <View style={styles.statusCard}>

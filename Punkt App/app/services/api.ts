@@ -283,6 +283,16 @@ export interface ReceiveFromPunktResponse {
   data: Order;
 }
 
+export interface SendToPunktRequest {
+  toPunktId: string;
+}
+
+export interface SendToPunktResponse {
+  success: boolean;
+  message: string;
+  data: Order;
+}
+
 export interface ReceiveFromContragentResponse {
   success: boolean;
   message: string;
@@ -483,13 +493,12 @@ export interface Notification {
 
 export interface NotificationsResponse {
   success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
   data: Notification[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
 }
 
 export interface UnreadCountResponse {
@@ -825,6 +834,16 @@ class ApiService {
     });
   }
 
+  async sendToPunkt(
+    id: string,
+    data: SendToPunktRequest
+  ): Promise<SendToPunktResponse> {
+    return this.request<SendToPunktResponse>(`/punkt/orders/${id}/send-to-punkt`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async receiveFromContragent(id: string): Promise<ReceiveFromContragentResponse> {
     return this.request<ReceiveFromContragentResponse>(
       `/punkt/orders/${id}/receive-from-contragent`,
@@ -935,6 +954,7 @@ class ApiService {
   async getNotifications(params?: {
     page?: number;
     limit?: number;
+    read?: boolean;
   }): Promise<NotificationsResponse> {
     const queryParams = new URLSearchParams();
     if (params) {

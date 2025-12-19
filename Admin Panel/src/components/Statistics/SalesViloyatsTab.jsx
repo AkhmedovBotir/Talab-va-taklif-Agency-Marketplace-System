@@ -23,28 +23,27 @@ const formatDate = (dateString) => {
 const orderStatusOptions = [
   { value: '', label: 'Barchasi' },
   { value: 'pending', label: 'Kutilmoqda' },
-  { value: 'marketplace', label: 'Marketplace' },
-  { value: 'delivered_to_punkt', label: 'Punktga yetkazildi' },
-  { value: 'assigned_to_agent', label: 'Agentga biriktirildi' },
-  { value: 'confirmed_by_agent', label: 'Agent tasdiqladi' },
-  { value: 'confirmed_by_customer', label: 'Mijoz qabul qildi' },
+  { value: 'confirmed_by_punkt', label: 'Punkt tasdiqlagan' },
+  { value: 'requested_to_contragent', label: 'Contragentga so\'rov yuborilgan' },
+  { value: 'accepted_by_contragent', label: 'Contragent tomonidan qabul qilingan' },
+  { value: 'delivered_to_punkt', label: 'Punktga yetkazilgan' },
+  { value: 'assigned_to_agent', label: 'Agentga yuborilgan' },
+  { value: 'confirmed_by_agent', label: 'Agent tomonidan tasdiqlangan' },
+  { value: 'confirmed_by_customer', label: 'Mijoz tomonidan tasdiqlangan' },
   { value: 'cancelled', label: 'Bekor qilingan' },
-  { value: 'returned', label: 'Qaytarilgan' },
 ];
 
 // Detail Modal
-const ViloyatDetailModal = ({ viloyatId, viloyatName, filters, open, onClose }) => {
+const ViloyatDetailModal = ({ viloyatId, viloyatName, filters, open, onClose, onTumanClick }) => {
   const { showError } = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
-  const [groupBy, setGroupBy] = useState('tuman');
 
   const fetchData = async () => {
     if (!viloyatId) return;
     setLoading(true);
     try {
       const response = await salesStatsAPI.getViloyatStats(viloyatId, {
-        groupBy,
         startDate: filters.startDate,
         endDate: filters.endDate,
         status: filters.status,
@@ -64,7 +63,7 @@ const ViloyatDetailModal = ({ viloyatId, viloyatName, filters, open, onClose }) 
       fetchData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, viloyatId, groupBy]);
+  }, [open, viloyatId]);
 
   if (!open) return null;
 
@@ -100,26 +99,20 @@ const ViloyatDetailModal = ({ viloyatId, viloyatName, filters, open, onClose }) 
           </div>
 
           <div className="p-6">
-            {/* Group By Selector */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Guruhlash</label>
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="tuman">Tumanlar bo'yicha</option>
-                <option value="mfy">MFYlar bo'yicha</option>
-                <option value="day">Kunlar bo'yicha</option>
-              </select>
-            </div>
-
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-indigo-600"></div>
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Viloyat Info */}
+                {data?.viloyat && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500">Viloyat</p>
+                    <p className="font-medium text-gray-900">{data.viloyat.name} ({data.viloyat.code})</p>
+                  </div>
+                )}
+
                 {/* Totals */}
                 <div className="grid grid-cols-3 gap-4 bg-indigo-50 p-4 rounded-lg">
                   <div>
@@ -136,29 +129,44 @@ const ViloyatDetailModal = ({ viloyatId, viloyatName, filters, open, onClose }) 
                   </div>
                 </div>
 
-                {/* Data Table */}
+                {/* Data Table - Tumans */}
                 {data?.data?.length > 0 && (
                   <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-96">
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            {groupBy === 'day' ? 'Sana' : groupBy === 'mfy' ? 'MFY' : 'Tuman'}
-                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tuman</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Buyurtmalar</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Daromad</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mahsulotlar</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">O'rtacha</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amallar</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {data.data.map((item, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
+                          <tr key={item.tuman?._id || index} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                              {groupBy === 'day' ? formatDate(item.date) : (item.tuman?.name || item.mfy?.name || '-')}
+                              {item.tuman?.name || '-'}
+                              {item.tuman?.code && <span className="text-xs text-gray-500 ml-2">({item.tuman.code})</span>}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-600">{formatNumber(item.totalOrders)}</td>
                             <td className="px-4 py-2 text-sm font-semibold text-green-600">{formatNumber(item.totalRevenue)} so'm</td>
                             <td className="px-4 py-2 text-sm text-gray-600">{formatNumber(item.totalItems)}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{formatNumber(item.avgOrderValue)} so'm</td>
+                            <td className="px-4 py-2 text-right">
+                              {onTumanClick && (
+                                <button
+                                  onClick={() => {
+                                    onTumanClick(item.tuman);
+                                    onClose();
+                                  }}
+                                  className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                                >
+                                  MFYlar →
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -174,7 +182,7 @@ const ViloyatDetailModal = ({ viloyatId, viloyatName, filters, open, onClose }) 
   );
 };
 
-const SalesViloyatsTab = () => {
+const SalesViloyatsTab = ({ onViloyatClick }) => {
   const { showError } = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
@@ -346,13 +354,24 @@ const SalesViloyatsTab = () => {
                   <td className="px-4 py-3 text-sm text-gray-600">{formatNumber(item.totalItems)}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{formatNumber(item.avgOrderValue)} so'm</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleViewViloyat(item.viloyat)}
-                      className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
-                      title="Batafsil"
-                    >
-                      <Visibility className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      {onViloyatClick && (
+                        <button
+                          onClick={() => onViloyatClick(item.viloyat)}
+                          className="text-indigo-600 hover:text-indigo-900 px-3 py-1 text-sm font-medium rounded hover:bg-indigo-50"
+                          title="Tumanlarni ko'rish"
+                        >
+                          Tumanlar →
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleViewViloyat(item.viloyat)}
+                        className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50"
+                        title="Batafsil"
+                      >
+                        <Visibility className="w-5 h-5" />
+                      </button>
+                    </div>
                   </td>
                 </motion.tr>
               ))}
@@ -372,6 +391,10 @@ const SalesViloyatsTab = () => {
         onClose={() => {
           setModalOpen(false);
           setSelectedViloyat(null);
+        }}
+        onTumanClick={(tuman) => {
+          // Navigate to tumans tab with selected tuman
+          console.log('Navigate to tuman:', tuman);
         }}
       />
     </div>

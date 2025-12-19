@@ -12,7 +12,7 @@
 const BASE_URL = 'http://localhost:5000';
 
 // Admin token - bu yerga haqiqiy tokenni qo'ying
-const ADMIN_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5MzA2OTMyODk5ODM0ZThmZWMwYzliYiIsInVzZXJuYW1lIjoiZ2VuZXJhbCIsInJvbGUiOiJnZW5lcmFsIiwiaWF0IjoxNzY0NzgwOTg0LCJleHAiOjE3NjUzODU3ODR9.0iBmpIMI_sUCmQWMMbC_24PZbJsrHfYCSsLTXqWxXYs';
+const ADMIN_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NDI1OWFhZGYyMDdlOTkxZWVmYTFmMCIsInVzZXJuYW1lIjoiZ2VuZXJhbCIsInJvbGUiOiJnZW5lcmFsIiwiaWF0IjoxNzY1OTU2MDUwLCJleHAiOjE3NjY1NjA4NTB9.5tZwllqFOc0CG6E8im4lCpW2QhoVy76gFazeV_OuA4s';
 
 // Notification types
 const notificationTypes = ['info', 'warning', 'success', 'error', 'announcement', 'promotion', 'update'];

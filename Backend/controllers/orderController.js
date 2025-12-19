@@ -3,6 +3,7 @@ const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const MarketplaceUser = require('../models/MarketplaceUser');
 const Region = require('../models/Region');
+const { cacheInvalidators } = require('../middleware/cache');
 
 // Create order from cart
 const createOrder = async (req, res) => {
@@ -217,6 +218,27 @@ const createOrder = async (req, res) => {
       });
     }
 
+    // Find punkt in customer's district to automatically assign order
+    const Punkt = require('../models/Punkt');
+    let assignedPunkt = null;
+    
+    if (deliveryTuman) {
+      // Try to find active punkt in customer's tuman
+      assignedPunkt = await Punkt.findOne({
+        tuman: deliveryTuman,
+        viloyat: deliveryViloyat,
+        status: 'active',
+      });
+    }
+    
+    // If no punkt found in tuman, try to find any active punkt in viloyat
+    if (!assignedPunkt) {
+      assignedPunkt = await Punkt.findOne({
+        viloyat: deliveryViloyat,
+        status: 'active',
+      });
+    }
+
     // Create order
     const order = await Order.create({
       user: userId,
@@ -234,6 +256,7 @@ const createOrder = async (req, res) => {
       deliveryMfy: deliveryMfy || null,
       deliveryNote: deliveryNote || '',
       phoneNumber: orderPhoneNumber,
+      currentPunkt: assignedPunkt ? assignedPunkt._id : null,
     });
 
     // Clear cart if requested
@@ -296,6 +319,10 @@ const createOrder = async (req, res) => {
       }
       return item;
     });
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateOrderCache();
+    await cacheInvalidators.invalidateCartCache(userId);
 
     res.status(201).json({
       success: true,
@@ -623,6 +650,10 @@ const cancelOrder = async (req, res) => {
       return item;
     });
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateOrderCache();
+    await cacheInvalidators.invalidateCartCache(userId);
+
     res.status(200).json({
       success: true,
       message: 'Buyurtma bekor qilindi',
@@ -752,6 +783,9 @@ const confirmDelivery = async (req, res) => {
         return item;
       });
     }
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateOrderCache();
 
     res.status(200).json({
       success: true,

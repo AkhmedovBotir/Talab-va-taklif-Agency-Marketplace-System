@@ -6,7 +6,7 @@ import OrderTable from '../../components/Orders/OrderTable';
 import ViewOrderModal from '../../components/Orders/ViewOrderModal';
 import { Clear } from '@mui/icons-material';
 
-const CancelledOrders = () => {
+const CancelledOrders = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -96,16 +96,18 @@ const CancelledOrders = () => {
 
   return (
     <div>
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Qaytarilgan Buyurtmalar</h1>
-          <p className="text-gray-600">Bekor qilingan buyurtmalarni ko'rish va monitoring qilish</p>
-        </div>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Qaytarilgan Buyurtmalar</h1>
+            <p className="text-gray-600">Bekor qilingan buyurtmalarni ko'rish va monitoring qilish</p>
+          </div>
+        </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}

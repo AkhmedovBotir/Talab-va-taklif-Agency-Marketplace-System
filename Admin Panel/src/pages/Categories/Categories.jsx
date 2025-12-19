@@ -6,7 +6,7 @@ import CategoryTable from '../../components/Categories/CategoryTable';
 import ViewCategoryModal from '../../components/Categories/ViewCategoryModal';
 import { Search, Clear } from '@mui/icons-material';
 
-const Categories = () => {
+const Categories = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -96,16 +96,18 @@ const Categories = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Kategoriyalar</h1>
-          <p className="text-gray-600">Kategoriyalar va subkategoriyalarni ko'rish</p>
-        </div>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Kategoriyalar</h1>
+            <p className="text-gray-600">Kategoriyalar va subkategoriyalarni ko'rish</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Filters */}
       <motion.div

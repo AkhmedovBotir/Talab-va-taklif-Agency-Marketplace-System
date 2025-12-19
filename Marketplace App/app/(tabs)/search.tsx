@@ -174,7 +174,7 @@ export default function SearchScreen() {
     };
 
     const { isAuthenticated } = useAuth();
-    const { addToCart } = useCart();
+    const { addToCart, getCartItemQuantity } = useCart();
 
     const handleAddToCart = async (product: Product) => {
         if (!isAuthenticated) {
@@ -204,13 +204,17 @@ export default function SearchScreen() {
         router.push('/notifications' as any);
     };
 
-    const renderItem = ({ item }: { item: Product }) => (
-        <ProductCard
-            product={item}
-            onPress={handleProductPress}
-            onAddToCart={handleAddToCart}
-        />
-    );
+    const renderItem = ({ item }: { item: Product }) => {
+        const isInCart = getCartItemQuantity(item._id) > 0;
+        return (
+            <ProductCard
+                product={item}
+                onPress={handleProductPress}
+                onAddToCart={handleAddToCart}
+                isInCart={isInCart}
+            />
+        );
+    };
 
     const renderFooter = () => {
         if (!loadingMore) return null;

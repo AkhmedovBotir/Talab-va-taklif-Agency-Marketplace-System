@@ -21,7 +21,6 @@ const vacancyApplicantSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Telefon raqami kiritilishi shart'],
       trim: true,
-      unique: true,
       match: [/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/, 'To\'g\'ri telefon raqam formatini kiriting'],
     },
     gender: {

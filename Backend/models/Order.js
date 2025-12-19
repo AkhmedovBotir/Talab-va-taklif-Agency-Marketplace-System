@@ -42,7 +42,6 @@ const orderSchema = new mongoose.Schema(
     orderNumber: {
       type: String,
       required: true,
-      unique: true,
     },
     items: {
       type: [orderItemSchema],
@@ -193,6 +192,11 @@ const orderSchema = new mongoose.Schema(
           type: mongoose.Schema.Types.ObjectId,
           ref: 'Contragent',
           required: true,
+        },
+        itemIds: {
+          type: [Number],
+          required: true,
+          default: [],
         },
         status: {
           type: String,

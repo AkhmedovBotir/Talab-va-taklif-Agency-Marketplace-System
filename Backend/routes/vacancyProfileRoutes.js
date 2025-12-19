@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { cacheMiddleware } = require('../middleware/cache');
 const {
   getMe,
   updateProfile,
@@ -13,7 +14,7 @@ const { vacancyApplicantAuth } = require('../middleware/auth');
 router.use(vacancyApplicantAuth);
 
 // Get current applicant profile
-router.get('/me', getMe);
+router.get('/me', cacheMiddleware(300), getMe); // 5 min cache
 
 // Update profile (firstName, lastName, gender, birthDate)
 router.put('/me', updateProfile);

@@ -5,8 +5,6 @@ import {
     ActivityIndicator,
     Alert,
     Image,
-    PermissionsAndroid,
-    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -14,10 +12,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QuillEditor, { QuillEditorRef } from '../../../../components/QuillEditor';
 import { apiService, Category, DeliveryRegion, DeltaFormat, Product } from '../../../../services/api';
+import { formatNumberInput, unformatNumber } from '../../../../utils/formatNumber';
 
 export default function ProductEditScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>();
@@ -123,48 +122,38 @@ export default function ProductEditScreen() {
     }, [params?.selectedRegions])
   );
 
-  const requestGalleryPermission = async () => {
-    if (Platform.OS !== 'android') return true;
-
-    const permission =
-      Platform.Version >= 33
-        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
-        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-
-    const status = await PermissionsAndroid.request(permission, {
-      title: 'Ruxsat kerak',
-      message: 'Rasmlarni tanlash uchun ruxsat kerak',
-      buttonPositive: 'OK',
-    });
-
-    return status === PermissionsAndroid.RESULTS.GRANTED;
-  };
-
   const pickImage = async () => {
     if (images.length >= 5) {
       Alert.alert('Xatolik', 'Maksimal 5 ta rasm qo\'shish mumkin');
       return;
     }
 
-    const hasPermission = await requestGalleryPermission();
-    if (!hasPermission) {
-      Alert.alert('Ruxsat kerak', 'Rasmlarni tanlash uchun ruxsat kerak');
-      return;
-    }
+    launchImageLibrary(
+      {
+        mediaType: 'photo' as MediaType,
+        quality: 0.6,
+        includeBase64: true,
+        maxWidth: 2000,
+        maxHeight: 2000,
+      },
+      (response: ImagePickerResponse) => {
+        if (response.didCancel) {
+          return;
+        }
 
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-      includeBase64: true,
-      selectionLimit: 1,
-      quality: 0.6,
-    });
+        if (response.errorMessage) {
+          Alert.alert('Xatolik', response.errorMessage);
+          return;
+        }
 
-    if (!result.didCancel && result.assets?.[0]?.base64) {
-      const asset = result.assets[0];
-      const mimeType = asset.type || 'image/jpeg';
-      const base64 = `data:${mimeType};base64,${asset.base64}`;
-      setImages([...images, base64]);
-    }
+        if (response.assets && response.assets[0]?.base64) {
+          const asset = response.assets[0];
+          const mimeType = asset.type || 'image/jpeg';
+          const base64 = `data:${mimeType};base64,${asset.base64}`;
+          setImages([...images, base64]);
+        }
+      }
+    );
   };
 
   const removeImage = (index: number) => {
@@ -384,8 +373,8 @@ export default function ProductEditScreen() {
           <TextInput
             style={styles.input}
             placeholder="Narx"
-            value={price}
-            onChangeText={setPrice}
+            value={formatNumberInput(price)}
+            onChangeText={(text) => setPrice(unformatNumber(text))}
             keyboardType="numeric"
           />
 
@@ -393,8 +382,8 @@ export default function ProductEditScreen() {
           <TextInput
             style={styles.input}
             placeholder="Asl narx"
-            value={originalPrice}
-            onChangeText={setOriginalPrice}
+            value={formatNumberInput(originalPrice)}
+            onChangeText={(text) => setOriginalPrice(unformatNumber(text))}
             keyboardType="numeric"
           />
 
@@ -403,8 +392,16 @@ export default function ProductEditScreen() {
             style={styles.input}
             placeholder="Masalan: 5"
             value={kpiBonusPercent}
-            onChangeText={setKpiBonusPercent}
+            onChangeText={(text) => {
+              // Faqat raqamlar va nuqta qabul qilish
+              const numericValue = text.replace(/[^0-9.]/g, '');
+              // Maksimum 100 gacha cheklash
+              if (numericValue === '' || (parseFloat(numericValue) >= 0 && parseFloat(numericValue) <= 100)) {
+                setKpiBonusPercent(numericValue);
+              }
+            }}
             keyboardType="numeric"
+            maxLength={3}
           />
         </View>
 

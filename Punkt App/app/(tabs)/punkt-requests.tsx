@@ -38,6 +38,7 @@ export default function PunktRequestsScreen() {
 
       const response = await apiService.getPunktToPunktRequests(params);
       setRequests(response.data);
+      console.log('requests', response.data);
     } catch (error: any) {
       console.error('Error loading punkt requests:', error);
     } finally {
@@ -91,9 +92,18 @@ export default function PunktRequestsScreen() {
   };
 
   const handleReceive = async (order: Order) => {
+    const request = order.punktToPunktRequests?.find(
+      (req) => req.toPunktId && typeof req.toPunktId === 'object' && req.toPunktId._id === punkt?._id
+    );
+    const isPending = request?.status === 'pending';
+    
+    const message = isPending
+      ? 'Punktdan buyurtmani qabul qilishni xohlaysizmi? So\'rov avtomatik qabul qilinadi va buyurtma tasdiqlanadi.'
+      : 'Punktdan buyurtmani qabul qilishni xohlaysizmi?';
+    
     Alert.alert(
       'Qabul qilish',
-      'Punktdan buyurtmani qabul qilishni xohlaysizmi?',
+      message,
       [
         { text: 'Bekor qilish', style: 'cancel' },
         {
@@ -103,7 +113,10 @@ export default function PunktRequestsScreen() {
             try {
               await apiService.receiveFromPunkt(order._id);
               await loadRequests();
-              Alert.alert('Muvaffaqiyatli', 'Buyurtma qabul qilindi');
+              const successMessage = isPending
+                ? 'So\'rov avtomatik qabul qilindi va buyurtma tasdiqlandi. Buyurtma qabul qilindi. Endi kontragentlarga so\'rov yuborishingiz mumkin.'
+                : 'Buyurtma qabul qilindi.';
+              Alert.alert('Muvaffaqiyatli', successMessage);
             } catch (error: any) {
               Alert.alert('Xatolik', error.message || 'Qabul qilishda xatolik');
             } finally {
@@ -123,8 +136,8 @@ export default function PunktRequestsScreen() {
       return (
         <View style={styles.actionsContainer}>
           <Button
-            title="Qabul qilish"
-            onPress={() => handleRespond(order, 'accepted')}
+            title="Qabul qilish (avtomatik qabul)"
+            onPress={() => handleReceive(order)}
             variant="primary"
             style={styles.actionButton}
             disabled={isLoading}
@@ -178,16 +191,26 @@ export default function PunktRequestsScreen() {
         {fromPunkt && (
           <View style={styles.fromPunktInfo}>
             <Ionicons name="business-outline" size={16} color="#666" />
-            <Text style={styles.fromPunktText}>
-              {fromPunkt.name} punktidan
-            </Text>
-            {status && (
-              <View style={[styles.statusBadge, styles[`status${status}`]]}>
-                <Text style={styles.statusText}>
-                  {status === 'pending' ? 'Kutilmoqda' : 
-                   status === 'accepted' ? 'Qabul qilindi' : 
-                   status === 'rejected' ? 'Rad etilgan' : 
-                   status === 'delivered' ? 'Yetkazildi' : status}
+            <View style={styles.fromPunktContent}>
+              <Text style={styles.fromPunktText}>
+                {fromPunkt.name} punktidan
+              </Text>
+              {status && (
+                <View style={[styles.statusBadge, styles[`status${status}`]]}>
+                  <Text style={styles.statusText}>
+                    {status === 'pending' ? 'Kutilmoqda' : 
+                     status === 'accepted' ? 'Qabul qilindi' : 
+                     status === 'rejected' ? 'Rad etilgan' : 
+                     status === 'delivered' ? 'Yetkazildi' : status}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {status === 'pending' && (
+              <View style={styles.flowHint}>
+                <Ionicons name="information-circle-outline" size={14} color="#007AFF" />
+                <Text style={styles.flowHintText}>
+                  Qabul qilish avtomatik tasdiqlaydi va buyurtmani punktga belgilaydi
                 </Text>
               </View>
             )}
@@ -302,18 +325,36 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fromPunktInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     padding: 12,
     backgroundColor: '#F9F9F9',
     borderTopWidth: 1,
     borderTopColor: '#E5E5EA',
   },
+  fromPunktContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   fromPunktText: {
     flex: 1,
     fontSize: 14,
     color: '#666',
+    fontWeight: '500',
+  },
+  flowHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  flowHintText: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontStyle: 'italic',
   },
   statusBadge: {
     paddingHorizontal: 10,

@@ -11,7 +11,6 @@ const reviewCommentTemplateSchema = new mongoose.Schema(
     order: {
       type: Number,
       required: [true, 'Tartib raqami kiritilishi shart'],
-      unique: true,
       min: [1, 'Tartib raqami kamida 1 bo\'lishi kerak'],
     },
     isActive: {
@@ -25,7 +24,7 @@ const reviewCommentTemplateSchema = new mongoose.Schema(
 );
 
 // Index
-reviewCommentTemplateSchema.index({ order: 1 });
+reviewCommentTemplateSchema.index({ order: 1 }, { unique: true });
 reviewCommentTemplateSchema.index({ isActive: 1 });
 
 const ReviewCommentTemplate = mongoose.model('ReviewCommentTemplate', reviewCommentTemplateSchema);

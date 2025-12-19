@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
@@ -31,6 +31,7 @@ export default function OrdersScreen() {
   });
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [kpiRefreshTrigger, setKpiRefreshTrigger] = useState(0);
   const router = useRouter();
 
   const loadOrders = useCallback(async (pageNum = 1, reset = false) => {
@@ -45,10 +46,11 @@ export default function OrdersScreen() {
       if (filters.paymentMethod) params.paymentMethod = filters.paymentMethod;
       if (filters.search) params.search = filters.search;
 
-      const response = await apiService.getOrders(params);
+      const response = await apiService.getTodayOrders(params);
 
       if (reset) {
         setOrders(response.data);
+        console.log("orders", response.data);
       } else {
         setOrders((prev) => [...prev, ...response.data]);
       }
@@ -67,11 +69,18 @@ export default function OrdersScreen() {
     setPage(1);
   }, [filters]);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
     setPage(1);
-    loadOrders(1, true);
+    setKpiRefreshTrigger(prev => prev + 1);
+    await loadOrders(1, true);
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      setKpiRefreshTrigger(prev => prev + 1);
+    }, [])
+  );
 
   const loadMore = () => {
     if (!loading && hasMore) {
@@ -106,7 +115,10 @@ export default function OrdersScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <KpiBalanceCard onPress={() => router.push('/kpi')} />
+        <KpiBalanceCard 
+          onPress={() => router.push('/kpi')} 
+          refreshTrigger={kpiRefreshTrigger}
+        />
         <View style={styles.headerRow}>
           <Input
             placeholder="Qidirish (buyurtma raqami, telefon)"

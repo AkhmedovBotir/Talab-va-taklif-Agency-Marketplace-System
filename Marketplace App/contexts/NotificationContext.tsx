@@ -43,11 +43,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     refreshUnreadCount();
   }, [refreshUnreadCount]);
 
-  // Refresh every 30 seconds
+  // Refresh every 1 second
   useEffect(() => {
     if (!token) return;
     
-    const interval = setInterval(refreshUnreadCount, 30000);
+    const interval = setInterval(refreshUnreadCount, 1000);
     return () => clearInterval(interval);
   }, [token, refreshUnreadCount]);
 

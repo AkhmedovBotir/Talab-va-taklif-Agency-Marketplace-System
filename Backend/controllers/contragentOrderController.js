@@ -44,11 +44,26 @@ const getOrdersForContragent = async (req, res) => {
       .limit(limitNum);
 
     // Filter contragentRequests to only show requests to this contragent
+    // And filter items to only show items requested from this contragent
     const filteredOrders = orders.map((order) => {
       const orderObj = order.toObject();
-      orderObj.contragentRequests = orderObj.contragentRequests.filter(
+      const contragentRequest = orderObj.contragentRequests.find(
         (req) => req.contragentId._id.toString() === userId.toString()
       );
+      
+      // Filter to only show this contragent's request
+      orderObj.contragentRequests = contragentRequest ? [contragentRequest] : [];
+      
+      // Filter items to only show items requested from this contragent
+      if (contragentRequest && contragentRequest.itemIds && contragentRequest.itemIds.length > 0) {
+        orderObj.items = orderObj.items.filter((item, index) => 
+          contragentRequest.itemIds.includes(index)
+        );
+      } else {
+        // If no itemIds specified (old data), show all items (backward compatibility)
+        orderObj.items = orderObj.items || [];
+      }
+      
       // Remove kpiBonusPercent from products
       if (orderObj.items) {
         orderObj.items = orderObj.items.map((item) => {
@@ -58,6 +73,7 @@ const getOrdersForContragent = async (req, res) => {
           return item;
         });
       }
+      
       return orderObj;
     });
 
@@ -125,8 +141,17 @@ const getOrderById = async (req, res) => {
       });
     }
 
-    // Remove kpiBonusPercent from products
+    // Remove kpiBonusPercent from products and filter items
     const orderObj = order.toObject();
+    
+    // Filter items to only show items requested from this contragent
+    if (contragentRequest.itemIds && contragentRequest.itemIds.length > 0) {
+      orderObj.items = orderObj.items.filter((item, index) => 
+        contragentRequest.itemIds.includes(index)
+      );
+    }
+    // If no itemIds specified (old data), show all items (backward compatibility)
+    
     if (orderObj.items) {
       orderObj.items = orderObj.items.map((item) => {
         if (item.product && item.product.kpiBonusPercent !== undefined) {
@@ -135,6 +160,9 @@ const getOrderById = async (req, res) => {
         return item;
       });
     }
+    
+    // Filter to only show this contragent's request
+    orderObj.contragentRequests = [contragentRequest];
 
     res.status(200).json({
       success: true,
@@ -224,8 +252,17 @@ const respondToOrderRequest = async (req, res) => {
       ],
     });
 
-    // Remove kpiBonusPercent from products
+    // Remove kpiBonusPercent from products and filter items
     const orderObj = order.toObject();
+    
+    // Filter items to only show items requested from this contragent
+    if (request.itemIds && request.itemIds.length > 0) {
+      orderObj.items = orderObj.items.filter((item, index) => 
+        request.itemIds.includes(index)
+      );
+    }
+    // If no itemIds specified (old data), show all items (backward compatibility)
+    
     if (orderObj.items) {
       orderObj.items = orderObj.items.map((item) => {
         if (item.product && item.product.kpiBonusPercent !== undefined) {
@@ -234,6 +271,9 @@ const respondToOrderRequest = async (req, res) => {
         return item;
       });
     }
+    
+    // Filter to only show this contragent's request
+    orderObj.contragentRequests = [request];
 
     res.status(200).json({
       success: true,
@@ -332,8 +372,17 @@ const deliverToPunkt = async (req, res) => {
       ],
     });
 
-    // Remove kpiBonusPercent from products
+    // Remove kpiBonusPercent from products and filter items
     const orderObj = order.toObject();
+    
+    // Filter items to only show items requested from this contragent
+    if (request.itemIds && request.itemIds.length > 0) {
+      orderObj.items = orderObj.items.filter((item, index) => 
+        request.itemIds.includes(index)
+      );
+    }
+    // If no itemIds specified (old data), show all items (backward compatibility)
+    
     if (orderObj.items) {
       orderObj.items = orderObj.items.map((item) => {
         if (item.product && item.product.kpiBonusPercent !== undefined) {
@@ -342,6 +391,9 @@ const deliverToPunkt = async (req, res) => {
         return item;
       });
     }
+    
+    // Filter to only show this contragent's request
+    orderObj.contragentRequests = [request];
 
     res.status(200).json({
       success: true,

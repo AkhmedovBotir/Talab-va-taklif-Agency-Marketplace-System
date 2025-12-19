@@ -2022,9 +2022,11 @@ The complete order workflow:
 
 ### 12. Get Marketplace Orders
 
-Get all marketplace orders (new orders from marketplace, excluding cancelled orders).
+Get all marketplace orders that have not been confirmed by punkt yet (punkt qabul qilmagan buyurtmalar).
 
 **Endpoint:** `GET /api/admins/data/orders/marketplace`
+
+**Description:** Returns orders from marketplace that are still pending punkt confirmation. These are new orders that punkt has not yet accepted.
 
 **Headers:**
 - `Authorization: Bearer <token>` (required)

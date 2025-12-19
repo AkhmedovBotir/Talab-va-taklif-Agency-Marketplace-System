@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { cacheMiddleware } = require('../middleware/cache');
 const {
   createProduct,
   getAllProducts,
@@ -16,13 +17,13 @@ const { contragentAuth } = require('../middleware/auth');
 router.post('/create', contragentAuth, validate(productValidationSchemas.create), createProduct);
 
 // Get my products (requires authentication)
-router.get('/my', contragentAuth, getMyProducts);
+router.get('/my', contragentAuth, cacheMiddleware(300), getMyProducts); // 5 min cache
 
 // Get all products (public, but can be filtered)
-router.get('/list', getAllProducts);
+router.get('/list', cacheMiddleware(1800), getAllProducts); // 30 min cache
 
 // Get product by ID (public)
-router.get('/:id', getProductById);
+router.get('/:id', cacheMiddleware(3600), getProductById); // 1 hour cache
 
 // Update product (requires authentication, only owner)
 router.put('/:id', contragentAuth, validate(productValidationSchemas.update), updateProduct);

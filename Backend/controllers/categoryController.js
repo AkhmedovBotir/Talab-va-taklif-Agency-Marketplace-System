@@ -1,4 +1,5 @@
 const Category = require('../models/Category');
+const { cacheInvalidators } = require('../middleware/cache');
 
 // Create category
 const createCategory = async (req, res) => {
@@ -29,6 +30,9 @@ const createCategory = async (req, res) => {
     if (category.parent) {
       await category.populate('parent', 'name slug status');
     }
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(201).json({
       success: true,
@@ -96,6 +100,9 @@ const createSubcategory = async (req, res) => {
     // Populate parent
     await category.populate('parent', 'name slug status');
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateCategoryCache();
+
     res.status(201).json({
       success: true,
       message: 'Sub kategoriya muvaffaqiyatli yaratildi',
@@ -125,6 +132,12 @@ const getAllCategories = async (req, res) => {
   try {
     const { status, parent, page = 1, limit = 10 } = req.query;
     const filter = { parent: null }; // Only top-level categories
+
+    // If user is authenticated as contragent, filter by their own categories
+    if (req.user && req.user.userType === 'Contragent') {
+      filter.createdBy = req.user.userId;
+      filter.createdByModel = 'Contragent';
+    }
 
     if (status) {
       filter.status = status;
@@ -174,6 +187,12 @@ const getAllSubcategories = async (req, res) => {
   try {
     const { status, parent, page = 1, limit = 10 } = req.query;
     const filter = { parent: { $ne: null } }; // Only subcategories
+
+    // If user is authenticated as contragent, filter by their own subcategories
+    if (req.user && req.user.userType === 'Contragent') {
+      filter.createdBy = req.user.userId;
+      filter.createdByModel = 'Contragent';
+    }
 
     if (status) {
       filter.status = status;
@@ -241,6 +260,18 @@ const getCategoryById = async (req, res) => {
         success: false,
         message: 'Kategoriya topilmadi',
       });
+    }
+
+    // If user is authenticated as contragent, check if category belongs to them
+    if (req.user && req.user.userType === 'Contragent') {
+      const createdById = category.createdBy?._id?.toString() || category.createdBy?.toString();
+      if (category.createdByModel !== 'Contragent' || 
+          createdById !== req.user.userId.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bu kategoriyaga kirish huquqingiz yo\'q',
+        });
+      }
     }
 
     res.status(200).json({
@@ -330,6 +361,9 @@ const updateCategory = async (req, res) => {
         message: 'Kategoriya topilmadi',
       });
     }
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(200).json({
       success: true,
@@ -423,6 +457,9 @@ const updateSubcategory = async (req, res) => {
       });
     }
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateCategoryCache();
+
     res.status(200).json({
       success: true,
       message: 'Sub kategoriya muvaffaqiyatli yangilandi',
@@ -489,6 +526,9 @@ const updateCategoryStatus = async (req, res) => {
       });
     }
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateCategoryCache();
+
     res.status(200).json({
       success: true,
       message: 'Kategoriya statusi muvaffaqiyatli yangilandi',
@@ -535,6 +575,9 @@ const deleteCategory = async (req, res) => {
       });
     }
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateCategoryCache();
+
     res.status(200).json({
       success: true,
       message: 'Kategoriya muvaffaqiyatli o\'chirildi',
@@ -570,6 +613,9 @@ const deleteSubcategory = async (req, res) => {
         message: 'Sub kategoriya topilmadi',
       });
     }
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(200).json({
       success: true,

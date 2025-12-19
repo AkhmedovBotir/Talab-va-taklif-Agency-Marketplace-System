@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { apiService, StatisticsData } from '../../services/api';
+import { formatNumberDisplay } from '../../utils/formatNumber';
 
 export default function StatistikaScreen() {
   const insets = useSafeAreaInsets();
@@ -73,11 +74,11 @@ export default function StatistikaScreen() {
   };
 
   const formatNumber = (num: number): string => {
-    return num.toLocaleString('uz-UZ');
+    return formatNumberDisplay(num);
   };
 
   const formatCurrency = (num: number): string => {
-    return num.toLocaleString('uz-UZ') + ' so\'m';
+    return formatNumberDisplay(num) + ' so\'m';
   };
 
   const getMonthName = (month: number): string => {

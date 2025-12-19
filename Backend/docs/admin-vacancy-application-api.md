@@ -685,29 +685,86 @@ Barcha intervyu bosqichlari yakunlangandan keyin yakuniy qaror qilish.
 - `reason` (optional): Qaror sababi
 - `decidedBy` (optional): Qaror qilgan shaxs nomi
 
-**Response:**
+**Response (hired):**
 ```json
 {
   "success": true,
   "message": "Yakuniy qaror: Ishga qabul qilindi",
   "data": {
-    "_id": "application_id",
-    "vacancy": "vacancy_id",
-    "applicant": { /* applicant object */ },
-    "answers": [ /* javoblar */ ],
-    "status": "accepted",
-    "adminDecision": "accepted",
-    "interviewStages": [ /* barcha bosqichlar */ ],
-    "finalDecision": {
-      "result": "hired",
-      "reason": "Barcha bosqichlardan muvaffaqiyatli o'tdi",
-      "responseStatus": "waiting",
-      "respondedAt": null,
-      "decidedAt": "2024-01-20T00:00:00.000Z",
-      "decidedBy": "Ahmadjon Ahmadov"
+    "application": {
+      "_id": "application_id",
+      "vacancy": {
+        "_id": "vacancy_id",
+        "name": "Punkt menejeri",
+        "target": "punkt"
+      },
+      "applicant": { /* applicant object */ },
+      "answers": [ /* javoblar */ ],
+      "status": "accepted",
+      "adminDecision": "accepted",
+      "interviewStages": [ /* barcha bosqichlar */ ],
+      "finalDecision": {
+        "result": "hired",
+        "reason": "Barcha bosqichlardan muvaffaqiyatli o'tdi",
+        "responseStatus": "waiting",
+        "respondedAt": null,
+        "decidedAt": "2024-01-20T00:00:00.000Z",
+        "decidedBy": "Ahmadjon Ahmadov"
+      },
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-20T00:00:00.000Z"
     },
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-20T00:00:00.000Z"
+    "createdUser": {
+      "type": "punkt",
+      "data": {
+        "_id": "punkt_id",
+        "name": "Ahmadjon Ahmadov",
+        "phone": "+998901234567",
+        "viloyat": { /* region object */ },
+        "tuman": { /* region object */ },
+        "status": "active",
+        "createdAt": "2024-01-20T00:00:00.000Z",
+        "updatedAt": "2024-01-20T00:00:00.000Z"
+      }
+    }
+  }
+}
+```
+
+**Response (hired - agent):**
+```json
+{
+  "success": true,
+  "message": "Yakuniy qaror: Ishga qabul qilindi",
+  "data": {
+    "application": { /* application object */ },
+    "createdUser": {
+      "type": "agent",
+      "data": {
+        "_id": "agent_id",
+        "name": "Ahmadjon Ahmadov",
+        "phone": "+998901234567",
+        "viloyat": { /* region object */ },
+        "tuman": { /* region object */ },
+        "mfy": { /* region object */ },
+        "agentType": "mfy",
+        "status": "active",
+        "createdAt": "2024-01-20T00:00:00.000Z",
+        "updatedAt": "2024-01-20T00:00:00.000Z"
+      }
+    }
+  }
+}
+```
+
+**Response (rejected):**
+```json
+{
+  "success": true,
+  "message": "Yakuniy qaror: Rad etildi",
+  "data": {
+    "application": { /* application object */ },
+    "createdUser": null
   }
 }
 ```
@@ -717,6 +774,10 @@ Barcha intervyu bosqichlari yakunlangandan keyin yakuniy qaror qilish.
   - Yakuniy qaror kiritilmagan yoki noto'g'ri
   - Barcha intervyu bosqichlari yakunlanmagan
   - Muvaffaqiyatsiz intervyu bosqichlari bor (hired uchun)
+  - Telefon raqami allaqachon punkt yoki agent sifatida mavjud
+  - Bu hudud uchun allaqachon faol punkt yoki agent mavjud
+  - Viloyat, tuman yoki MFY topilmadi yoki noto'g'ri tur
+  - Tuman viloyatga yoki MFY tumanga tegishli emas
 - `404`: Topshirish topilmadi
 - `500`: Server xatosi
 
@@ -724,6 +785,16 @@ Barcha intervyu bosqichlari yakunlangandan keyin yakuniy qaror qilish.
 - Yakuniy qaror qilishdan oldin barcha intervyu bosqichlari `completed` bo'lishi kerak
 - Agar biror intervyu bosqichi `failed` bo'lsa, `hired` qaror qilish mumkin emas
 - Yakuniy qaror qilingandan keyin `status` avtomatik yangilanadi
+- **Yangi funksional:** Agar `result: "hired"` bo'lsa va vakansiyaning `target` field'i `"punkt"` yoki `"agent"` bo'lsa, avtomatik ravishda yangi Punkt yoki Agent yaratiladi:
+  - `target: "punkt"` → Yangi Punkt yaratiladi (applicant'ning ma'lumotlari asosida)
+  - `target: "agent"` → Yangi Agent yaratiladi (applicant'ning ma'lumotlari asosida)
+- Yaratilgan Punkt yoki Agent uchun:
+  - **Name:** Applicant'ning `firstName` va `lastName` birlashtiriladi
+  - **Phone:** Applicant'ning telefon raqami
+  - **Password:** Default password sifatida telefon raqami ishlatiladi (foydalanuvchi keyin o'zgartirishi kerak)
+  - **Viloyat, Tuman, MFY:** Applicant'ning hudud ma'lumotlari
+  - **Status:** `active`
+- Yaratilgan foydalanuvchi `createdUser` field'ida qaytariladi (rejected bo'lsa `null`)
 
 ---
 

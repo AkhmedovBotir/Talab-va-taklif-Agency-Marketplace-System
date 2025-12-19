@@ -33,7 +33,7 @@ export default function TabLayout() {
     };
 
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 1000); // Refresh every 1 second
     return () => clearInterval(interval);
   }, []);
 

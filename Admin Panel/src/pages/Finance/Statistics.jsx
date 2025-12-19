@@ -5,7 +5,7 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 import FinanceReportCard from '../../components/Finance/FinanceReportCard';
 import { TrendingUp, Receipt, Assessment, LocationOn, Business, Person } from '@mui/icons-material';
 
-const Statistics = () => {
+const Statistics = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [generalStats, setGeneralStats] = useState(null);
   const [regionStats, setRegionStats] = useState([]);
@@ -95,20 +95,7 @@ const Statistics = () => {
 
   return (
     <div>
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
-            <TrendingUp className="text-indigo-600" />
-            Moliya Statistika
-          </h1>
-          <p className="text-gray-600">Moliya bo'limi statistikasi</p>
-        </div>
-      </motion.div>
+
 
       {/* Tabs */}
       <motion.div

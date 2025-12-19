@@ -17,6 +17,7 @@ interface PunktPickerProps {
   viloyatId?: string;
   tumanId?: string;
   orderItems?: OrderItem[]; // Mahsulotlar ma'lumotlari yetkazib berish hududlari bilan
+  currentPunktTumanId?: string; // Punktning o'z tuman ID si (uni ko'rsatmaslik uchun)
 }
 
 export function PunktPicker({
@@ -25,6 +26,7 @@ export function PunktPicker({
   viloyatId,
   tumanId,
   orderItems,
+  currentPunktTumanId,
 }: PunktPickerProps) {
   const [punkts, setPunkts] = useState<PunktSelection[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,6 +76,11 @@ export function PunktPicker({
           const punktsWithTuman = response.data.filter((p) => {
             if (!p.tuman) return false;
             
+            // Punktning o'z hududini ko'rsatmaslik (agar currentPunktTumanId berilgan bo'lsa)
+            if (currentPunktTumanId && p.tuman._id === currentPunktTumanId) {
+              return false;
+            }
+            
             // Punktning viloyat + tuman kombinatsiyasini yaratish
             const punktKey = `${p.viloyat._id}_${p.tuman._id}`;
             
@@ -108,7 +115,14 @@ export function PunktPicker({
           }
 
           const response = await apiService.getPunktsForSelection(params);
-          const punktsWithTuman = response.data.filter((p) => p.tuman !== null);
+          const punktsWithTuman = response.data.filter((p) => {
+            if (!p.tuman) return false;
+            // Punktning o'z hududini ko'rsatmaslik (agar currentPunktTumanId berilgan bo'lsa)
+            if (currentPunktTumanId && p.tuman._id === currentPunktTumanId) {
+              return false;
+            }
+            return true;
+          });
           setPunkts(punktsWithTuman);
         }
       } else {

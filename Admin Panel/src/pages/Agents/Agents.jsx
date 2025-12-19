@@ -7,6 +7,7 @@ import CreateAgentModal from '../../components/Agents/CreateAgentModal';
 import EditAgentModal from '../../components/Agents/EditAgentModal';
 import DeleteAgentModal from '../../components/Agents/DeleteAgentModal';
 import ViewAgentModal from '../../components/Agents/ViewAgentModal';
+import RegionSelect from '../../components/Regions/RegionSelect';
 import { Add, Search, Clear } from '@mui/icons-material';
 
 const Agents = () => {
@@ -14,6 +15,7 @@ const Agents = () => {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('viloyat'); // 'viloyat', 'tuman', 'mfy'
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -24,8 +26,11 @@ const Agents = () => {
   // Filters
   const [filters, setFilters] = useState({
     status: '',
-    agentType: '',
+    agentType: 'viloyat',
     search: '',
+    viloyat: '',
+    tuman: '',
+    mfy: '',
   });
 
   // Modals
@@ -40,12 +45,18 @@ const Agents = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await agentAPI.getAllAgents({
+      const params = {
         page: pagination.page,
         limit: pagination.limit,
-        status: filters.status || undefined,
         agentType: filters.agentType || undefined,
-      });
+      };
+
+      if (filters.status) params.status = filters.status;
+      if (filters.viloyat) params.viloyat = filters.viloyat;
+      if (filters.tuman) params.tuman = filters.tuman;
+      if (filters.mfy) params.mfy = filters.mfy;
+
+      const response = await agentAPI.getAllAgents(params);
 
       if (response.success) {
         // API returns { success: true, count, total, page, limit, totalPages, data: [...] }
@@ -66,9 +77,35 @@ const Agents = () => {
     }
   };
 
+  // Update agentType when tab changes
+  useEffect(() => {
+    setFilters(prev => {
+      const newFilters = {
+        ...prev,
+        agentType: activeTab,
+      };
+      
+      // Clear region filters based on active tab
+      if (activeTab === 'viloyat') {
+        // Keep viloyat, clear tuman and mfy
+        newFilters.tuman = '';
+        newFilters.mfy = '';
+      } else if (activeTab === 'tuman') {
+        // Keep viloyat and tuman, clear mfy
+        newFilters.mfy = '';
+      } else if (activeTab === 'mfy') {
+        // Keep all filters
+      }
+      
+      return newFilters;
+    });
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [activeTab]);
+
   useEffect(() => {
     fetchAgents();
-  }, [pagination.page, pagination.limit, filters.status, filters.agentType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.limit, filters.status, filters.agentType, filters.viloyat, filters.tuman, filters.mfy]);
 
   const handleCreateSuccess = () => {
     setCreateModalOpen(false);
@@ -126,10 +163,41 @@ const Agents = () => {
       viloyat: '',
       tuman: '',
       mfy: '',
-      agentType: '',
+      agentType: activeTab,
       search: '',
     });
     setPagination({ ...pagination, page: 1 });
+  };
+
+  // Handle region changes
+  const handleViloyatChange = (e) => {
+    const viloyatId = e.target.value;
+    setFilters(prev => ({
+      ...prev,
+      viloyat: viloyatId,
+      tuman: '', // Reset tuman when viloyat changes
+      mfy: '', // Reset mfy when viloyat changes
+    }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleTumanChange = (e) => {
+    const tumanId = e.target.value;
+    setFilters(prev => ({
+      ...prev,
+      tuman: tumanId,
+      mfy: '', // Reset mfy when tuman changes
+    }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleMfyChange = (e) => {
+    const mfyId = e.target.value;
+    setFilters(prev => ({
+      ...prev,
+      mfy: mfyId,
+    }));
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   return (
@@ -199,21 +267,6 @@ const Agents = () => {
             <option value="inactive">Nofaol</option>
           </select>
 
-          {/* Agent Type Filter */}
-          <select
-            value={filters.agentType}
-            onChange={(e) => {
-              setFilters({ ...filters, agentType: e.target.value });
-              setPagination({ ...pagination, page: 1 });
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Barcha turlar</option>
-            <option value="viloyat">Viloyat Agent</option>
-            <option value="tuman">Tuman Agent</option>
-            <option value="mfy">MFY Agent</option>
-          </select>
-
           {/* Limit */}
           <select
             value={pagination.limit}
@@ -227,6 +280,138 @@ const Agents = () => {
             <option value="50">50 ta</option>
             <option value="100">100 ta</option>
           </select>
+        </div>
+      </motion.div>
+
+      {/* Tab Navigation */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6"
+      >
+        <div className="border-b border-gray-200">
+          <nav className="flex overflow-x-auto scrollbar-hide" aria-label="Tabs">
+            <div className="flex min-w-max">
+              <button
+                onClick={() => setActiveTab('viloyat')}
+                className={`
+                  px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200
+                  ${
+                    activeTab === 'viloyat'
+                      ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                  }
+                `}
+              >
+                Viloyat Agentlari
+              </button>
+              <button
+                onClick={() => setActiveTab('tuman')}
+                className={`
+                  px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200
+                  ${
+                    activeTab === 'tuman'
+                      ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                  }
+                `}
+              >
+                Tuman Agentlari
+              </button>
+              <button
+                onClick={() => setActiveTab('mfy')}
+                className={`
+                  px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200
+                  ${
+                    activeTab === 'mfy'
+                      ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                  }
+                `}
+              >
+                MFY Agentlari
+              </button>
+            </div>
+          </nav>
+        </div>
+
+        {/* Tab-specific Filters */}
+        <div className="p-4 bg-gray-50 border-t border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {activeTab === 'viloyat' && (
+              <div>
+                <RegionSelect
+                  name="viloyat"
+                  value={filters.viloyat}
+                  onChange={handleViloyatChange}
+                  label="Viloyat"
+                  type="region"
+                />
+              </div>
+            )}
+
+            {activeTab === 'tuman' && (
+              <>
+                <div>
+                  <RegionSelect
+                    name="viloyat"
+                    value={filters.viloyat}
+                    onChange={handleViloyatChange}
+                    label="Viloyat"
+                    type="region"
+                  />
+                </div>
+                <div>
+                  <RegionSelect
+                    name="tuman"
+                    value={filters.tuman}
+                    onChange={handleTumanChange}
+                    label="Tuman"
+                    type="district"
+                    parentId={filters.viloyat || undefined}
+                    disabled={!filters.viloyat}
+                  />
+                </div>
+              </>
+            )}
+
+            {activeTab === 'mfy' && (
+              <>
+                <div>
+                  <RegionSelect
+                    name="viloyat"
+                    value={filters.viloyat}
+                    onChange={handleViloyatChange}
+                    label="Viloyat"
+                    type="region"
+                  />
+                </div>
+                <div>
+                  <RegionSelect
+                    name="tuman"
+                    value={filters.tuman}
+                    onChange={handleTumanChange}
+                    label="Tuman"
+                    type="district"
+                    parentId={filters.viloyat || undefined}
+                    disabled={!filters.viloyat}
+                  />
+                </div>
+                <div>
+                  <RegionSelect
+                    name="mfy"
+                    value={filters.mfy}
+                    onChange={handleMfyChange}
+                    label="MFY"
+                    type="mfy"
+                    parentId={filters.tuman || undefined}
+                    disabled={!filters.tuman}
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </motion.div>
 
@@ -247,6 +432,7 @@ const Agents = () => {
         pagination={pagination}
         onPageChange={handlePageChange}
         onStatusChange={fetchAgents}
+        activeTab={activeTab}
       />
 
       {/* Modals */}

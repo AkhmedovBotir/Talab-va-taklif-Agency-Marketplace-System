@@ -54,10 +54,15 @@ export default function ProductDetailScreen() {
 
 
     const { isAuthenticated } = useAuth();
-    const { addToCart } = useCart();
+    const { addToCart, getCartItemQuantity } = useCart();
 
     const handleAddToCart = async () => {
         if (!product) return;
+
+        const isInCart = getCartItemQuantity(product._id) > 0;
+        if (isInCart) {
+            return; // Already in cart, button is disabled
+        }
 
         if (!isAuthenticated) {
             Alert.alert(
@@ -111,6 +116,7 @@ export default function ProductDetailScreen() {
     }
 
     const images = product.images && product.images.length > 0 ? product.images : [];
+    const isInCart = product ? getCartItemQuantity(product._id) > 0 : false;
 
     // Table data rows
     const tableRows = [
@@ -290,12 +296,15 @@ export default function ProductDetailScreen() {
                 ]}
             >
                 <TouchableOpacity
-                    style={styles.cartButton}
+                    style={[styles.cartButton, isInCart && styles.cartButtonDisabled]}
                     onPress={handleAddToCart}
                     activeOpacity={0.8}
+                    disabled={isInCart}
                 >
-                    <Ionicons name="cart" size={24} color="#fff" />
-                    <Text style={styles.cartButtonText}>Korzinkaga qo'shish</Text>
+                    <Ionicons name={isInCart ? "checkmark" : "cart"} size={24} color="#fff" />
+                    <Text style={styles.cartButtonText}>
+                        {isInCart ? 'Korzinkada' : 'Korzinkaga qo\'shish'}
+                    </Text>
                 </TouchableOpacity>
             </View>
 
@@ -480,6 +489,10 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#fff',
+    },
+    cartButtonDisabled: {
+        backgroundColor: '#4CAF50',
+        opacity: 0.8,
     },
     errorContainer: {
         flex: 1,

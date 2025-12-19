@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { cacheMiddleware } = require('../middleware/cache');
 const {
   registerStep1,
   registerStep2,
@@ -56,7 +57,7 @@ const {
   getMyPartnershipRequests,
 } = require('../controllers/partnershipRequestController');
 const { validate, marketplaceValidationSchemas, cartValidationSchemas, orderValidationSchemas, marketplaceProfileValidationSchemas, partnershipRequestValidationSchemas } = require('../middleware/validation');
-const { marketplaceUserAuth } = require('../middleware/auth');
+const { marketplaceUserAuth, optionalMarketplaceUserAuth } = require('../middleware/auth');
 
 // Check phone exists (must be before other routes to avoid conflicts)
 router.get('/check-phone', checkPhoneExists);
@@ -78,24 +79,24 @@ router.post('/resend-code', validate(marketplaceValidationSchemas.resendSMSCode)
 
 // Marketplace data routes
 // Search and Filter (must be before other routes)
-router.get('/search', search);
-router.get('/filter', filterProducts);
+router.get('/search', cacheMiddleware(1800), search); // 30 min cache
+router.get('/filter', cacheMiddleware(1800), filterProducts); // 30 min cache
 
 // Products
-router.get('/products', getAllProducts);
-router.get('/products/:id', getProductById);
+router.get('/products', cacheMiddleware(1800), getAllProducts); // 30 min cache
+router.get('/products/:id', cacheMiddleware(3600), getProductById); // 1 hour cache
 
 // Categories (specific routes before generic ones)
-router.get('/categories', getAllCategories);
-router.get('/categories/:id/products', getProductsByCategory);
-router.get('/categories/:id', getCategoryById);
+router.get('/categories', cacheMiddleware(3600), getAllCategories); // 1 hour cache
+router.get('/categories/:id/products', cacheMiddleware(1800), getProductsByCategory); // 30 min cache
+router.get('/categories/:id', cacheMiddleware(3600), getCategoryById); // 1 hour cache
 
 // Contragents
-router.get('/contragents', getAllContragents);
-router.get('/contragents/:id', getContragentById);
+router.get('/contragents', cacheMiddleware(1800), getAllContragents); // 30 min cache
+router.get('/contragents/:id', cacheMiddleware(3600), getContragentById); // 1 hour cache
 
 // Cart routes (require authentication)
-router.get('/cart', marketplaceUserAuth, getCart);
+router.get('/cart', marketplaceUserAuth, cacheMiddleware(60), getCart); // 1 min cache
 router.post('/cart', marketplaceUserAuth, validate(cartValidationSchemas.addToCart), addToCart);
 router.put('/cart/:productId', marketplaceUserAuth, validate(cartValidationSchemas.updateCartItem), updateCartItem);
 router.delete('/cart/:productId', marketplaceUserAuth, removeFromCart);
@@ -103,30 +104,30 @@ router.delete('/cart', marketplaceUserAuth, clearCart);
 
 // Order routes (require authentication)
 router.post('/orders', marketplaceUserAuth, validate(orderValidationSchemas.create), createOrder);
-router.get('/orders', marketplaceUserAuth, getOrders);
-router.get('/orders/:id', marketplaceUserAuth, getOrderById);
+router.get('/orders', marketplaceUserAuth, cacheMiddleware(60), getOrders); // 1 min cache
+router.get('/orders/:id', marketplaceUserAuth, cacheMiddleware(60), getOrderById); // 1 min cache
 router.delete('/orders/:id', marketplaceUserAuth, cancelOrder);
 router.post('/orders/:id/confirm-delivery', marketplaceUserAuth, confirmDelivery);
 
 // Profile routes (require authentication)
-router.get('/me', marketplaceUserAuth, getMe);
+router.get('/me', marketplaceUserAuth, cacheMiddleware(300), getMe); // 5 min cache
 router.put('/me', marketplaceUserAuth, validate(marketplaceProfileValidationSchemas.updateProfile), updateProfile);
 router.patch('/me/password', marketplaceUserAuth, validate(marketplaceProfileValidationSchemas.updatePassword), updatePassword);
 router.patch('/me/avatar', marketplaceUserAuth, validate(marketplaceProfileValidationSchemas.updateAvatar), updateAvatar);
 router.patch('/me/location', marketplaceUserAuth, validate(marketplaceProfileValidationSchemas.updateLocation), updateLocation);
 
 // Notification routes for Marketplace Users
-router.get('/notifications/list', marketplaceUserAuth, getMarketplaceNotifications);
-router.get('/notifications/unread-count', marketplaceUserAuth, getMarketplaceUnreadCount);
+router.get('/notifications/list', marketplaceUserAuth, cacheMiddleware(60), getMarketplaceNotifications); // 1 min cache
+router.get('/notifications/unread-count', marketplaceUserAuth, cacheMiddleware(30), getMarketplaceUnreadCount); // 30 sec cache
 router.post('/notifications/:notificationId/read', marketplaceUserAuth, markMarketplaceNotificationRead);
 router.post('/notifications/read-all', marketplaceUserAuth, markAllMarketplaceNotificationsRead);
 
 // Featured contragents (short info, public for marketplace)
-router.get('/featured-contragents', getFeaturedContragentsForMarketplace);
+router.get('/featured-contragents', cacheMiddleware(1800), getFeaturedContragentsForMarketplace); // 30 min cache
 
-// Partnership request routes (require authentication)
-router.post('/partnership-requests', marketplaceUserAuth, validate(partnershipRequestValidationSchemas.create), createPartnershipRequest);
-router.get('/partnership-requests', marketplaceUserAuth, getMyPartnershipRequests);
+// Partnership request routes (optional authentication - tokensiz ham, token bilan ham ishlaydi)
+router.post('/partnership-requests', optionalMarketplaceUserAuth, validate(partnershipRequestValidationSchemas.create), createPartnershipRequest);
+router.get('/partnership-requests', marketplaceUserAuth, cacheMiddleware(300), getMyPartnershipRequests); // 5 min cache
 
 module.exports = router;
 

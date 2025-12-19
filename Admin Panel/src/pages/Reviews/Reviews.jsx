@@ -6,7 +6,7 @@ import ReviewTable from '../../components/Reviews/ReviewTable';
 import ViewReviewModal from '../../components/Reviews/ViewReviewModal';
 import { Search, Clear } from '@mui/icons-material';
 
-const Reviews = () => {
+const Reviews = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -108,16 +108,18 @@ const Reviews = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Baholar</h1>
-          <p className="text-gray-600">Barcha baholarni ko'rish va boshqarish</p>
-        </div>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Baholar</h1>
+            <p className="text-gray-600">Barcha baholarni ko'rish va boshqarish</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Filters */}
       <motion.div

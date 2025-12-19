@@ -11,37 +11,22 @@ import Regions from './pages/Regions/Regions';
 import Contragents from './pages/Contragents/Contragents';
 import Agents from './pages/Agents/Agents';
 import Punkts from './pages/Punkts/Punkts';
-import Categories from './pages/Categories/Categories';
-import Products from './pages/Products/Products';
 import SMSVerifications from './pages/SMSVerifications/SMSVerifications';
 import MarketplaceUsers from './pages/MarketplaceUsers/MarketplaceUsers';
-import Orders from './pages/Orders/Orders';
-import MarketplaceOrders from './pages/Orders/MarketplaceOrders';
-import DeliveredToPunktOrders from './pages/Orders/DeliveredToPunktOrders';
-import AssignedToAgentsOrders from './pages/Orders/AssignedToAgentsOrders';
-import ConfirmedByAgentsOrders from './pages/Orders/ConfirmedByAgentsOrders';
-import ConfirmedByCustomersOrders from './pages/Orders/ConfirmedByCustomersOrders';
-import CancelledOrders from './pages/Orders/CancelledOrders';
+import OrdersMain from './pages/Orders/OrdersMain';
 import Settings from './pages/Settings/Settings';
-import KPIStatistics from './pages/KPI/KPIStatistics';
-import KPITransactions from './pages/KPI/KPITransactions';
-import KPIViloyatAgents from './pages/KPI/KPIViloyatAgents';
-import KPITumanAgents from './pages/KPI/KPITumanAgents';
-import KPIMfyAgents from './pages/KPI/KPIMfyAgents';
-import KPIPunkts from './pages/KPI/KPIPunkts';
+import KPIMain from './pages/KPI/KPIMain';
 import SalesStatistics from './pages/Statistics/SalesStatistics';
 import Notifications from './pages/Notifications/Notifications';
-import Reviews from './pages/Reviews/Reviews';
-import Contacts from './pages/Contacts/Contacts';
+import ReviewsMain from './pages/Reviews/ReviewsMain';
+import OmborMain from './pages/Ombor/OmborMain';
 import PartnershipRequests from './pages/PartnershipRequests/PartnershipRequests';
 import Vacancies from './pages/Vacancies/Vacancies';
 import VacancyApplications from './pages/Vacancies/VacancyApplications';
-import Balance from './pages/Finance/Balance';
-import Reports from './pages/Finance/Reports';
-import Submissions from './pages/Finance/Submissions';
-import KPIPayments from './pages/Finance/KPIPayments';
-import Transactions from './pages/Finance/Transactions';
-import FinanceStatistics from './pages/Finance/Statistics';
+import FinanceMain from './pages/Finance/FinanceMain';
+import ArchiveMain from './pages/Archive/ArchiveMain';
+import ArchivedPunktWorkHistory from './pages/Archive/ArchivedPunktWorkHistory';
+import ArchivedAgentWorkHistory from './pages/Archive/ArchivedAgentWorkHistory';
 import NotFound from './pages/NotFound/NotFound';
 
 function App() {
@@ -67,36 +52,21 @@ function App() {
               <Route path="contragents" element={<Contragents />} />
               <Route path="agents" element={<Agents />} />
               <Route path="punkts" element={<Punkts />} />
-              <Route path="categories" element={<Categories />} />
-              <Route path="products" element={<Products />} />
+              <Route path="ombor" element={<OmborMain />} />
               <Route path="sms-verifications" element={<SMSVerifications />} />
               <Route path="marketplace-users" element={<MarketplaceUsers />} />
-              <Route path="orders" element={<Orders />} />
-              <Route path="orders/marketplace" element={<MarketplaceOrders />} />
-              <Route path="orders/delivered-to-punkt" element={<DeliveredToPunktOrders />} />
-              <Route path="orders/assigned-to-agents" element={<AssignedToAgentsOrders />} />
-              <Route path="orders/confirmed-by-agents" element={<ConfirmedByAgentsOrders />} />
-              <Route path="orders/confirmed-by-customers" element={<ConfirmedByCustomersOrders />} />
-              <Route path="orders/cancelled" element={<CancelledOrders />} />
-              <Route path="kpi/statistics" element={<KPIStatistics />} />
-              <Route path="kpi/transactions" element={<KPITransactions />} />
-              <Route path="kpi/viloyat-agents" element={<KPIViloyatAgents />} />
-              <Route path="kpi/tuman-agents" element={<KPITumanAgents />} />
-              <Route path="kpi/mfy-agents" element={<KPIMfyAgents />} />
-              <Route path="kpi/punkts" element={<KPIPunkts />} />
+              <Route path="orders" element={<OrdersMain />} />
+              <Route path="kpi" element={<KPIMain />} />
               <Route path="statistics" element={<SalesStatistics />} />
               <Route path="notifications" element={<Notifications />} />
-              <Route path="reviews" element={<Reviews />} />
-              <Route path="reviews/contacts" element={<Contacts />} />
+              <Route path="reviews" element={<ReviewsMain />} />
               <Route path="partnership-requests" element={<PartnershipRequests />} />
               <Route path="vacancies" element={<Vacancies />} />
               <Route path="vacancies/:vacancyId/applications" element={<VacancyApplications />} />
-              <Route path="finance/balance" element={<Balance />} />
-              <Route path="finance/reports" element={<Reports />} />
-              <Route path="finance/submissions" element={<Submissions />} />
-              <Route path="finance/kpi-payments" element={<KPIPayments />} />
-              <Route path="finance/transactions" element={<Transactions />} />
-              <Route path="finance/statistics" element={<FinanceStatistics />} />
+              <Route path="finance" element={<FinanceMain />} />
+              <Route path="archive" element={<ArchiveMain />} />
+              <Route path="archive/punkts/:id/work" element={<ArchivedPunktWorkHistory />} />
+              <Route path="archive/agents/:id/work" element={<ArchivedAgentWorkHistory />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>

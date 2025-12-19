@@ -1,50 +1,297 @@
-# Welcome to your Expo app 👋
+# Kontragent Dasturi
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Kontragent (yetkazib beruvchi) uchun mobil ilova. Bu ilova kontragentlarga maxsulotlarni boshqarish, buyurtmalarni ko'rish va qabul qilish, statistikalarni kuzatish va xabarlar bilan ishlash imkoniyatini beradi.
 
-## Get started
+## 📱 Asosiy funksiyalar
 
-1. Install dependencies
+### 🔐 Autentifikatsiya
+- Telefon raqami va parol orqali kirish
+- Token asosida autentifikatsiya
+- Avtomatik sessiya saqlash
 
-   ```bash
-   npm install
-   ```
+### 🏠 Bosh sahifa
+- Kontragent ma'lumotlarini ko'rish
+- INN, telefon, manzil ma'lumotlari
+- Holat ko'rsatkichlari
 
-2. Start the app
+### 📦 Ombor boshqaruvi
+- **Kategoriyalar**: Maxsulot kategoriyalarini ko'rish va tanlash
+- **Maxsulotlar**: 
+  - Yangi maxsulot yaratish
+  - Maxsulotlarni tahrirlash
+  - Maxsulot ma'lumotlarini ko'rish
+  - Rasm yuklash (maksimal 5 ta rasm)
+  - Rich text editor bilan tavsif yozish
+  - Narx, miqdor, o'lchamlar kiritish
+  - Yetkazib berish hududlarini tanlash
+- **Buyurtmalar**: Ombor buyurtmalarini ko'rish
 
-   ```bash
-   npx expo start
-   ```
+### 📋 Buyurtmalar
+- Bugungi buyurtmalarni ko'rish
+- Status bo'yicha filtrlash (Barchasi, Kutilmoqda, Qabul qilindi, Rad etildi, Yetkazildi)
+- Buyurtma tafsilotlarini ko'rish
+- Buyurtmalar tarixini ko'rish
+- Pull-to-refresh funksiyasi
+- Pagination qo'llab-quvvatlash
 
-In the output, you'll find options to open the app in a
+### 📊 Statistika
+- Kontragent statistikalarini ko'rish
+- Ma'lumotlarni vizual ko'rinishda ko'rsatish
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 👤 Profil
+- Kontragent ma'lumotlarini ko'rish va yangilash
+- Logo yuklash va yangilash
+- Habarlar sonini ko'rish (real-time yangilanadi - har 1 soniyada)
+- Tizimdan chiqish
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### 💬 Habarlar
+- Xabarlarni ko'rish
+- Yangi xabarlarni belgilash
+- Barcha xabarlarni o'qilgan deb belgilash
+- Pagination qo'llab-quvvatlash
 
-## Get a fresh project
+## 🛠 Texnologiyalar
 
-When you're ready, run:
+- **Framework**: React Native 0.81.5
+- **UI Framework**: Expo SDK 54
+- **Routing**: Expo Router 6.0 (file-based routing)
+- **State Management**: React Context API
+- **Storage**: AsyncStorage
+- **Image Picker**: react-native-image-picker 7.2.3
+- **Language**: TypeScript 5.9.2
+- **Icons**: @expo/vector-icons (Ionicons)
+- **Rich Text Editor**: Quill Editor (WebView orqali)
+
+## 📋 Talablar
+
+- Node.js (v18 yoki yuqori)
+- npm yoki yarn
+- Expo CLI
+- Android Studio (Android uchun)
+- Xcode (iOS uchun, faqat macOS)
+
+## 🚀 O'rnatish
+
+### 1. Loyihani klonlash yoki yuklab olish
 
 ```bash
-npm run reset-project
+git clone <repository-url>
+cd contragent
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Dependencies o'rnatish
 
-## Learn more
+```bash
+npm install
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+yoki
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+yarn install
+```
 
-## Join the community
+### 3. API URL ni sozlash
 
-Join our community of developers creating universal apps.
+`services/api.ts` faylida `BASE_URL` ni o'zgartiring:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```typescript
+const BASE_URL = 'http://your-api-url:port';
+```
+
+### 4. Ilovani ishga tushirish
+
+#### Development mode
+
+```bash
+npm start
+```
+
+yoki
+
+```bash
+npx expo start
+```
+
+#### Android uchun
+
+```bash
+npm run android
+```
+
+#### iOS uchun (faqat macOS)
+
+```bash
+npm run ios
+```
+
+#### Web uchun
+
+```bash
+npm run web
+```
+
+## 📱 Build qilish
+
+### Android APK yaratish
+
+```bash
+npx expo build:android
+```
+
+yoki EAS Build ishlatish:
+
+```bash
+eas build --platform android
+```
+
+### iOS build (faqat macOS)
+
+```bash
+npx expo build:ios
+```
+
+yoki
+
+```bash
+eas build --platform ios
+```
+
+## 📁 Loyiha strukturası
+
+```
+contragent/
+├── app/                    # Expo Router fayllari
+│   ├── (tabs)/            # Tab navigation ekranlari
+│   │   ├── index.tsx      # Bosh sahifa
+│   │   ├── ombor/         # Ombor moduli
+│   │   ├── buyurtmalar/   # Buyurtmalar moduli
+│   │   ├── statistika.tsx # Statistika
+│   │   ├── profile.tsx    # Profil
+│   │   └── habarlar.tsx   # Habarlar
+│   ├── login.tsx          # Login ekrani
+│   └── _layout.tsx        # Root layout
+├── components/            # Reusable komponentlar
+├── contexts/             # React Context providers
+│   └── AuthContext.tsx   # Autentifikatsiya context
+├── services/             # API xizmatlari
+│   └── api.ts           # API client
+├── utils/                # Utility funksiyalar
+│   └── formatNumber.ts   # Raqamlarni formatlash
+├── assets/               # Rasmlar va boshqa assetlar
+├── app.json             # Expo konfiguratsiyasi
+├── package.json        # Dependencies
+└── tsconfig.json       # TypeScript konfiguratsiyasi
+```
+
+## 🔧 Konfiguratsiya
+
+### Android permissions
+
+`app.json` faylida quyidagi ruxsatlar sozlang:
+
+```json
+{
+  "android": {
+    "permissions": [
+      "CAMERA",
+      "READ_MEDIA_IMAGES"
+    ]
+  }
+}
+```
+
+### react-native-image-picker sozlash
+
+Android uchun `android/app/src/main/AndroidManifest.xml` fayliga quyidagilarni qo'shing:
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+```
+
+iOS uchun `ios/Info.plist` fayliga quyidagilarni qo'shing:
+
+```xml
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Rasmlarni tanlash uchun ruxsat kerak</string>
+<key>NSCameraUsageDescription</key>
+<string>Kameradan rasm olish uchun ruxsat kerak</string>
+```
+
+## 🐛 Muammolarni hal qilish
+
+### react-native-image-picker xatosi
+
+Agar `Cannot read property 'launchImageLibrary' of null` xatosi chiqsa:
+
+1. Native modullarni rebuild qiling:
+   ```bash
+   npx expo prebuild
+   ```
+
+2. Yoki development build yarating:
+   ```bash
+   npx expo run:android
+   # yoki
+   npx expo run:ios
+   ```
+
+### Metro bundler xatolari
+
+Cache ni tozalash:
+
+```bash
+npx expo start --clear
+```
+
+### Dependencies muammolari
+
+```bash
+rm -rf node_modules
+npm install
+```
+
+## 📝 API Integration
+
+Ilova REST API bilan ishlaydi. Asosiy endpointlar:
+
+- `POST /api/contragents/login` - Kirish
+- `GET /api/contragents/me` - Kontragent ma'lumotlari
+- `GET /api/contragents/categories` - Kategoriyalar
+- `GET /api/contragents/products` - Maxsulotlar
+- `POST /api/contragents/products` - Maxsulot yaratish
+- `GET /api/contragents/orders` - Buyurtmalar
+- `GET /api/contragents/notifications` - Xabarlar
+- `GET /api/contragents/notifications/unread-count` - O'qilmagan xabarlar soni
+
+## 🔄 Real-time yangilanishlar
+
+- **Unread count**: Har 1 soniyada avtomatik yangilanadi
+- **Buyurtmalar**: Pull-to-refresh orqali yangilash
+- **Xabarlar**: Real-time yangilanishlar
+
+## 🎨 UI/UX
+
+- Modern va intuitiv interfeys
+- Material Design prinsiplari
+- Dark mode qo'llab-quvvatlash (automatic)
+- Safe area insets qo'llab-quvvatlash
+- Responsive dizayn
+
+## 📄 Litsenziya
+
+Bu loyiha private loyiha hisoblanadi.
+
+## 👥 Muallif
+
+Botir123
+
+## 📞 Aloqa
+
+Savollar yoki takliflar uchun loyiha egasiga murojaat qiling.
+
+---
+
+**Eslatma**: Bu ilova development jarayonida. Production uchun ishlatishdan oldin barcha xavfsizlik sozlamalarini tekshiring.

@@ -123,6 +123,53 @@ const contragentAuth = async (req, res, next) => {
   }
 };
 
+// Optional authentication middleware for contragent (doesn't fail if no token)
+const optionalContragentAuth = async (req, res, next) => {
+  try {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // No token provided, continue without setting req.user
+      return next();
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify and decode token
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+      );
+    } catch (error) {
+      // Invalid token, continue without setting req.user
+      return next();
+    }
+
+    // Check if token is for contragent
+    if (decoded.type !== 'contragent') {
+      // Not a contragent token, continue without setting req.user
+      return next();
+    }
+
+    // Attach user info to request
+    req.user = {
+      userId: decoded.id,
+      userType: 'Contragent',
+      phone: decoded.phone,
+      inn: decoded.inn,
+    };
+
+    next();
+  } catch (error) {
+    // On error, continue without setting req.user
+    console.error('Error in optionalContragentAuth:', error);
+    next();
+  }
+};
+
 // Authentication middleware for marketplace user
 const marketplaceUserAuth = async (req, res, next) => {
   try {
@@ -192,6 +239,69 @@ const marketplaceUserAuth = async (req, res, next) => {
       message: 'Autentifikatsiya xatosi',
       error: error.message,
     });
+  }
+};
+
+// Optional authentication middleware for marketplace users (for partnership requests)
+const optionalMarketplaceUserAuth = async (req, res, next) => {
+  try {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+
+    // If no token, continue without authentication
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      req.user = null;
+      return next();
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify and decode token
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+      );
+    } catch (error) {
+      // Invalid token, continue without authentication
+      req.user = null;
+      return next();
+    }
+
+    // Check if token is for marketplace user
+    if (decoded.type !== 'marketplace_user') {
+      req.user = null;
+      return next();
+    }
+
+    // Check if user exists and is active
+    const MarketplaceUser = require('../models/MarketplaceUser');
+    const user = await MarketplaceUser.findById(decoded.id).select('-password');
+
+    if (!user) {
+      req.user = null;
+      return next();
+    }
+
+    if (user.status !== 'active') {
+      req.user = null;
+      return next();
+    }
+
+    // Attach user info to request
+    req.user = {
+      userId: user._id,
+      userType: 'MarketplaceUser',
+      phone: user.phone,
+    };
+
+    next();
+  } catch (error) {
+    console.error('Error in optionalMarketplaceUserAuth:', error);
+    // On error, continue without authentication
+    req.user = null;
+    next();
   }
 };
 
@@ -437,7 +547,9 @@ const vacancyApplicantAuth = async (req, res, next) => {
 module.exports = {
   adminAuth,
   contragentAuth,
+  optionalContragentAuth,
   marketplaceUserAuth,
+  optionalMarketplaceUserAuth,
   punktAuth,
   agentAuth,
   vacancyApplicantAuth,

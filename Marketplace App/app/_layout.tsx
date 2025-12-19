@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { CartProvider } from '../contexts/CartContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
+import { LocationProvider } from '../contexts/LocationContext';
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -64,11 +65,13 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <NotificationProvider>
-        <RootLayoutNav />
-        </NotificationProvider>
-      </CartProvider>
+      <LocationProvider>
+        <CartProvider>
+          <NotificationProvider>
+            <RootLayoutNav />
+          </NotificationProvider>
+        </CartProvider>
+      </LocationProvider>
     </AuthProvider>
   );
 }

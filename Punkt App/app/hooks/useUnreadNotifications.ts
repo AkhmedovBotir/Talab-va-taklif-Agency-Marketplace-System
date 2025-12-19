@@ -19,8 +19,8 @@ export function useUnreadNotifications() {
   useEffect(() => {
     fetchUnreadCount();
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
+    // Refresh every 1 second
+    const interval = setInterval(fetchUnreadCount, 1000);
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 

@@ -10,7 +10,7 @@ export default function TabsLayout() {
 
   useEffect(() => {
     loadUnreadCount();
-    const interval = setInterval(loadUnreadCount, 30000);
+    const interval = setInterval(loadUnreadCount, 1000);
     return () => clearInterval(interval);
   }, []);
 

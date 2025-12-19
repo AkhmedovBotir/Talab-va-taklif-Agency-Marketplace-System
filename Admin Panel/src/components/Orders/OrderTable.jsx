@@ -24,11 +24,19 @@ const OrderTable = ({ orders, loading, onView, pagination, onPageChange }) => {
     switch (status) {
       case 'pending':
         return `${baseClasses} bg-yellow-100 text-yellow-800`;
-      case 'processing':
+      case 'confirmed_by_punkt':
         return `${baseClasses} bg-blue-100 text-blue-800`;
-      case 'shipped':
+      case 'requested_to_contragent':
+        return `${baseClasses} bg-indigo-100 text-indigo-800`;
+      case 'accepted_by_contragent':
+        return `${baseClasses} bg-cyan-100 text-cyan-800`;
+      case 'delivered_to_punkt':
         return `${baseClasses} bg-purple-100 text-purple-800`;
-      case 'delivered':
+      case 'assigned_to_agent':
+        return `${baseClasses} bg-orange-100 text-orange-800`;
+      case 'confirmed_by_agent':
+        return `${baseClasses} bg-teal-100 text-teal-800`;
+      case 'confirmed_by_customer':
         return `${baseClasses} bg-green-100 text-green-800`;
       case 'cancelled':
         return `${baseClasses} bg-red-100 text-red-800`;
@@ -41,12 +49,20 @@ const OrderTable = ({ orders, loading, onView, pagination, onPageChange }) => {
     switch (status) {
       case 'pending':
         return 'Kutilmoqda';
-      case 'processing':
-        return 'Jarayonda';
-      case 'shipped':
-        return 'Yuborilgan';
-      case 'delivered':
-        return 'Yetkazilgan';
+      case 'confirmed_by_punkt':
+        return 'Punkt tasdiqladi';
+      case 'requested_to_contragent':
+        return 'Contragentga yuborildi';
+      case 'accepted_by_contragent':
+        return 'Contragent qabul qildi';
+      case 'delivered_to_punkt':
+        return 'Punktga yetkazildi';
+      case 'assigned_to_agent':
+        return 'Agentga yuborildi';
+      case 'confirmed_by_agent':
+        return 'Agent tasdiqladi';
+      case 'confirmed_by_customer':
+        return 'Mijoz tasdiqladi';
       case 'cancelled':
         return 'Bekor qilingan';
       default:
@@ -165,7 +181,7 @@ const OrderTable = ({ orders, loading, onView, pagination, onPageChange }) => {
                 className="hover:bg-gray-50 transition-colors"
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {(pagination.page - 1) * pagination.limit + index + 1}
+                  {pagination ? (pagination.page - 1) * pagination.limit + index + 1 : index + 1}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">

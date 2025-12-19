@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService, Order } from '../../../../services/api';
+import { formatPrice } from '../../../../utils/formatNumber';
 
 export default function OrderViewScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
@@ -27,6 +28,7 @@ export default function OrderViewScreen() {
 
     try {
       const response = await apiService.getContragentOrderById(orderId);
+      console.log(response.data);
       setOrder(response.data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Buyurtmani yuklashda xatolik');
@@ -42,6 +44,52 @@ export default function OrderViewScreen() {
 
   const getCurrentRequest = (order: Order) => {
     return order.contragentRequests[0];
+  };
+
+  // Get only items requested from this contragent
+  // Backend already filters items, but we check itemIds for safety
+  const getRequestedItems = (order: Order) => {
+    const request = getCurrentRequest(order);
+    if (!request) {
+      return order.items || [];
+    }
+    
+    // If backend already filtered (items length matches itemIds length), use items directly
+    // Otherwise, filter by itemIds
+    if (request.itemIds && request.itemIds.length > 0) {
+      const items = order.items || [];
+      // Check if backend already filtered
+      if (items.length === request.itemIds.length) {
+        return items;
+      }
+      // Filter items based on itemIds (indices in the original order)
+      return items.filter((_, index) => request.itemIds!.includes(index));
+    }
+    
+    return order.items || [];
+  };
+
+  // Calculate totals for requested items only
+  const calculateRequestedTotals = (order: Order) => {
+    const requestedItems = getRequestedItems(order);
+    let totalPrice = 0;
+    let totalOriginalPrice = 0;
+    let totalKpiPrice = 0;
+
+    requestedItems.forEach((item) => {
+      const itemTotal = item.price * item.quantity;
+      totalPrice += itemTotal;
+      
+      if (item.originalPrice !== undefined) {
+        totalOriginalPrice += item.originalPrice * item.quantity;
+      }
+      
+      if (item.originalPrice !== undefined && item.price !== undefined) {
+        totalKpiPrice += (item.price - item.originalPrice) * item.quantity;
+      }
+    });
+
+    return { totalPrice, totalOriginalPrice, totalKpiPrice };
   };
 
   const getStatusColor = (status: string) => {
@@ -72,6 +120,33 @@ export default function OrderViewScreen() {
       default:
         return status;
     }
+  };
+
+  // Get workflow steps for contragent
+  const getWorkflowSteps = () => {
+    const steps = [
+      { 
+        key: 'requested', 
+        label: 'So\'rov yuborildi', 
+        completed: true,
+        date: request.requestedAt 
+      },
+      { 
+        key: 'responded', 
+        label: request.status === 'rejected' ? 'Rad etildi' : 'Qabul qilindi', 
+        completed: request.status !== 'pending',
+        date: request.respondedAt,
+        isRejected: request.status === 'rejected'
+      },
+      { 
+        key: 'delivered', 
+        label: 'Punktga yetkazildi', 
+        completed: request.status === 'delivered_to_punkt',
+        date: request.deliveredToPunktAt,
+        hidden: request.status === 'rejected'
+      },
+    ];
+    return steps.filter(step => !step.hidden);
   };
 
   const handleAccept = async () => {
@@ -196,6 +271,8 @@ export default function OrderViewScreen() {
 
   const request = getCurrentRequest(order);
   const statusColor = getStatusColor(request.status);
+  const requestedItems = getRequestedItems(order);
+  const { totalPrice: requestedTotalPrice, totalOriginalPrice: requestedTotalOriginalPrice, totalKpiPrice: requestedTotalKpiPrice } = calculateRequestedTotals(order);
 
   const getPaymentMethodText = (method: string) => {
     switch (method) {
@@ -223,9 +300,6 @@ export default function OrderViewScreen() {
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
-  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -254,70 +328,91 @@ export default function OrderViewScreen() {
             </View>
           </View>
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Buyurtma raqami</Text>
-            <Text style={styles.infoValue}>{order.orderNumber}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Punkt</Text>
-            <Text style={styles.infoValue}>{order.currentPunkt.name}</Text>
-          </View>
-
-          {order.currentPunkt.phone && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Punkt telefon</Text>
-              <Text style={styles.infoValue}>{order.currentPunkt.phone}</Text>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoGridItem}>
+              <View style={styles.infoIconContainer}>
+                <Ionicons name="receipt-outline" size={16} color="#007AFF" />
+              </View>
+              <View style={styles.infoGridContent}>
+                <Text style={styles.infoGridLabel}>Buyurtma raqami</Text>
+                <Text style={styles.infoGridValue}>{order.orderNumber}</Text>
+              </View>
             </View>
-          )}
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Mijoz telefon</Text>
-            <Text style={styles.infoValue}>{order.phoneNumber}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>So'rov vaqti</Text>
-            <Text style={styles.infoValue}>
-              {new Date(request.requestedAt).toLocaleString('uz-UZ', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
-          </View>
-
-          {request.respondedAt && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Javob vaqti</Text>
-              <Text style={styles.infoValue}>
-                {new Date(request.respondedAt).toLocaleString('uz-UZ', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
+            <View style={styles.infoGridItem}>
+              <View style={styles.infoIconContainer}>
+                <Ionicons name="storefront-outline" size={16} color="#007AFF" />
+              </View>
+              <View style={styles.infoGridContent}>
+                <Text style={styles.infoGridLabel}>Punkt</Text>
+                <Text style={styles.infoGridValue}>{order.currentPunkt.name}</Text>
+                {order.currentPunkt.phone && (
+                  <Text style={styles.infoGridSubValue}>{order.currentPunkt.phone}</Text>
+                )}
+              </View>
             </View>
-          )}
 
-          {request.deliveredToPunktAt && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Yetkazilgan vaqt</Text>
-              <Text style={styles.infoValue}>
-                {new Date(request.deliveredToPunktAt).toLocaleString('uz-UZ', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
+            <View style={styles.infoGridItem}>
+              <View style={styles.infoIconContainer}>
+                <Ionicons name="call-outline" size={16} color="#007AFF" />
+              </View>
+              <View style={styles.infoGridContent}>
+                <Text style={styles.infoGridLabel}>Mijoz telefon</Text>
+                <Text style={styles.infoGridValue}>{order.phoneNumber}</Text>
+              </View>
             </View>
-          )}
+          </View>
+        </View>
+
+        {/* Workflow Steps */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Ketma-ketlik</Text>
+            <Ionicons name="time-outline" size={20} color="#007AFF" />
+          </View>
+          <View style={styles.workflowContainer}>
+            {getWorkflowSteps().map((step, index) => {
+              const isLast = index === getWorkflowSteps().length - 1;
+              const stepColor = step.isRejected ? '#FF3B30' : (step.completed ? '#34C759' : '#FF9500');
+              
+              return (
+                <View key={step.key} style={styles.workflowStep}>
+                  <View style={styles.workflowStepContent}>
+                    <View style={[styles.workflowIcon, { backgroundColor: `${stepColor}20` }]}>
+                      {step.completed ? (
+                        <Ionicons 
+                          name={step.isRejected ? "close-circle" : "checkmark-circle"} 
+                          size={20} 
+                          color={stepColor} 
+                        />
+                      ) : (
+                        <View style={[styles.workflowIconPending, { borderColor: stepColor }]} />
+                      )}
+                    </View>
+                    <View style={styles.workflowStepInfo}>
+                      <Text style={[styles.workflowStepLabel, { color: step.completed ? '#333' : '#999' }]}>
+                        {step.label}
+                      </Text>
+                      {step.date && (
+                        <Text style={styles.workflowStepDate}>
+                          {new Date(step.date).toLocaleString('uz-UZ', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  {!isLast && (
+                    <View style={[styles.workflowLine, { backgroundColor: step.completed ? '#34C759' : '#E0E0E0' }]} />
+                  )}
+                </View>
+              );
+            })}
+          </View>
         </View>
 
         {/* Delivery Address Card */}
@@ -359,58 +454,91 @@ export default function OrderViewScreen() {
         )}
 
         {/* Items Card */}
-        {order.items && order.items.length > 0 && (
+        {requestedItems && requestedItems.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Mahsulotlar ({order.itemCount || order.items.length})</Text>
+              <Text style={styles.cardTitle}>Mahsulotlar ({requestedItems.length})</Text>
               <Ionicons name="cube-outline" size={20} color="#007AFF" />
             </View>
 
-            {order.items.map((item, index) => (
-              <View key={index} style={styles.itemContainer}>
-                <View style={styles.itemHeader}>
-                  {item.product.images && item.product.images.length > 0 && (
-                    <Image
-                      source={{ uri: item.product.images[0] }}
-                      style={styles.itemImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.product.name}</Text>
-                    {item.product.productCode && (
-                      <Text style={styles.itemCode}>Kod: {item.product.productCode}</Text>
-                    )}
-                    <Text style={styles.itemQuantity}>
-                      Miqdor: {item.quantity} dona
-                    </Text>
-                  </View>
-                </View>
+            {requestedItems.map((item, index) => {
+              const originalPrice = item.originalPrice ?? item.product.price ?? 0;
+              const salePrice = item.price;
+              const kpiBonus = item.kpiBonusPercent ?? 0;
+              const kpiAmount = originalPrice > 0 ? (salePrice - originalPrice) * item.quantity : 0;
+              const itemTotal = salePrice * item.quantity;
+              const unitPrice = salePrice;
 
-                <View style={styles.itemPrices}>
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>Asl narx:</Text>
-                    <Text style={styles.priceValue}>{formatPrice(item.originalPrice)}</Text>
+              return (
+                <View key={index} style={styles.itemContainer}>
+                  <View style={styles.itemHeader}>
+                    {item.product.images && item.product.images.length > 0 ? (
+                      <Image
+                        source={{ uri: item.product.images[0] }}
+                        style={styles.itemImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.itemImagePlaceholder}>
+                        <Ionicons name="cube-outline" size={24} color="#8E8E93" />
+                      </View>
+                    )}
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemName}>{item.product.name}</Text>
+                      {item.product.productCode && (
+                        <Text style={styles.itemCode}>Kod: {item.product.productCode}</Text>
+                      )}
+                      <View style={styles.quantityContainer}>
+                        <Ionicons name="layers-outline" size={14} color="#666" />
+                        <Text style={styles.itemQuantity}>
+                          {item.quantity} dona
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>Sotuv narxi:</Text>
-                    <Text style={styles.priceValueBold}>{formatPrice(item.price)}</Text>
-                  </View>
-                  <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>KPI bonus:</Text>
-                    <Text style={styles.priceValueKpi}>
-                      {item.kpiBonusPercent}% ({formatPrice((item.price - item.originalPrice) * item.quantity)})
-                    </Text>
-                  </View>
-                  <View style={[styles.priceRow, styles.itemTotalRow]}>
-                    <Text style={styles.priceLabelBold}>Jami:</Text>
-                    <Text style={styles.priceValueBold}>
-                      {formatPrice(item.price * item.quantity)}
-                    </Text>
+
+                  <View style={styles.itemPrices}>
+                    <View style={styles.priceSection}>
+                      {originalPrice > 0 && originalPrice !== salePrice && (
+                        <View style={styles.priceRow}>
+                          <Text style={styles.priceLabel}>Asl narx (birlik):</Text>
+                          <Text style={styles.priceValue}>{formatPrice(originalPrice)}</Text>
+                        </View>
+                      )}
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceLabel}>Sotuv narxi (birlik):</Text>
+                        <Text style={styles.priceValueBold}>{formatPrice(unitPrice)}</Text>
+                      </View>
+                      {item.quantity > 1 && (
+                        <View style={styles.priceRow}>
+                          <Text style={styles.priceLabel}>Miqdor:</Text>
+                          <Text style={styles.priceValue}>{item.quantity} dona</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    {kpiBonus > 0 && kpiAmount > 0 && (
+                      <View style={[styles.priceRow, styles.kpiRow]}>
+                        <View style={styles.kpiLabelContainer}>
+                          <Ionicons name="gift-outline" size={14} color="#34C759" />
+                          <Text style={styles.priceLabel}>KPI bonus:</Text>
+                        </View>
+                        <Text style={styles.priceValueKpi}>
+                          {kpiBonus}% ({formatPrice(kpiAmount)})
+                        </Text>
+                      </View>
+                    )}
+                    
+                    <View style={[styles.priceRow, styles.itemTotalRow]}>
+                      <Text style={styles.priceLabelBold}>Mahsulot jami:</Text>
+                      <Text style={styles.priceValueBold}>
+                        {formatPrice(itemTotal)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -439,9 +567,25 @@ export default function OrderViewScreen() {
             </Text>
           </View>
 
-          <View style={[styles.infoRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Jami summa</Text>
-            <Text style={styles.totalValue}>{formatPrice(order.totalPrice)}</Text>
+          <View style={styles.summarySection}>
+            {requestedTotalOriginalPrice > 0 && requestedTotalOriginalPrice !== requestedTotalPrice && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Jami asl narx</Text>
+                <Text style={styles.infoValue}>{formatPrice(requestedTotalOriginalPrice)}</Text>
+              </View>
+            )}
+            {requestedTotalKpiPrice > 0 && (
+              <View style={styles.infoRowSmall}>
+                <View style={styles.kpiLabelContainerSmall}>
+                  <Text style={styles.infoLabelSmall}>Jami KPI bonus</Text>
+                </View>
+                <Text style={[styles.infoValueSmall, styles.priceValueKpiSmall]}>{formatPrice(requestedTotalKpiPrice)}</Text>
+              </View>
+            )}
+            <View style={[styles.infoRow, styles.totalRow]}>
+              <Text style={styles.totalLabel}>Jami to'lov summa</Text>
+              <Text style={styles.totalValue}>{formatPrice(requestedTotalPrice)}</Text>
+            </View>
           </View>
         </View>
 
@@ -608,6 +752,111 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
+  infoGrid: {
+    gap: 12,
+  },
+  infoGridItem: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  infoIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#F0F7FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoGridContent: {
+    flex: 1,
+    gap: 2,
+  },
+  infoGridLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  infoGridValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  infoGridSubValue: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  workflowContainer: {
+    gap: 0,
+  },
+  workflowStep: {
+    position: 'relative',
+  },
+  workflowStepContent: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    paddingBottom: 16,
+  },
+  workflowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  workflowIconPending: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  workflowStepInfo: {
+    flex: 1,
+    gap: 4,
+    paddingTop: 4,
+  },
+  workflowStepLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  workflowStepDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  workflowLine: {
+    width: 2,
+    height: 20,
+    marginLeft: 15,
+    marginTop: -4,
+  },
+  infoRowSmall: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  kpiLabelContainerSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  infoLabelSmall: {
+    fontSize: 14,
+    color: '#34C759',
+  },
+  infoValueSmall: {
+    fontSize: 14,
+    color: '#34C759',
+    fontWeight: '500',
+  },
+  priceValueKpiSmall: {
+    fontSize: 14,
+    color: '#34C759',
+    fontWeight: '600',
+  },
   actionsContainer: {
     gap: 12,
     marginTop: 8,
@@ -650,6 +899,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#f0f0f0',
   },
+  itemImagePlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   itemInfo: {
     flex: 1,
     gap: 4,
@@ -658,18 +915,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 4,
   },
   itemCode: {
     fontSize: 12,
     color: '#666',
+    marginBottom: 4,
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   itemQuantity: {
     fontSize: 13,
     color: '#666',
   },
   itemPrices: {
-    gap: 6,
+    gap: 8,
     paddingLeft: 72,
+    marginTop: 4,
+  },
+  priceSection: {
+    gap: 4,
+    marginBottom: 8,
   },
   priceRow: {
     flexDirection: 'row',
@@ -697,13 +966,38 @@ const styles = StyleSheet.create({
   priceValueKpi: {
     fontSize: 13,
     color: '#34C759',
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  kpiRow: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  kpiLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   itemTotalRow: {
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#e0e0e0',
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: -8,
+    marginRight: -8,
+  },
+  summarySection: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    gap: 8,
   },
   totalRow: {
     marginTop: 8,

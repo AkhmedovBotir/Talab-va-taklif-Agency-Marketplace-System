@@ -30,7 +30,7 @@ export default function CheckoutScreen() {
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   const [formData, setFormData] = useState({
-    paymentMethod: 'cash' as 'cash' | 'card',
+    paymentMethod: 'cash' as 'cash',
     deliveryViloyat: '',
     deliveryViloyatId: '',
     deliveryTuman: '',
@@ -305,55 +305,16 @@ export default function CheckoutScreen() {
         {/* Payment Method */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>To'lov usuli</Text>
-          <View style={styles.paymentMethods}>
-            <TouchableOpacity
-              style={[
-                styles.paymentMethod,
-                formData.paymentMethod === 'cash' && styles.paymentMethodActive,
-              ]}
-              onPress={() => setFormData({ ...formData, paymentMethod: 'cash' })}
-            >
-              <Ionicons
-                name="cash-outline"
-                size={24}
-                color={formData.paymentMethod === 'cash' ? '#007AFF' : '#666'}
-              />
-              <Text
-                style={[
-                  styles.paymentMethodText,
-                  formData.paymentMethod === 'cash' && styles.paymentMethodTextActive,
-                ]}
-              >
-                Naqd pul
-              </Text>
-              {formData.paymentMethod === 'cash' && (
-                <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.paymentMethod,
-                formData.paymentMethod === 'card' && styles.paymentMethodActive,
-              ]}
-              onPress={() => setFormData({ ...formData, paymentMethod: 'card' })}
-            >
-              <Ionicons
-                name="card-outline"
-                size={24}
-                color={formData.paymentMethod === 'card' ? '#007AFF' : '#666'}
-              />
-              <Text
-                style={[
-                  styles.paymentMethodText,
-                  formData.paymentMethod === 'card' && styles.paymentMethodTextActive,
-                ]}
-              >
-                Karta
-              </Text>
-              {formData.paymentMethod === 'card' && (
-                <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
-              )}
-            </TouchableOpacity>
+          <View style={styles.paymentMethod}>
+            <Ionicons
+              name="cash-outline"
+              size={24}
+              color="#007AFF"
+            />
+            <Text style={styles.paymentMethodText}>
+              Naqd pul
+            </Text>
+            <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
           </View>
         </View>
 
@@ -589,29 +550,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#007AFF',
   },
-  paymentMethods: {
-    gap: 12,
-  },
   paymentMethod: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f7ff',
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
-    borderColor: '#e5e5e7',
-    gap: 12,
-  },
-  paymentMethodActive: {
     borderColor: '#007AFF',
-    backgroundColor: '#f0f7ff',
+    gap: 12,
   },
   paymentMethodText: {
     flex: 1,
     fontSize: 16,
-    color: '#666',
-  },
-  paymentMethodTextActive: {
     color: '#007AFF',
     fontWeight: '600',
   },

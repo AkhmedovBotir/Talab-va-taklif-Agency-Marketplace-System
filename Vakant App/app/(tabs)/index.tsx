@@ -10,6 +10,7 @@ import {
   Image,
   Modal,
   Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
@@ -279,52 +280,73 @@ export default function ProfileScreen() {
 
   async function handleUpdateAvatar() {
     try {
-      const options = {
-        mediaType: 'photo' as MediaType,
-        includeBase64: true,
-        maxHeight: 2000,
-        maxWidth: 2000,
-        quality: 0.8,
-      };
-
-      launchImageLibrary(options, async (response: ImagePickerResponse) => {
-        if (response.didCancel) {
+      // Request permissions for Android
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
+          {
+            title: 'Rasm tanlash ruxsati',
+            message: 'Rasm tanlash uchun ruxsat kerak',
+            buttonNeutral: 'Keyinroq',
+            buttonNegative: 'Bekor qilish',
+            buttonPositive: 'Ruxsat berish',
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Ruxsat kerak', 'Rasm tanlash uchun ruxsat berilishi kerak');
           return;
         }
+      }
 
-        if (response.errorMessage) {
-          Alert.alert('Xatolik', response.errorMessage || 'Rasm tanlashda xatolik');
-          return;
-        }
-
-        if (response.assets && response.assets[0]) {
-          const asset = response.assets[0];
-          
-          if (!asset.uri) {
-            Alert.alert('Xatolik', 'Rasm tanlanmadi');
+      launchImageLibrary(
+        {
+          mediaType: 'photo' as MediaType,
+          includeBase64: true,
+          quality: 0.8,
+          maxWidth: 1024,
+          maxHeight: 1024,
+        },
+        (response: ImagePickerResponse) => {
+          if (response.didCancel) {
             return;
           }
 
-          let base64Image: string;
-          
-          if (asset.base64) {
-            const imageType = asset.type || `image/${asset.uri.split('.').pop()?.toLowerCase() || 'jpeg'}`;
-            base64Image = `data:${imageType};base64,${asset.base64}`;
-          } else {
-            // Fallback: use URI if base64 is not available
-            base64Image = asset.uri;
+          if (response.errorMessage) {
+            Alert.alert('Xatolik', response.errorMessage);
+            return;
           }
-          
-          try {
-            const updated = await profileApi.updateAvatar({ avatar: base64Image });
-            setProfile(updated);
-            updateUser(updated as any);
-            Alert.alert('Muvaffaqiyat', 'Avatar yangilandi');
-          } catch (error: any) {
-            Alert.alert('Xatolik', error.message || 'Avatarni yangilashda xatolik');
+
+          if (response.assets && response.assets[0]) {
+            const asset = response.assets[0];
+            
+            if (!asset.uri) {
+              Alert.alert('Xatolik', 'Rasm tanlanmadi');
+              return;
+            }
+
+            let base64Image: string;
+            
+            if (asset.base64) {
+              const imageType = asset.type || `image/${asset.uri.split('.').pop()?.toLowerCase() || 'jpeg'}`;
+              base64Image = `data:${imageType};base64,${asset.base64}`;
+            } else {
+              // Fallback: use URI if base64 is not available
+              base64Image = asset.uri;
+            }
+            
+            (async () => {
+              try {
+                const updated = await profileApi.updateAvatar({ avatar: base64Image });
+                setProfile(updated);
+                updateUser(updated as any);
+                Alert.alert('Muvaffaqiyat', 'Avatar yangilandi');
+              } catch (error: any) {
+                Alert.alert('Xatolik', error.message || 'Avatarni yangilashda xatolik');
+              }
+            })();
           }
         }
-      });
+      );
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Rasm tanlashda xatolik');
     }

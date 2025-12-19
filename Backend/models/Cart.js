@@ -22,7 +22,6 @@ const cartSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'MarketplaceUser',
       required: [true, 'Foydalanuvchi kiritilishi shart'],
-      unique: true,
     },
     items: {
       type: [cartItemSchema],
@@ -35,7 +34,7 @@ const cartSchema = new mongoose.Schema(
 );
 
 // Indexes
-cartSchema.index({ user: 1 });
+cartSchema.index({ user: 1 }, { unique: true });
 
 const Cart = mongoose.model('Cart', cartSchema);
 

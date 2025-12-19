@@ -657,6 +657,48 @@ export const adminDataAPI = {
     return apiRequest(`/admins/data/orders/marketplace?${queryParams.toString()}`);
   },
 
+  // Get orders confirmed by punkt
+  getOrdersConfirmedByPunkt: async (params = {}) => {
+    const { 
+      page = 1, 
+      limit = 50, 
+      status, 
+      startDate,
+      endDate
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) queryParams.append('status', status);
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    return apiRequest(`/admins/data/orders/confirmed-by-punkt?${queryParams.toString()}`);
+  },
+
+  // Get orders requested to contragents
+  getOrdersRequestedToContragents: async (params = {}) => {
+    const { 
+      page = 1, 
+      limit = 50, 
+      status, 
+      startDate,
+      endDate
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) queryParams.append('status', status);
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    return apiRequest(`/admins/data/orders/requested-to-contragents?${queryParams.toString()}`);
+  },
+
   // Get orders delivered to punkt
   getOrdersDeliveredToPunkt: async (params = {}) => {
     const { 
@@ -758,6 +800,65 @@ export const adminDataAPI = {
     if (endDate) queryParams.append('endDate', endDate);
     
     return apiRequest(`/admins/data/orders/cancelled?${queryParams.toString()}`);
+  },
+};
+
+// Archive API functions
+export const archiveAPI = {
+  // Get all archived punkts
+  getArchivedPunkts: async (params = {}) => {
+    const { 
+      page = 1, 
+      limit = 50, 
+      search,
+      viloyat,
+      tuman
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (search) queryParams.append('search', search);
+    if (viloyat) queryParams.append('viloyat', viloyat);
+    if (tuman) queryParams.append('tuman', tuman);
+    
+    return apiRequest(`/admins/archive/punkts?${queryParams.toString()}`);
+  },
+
+  // Get archived punkt with work history
+  getArchivedPunktWorkHistory: async (id) => {
+    return apiRequest(`/admins/archive/punkts/${id}/work`);
+  },
+
+  // Get all archived agents
+  getArchivedAgents: async (params = {}) => {
+    const { 
+      page = 1, 
+      limit = 50, 
+      search,
+      viloyat,
+      tuman,
+      mfy,
+      agentType
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (search) queryParams.append('search', search);
+    if (viloyat) queryParams.append('viloyat', viloyat);
+    if (tuman) queryParams.append('tuman', tuman);
+    if (mfy) queryParams.append('mfy', mfy);
+    if (agentType) queryParams.append('agentType', agentType);
+    
+    return apiRequest(`/admins/archive/agents?${queryParams.toString()}`);
+  },
+
+  // Get archived agent with work history
+  getArchivedAgentWorkHistory: async (id) => {
+    return apiRequest(`/admins/archive/agents/${id}/work`);
   },
 };
 
@@ -1297,12 +1398,11 @@ export const salesStatsAPI = {
     return apiRequest(`/admins/stats/sales/mfys${queryString ? `?${queryString}` : ''}`);
   },
 
-  // Get single viloyat statistics
+  // Get single viloyat statistics (returns tumans)
   getViloyatStats: async (viloyatId, params = {}) => {
-    const { groupBy, startDate, endDate, status } = params;
+    const { startDate, endDate, status } = params;
     const queryParams = new URLSearchParams();
     
-    if (groupBy) queryParams.append('groupBy', groupBy);
     if (startDate) queryParams.append('startDate', startDate);
     if (endDate) queryParams.append('endDate', endDate);
     if (status) queryParams.append('status', status);
@@ -1311,12 +1411,11 @@ export const salesStatsAPI = {
     return apiRequest(`/admins/stats/sales/viloyats/${viloyatId}${queryString ? `?${queryString}` : ''}`);
   },
 
-  // Get single tuman statistics
+  // Get single tuman statistics (returns MFYs)
   getTumanStats: async (tumanId, params = {}) => {
-    const { groupBy, startDate, endDate, status } = params;
+    const { startDate, endDate, status } = params;
     const queryParams = new URLSearchParams();
     
-    if (groupBy) queryParams.append('groupBy', groupBy);
     if (startDate) queryParams.append('startDate', startDate);
     if (endDate) queryParams.append('endDate', endDate);
     if (status) queryParams.append('status', status);
@@ -1926,6 +2025,93 @@ export const kpiPaymentAPI = {
   syncPayments: async () => {
     return apiRequest('/admin-kpi-payments/sync', {
       method: 'POST',
+    });
+  },
+};
+
+// Contragent Payment Distribution API functions
+export const contragentPaymentAPI = {
+  // Get unpaid payments
+  getUnpaidPayments: async (params = {}) => {
+    const { 
+      page = 1, 
+      limit = 50, 
+      contragentId,
+      viloyatId,
+      tumanId,
+      mfyId,
+      isOverdue
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (contragentId) queryParams.append('contragentId', contragentId);
+    if (viloyatId) queryParams.append('viloyatId', viloyatId);
+    if (tumanId) queryParams.append('tumanId', tumanId);
+    if (mfyId) queryParams.append('mfyId', mfyId);
+    if (isOverdue !== undefined) queryParams.append('isOverdue', isOverdue.toString());
+    
+    return apiRequest(`/admin-contragent-payments/unpaid?${queryParams.toString()}`);
+  },
+
+  // Get unpaid payments grouped
+  getUnpaidPaymentsGrouped: async (params = {}) => {
+    const { isOverdue } = params;
+    const queryParams = new URLSearchParams();
+    
+    if (isOverdue !== undefined) queryParams.append('isOverdue', isOverdue.toString());
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-contragent-payments/unpaid/grouped${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Mark payments as paid
+  markAsPaid: async (paymentIds, notes) => {
+    return apiRequest('/admin-contragent-payments/mark-as-paid', {
+      method: 'POST',
+      body: JSON.stringify({ paymentIds, notes }),
+    });
+  },
+
+  // Get paid payments
+  getPaidPayments: async (params = {}) => {
+    const { 
+      page = 1, 
+      limit = 50, 
+      contragentId,
+      startDate,
+      endDate
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (contragentId) queryParams.append('contragentId', contragentId);
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    return apiRequest(`/admin-contragent-payments/paid?${queryParams.toString()}`);
+  },
+
+  // Get statistics
+  getStatistics: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-contragent-payments/statistics${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Sync payments
+  syncPayments: async (dueDateDays = 7) => {
+    return apiRequest('/admin-contragent-payments/sync', {
+      method: 'POST',
+      body: JSON.stringify({ dueDateDays }),
     });
   },
 };

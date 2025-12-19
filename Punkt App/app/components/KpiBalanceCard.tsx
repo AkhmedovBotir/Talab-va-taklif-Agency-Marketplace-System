@@ -5,10 +5,17 @@ import { useKpiBalance } from '../hooks/useKpiBalance';
 
 interface KpiBalanceCardProps {
   onPress?: () => void;
+  refreshTrigger?: number;
 }
 
-export function KpiBalanceCard({ onPress }: KpiBalanceCardProps) {
-  const { balance, loading } = useKpiBalance();
+export function KpiBalanceCard({ onPress, refreshTrigger }: KpiBalanceCardProps) {
+  const { balance, loading, refresh } = useKpiBalance();
+  
+  React.useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      refresh();
+    }
+  }, [refreshTrigger, refresh]);
 
   if (loading || !balance) {
     return <View />;

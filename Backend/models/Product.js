@@ -129,8 +129,11 @@ productSchema.index({ productCode: 1 }, { unique: true });
 productSchema.index({ 'deliveryRegions.viloyat': 1 });
 productSchema.index({ 'deliveryRegions.tuman': 1 });
 
-// Method to generate product code
+// Method to generate product code (global sequence for all products)
 productSchema.statics.generateProductCode = async function (contragentId) {
+  const Counter = require('./Counter');
+  
+  // Validate contragent exists
   const Contragent = mongoose.model('Contragent');
   const contragent = await Contragent.findById(contragentId);
   
@@ -138,71 +141,65 @@ productSchema.statics.generateProductCode = async function (contragentId) {
     throw new Error('Contragent topilmadi');
   }
 
-  // Get last product code for this contragent
-  const lastProduct = await this.findOne({ contragent: contragentId })
-    .sort({ createdAt: -1 })
-    .select('productCode');
-
-  if (!lastProduct || !lastProduct.productCode) {
-    return '001';
-  }
-
-  // Extract numeric part and suffix
-  const match = lastProduct.productCode.match(/^(\d+)([a-z]*)$/i);
-  
-  if (!match) {
-    return '001';
-  }
-
-  let numPart = parseInt(match[1], 10);
-  let suffix = match[2] || '';
-
-  // Try to increment number
-  numPart++;
-  
-  // Format with leading zeros
-  let newCode;
-  
-  // If number exceeds 999, add letter suffix
-  if (numPart > 999) {
-    if (!suffix) {
-      suffix = 'a';
+  // Helper function to format code from sequence number
+  const formatCode = (seqNum) => {
+    if (seqNum <= 999) {
+      // 001 to 999: 3 digits with leading zeros
+      return seqNum.toString().padStart(3, '0');
+    } else if (seqNum <= 9999) {
+      // 1000 to 9999: 4 digits
+      return seqNum.toString();
+    } else if (seqNum <= 99999) {
+      // 10000 to 99999: 5 digits
+      return seqNum.toString();
     } else {
-      // Increment suffix letter
-      const lastChar = suffix[suffix.length - 1].toLowerCase();
-      if (lastChar === 'z') {
-        suffix += 'a';
+      // 100000+: Add letter prefix and 5 digits
+      // Calculate: A00001, A00002, ..., A99999, B00001, B00002, ...
+      const baseNumber = 100000;
+      const numbersPerLetter = 99999; // A00001 to A99999 = 99999 numbers
+      
+      const letterIndex = Math.floor((seqNum - baseNumber) / numbersPerLetter);
+      const remainder = ((seqNum - baseNumber) % numbersPerLetter) + 1;
+      
+      // Generate letter prefix: A=0, B=1, C=2, ..., Z=25, AA=26, AB=27, ...
+      let letterPrefix = '';
+      let tempIndex = letterIndex;
+      
+      if (tempIndex < 26) {
+        // Single letter: A-Z
+        letterPrefix = String.fromCharCode(65 + tempIndex); // 65 is 'A'
       } else {
-        suffix = suffix.slice(0, -1) + String.fromCharCode(lastChar.charCodeAt(0) + 1);
-      }
-    }
-    newCode = '001' + suffix;
-    numPart = 1;
-  } else {
-    newCode = numPart.toString().padStart(3, '0') + suffix;
-  }
-
-  // Check if code already exists and find unique one
-  let attempts = 0;
-  while (await this.findOne({ productCode: newCode, contragent: contragentId }) && attempts < 1000) {
-    numPart++;
-    if (numPart > 999) {
-      if (!suffix) {
-        suffix = 'a';
-      } else {
-        const lastChar = suffix[suffix.length - 1].toLowerCase();
-        if (lastChar === 'z') {
-          suffix += 'a';
-        } else {
-          suffix = suffix.slice(0, -1) + String.fromCharCode(lastChar.charCodeAt(0) + 1);
+        // Multiple letters: AA, AB, ..., ZZ, AAA, ...
+        while (tempIndex >= 0) {
+          letterPrefix = String.fromCharCode(65 + (tempIndex % 26)) + letterPrefix;
+          tempIndex = Math.floor(tempIndex / 26) - 1;
         }
       }
-      newCode = '001' + suffix;
-      numPart = 1;
-    } else {
-      newCode = numPart.toString().padStart(3, '0') + suffix;
+      
+      return letterPrefix + remainder.toString().padStart(5, '0');
     }
+  };
+
+  // Get next sequence number from counter
+  let sequenceNumber = await Counter.getNextValue('productCode');
+  let newCode = formatCode(sequenceNumber);
+
+  // Check if code already exists (shouldn't happen, but safety check)
+  let attempts = 0;
+  while (await this.findOne({ productCode: newCode }) && attempts < 100) {
+    // If code exists, increment sequence and try again
+    sequenceNumber++;
+    newCode = formatCode(sequenceNumber);
     attempts++;
+  }
+
+  // If we had to skip codes, update counter to match
+  if (attempts > 0) {
+    await Counter.findOneAndUpdate(
+      { name: 'productCode' },
+      { $set: { value: sequenceNumber } },
+      { upsert: true }
+    );
   }
 
   return newCode;

@@ -14,9 +14,10 @@ interface ProductCardProps {
   product: Product;
   onPress: (product: Product) => void;
   onAddToCart: (product: Product) => void;
+  isInCart?: boolean;
 }
 
-export default function ProductCard({ product, onPress, onAddToCart }: ProductCardProps) {
+export default function ProductCard({ product, onPress, onAddToCart, isInCart = false }: ProductCardProps) {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
   };
@@ -76,11 +77,12 @@ export default function ProductCard({ product, onPress, onAddToCart }: ProductCa
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.cartButton}
-            onPress={() => onAddToCart(product)}
+            style={[styles.cartButton, isInCart && styles.cartButtonDisabled]}
+            onPress={() => !isInCart && onAddToCart(product)}
             activeOpacity={0.7}
+            disabled={isInCart}
           >
-            <Ionicons name="cart" size={20} color="#fff" />
+            <Ionicons name={isInCart ? "checkmark" : "cart"} size={20} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -179,6 +181,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cartButtonDisabled: {
+    backgroundColor: '#4CAF50',
+    opacity: 0.8,
   },
 });
 

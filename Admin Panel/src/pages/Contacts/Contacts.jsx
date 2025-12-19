@@ -5,7 +5,7 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 import { Search, Clear, Edit } from '@mui/icons-material';
 import UpdateContactStatusModal from '../../components/Contacts/UpdateContactStatusModal';
 
-const Contacts = () => {
+const Contacts = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [contacts, setContacts] = useState([]);
   const [statistics, setStatistics] = useState(null);
@@ -121,16 +121,18 @@ const Contacts = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Aloqalar</h1>
-          <p className="text-gray-600">Barcha aloqalarni ko'rish va boshqarish</p>
-        </div>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Aloqalar</h1>
+            <p className="text-gray-600">Barcha aloqalarni ko'rish va boshqarish</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Statistics */}
       {statistics && (

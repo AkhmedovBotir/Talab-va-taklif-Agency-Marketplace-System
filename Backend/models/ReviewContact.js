@@ -6,7 +6,6 @@ const reviewContactSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Review',
       required: [true, 'Baholash kiritilishi shart'],
-      unique: true,
     },
     message: {
       type: String,
@@ -45,7 +44,7 @@ const reviewContactSchema = new mongoose.Schema(
 );
 
 // Indexes
-reviewContactSchema.index({ review: 1 });
+reviewContactSchema.index({ review: 1 }, { unique: true });
 reviewContactSchema.index({ isPositive: 1 });
 reviewContactSchema.index({ status: 1 });
 reviewContactSchema.index({ createdAt: -1 });

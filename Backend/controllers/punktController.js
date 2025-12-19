@@ -1,14 +1,18 @@
 const Punkt = require('../models/Punkt');
 const Contragent = require('../models/Contragent');
 const jwt = require('jsonwebtoken');
+const { cacheInvalidators } = require('../middleware/cache');
 
 // Create new punkt
 const createPunkt = async (req, res) => {
   try {
     const { name, phone, password, viloyat, tuman, status } = req.body;
 
-    // Check if phone number already exists
-    const existingPhone = await Punkt.findOne({ phone });
+    // Check if phone number already exists (only non-deleted)
+    const existingPhone = await Punkt.findOne({
+      phone,
+      isDeleted: { $ne: true },
+    });
     if (existingPhone) {
       return res.status(400).json({
         success: false,
@@ -45,26 +49,57 @@ const createPunkt = async (req, res) => {
       }
     }
 
-    const punkt = await Punkt.create({
-      name,
-      phone,
-      password,
+    // Check if there's already an active punkt in this position (viloyat + tuman)
+    const positionFilter = {
       viloyat,
       tuman: tuman || null,
-      status: status || 'active',
-    });
+      isDeleted: { $ne: true },
+      status: 'active',
+    };
 
-    // Populate viloyat and tuman
-    await punkt.populate([
-      { path: 'viloyat', select: 'name type code' },
-      { path: 'tuman', select: 'name type code' },
-    ]);
+    const existingPunktInPosition = await Punkt.findOne(positionFilter);
+    if (existingPunktInPosition) {
+      const tumanName = tuman ? ' va tuman' : '';
+      return res.status(400).json({
+        success: false,
+        message: `Bu viloyat${tumanName} uchun allaqachon faol punkt mavjud`,
+      });
+    }
 
-    res.status(201).json({
-      success: true,
-      message: 'Punkt muvaffaqiyatli yaratildi',
-      data: punkt,
-    });
+    try {
+      const punkt = await Punkt.create({
+        name,
+        phone,
+        password,
+        viloyat,
+        tuman: tuman || null,
+        status: status || 'active',
+      });
+
+      // Populate viloyat and tuman
+      await punkt.populate([
+        { path: 'viloyat', select: 'name type code' },
+        { path: 'tuman', select: 'name type code' },
+      ]);
+
+      // Invalidate cache
+      await cacheInvalidators.invalidatePunktCache();
+
+      res.status(201).json({
+        success: true,
+        message: 'Punkt muvaffaqiyatli yaratildi',
+        data: punkt,
+      });
+    } catch (createError) {
+      // Handle duplicate key error (phone already exists)
+      if (createError.code === 11000 && createError.keyPattern && createError.keyPattern.phone) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu telefon raqami allaqachon mavjud (arxivda yoki faol punktda)',
+        });
+      }
+      throw createError;
+    }
   } catch (error) {
     console.error('Error creating punkt:', error);
     res.status(500).json({
@@ -92,6 +127,9 @@ const getAllPunkts = async (req, res) => {
     if (tuman) {
       filter.tuman = tuman;
     }
+
+    // Only show non-deleted punkts (include those without isDeleted field for backward compatibility)
+    filter.isDeleted = { $ne: true };
 
     // Pagination
     const pageNum = parseInt(page, 10);
@@ -136,7 +174,7 @@ const getPunktById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const punkt = await Punkt.findById(id)
+    const punkt = await Punkt.findOne({ _id: id, isDeleted: false })
       .populate([
         { path: 'viloyat', select: 'name type code' },
         { path: 'tuman', select: 'name type code' },
@@ -178,11 +216,12 @@ const updatePunkt = async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    // If phone is being updated, check for duplicates
+    // If phone is being updated, check for duplicates (only non-deleted)
     if (updateData.phone) {
       const existingPhone = await Punkt.findOne({
         phone: updateData.phone,
         _id: { $ne: id },
+        isDeleted: { $ne: true },
       });
       if (existingPhone) {
         return res.status(400).json({
@@ -226,10 +265,44 @@ const updatePunkt = async (req, res) => {
       }
     }
 
+    // Check if position (viloyat + tuman) is being changed
+    // If so, check if there's already an active punkt in the new position
+    if (updateData.viloyat !== undefined || updateData.tuman !== undefined) {
+      const currentPunkt = await Punkt.findOne({
+        _id: id,
+        isDeleted: { $ne: true },
+      });
+
+      if (currentPunkt) {
+        const newViloyat = updateData.viloyat || currentPunkt.viloyat;
+        const newTuman = updateData.tuman !== undefined ? (updateData.tuman || null) : currentPunkt.tuman;
+
+        const positionFilter = {
+          viloyat: newViloyat,
+          tuman: newTuman,
+          isDeleted: { $ne: true },
+          status: 'active',
+          _id: { $ne: id }, // Exclude current punkt
+        };
+
+        const existingPunktInPosition = await Punkt.findOne(positionFilter);
+        if (existingPunktInPosition) {
+          const tumanName = newTuman ? ' va tuman' : '';
+          return res.status(400).json({
+            success: false,
+            message: `Bu viloyat${tumanName} uchun allaqachon faol punkt mavjud`,
+          });
+        }
+      }
+    }
+
     // If password is being updated, we need to hash it first
     // We'll use save() method instead of findByIdAndUpdate to trigger pre('save') hook
     if (updateData.password) {
-      const punkt = await Punkt.findById(id);
+    const punkt = await Punkt.findOne({
+      _id: id,
+      isDeleted: { $ne: true },
+    });
       
       if (!punkt) {
         return res.status(404).json({
@@ -257,6 +330,9 @@ const updatePunkt = async (req, res) => {
         { path: 'tuman', select: 'name type code' },
       ]);
 
+      // Invalidate cache
+      await cacheInvalidators.invalidatePunktCache();
+
       return res.status(200).json({
         success: true,
         message: 'Punkt muvaffaqiyatli yangilandi',
@@ -273,9 +349,9 @@ const updatePunkt = async (req, res) => {
       });
     }
 
-    // If password is not being updated, use findByIdAndUpdate
-    const punkt = await Punkt.findByIdAndUpdate(
-      id,
+    // If password is not being updated, use findOneAndUpdate
+    const punkt = await Punkt.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
       updateData,
       {
         new: true,
@@ -294,6 +370,9 @@ const updatePunkt = async (req, res) => {
         message: 'Punkt topilmadi',
       });
     }
+
+    // Invalidate cache
+    await cacheInvalidators.invalidatePunktCache();
 
     res.status(200).json({
       success: true,
@@ -318,12 +397,23 @@ const updatePunkt = async (req, res) => {
   }
 };
 
-// Delete punkt
+// Delete punkt (soft delete)
 const deletePunkt = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const punkt = await Punkt.findByIdAndDelete(id);
+    const punkt = await Punkt.findOneAndUpdate(
+      {
+        _id: id,
+        isDeleted: { $ne: true },
+      },
+      {
+        isDeleted: true,
+        deletedAt: new Date(),
+        status: 'inactive',
+      },
+      { new: true }
+    );
 
     if (!punkt) {
       return res.status(404).json({
@@ -332,9 +422,12 @@ const deletePunkt = async (req, res) => {
       });
     }
 
+    // Invalidate cache
+    await cacheInvalidators.invalidatePunktCache();
+
     res.status(200).json({
       success: true,
-      message: 'Punkt muvaffaqiyatli o\'chirildi',
+      message: 'Punkt muvaffaqiyatli o\'chirildi (arxivga o\'tkazildi)',
     });
   } catch (error) {
     console.error('Error deleting punkt:', error);
@@ -359,8 +452,11 @@ const loginPunkt = async (req, res) => {
   try {
     const { phone, password } = req.body;
 
-    // Find punkt with password field included
-    const punkt = await Punkt.findOne({ phone }).select('+password');
+    // Find punkt with password field included (only non-deleted)
+    const punkt = await Punkt.findOne({
+      phone,
+      isDeleted: { $ne: true },
+    }).select('+password');
 
     if (!punkt) {
       return res.status(401).json({
@@ -438,6 +534,9 @@ const getPunktsForSelection = async (req, res) => {
   try {
     const { status, viloyat, tuman, search, page = 1, limit = 100 } = req.query;
     const filter = {};
+
+    // Only show non-deleted punkts (include those without isDeleted field for backward compatibility)
+    filter.isDeleted = { $ne: true };
 
     // Only show active punkts by default
     if (status) {

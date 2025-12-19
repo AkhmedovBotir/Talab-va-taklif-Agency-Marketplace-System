@@ -680,6 +680,258 @@ const getMarketplaceUserByIdForAdmin = async (req, res) => {
   }
 };
 
+// Helper function to calculate order statistics
+const calculateOrderStatistics = async (filter) => {
+  const stats = await Order.aggregate([
+    { $match: filter },
+    {
+      $group: {
+        _id: null,
+        totalOrders: { $sum: 1 },
+        totalPrice: { $sum: '$totalPrice' },
+        totalOriginalPrice: { $sum: '$totalOriginalPrice' },
+        totalKpiPrice: { $sum: '$totalKpiPrice' },
+        totalItems: { $sum: '$itemCount' },
+        avgOrderValue: { $avg: '$totalPrice' },
+      },
+    },
+  ]);
+
+  return stats[0] || {
+    totalOrders: 0,
+    totalPrice: 0,
+    totalOriginalPrice: 0,
+    totalKpiPrice: 0,
+    totalItems: 0,
+    avgOrderValue: 0,
+  };
+};
+
+// Helper function to populate order with all details
+const populateOrderDetails = (query) => {
+  return query
+    .populate({
+      path: 'user',
+      select: 'firstName lastName phone viloyat tuman mfy status',
+      populate: [
+        { path: 'viloyat', select: 'name type code' },
+        { path: 'tuman', select: 'name type code' },
+        { path: 'mfy', select: 'name type code' },
+      ],
+    })
+    .populate({
+      path: 'items.product',
+      select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
+      populate: [
+        { path: 'category', select: 'name slug status' },
+        { path: 'subcategory', select: 'name slug status' },
+        {
+          path: 'contragent',
+          select: 'name phone viloyat tuman mfy status',
+          populate: [
+            { path: 'viloyat', select: 'name type code' },
+            { path: 'tuman', select: 'name type code' },
+            { path: 'mfy', select: 'name type code' },
+          ],
+        },
+        { path: 'deliveryRegions.viloyat', select: 'name type code' },
+        { path: 'deliveryRegions.tuman', select: 'name type code' },
+      ],
+    })
+    .populate([
+      { path: 'deliveryViloyat', select: 'name type code' },
+      { path: 'deliveryTuman', select: 'name type code' },
+      { path: 'deliveryMfy', select: 'name type code' },
+      { path: 'confirmedByPunkt', select: 'name phone viloyat tuman' },
+      { path: 'assignedToAgent', select: 'name phone viloyat tuman mfy' },
+      { path: 'assignedByPunkt', select: 'name phone viloyat tuman' },
+      { path: 'punktRequests.punktId', select: 'name phone viloyat tuman' },
+      { path: 'contragentRequests.contragentId', select: 'name inn phone viloyat tuman mfy' },
+      { path: 'punktToPunktRequests.fromPunktId', select: 'name phone viloyat tuman' },
+      { path: 'punktToPunktRequests.toPunktId', select: 'name phone viloyat tuman' },
+      { path: 'currentPunkt', select: 'name phone viloyat tuman' },
+      { path: 'confirmedByAgent', select: 'name phone viloyat tuman mfy' },
+    ]);
+};
+
+// Helper function to determine order workflow stage (buyurtma qayerda to'xtaganini aniqlash)
+const getOrderWorkflowStage = (order) => {
+  const orderObj = order.toObject ? order.toObject() : (order._doc ? order._doc : order);
+  
+  // Cancelled orders
+  if (orderObj.status === 'cancelled') {
+    return {
+      stage: 'cancelled',
+      stageName: 'Bekor qilingan',
+      description: 'Buyurtma bekor qilingan',
+      canProceed: false,
+    };
+  }
+  
+  // Customer confirmed
+  if (orderObj.customerConfirmed) {
+    return {
+      stage: 'completed',
+      stageName: 'Yakunlangan',
+      description: 'Mijoz buyurtmani qabul qilgan',
+      canProceed: false,
+    };
+  }
+  
+  // Agent confirmed
+  if (orderObj.confirmedByAgent) {
+    return {
+      stage: 'waiting_customer_confirmation',
+      stageName: 'Mijoz tasdiqlashini kutmoqda',
+      description: 'Agent buyurtmani yetkazgan, mijoz tasdiqlashini kutmoqda',
+      canProceed: true,
+      nextAction: 'Mijoz tasdiqlashi kerak',
+    };
+  }
+  
+  // Assigned to agent
+  if (orderObj.assignedToAgent) {
+    return {
+      stage: 'assigned_to_agent',
+      stageName: 'Agentga yuborilgan',
+      description: 'Buyurtma agentga yuborilgan, yetkazish kutilmoqda',
+      canProceed: true,
+      nextAction: 'Agent yetkazishi kerak',
+    };
+  }
+  
+  // Check if contragents delivered to punkt
+  const hasDeliveredContragents = orderObj.contragentRequests && 
+    orderObj.contragentRequests.some(req => req.status === 'delivered_to_punkt');
+  
+  if (hasDeliveredContragents) {
+    return {
+      stage: 'ready_for_agent',
+      stageName: 'Agentga yuborishga tayyor',
+      description: 'Barcha mahsulotlar punktga yetkazilgan, agentga yuborish mumkin',
+      canProceed: true,
+      nextAction: 'Punkt agentga yuborishi kerak',
+    };
+  }
+  
+  // Check if contragents accepted
+  const hasAcceptedContragents = orderObj.contragentRequests && 
+    orderObj.contragentRequests.some(req => req.status === 'accepted');
+  
+  if (hasAcceptedContragents) {
+    return {
+      stage: 'contragent_preparing',
+      stageName: 'Kontragent tayyorlamoqda',
+      description: 'Kontragent mahsulotni tayyorlamoqda',
+      canProceed: true,
+      nextAction: 'Kontragent punktga yetkazishi kerak',
+    };
+  }
+  
+  // Check if contragents requested
+  const hasPendingContragents = orderObj.contragentRequests && 
+    orderObj.contragentRequests.some(req => req.status === 'pending');
+  
+  if (hasPendingContragents) {
+    return {
+      stage: 'waiting_contragent_response',
+      stageName: 'Kontragent javobini kutmoqda',
+      description: 'Kontragentlarga so\'rov yuborilgan, javob kutilmoqda',
+      canProceed: true,
+      nextAction: 'Kontragent javob berishi kerak',
+    };
+  }
+  
+  // Check if punkt-to-punkt requests exist
+  const hasPunktRequests = orderObj.punktToPunktRequests && 
+    orderObj.punktToPunktRequests.length > 0;
+  
+  if (hasPunktRequests) {
+    const pendingPunktRequest = orderObj.punktToPunktRequests.find(req => req.status === 'pending');
+    if (pendingPunktRequest) {
+      return {
+        stage: 'waiting_punkt_response',
+        stageName: 'Punkt javobini kutmoqda',
+        description: 'Boshqa punktga so\'rov yuborilgan, javob kutilmoqda',
+        canProceed: true,
+        nextAction: 'Punkt javob berishi kerak',
+      };
+    }
+    
+    const acceptedPunktRequest = orderObj.punktToPunktRequests.find(req => req.status === 'accepted');
+    if (acceptedPunktRequest) {
+      return {
+        stage: 'punkt_processing',
+        stageName: 'Punkt ishlayapti',
+        description: 'Punkt buyurtmani qabul qilgan va ishlayapti',
+        canProceed: true,
+        nextAction: 'Punkt kontragentlarga so\'rov yuborishi kerak',
+      };
+    }
+  }
+  
+  // Punkt confirmed but nothing done
+  if (orderObj.confirmedByPunkt) {
+    return {
+      stage: 'punkt_confirmed',
+      stageName: 'Punkt tasdiqlagan',
+      description: 'Punkt buyurtmani tasdiqlagan, keyingi qadamni kutmoqda',
+      canProceed: true,
+      nextAction: 'Punkt kontragentlarga so\'rov yuborishi yoki boshqa punktga yuborishi kerak',
+    };
+  }
+  
+  // Marketplace order - not confirmed by punkt
+  if (orderObj.currentPunkt) {
+    return {
+      stage: 'assigned_to_punkt',
+      stageName: 'Punktga biriktirilgan',
+      description: 'Buyurtma punktga biriktirilgan, punkt tasdiqlashini kutmoqda',
+      canProceed: true,
+      nextAction: 'Punkt buyurtmani tasdiqlashi kerak',
+    };
+  }
+  
+  // New order
+  return {
+    stage: 'new_order',
+    stageName: 'Yangi buyurtma',
+    description: 'Yangi buyurtma, punktga biriktirilishi kerak',
+    canProceed: true,
+    nextAction: 'Punktga biriktirilishi kerak',
+  };
+};
+
+// Helper function to remove kpiBonusPercent from orders and add workflow stage
+const removeKpiFromOrders = (orders) => {
+  return orders.map((order) => {
+    // Handle both Mongoose documents and plain objects
+    const orderObj = order.toObject ? order.toObject() : (order._doc ? order._doc : order);
+    
+    // Ensure items is an array
+    if (!orderObj.items || !Array.isArray(orderObj.items)) {
+      // Add workflow stage even if no items
+      orderObj.workflowStage = getOrderWorkflowStage(order);
+      return orderObj;
+    }
+    
+    orderObj.items = orderObj.items.map((item) => {
+      if (item.product) {
+        // Handle both Mongoose documents and plain objects
+        const productObj = item.product.toObject ? item.product.toObject() : (item.product._doc ? item.product._doc : item.product);
+        delete productObj.kpiBonusPercent;
+        return { ...item, product: productObj };
+      }
+      return item;
+    });
+    
+    // Add workflow stage information
+    orderObj.workflowStage = getOrderWorkflowStage(order);
+    
+    return orderObj;
+  });
+};
+
 // Get all orders with full details and advanced filters (for admin)
 const getAllOrdersForAdmin = async (req, res) => {
   try {
@@ -763,91 +1015,17 @@ const getAllOrdersForAdmin = async (req, res) => {
     // Get total count
     const total = await Order.countDocuments(filter);
 
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(filter);
+
     // Get orders with pagination and full population
-    const orders = await Order.find(filter)
-      .populate({
-        path: 'user',
-        select: 'firstName lastName phone viloyat tuman mfy status',
-        populate: [
-          {
-            path: 'viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'tuman',
-            select: 'name type code',
-          },
-          {
-            path: 'mfy',
-            select: 'name type code',
-          },
-        ],
-      })
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          {
-            path: 'category',
-            select: 'name slug status',
-          },
-          {
-            path: 'subcategory',
-            select: 'name slug status',
-          },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-          {
-            path: 'deliveryRegions.viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'deliveryRegions.tuman',
-            select: 'name type code',
-          },
-        ],
-      })
-      .populate([
-        { path: 'deliveryViloyat', select: 'name type code' },
-        { path: 'deliveryTuman', select: 'name type code' },
-        { path: 'deliveryMfy', select: 'name type code' },
-        { path: 'confirmedByPunkt', select: 'name phone viloyat tuman' },
-        { path: 'assignedToAgent', select: 'name phone viloyat tuman mfy' },
-        { path: 'assignedByPunkt', select: 'name phone viloyat tuman' },
-        { path: 'punktRequests.punktId', select: 'name phone viloyat tuman' },
-        { path: 'contragentRequests.contragentId', select: 'name inn phone viloyat tuman mfy' },
-        { path: 'punktToPunktRequests.fromPunktId', select: 'name phone viloyat tuman' },
-        { path: 'punktToPunktRequests.toPunktId', select: 'name phone viloyat tuman' },
-        { path: 'currentPunkt', select: 'name phone viloyat tuman' },
-        { path: 'confirmedByAgent', select: 'name phone viloyat tuman mfy' },
-      ])
+    const orders = await populateOrderDetails(Order.find(filter))
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
     // Remove kpiBonusPercent from product objects
-    const ordersWithoutKpi = orders.map((order) => {
-      const orderObj = order.toObject();
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product) {
-          const productObj = item.product.toObject ? item.product.toObject() : item.product;
-          delete productObj.kpiBonusPercent;
-          return {
-            ...item,
-            product: productObj,
-          };
-        }
-        return item;
-      });
-      return orderObj;
-    });
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
       success: true,
@@ -856,6 +1034,14 @@ const getAllOrdersForAdmin = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
       data: ordersWithoutKpi,
     });
   } catch (error) {
@@ -873,70 +1059,7 @@ const getOrderByIdForAdmin = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const order = await Order.findById(id)
-      .populate({
-        path: 'user',
-        select: 'firstName lastName phone viloyat tuman mfy status',
-        populate: [
-          {
-            path: 'viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'tuman',
-            select: 'name type code',
-          },
-          {
-            path: 'mfy',
-            select: 'name type code',
-          },
-        ],
-      })
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          {
-            path: 'category',
-            select: 'name slug status',
-          },
-          {
-            path: 'subcategory',
-            select: 'name slug status',
-          },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-          {
-            path: 'deliveryRegions.viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'deliveryRegions.tuman',
-            select: 'name type code',
-          },
-        ],
-      })
-      .populate([
-        { path: 'deliveryViloyat', select: 'name type code' },
-        { path: 'deliveryTuman', select: 'name type code' },
-        { path: 'deliveryMfy', select: 'name type code' },
-        { path: 'confirmedByPunkt', select: 'name phone viloyat tuman' },
-        { path: 'assignedToAgent', select: 'name phone viloyat tuman mfy' },
-        { path: 'assignedByPunkt', select: 'name phone viloyat tuman' },
-        { path: 'punktRequests.punktId', select: 'name phone viloyat tuman' },
-        { path: 'contragentRequests.contragentId', select: 'name inn phone viloyat tuman mfy' },
-        { path: 'punktToPunktRequests.fromPunktId', select: 'name phone viloyat tuman' },
-        { path: 'punktToPunktRequests.toPunktId', select: 'name phone viloyat tuman' },
-        { path: 'currentPunkt', select: 'name phone viloyat tuman' },
-        { path: 'confirmedByAgent', select: 'name phone viloyat tuman mfy' },
-      ]);
+    const order = await populateOrderDetails(Order.findById(id));
 
     if (!order) {
       return res.status(404).json({
@@ -946,18 +1069,8 @@ const getOrderByIdForAdmin = async (req, res) => {
     }
 
     // Remove kpiBonusPercent from product objects
-    const orderObj = order.toObject();
-    orderObj.items = orderObj.items.map((item) => {
-      if (item.product) {
-        const productObj = item.product.toObject ? item.product.toObject() : item.product;
-        delete productObj.kpiBonusPercent;
-        return {
-          ...item,
-          product: productObj,
-        };
-      }
-      return item;
-    });
+    const ordersWithoutKpi = removeKpiFromOrders([order]);
+    const orderObj = ordersWithoutKpi[0];
 
     res.status(200).json({
       success: true,
@@ -996,6 +1109,7 @@ const getMarketplaceOrdersForAdmin = async (req, res) => {
 
     const filter = {
       status: { $ne: 'cancelled' }, // Cancelled buyurtmalar kiritilmaydi
+      confirmedByPunkt: null, // Punkt qabul qilmagan buyurtmalar
     };
 
     // Additional filters
@@ -1030,76 +1144,17 @@ const getMarketplaceOrdersForAdmin = async (req, res) => {
     // Get total count
     const total = await Order.countDocuments(filter);
 
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(filter);
+
     // Get orders with pagination and full population
-    const orders = await Order.find(filter)
-      .populate({
-        path: 'user',
-        select: 'firstName lastName phone viloyat tuman mfy status',
-        populate: [
-          { path: 'viloyat', select: 'name type code' },
-          { path: 'tuman', select: 'name type code' },
-          { path: 'mfy', select: 'name type code' },
-        ],
-      })
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          { path: 'category', select: 'name slug status' },
-          { path: 'subcategory', select: 'name slug status' },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-          {
-            path: 'deliveryRegions.viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'deliveryRegions.tuman',
-            select: 'name type code',
-          },
-        ],
-      })
-      .populate([
-        { path: 'deliveryViloyat', select: 'name type code' },
-        { path: 'deliveryTuman', select: 'name type code' },
-        { path: 'deliveryMfy', select: 'name type code' },
-        { path: 'confirmedByPunkt', select: 'name phone viloyat tuman' },
-        { path: 'assignedToAgent', select: 'name phone viloyat tuman mfy' },
-        { path: 'assignedByPunkt', select: 'name phone viloyat tuman' },
-        { path: 'punktRequests.punktId', select: 'name phone viloyat tuman' },
-        { path: 'contragentRequests.contragentId', select: 'name inn phone viloyat tuman mfy' },
-        { path: 'punktToPunktRequests.fromPunktId', select: 'name phone viloyat tuman' },
-        { path: 'punktToPunktRequests.toPunktId', select: 'name phone viloyat tuman' },
-        { path: 'currentPunkt', select: 'name phone viloyat tuman' },
-        { path: 'confirmedByAgent', select: 'name phone viloyat tuman mfy' },
-      ])
+    const orders = await populateOrderDetails(Order.find(filter))
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
     // Remove kpiBonusPercent from product objects
-    const ordersWithoutKpi = orders.map((order) => {
-      const orderObj = order.toObject();
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product) {
-          const productObj = item.product.toObject ? item.product.toObject() : item.product;
-          delete productObj.kpiBonusPercent;
-          return {
-            ...item,
-            product: productObj,
-          };
-        }
-        return item;
-      });
-      return orderObj;
-    });
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
       success: true,
@@ -1108,6 +1163,14 @@ const getMarketplaceOrdersForAdmin = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
       data: ordersWithoutKpi,
     });
   } catch (error) {
@@ -1158,41 +1221,11 @@ const getOrdersDeliveredToPunktForAdmin = async (req, res) => {
     // Get total count
     const total = await Order.countDocuments(filter);
 
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(filter);
+
     // Get orders
-    const orders = await Order.find(filter)
-      .populate({
-        path: 'user',
-        select: 'firstName lastName phone viloyat tuman mfy status',
-        populate: [
-          { path: 'viloyat', select: 'name type code' },
-          { path: 'tuman', select: 'name type code' },
-          { path: 'mfy', select: 'name type code' },
-        ],
-      })
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          { path: 'category', select: 'name slug status' },
-          { path: 'subcategory', select: 'name slug status' },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-        ],
-      })
-      .populate([
-        { path: 'deliveryViloyat', select: 'name type code' },
-        { path: 'deliveryTuman', select: 'name type code' },
-        { path: 'deliveryMfy', select: 'name type code' },
-        { path: 'currentPunkt', select: 'name phone viloyat tuman' },
-        { path: 'contragentRequests.contragentId', select: 'name inn phone viloyat tuman mfy' },
-      ])
+    const orders = await populateOrderDetails(Order.find(filter))
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -1203,29 +1236,220 @@ const getOrdersDeliveredToPunktForAdmin = async (req, res) => {
       orderObj.contragentRequests = orderObj.contragentRequests.filter(
         (req) => req.status === 'delivered_to_punkt'
       );
-      // Remove kpiBonusPercent
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product) {
-          const productObj = item.product.toObject ? item.product.toObject() : item.product;
-          delete productObj.kpiBonusPercent;
-          return { ...item, product: productObj };
-        }
-        return item;
-      });
       return orderObj;
     });
 
+    // Remove kpiBonusPercent
+    const ordersWithoutKpi = removeKpiFromOrders(formattedOrders);
+
     res.status(200).json({
       success: true,
-      count: formattedOrders.length,
+      count: ordersWithoutKpi.length,
       total,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
-      data: formattedOrders,
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
     });
   } catch (error) {
     console.error('Error fetching orders delivered to punkt:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get orders confirmed by punkt but nothing done yet (punkt qabul qilgan, lekin hech narsa qilinmagan)
+const getOrdersConfirmedByPunktForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    // Punkt qabul qilgan, lekin hech narsa qilinmagan buyurtmalar
+    // Shartlar:
+    // 1. confirmedByPunkt bor
+    // 2. contragentRequests bo'sh YOKI hammasi pending/rejected (hech biri accepted yoki delivered_to_punkt emas)
+    // 3. assignedToAgent null
+    const filter = {
+      confirmedByPunkt: { $ne: null },
+      assignedToAgent: null,
+    };
+    
+    // Contragent so'rovlari bo'sh yoki faqat pending/rejected bo'lishi kerak
+    // Bu MongoDB'da murakkab, shuning uchun keyinroq filter qilamiz
+
+    if (status) {
+      filter.status = status;
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) {
+        filter.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filter.createdAt.$lte = new Date(endDate);
+      }
+    }
+
+    // Pagination
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get all matching orders first (for filtering)
+    let allOrders = await Order.find(filter).lean();
+    
+    // Filter: contragentRequests bo'sh yoki hammasi pending/rejected
+    allOrders = allOrders.filter((order) => {
+      if (!order.contragentRequests || order.contragentRequests.length === 0) {
+        return true; // Hech qanday so'rov yo'q
+      }
+      // Hammasi pending yoki rejected bo'lishi kerak
+      return order.contragentRequests.every(
+        (req) => req.status === 'pending' || req.status === 'rejected'
+      );
+    });
+
+    const total = allOrders.length;
+    
+    // Get order IDs for statistics
+    const orderIds = allOrders.map(o => o._id);
+    const statistics = orderIds.length > 0 
+      ? await calculateOrderStatistics({ _id: { $in: orderIds } })
+      : await calculateOrderStatistics({ _id: { $in: [] } });
+
+    // Paginate filtered orders
+    const paginatedOrderIds = orderIds.slice(skip, skip + limitNum);
+
+    // Get orders with full details
+    const orders = await populateOrderDetails(Order.find({ _id: { $in: paginatedOrderIds } }))
+      .sort({ createdAt: -1 });
+
+    // Remove kpiBonusPercent
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching orders confirmed by punkt:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get orders requested to contragents (kontragentlarga yuborilgan)
+const getOrdersRequestedToContragentsForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = {
+      'contragentRequests.status': { $in: ['pending', 'accepted'] },
+    };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter['contragentRequests.requestedAt'] = {};
+      if (startDate) {
+        filter['contragentRequests.requestedAt'].$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filter['contragentRequests.requestedAt'].$lte = new Date(endDate);
+      }
+    }
+
+    // Pagination
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count
+    const total = await Order.countDocuments(filter);
+
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(filter);
+
+    // Get orders
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    // Filter and format contragentRequests
+    const formattedOrders = orders.map((order) => {
+      const orderObj = order.toObject();
+      orderObj.contragentRequests = orderObj.contragentRequests.filter(
+        (req) => req.status === 'pending' || req.status === 'accepted'
+      );
+      return orderObj;
+    });
+
+    // Remove kpiBonusPercent
+    const ordersWithoutKpi = removeKpiFromOrders(formattedOrders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching orders requested to contragents:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -1272,58 +1496,17 @@ const getOrdersAssignedToAgentsForAdmin = async (req, res) => {
     // Get total count
     const total = await Order.countDocuments(filter);
 
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(filter);
+
     // Get orders
-    const orders = await Order.find(filter)
-      .populate({
-        path: 'user',
-        select: 'firstName lastName phone viloyat tuman mfy status',
-        populate: [
-          { path: 'viloyat', select: 'name type code' },
-          { path: 'tuman', select: 'name type code' },
-          { path: 'mfy', select: 'name type code' },
-        ],
-      })
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          { path: 'category', select: 'name slug status' },
-          { path: 'subcategory', select: 'name slug status' },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-        ],
-      })
-      .populate([
-        { path: 'deliveryViloyat', select: 'name type code' },
-        { path: 'deliveryTuman', select: 'name type code' },
-        { path: 'deliveryMfy', select: 'name type code' },
-        { path: 'assignedToAgent', select: 'name phone viloyat tuman mfy' },
-        { path: 'assignedByPunkt', select: 'name phone viloyat tuman' },
-      ])
+    const orders = await populateOrderDetails(Order.find(filter))
       .sort({ assignedAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
     // Remove kpiBonusPercent
-    const ordersWithoutKpi = orders.map((order) => {
-      const orderObj = order.toObject();
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product) {
-          const productObj = item.product.toObject ? item.product.toObject() : item.product;
-          delete productObj.kpiBonusPercent;
-          return { ...item, product: productObj };
-        }
-        return item;
-      });
-      return orderObj;
-    });
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
       success: true,
@@ -1332,6 +1515,14 @@ const getOrdersAssignedToAgentsForAdmin = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
       data: ordersWithoutKpi,
     });
   } catch (error) {
@@ -1382,58 +1573,17 @@ const getOrdersConfirmedByAgentsForAdmin = async (req, res) => {
     // Get total count
     const total = await Order.countDocuments(filter);
 
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(filter);
+
     // Get orders
-    const orders = await Order.find(filter)
-      .populate({
-        path: 'user',
-        select: 'firstName lastName phone viloyat tuman mfy status',
-        populate: [
-          { path: 'viloyat', select: 'name type code' },
-          { path: 'tuman', select: 'name type code' },
-          { path: 'mfy', select: 'name type code' },
-        ],
-      })
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          { path: 'category', select: 'name slug status' },
-          { path: 'subcategory', select: 'name slug status' },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-        ],
-      })
-      .populate([
-        { path: 'deliveryViloyat', select: 'name type code' },
-        { path: 'deliveryTuman', select: 'name type code' },
-        { path: 'deliveryMfy', select: 'name type code' },
-        { path: 'confirmedByAgent', select: 'name phone viloyat tuman mfy' },
-        { path: 'assignedByPunkt', select: 'name phone viloyat tuman' },
-      ])
+    const orders = await populateOrderDetails(Order.find(filter))
       .sort({ agentConfirmedAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
     // Remove kpiBonusPercent
-    const ordersWithoutKpi = orders.map((order) => {
-      const orderObj = order.toObject();
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product) {
-          const productObj = item.product.toObject ? item.product.toObject() : item.product;
-          delete productObj.kpiBonusPercent;
-          return { ...item, product: productObj };
-        }
-        return item;
-      });
-      return orderObj;
-    });
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
       success: true,
@@ -1442,6 +1592,14 @@ const getOrdersConfirmedByAgentsForAdmin = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
       data: ordersWithoutKpi,
     });
   } catch (error) {
@@ -1492,58 +1650,17 @@ const getOrdersConfirmedByCustomersForAdmin = async (req, res) => {
     // Get total count
     const total = await Order.countDocuments(filter);
 
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(filter);
+
     // Get orders
-    const orders = await Order.find(filter)
-      .populate({
-        path: 'user',
-        select: 'firstName lastName phone viloyat tuman mfy status',
-        populate: [
-          { path: 'viloyat', select: 'name type code' },
-          { path: 'tuman', select: 'name type code' },
-          { path: 'mfy', select: 'name type code' },
-        ],
-      })
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          { path: 'category', select: 'name slug status' },
-          { path: 'subcategory', select: 'name slug status' },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-        ],
-      })
-      .populate([
-        { path: 'deliveryViloyat', select: 'name type code' },
-        { path: 'deliveryTuman', select: 'name type code' },
-        { path: 'deliveryMfy', select: 'name type code' },
-        { path: 'confirmedByAgent', select: 'name phone viloyat tuman mfy' },
-        { path: 'assignedByPunkt', select: 'name phone viloyat tuman' },
-      ])
+    const orders = await populateOrderDetails(Order.find(filter))
       .sort({ customerConfirmedAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
     // Remove kpiBonusPercent
-    const ordersWithoutKpi = orders.map((order) => {
-      const orderObj = order.toObject();
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product) {
-          const productObj = item.product.toObject ? item.product.toObject() : item.product;
-          delete productObj.kpiBonusPercent;
-          return { ...item, product: productObj };
-        }
-        return item;
-      });
-      return orderObj;
-    });
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
       success: true,
@@ -1552,6 +1669,14 @@ const getOrdersConfirmedByCustomersForAdmin = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
       data: ordersWithoutKpi,
     });
   } catch (error) {
@@ -1597,56 +1722,17 @@ const getCancelledOrdersForAdmin = async (req, res) => {
     // Get total count
     const total = await Order.countDocuments(filter);
 
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(filter);
+
     // Get orders
-    const orders = await Order.find(filter)
-      .populate({
-        path: 'user',
-        select: 'firstName lastName phone viloyat tuman mfy status',
-        populate: [
-          { path: 'viloyat', select: 'name type code' },
-          { path: 'tuman', select: 'name type code' },
-          { path: 'mfy', select: 'name type code' },
-        ],
-      })
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          { path: 'category', select: 'name slug status' },
-          { path: 'subcategory', select: 'name slug status' },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-        ],
-      })
-      .populate([
-        { path: 'deliveryViloyat', select: 'name type code' },
-        { path: 'deliveryTuman', select: 'name type code' },
-        { path: 'deliveryMfy', select: 'name type code' },
-      ])
+    const orders = await populateOrderDetails(Order.find(filter))
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
     // Remove kpiBonusPercent
-    const ordersWithoutKpi = orders.map((order) => {
-      const orderObj = order.toObject();
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product) {
-          const productObj = item.product.toObject ? item.product.toObject() : item.product;
-          delete productObj.kpiBonusPercent;
-          return { ...item, product: productObj };
-        }
-        return item;
-      });
-      return orderObj;
-    });
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
       success: true,
@@ -1761,183 +1847,11 @@ const getSalesStatsByViloyats = async (req, res) => {
   }
 };
 
-// Get sales statistics by tumans (optionally filtered by viloyat)
-const getSalesStatsByTumans = async (req, res) => {
-  try {
-    const { viloyatId, startDate, endDate, status } = req.query;
-
-    const matchFilter = {};
-    
-    if (status) {
-      matchFilter.status = status;
-    } else {
-      matchFilter.status = 'confirmed_by_customer';
-    }
-
-    if (viloyatId) {
-      matchFilter.deliveryViloyat = new mongoose.Types.ObjectId(viloyatId);
-    }
-
-    const dateFilter = parseDateRangeForStats(startDate, endDate);
-    if (dateFilter.createdAt) matchFilter.createdAt = dateFilter.createdAt;
-
-    const stats = await Order.aggregate([
-      { $match: matchFilter },
-      {
-        $group: {
-          _id: { viloyat: '$deliveryViloyat', tuman: '$deliveryTuman' },
-          totalOrders: { $sum: 1 },
-          totalRevenue: { $sum: '$totalPrice' },
-          totalItems: { $sum: { $size: '$items' } },
-          avgOrderValue: { $avg: '$totalPrice' },
-        },
-      },
-      { $sort: { totalRevenue: -1 } },
-    ]);
-
-    // Populate region names
-    const viloyatIds = [...new Set(stats.map((s) => s._id.viloyat).filter(Boolean))];
-    const tumanIds = [...new Set(stats.map((s) => s._id.tuman).filter(Boolean))];
-    
-    const [viloyats, tumans] = await Promise.all([
-      Region.find({ _id: { $in: viloyatIds } }).select('name code'),
-      Region.find({ _id: { $in: tumanIds } }).select('name code parent'),
-    ]);
-
-    const viloyatMap = {};
-    viloyats.forEach((v) => { viloyatMap[v._id.toString()] = v; });
-    const tumanMap = {};
-    tumans.forEach((t) => { tumanMap[t._id.toString()] = t; });
-
-    const result = stats.map((stat) => ({
-      viloyat: stat._id.viloyat ? viloyatMap[stat._id.viloyat.toString()] || { _id: stat._id.viloyat } : null,
-      tuman: stat._id.tuman ? tumanMap[stat._id.tuman.toString()] || { _id: stat._id.tuman } : null,
-      totalOrders: stat.totalOrders,
-      totalRevenue: Math.round(stat.totalRevenue),
-      totalItems: stat.totalItems,
-      avgOrderValue: Math.round(stat.avgOrderValue),
-    }));
-
-    const totals = result.reduce(
-      (acc, curr) => ({
-        totalOrders: acc.totalOrders + curr.totalOrders,
-        totalRevenue: acc.totalRevenue + curr.totalRevenue,
-        totalItems: acc.totalItems + curr.totalItems,
-      }),
-      { totalOrders: 0, totalRevenue: 0, totalItems: 0 }
-    );
-
-    res.status(200).json({
-      success: true,
-      count: result.length,
-      totals,
-      data: result,
-    });
-  } catch (error) {
-    console.error('Error fetching sales stats by tumans:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Tumanlar bo\'yicha statistikani olishda xatolik',
-      error: error.message,
-    });
-  }
-};
-
-// Get sales statistics by MFYs (optionally filtered by viloyat/tuman)
-const getSalesStatsByMfys = async (req, res) => {
-  try {
-    const { viloyatId, tumanId, startDate, endDate, status } = req.query;
-
-    const matchFilter = {};
-    
-    if (status) {
-      matchFilter.status = status;
-    } else {
-      matchFilter.status = 'confirmed_by_customer';
-    }
-
-    if (viloyatId) {
-      matchFilter.deliveryViloyat = new mongoose.Types.ObjectId(viloyatId);
-    }
-    if (tumanId) {
-      matchFilter.deliveryTuman = new mongoose.Types.ObjectId(tumanId);
-    }
-
-    const dateFilter = parseDateRangeForStats(startDate, endDate);
-    if (dateFilter.createdAt) matchFilter.createdAt = dateFilter.createdAt;
-
-    const stats = await Order.aggregate([
-      { $match: matchFilter },
-      {
-        $group: {
-          _id: { viloyat: '$deliveryViloyat', tuman: '$deliveryTuman', mfy: '$deliveryMfy' },
-          totalOrders: { $sum: 1 },
-          totalRevenue: { $sum: '$totalPrice' },
-          totalItems: { $sum: { $size: '$items' } },
-          avgOrderValue: { $avg: '$totalPrice' },
-        },
-      },
-      { $sort: { totalRevenue: -1 } },
-    ]);
-
-    // Populate region names
-    const viloyatIds = [...new Set(stats.map((s) => s._id.viloyat).filter(Boolean))];
-    const tumanIds = [...new Set(stats.map((s) => s._id.tuman).filter(Boolean))];
-    const mfyIds = [...new Set(stats.map((s) => s._id.mfy).filter(Boolean))];
-    
-    const [viloyats, tumans, mfys] = await Promise.all([
-      Region.find({ _id: { $in: viloyatIds } }).select('name code'),
-      Region.find({ _id: { $in: tumanIds } }).select('name code'),
-      Region.find({ _id: { $in: mfyIds } }).select('name code'),
-    ]);
-
-    const viloyatMap = {};
-    viloyats.forEach((v) => { viloyatMap[v._id.toString()] = v; });
-    const tumanMap = {};
-    tumans.forEach((t) => { tumanMap[t._id.toString()] = t; });
-    const mfyMap = {};
-    mfys.forEach((m) => { mfyMap[m._id.toString()] = m; });
-
-    const result = stats.map((stat) => ({
-      viloyat: stat._id.viloyat ? viloyatMap[stat._id.viloyat.toString()] || { _id: stat._id.viloyat } : null,
-      tuman: stat._id.tuman ? tumanMap[stat._id.tuman.toString()] || { _id: stat._id.tuman } : null,
-      mfy: stat._id.mfy ? mfyMap[stat._id.mfy.toString()] || { _id: stat._id.mfy } : null,
-      totalOrders: stat.totalOrders,
-      totalRevenue: Math.round(stat.totalRevenue),
-      totalItems: stat.totalItems,
-      avgOrderValue: Math.round(stat.avgOrderValue),
-    }));
-
-    const totals = result.reduce(
-      (acc, curr) => ({
-        totalOrders: acc.totalOrders + curr.totalOrders,
-        totalRevenue: acc.totalRevenue + curr.totalRevenue,
-        totalItems: acc.totalItems + curr.totalItems,
-      }),
-      { totalOrders: 0, totalRevenue: 0, totalItems: 0 }
-    );
-
-    res.status(200).json({
-      success: true,
-      count: result.length,
-      totals,
-      data: result,
-    });
-  } catch (error) {
-    console.error('Error fetching sales stats by mfys:', error);
-    res.status(500).json({
-      success: false,
-      message: 'MFYlar bo\'yicha statistikani olishda xatolik',
-      error: error.message,
-    });
-  }
-};
-
-// Get detailed sales statistics for a specific viloyat
+// Get detailed sales statistics for a specific viloyat (returns tumans)
 const getSalesStatsByViloyatId = async (req, res) => {
   try {
     const { viloyatId } = req.params;
-    const { startDate, endDate, status, groupBy = 'tuman' } = req.query;
+    const { startDate, endDate, status } = req.query;
 
     const matchFilter = {
       deliveryViloyat: new mongoose.Types.ObjectId(viloyatId),
@@ -1955,47 +1869,33 @@ const getSalesStatsByViloyatId = async (req, res) => {
     // Get viloyat info
     const viloyat = await Region.findById(viloyatId).select('name code');
 
-    let groupField = '$deliveryTuman';
-    if (groupBy === 'mfy') groupField = '$deliveryMfy';
-    if (groupBy === 'day') groupField = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
-
     const stats = await Order.aggregate([
       { $match: matchFilter },
       {
         $group: {
-          _id: groupField,
+          _id: '$deliveryTuman',
           totalOrders: { $sum: 1 },
           totalRevenue: { $sum: '$totalPrice' },
           totalItems: { $sum: { $size: '$items' } },
           avgOrderValue: { $avg: '$totalPrice' },
         },
       },
-      { $sort: groupBy === 'day' ? { _id: 1 } : { totalRevenue: -1 } },
+      { $sort: { totalRevenue: -1 } },
     ]);
 
-    let result;
-    if (groupBy === 'day') {
-      result = stats.map((stat) => ({
-        date: stat._id,
-        totalOrders: stat.totalOrders,
-        totalRevenue: Math.round(stat.totalRevenue),
-        totalItems: stat.totalItems,
-        avgOrderValue: Math.round(stat.avgOrderValue),
-      }));
-    } else {
-      const regionIds = stats.map((s) => s._id).filter(Boolean);
-      const regions = await Region.find({ _id: { $in: regionIds } }).select('name code');
-      const regionMap = {};
-      regions.forEach((r) => { regionMap[r._id.toString()] = r; });
+    // Populate tuman names
+    const tumanIds = stats.map((s) => s._id).filter(Boolean);
+    const tumans = await Region.find({ _id: { $in: tumanIds } }).select('name code parent');
+    const tumanMap = {};
+    tumans.forEach((t) => { tumanMap[t._id.toString()] = t; });
 
-      result = stats.map((stat) => ({
-        [groupBy]: stat._id ? regionMap[stat._id.toString()] || { _id: stat._id } : null,
-        totalOrders: stat.totalOrders,
-        totalRevenue: Math.round(stat.totalRevenue),
-        totalItems: stat.totalItems,
-        avgOrderValue: Math.round(stat.avgOrderValue),
-      }));
-    }
+    const result = stats.map((stat) => ({
+      tuman: stat._id ? tumanMap[stat._id.toString()] || { _id: stat._id } : null,
+      totalOrders: stat.totalOrders,
+      totalRevenue: Math.round(stat.totalRevenue),
+      totalItems: stat.totalItems,
+      avgOrderValue: Math.round(stat.avgOrderValue),
+    }));
 
     const totals = result.reduce(
       (acc, curr) => ({
@@ -2009,7 +1909,6 @@ const getSalesStatsByViloyatId = async (req, res) => {
     res.status(200).json({
       success: true,
       viloyat,
-      groupBy,
       count: result.length,
       totals,
       data: result,
@@ -2024,11 +1923,11 @@ const getSalesStatsByViloyatId = async (req, res) => {
   }
 };
 
-// Get detailed sales statistics for a specific tuman
+// Get detailed sales statistics for a specific tuman (returns MFYs)
 const getSalesStatsByTumanId = async (req, res) => {
   try {
     const { tumanId } = req.params;
-    const { startDate, endDate, status, groupBy = 'mfy' } = req.query;
+    const { startDate, endDate, status } = req.query;
 
     const matchFilter = {
       deliveryTuman: new mongoose.Types.ObjectId(tumanId),
@@ -2046,46 +1945,33 @@ const getSalesStatsByTumanId = async (req, res) => {
     // Get tuman info with parent viloyat
     const tuman = await Region.findById(tumanId).select('name code parent').populate('parent', 'name code');
 
-    let groupField = '$deliveryMfy';
-    if (groupBy === 'day') groupField = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
-
     const stats = await Order.aggregate([
       { $match: matchFilter },
       {
         $group: {
-          _id: groupField,
+          _id: '$deliveryMfy',
           totalOrders: { $sum: 1 },
           totalRevenue: { $sum: '$totalPrice' },
           totalItems: { $sum: { $size: '$items' } },
           avgOrderValue: { $avg: '$totalPrice' },
         },
       },
-      { $sort: groupBy === 'day' ? { _id: 1 } : { totalRevenue: -1 } },
+      { $sort: { totalRevenue: -1 } },
     ]);
 
-    let result;
-    if (groupBy === 'day') {
-      result = stats.map((stat) => ({
-        date: stat._id,
-        totalOrders: stat.totalOrders,
-        totalRevenue: Math.round(stat.totalRevenue),
-        totalItems: stat.totalItems,
-        avgOrderValue: Math.round(stat.avgOrderValue),
-      }));
-    } else {
-      const mfyIds = stats.map((s) => s._id).filter(Boolean);
-      const mfys = await Region.find({ _id: { $in: mfyIds } }).select('name code');
-      const mfyMap = {};
-      mfys.forEach((m) => { mfyMap[m._id.toString()] = m; });
+    // Populate MFY names
+    const mfyIds = stats.map((s) => s._id).filter(Boolean);
+    const mfys = await Region.find({ _id: { $in: mfyIds } }).select('name code parent');
+    const mfyMap = {};
+    mfys.forEach((m) => { mfyMap[m._id.toString()] = m; });
 
-      result = stats.map((stat) => ({
-        mfy: stat._id ? mfyMap[stat._id.toString()] || { _id: stat._id } : null,
-        totalOrders: stat.totalOrders,
-        totalRevenue: Math.round(stat.totalRevenue),
-        totalItems: stat.totalItems,
-        avgOrderValue: Math.round(stat.avgOrderValue),
-      }));
-    }
+    const result = stats.map((stat) => ({
+      mfy: stat._id ? mfyMap[stat._id.toString()] || { _id: stat._id } : null,
+      totalOrders: stat.totalOrders,
+      totalRevenue: Math.round(stat.totalRevenue),
+      totalItems: stat.totalItems,
+      avgOrderValue: Math.round(stat.avgOrderValue),
+    }));
 
     const totals = result.reduce(
       (acc, curr) => ({
@@ -2099,7 +1985,6 @@ const getSalesStatsByTumanId = async (req, res) => {
     res.status(200).json({
       success: true,
       tuman,
-      groupBy,
       count: result.length,
       totals,
       data: result,
@@ -2114,11 +1999,11 @@ const getSalesStatsByTumanId = async (req, res) => {
   }
 };
 
-// Get detailed sales statistics for a specific MFY
+// Get detailed sales statistics for a specific MFY (returns daily breakdown)
 const getSalesStatsByMfyId = async (req, res) => {
   try {
     const { mfyId } = req.params;
-    const { startDate, endDate, status, groupBy = 'day' } = req.query;
+    const { startDate, endDate, status } = req.query;
 
     const matchFilter = {
       deliveryMfy: new mongoose.Types.ObjectId(mfyId),
@@ -2468,6 +2353,9 @@ const getAgentsInRegion = async (req, res) => {
       filter.status = status;
     }
 
+    // Only show non-deleted agents (include those without isDeleted field for backward compatibility)
+    filter.isDeleted = { $ne: true };
+
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
@@ -2523,6 +2411,9 @@ const getPunktsInRegion = async (req, res) => {
       filter.status = status;
     }
 
+    // Only show non-deleted punkts (include those without isDeleted field for backward compatibility)
+    filter.isDeleted = { $ne: true };
+
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
@@ -2555,6 +2446,287 @@ const getPunktsInRegion = async (req, res) => {
   }
 };
 
+// ==================== ARCHIVE API ====================
+
+// Get archived punkts (ishdan chiqib ketgan punktlar)
+const getArchivedPunkts = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, search, viloyat, tuman } = req.query;
+
+    const filter = {
+      isDeleted: true,
+    };
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (viloyat) {
+      filter.viloyat = viloyat;
+    }
+
+    if (tuman) {
+      filter.tuman = tuman;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Punkt.countDocuments(filter);
+
+    const punkts = await Punkt.find(filter)
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .select('-password')
+      .sort({ deletedAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    res.status(200).json({
+      success: true,
+      count: punkts.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      data: punkts,
+    });
+  } catch (error) {
+    console.error('Error fetching archived punkts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Arxiv punktlarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get archived agents (ishdan chiqib ketgan agentlar)
+const getArchivedAgents = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, search, viloyat, tuman, mfy, agentType } = req.query;
+
+    const filter = {
+      isDeleted: true,
+    };
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (viloyat) {
+      filter.viloyat = viloyat;
+    }
+
+    if (tuman) {
+      filter.tuman = tuman;
+    }
+
+    if (mfy) {
+      filter.mfy = mfy;
+    }
+
+    // Filter by agent type
+    if (agentType) {
+      if (agentType === 'viloyat') {
+        filter.tuman = null;
+        filter.mfy = null;
+      } else if (agentType === 'tuman') {
+        filter.tuman = { $ne: null };
+        filter.mfy = null;
+      } else if (agentType === 'mfy') {
+        filter.mfy = { $ne: null };
+      }
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Agent.countDocuments(filter);
+
+    const agents = await Agent.find(filter)
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code')
+      .select('-password')
+      .sort({ deletedAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    // Add agentType to each agent
+    const agentsWithType = agents.map((agent) => {
+      const agentObj = agent.toObject();
+      agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
+      return agentObj;
+    });
+
+    res.status(200).json({
+      success: true,
+      count: agentsWithType.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      data: agentsWithType,
+    });
+  } catch (error) {
+    console.error('Error fetching archived agents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Arxiv agentlarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get archived punkt with all their work (punktning barcha ishlari)
+const getArchivedPunktWithWork = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const punkt = await Punkt.findOne({ _id: id, isDeleted: true })
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .select('-password');
+
+    if (!punkt) {
+      return res.status(404).json({
+        success: false,
+        message: 'Arxiv punkt topilmadi',
+      });
+    }
+
+    const Order = require('../models/Order');
+
+    // Get all orders where this punkt was involved
+    const ordersFilter = {
+      $or: [
+        { confirmedByPunkt: punkt._id },
+        { currentPunkt: punkt._id },
+        { assignedByPunkt: punkt._id },
+        { 'punktToPunktRequests.fromPunktId': punkt._id },
+        { 'punktToPunktRequests.toPunktId': punkt._id },
+      ],
+    };
+
+    const totalOrders = await Order.countDocuments(ordersFilter);
+
+    // Get orders with full details
+    const orders = await populateOrderDetails(Order.find(ordersFilter))
+      .sort({ createdAt: -1 })
+      .limit(100); // Limit to 100 most recent orders
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(ordersFilter);
+
+    res.status(200).json({
+      success: true,
+      punkt,
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      orders: {
+        total: totalOrders,
+        count: ordersWithoutKpi.length,
+        data: ordersWithoutKpi,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching archived punkt with work:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Arxiv punkt ma\'lumotlarini olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get archived agent with all their work (agentning barcha ishlari)
+const getArchivedAgentWithWork = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const agent = await Agent.findOne({ _id: id, isDeleted: true })
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code')
+      .select('-password');
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Arxiv agent topilmadi',
+      });
+    }
+
+    // Add agentType
+    const agentObj = agent.toObject();
+    agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
+
+    const Order = require('../models/Order');
+
+    // Get all orders where this agent was involved
+    const ordersFilter = {
+      $or: [
+        { assignedToAgent: agent._id },
+        { confirmedByAgent: agent._id },
+      ],
+    };
+
+    const totalOrders = await Order.countDocuments(ordersFilter);
+
+    // Get orders with full details
+    const orders = await populateOrderDetails(Order.find(ordersFilter))
+      .sort({ createdAt: -1 })
+      .limit(100); // Limit to 100 most recent orders
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    // Calculate statistics
+    const statistics = await calculateOrderStatistics(ordersFilter);
+
+    res.status(200).json({
+      success: true,
+      agent: agentObj,
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      orders: {
+        total: totalOrders,
+        count: ordersWithoutKpi.length,
+        data: ordersWithoutKpi,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching archived agent with work:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Arxiv agent ma\'lumotlarini olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllCategoriesForAdmin,
   getAllSubcategoriesForAdmin,
@@ -2568,6 +2740,8 @@ module.exports = {
   getAllOrdersForAdmin,
   getOrderByIdForAdmin,
   getMarketplaceOrdersForAdmin,
+  getOrdersConfirmedByPunktForAdmin,
+  getOrdersRequestedToContragentsForAdmin,
   getOrdersDeliveredToPunktForAdmin,
   getOrdersAssignedToAgentsForAdmin,
   getAgentsInRegion,
@@ -2577,8 +2751,6 @@ module.exports = {
   getCancelledOrdersForAdmin,
   // Sales Statistics
   getSalesStatsByViloyats,
-  getSalesStatsByTumans,
-  getSalesStatsByMfys,
   getSalesStatsByViloyatId,
   getSalesStatsByTumanId,
   getSalesStatsByMfyId,
@@ -2586,5 +2758,10 @@ module.exports = {
   getAdminDashboardOverview,
   getAgentsInRegion,
   getPunktsInRegion,
+  // Archive API
+  getArchivedPunkts,
+  getArchivedAgents,
+  getArchivedPunktWithWork,
+  getArchivedAgentWithWork,
 };
 

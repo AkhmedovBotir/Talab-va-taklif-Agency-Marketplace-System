@@ -48,7 +48,7 @@ export default function NotificationsScreen() {
         setNotifications((prev) => [...prev, ...response.data]);
       }
 
-      setHasMore(response.pagination.page < response.pagination.pages);
+      setHasMore(response.page < response.totalPages);
     } catch (error: any) {
       console.error('Error loading notifications:', error);
     } finally {

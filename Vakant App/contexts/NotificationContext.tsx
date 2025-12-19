@@ -46,7 +46,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadUnreadCount();
-  }, [loadUnreadCount]);
+
+    // Har 1 sekunda unread count yangilash
+    if (isAuthenticated) {
+      const interval = setInterval(() => {
+        loadUnreadCount();
+      }, 1000);
+
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [loadUnreadCount, isAuthenticated]);
 
   const decrementUnread = useCallback((amount = 1) => {
     setUnreadCount((prev) => Math.max(0, prev - amount));

@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,6 +25,7 @@ export default function OrderDetailScreen() {
   const { punkt } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentSelection | null>(null);
@@ -31,21 +33,70 @@ export default function OrderDetailScreen() {
   const [selectedToPunkt, setSelectedToPunkt] = useState<PunktSelection | null>(null);
   const [requestToContragentModalVisible, setRequestToContragentModalVisible] = useState(false);
   const [selectedContragent, setSelectedContragent] = useState<Contragent | null>(null);
+  const [orderContragents, setOrderContragents] = useState<Contragent[]>([]);
+  const [loadingContragents, setLoadingContragents] = useState(false);
+  const [sendToPunktModalVisible, setSendToPunktModalVisible] = useState(false);
+  const [selectedSendToPunkt, setSelectedSendToPunkt] = useState<PunktSelection | null>(null);
 
   useEffect(() => {
     loadOrder();
   }, [id]);
 
-  const loadOrder = async () => {
+  const loadOrderContragents = useCallback(async () => {
+    if (!order || !id) return;
+    setLoadingContragents(true);
     try {
+      const response = await apiService.getOrderContragents(id);
+      setOrderContragents(response.data.contragents);
+    } catch (error: any) {
+      console.error('Error loading order contragents:', error);
+    } finally {
+      setLoadingContragents(false);
+    }
+  }, [order, id]);
+
+  useEffect(() => {
+    if (!order || !id || !punkt) return;
+    
+    const orderStatus = order.status;
+    const isConfirmedByPunkt = orderStatus === 'confirmed_by_punkt';
+    const isRequestedToContragent = orderStatus === 'requested_to_contragent';
+    const isAssignedToAgent = orderStatus === 'assigned_to_agent';
+    const isMyPunkt = punkt._id === order.confirmedByPunkt?._id;
+    
+    // Check if current punkt is this punkt
+    const currentPunktId = order.currentPunkt 
+      ? (typeof order.currentPunkt === 'object' ? order.currentPunkt._id : order.currentPunkt)
+      : null;
+    const isCurrentPunkt = punkt._id && currentPunktId ? punkt._id === currentPunktId : false;
+    
+    // Load contragents if this punkt is the current punkt (for Holat 3 - second punkt)
+    // or if this punkt confirmed the order (for Holat 1, 2 - first punkt)
+    if ((isConfirmedByPunkt || isRequestedToContragent) && (isMyPunkt || isCurrentPunkt) && !isAssignedToAgent) {
+      loadOrderContragents();
+    }
+  }, [order, id, punkt, loadOrderContragents]);
+
+  const loadOrder = async (showLoading = true) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
       const response = await apiService.getOrderById(id);
       setOrder(response.data);
+      console.log('order', response.data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Buyurtma yuklanmadi');
       router.back();
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadOrder(false);
   };
 
   const handleConfirm = () => {
@@ -139,17 +190,16 @@ export default function OrderDetailScreen() {
       return;
     }
 
-    console.log('=== Contragentga so\'rov yuborish ===');
-    console.log('Order ID:', id);
-    console.log('Selected Contragent:', selectedContragent);
-    console.log('Contragent ID:', selectedContragent._id);
-    console.log('Request Data:', { contragentId: selectedContragent._id });
-
     setActionLoading(true);
     try {
       const response = await apiService.requestToContragent(id, { contragentId: selectedContragent._id });
-      console.log('✅ Success Response:', response);
-      Alert.alert('Muvaffaqiyatli', 'Contragentga so\'rov yuborildi', [
+      
+      const productCount = selectedContragent.products?.length || 0;
+      const message = productCount > 0 
+        ? `Contragentga so'rov yuborildi. Faqat bu contragentga tegishli ${productCount} ta mahsulot so'raldi.`
+        : 'Contragentga so\'rov yuborildi';
+      
+      Alert.alert('Muvaffaqiyatli', message, [
         { text: 'OK', onPress: () => {
           setRequestToContragentModalVisible(false);
           setSelectedContragent(null);
@@ -157,9 +207,6 @@ export default function OrderDetailScreen() {
         }},
       ]);
     } catch (error: any) {
-      console.error('❌ Error Details:', error);
-      console.error('Error Message:', error.message);
-      console.error('Error Stack:', error.stack);
       Alert.alert('Xatolik', error.message || 'Contragentga so\'rov yuborishda xatolik');
     } finally {
       setActionLoading(false);
@@ -167,9 +214,41 @@ export default function OrderDetailScreen() {
   };
 
   const handleReceiveFromPunkt = () => {
+    if (!order) return;
+    
+    // Check if there's a pending request (will be auto-accepted)
+    const pendingRequest = order.punktToPunktRequests?.find(
+      (req) => {
+        const toPunktId = typeof req.toPunktId === 'object' ? req.toPunktId._id : req.toPunktId;
+        return toPunktId === punkt?._id && req.status === 'pending';
+      }
+    );
+    
+    const acceptedRequest = order.punktToPunktRequests?.find(
+      (req) => {
+        const toPunktId = typeof req.toPunktId === 'object' ? req.toPunktId._id : req.toPunktId;
+        return toPunktId === punkt?._id && req.status === 'accepted';
+      }
+    );
+    
+    const deliveredRequest = order.punktToPunktRequests?.find(
+      (req) => {
+        const toPunktId = typeof req.toPunktId === 'object' ? req.toPunktId._id : req.toPunktId;
+        return toPunktId === punkt?._id && req.status === 'delivered';
+      }
+    );
+
+    const message = pendingRequest
+      ? 'Punktdan buyurtmani qabul qilishni xohlaysizmi? So\'rov avtomatik qabul qilinadi va buyurtma tasdiqlanadi.'
+      : acceptedRequest
+      ? 'Punktdan buyurtmani qabul qilishni xohlaysizmi?'
+      : deliveredRequest
+      ? 'Punktdan yuborilgan buyurtmani qabul qilishni xohlaysizmi?'
+      : 'Punktdan buyurtmani qabul qilishni xohlaysizmi?';
+
     Alert.alert(
       'Qabul qilish',
-      'Punktdan buyurtmani qabul qilishni xohlaysizmi? Qabul qilingandan keyin avtomatik routing qilinadi.',
+      message,
       [
         { text: 'Bekor qilish', style: 'cancel' },
         {
@@ -178,22 +257,15 @@ export default function OrderDetailScreen() {
             setActionLoading(true);
             try {
               await apiService.receiveFromPunkt(id);
-              // Reload order to get updated status
               await loadOrder();
               
-              // Show success message
-              Alert.alert(
-                'Muvaffaqiyatli', 
-                'Buyurtma qabul qilindi. Avtomatik routing qilindi. Endi kontragentlarga so\'rov yuborilgan yoki siz qo\'lda routing qilishingiz mumkin.',
-                [
-                  { 
-                    text: 'OK', 
-                    onPress: () => {
-                      // Order will be reloaded and routing buttons will appear
-                    }
-                  }
-                ]
-              );
+              const successMessage = pendingRequest
+                ? 'So\'rov avtomatik qabul qilindi va buyurtma tasdiqlandi. Buyurtma qabul qilindi. Endi kontragentlarga so\'rov yuborishingiz mumkin.'
+                : deliveredRequest
+                ? 'Buyurtma qabul qilindi. Endi agentga yuborishingiz mumkin.'
+                : 'Buyurtma qabul qilindi. Endi kontragentlarga so\'rov yuborishingiz mumkin.';
+              
+              Alert.alert('Muvaffaqiyatli', successMessage);
             } catch (error: any) {
               Alert.alert('Xatolik', error.message || 'Qabul qilishda xatolik');
             } finally {
@@ -222,6 +294,58 @@ export default function OrderDetailScreen() {
               ]);
             } catch (error: any) {
               Alert.alert('Xatolik', error.message || 'Qabul qilishda xatolik');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSendToPunkt = () => {
+    // If there's an accepted request, pre-select the fromPunkt (the one who sent the request)
+    if (acceptedRequestToThisPunkt && typeof acceptedRequestToThisPunkt.fromPunktId === 'object') {
+      const fromPunkt = acceptedRequestToThisPunkt.fromPunktId;
+      // Convert to PunktSelection format
+      setSelectedSendToPunkt({
+        _id: fromPunkt._id,
+        name: fromPunkt.name,
+        phone: fromPunkt.phone,
+        viloyat: fromPunkt.viloyat,
+        tuman: fromPunkt.tuman,
+        status: 'active',
+      });
+    }
+    setSendToPunktModalVisible(true);
+  };
+
+  const submitSendToPunkt = async () => {
+    if (!selectedSendToPunkt) {
+      Alert.alert('Xatolik', 'Punktni tanlang');
+      return;
+    }
+
+    Alert.alert(
+      'Yuborish',
+      `${selectedSendToPunkt.name} punktiga buyurtmani yuborishni xohlaysizmi?`,
+      [
+        { text: 'Bekor qilish', style: 'cancel' },
+        {
+          text: 'Yuborish',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              await apiService.sendToPunkt(id, { toPunktId: selectedSendToPunkt._id });
+              Alert.alert('Muvaffaqiyatli', 'Buyurtma punktga yuborildi', [
+                { text: 'OK', onPress: () => {
+                  setSendToPunktModalVisible(false);
+                  setSelectedSendToPunkt(null);
+                  loadOrder();
+                }},
+              ]);
+            } catch (error: any) {
+              Alert.alert('Xatolik', error.message || 'Punktga yuborishda xatolik');
             } finally {
               setActionLoading(false);
             }
@@ -307,10 +431,18 @@ export default function OrderDetailScreen() {
   
   // Check if there's an accepted punkt-to-punkt request (can receive)
   const hasAcceptedPunktToPunktRequest = order.punktToPunktRequests?.some(
-    (req) =>
-      typeof req.toPunktId === 'object' &&
-      req.toPunktId._id === punkt?._id &&
-      req.status === 'accepted'
+    (req) => {
+      const toPunktId = typeof req.toPunktId === 'object' ? req.toPunktId._id : req.toPunktId;
+      return toPunktId === punkt?._id && req.status === 'accepted';
+    }
+  ) || false;
+  
+  // Check if there's a delivered punkt-to-punkt request to this punkt (can receive after sending)
+  const hasDeliveredPunktToPunktRequestToThisPunkt = order.punktToPunktRequests?.some(
+    (req) => {
+      const toPunktId = typeof req.toPunktId === 'object' ? req.toPunktId._id : req.toPunktId;
+      return toPunktId === punkt?._id && req.status === 'delivered';
+    }
   ) || false;
   
   // Check if contragent has accepted/delivered (can receive)
@@ -321,6 +453,30 @@ export default function OrderDetailScreen() {
     }
   ) || false;
   
+  // Check if there are contragents without requests (for continuing to request)
+  const requestedContragentIds = new Set(
+    order.contragentRequests?.map((req) => {
+      const contragentId = typeof req.contragentId === 'object' ? req.contragentId._id : req.contragentId;
+      return contragentId;
+    }) || []
+  );
+  
+  // If contragents list is not loaded yet, assume there might be unrequested ones
+  // If loaded, check if there are any without requests
+  const hasUnrequestedContragents = orderContragents.length === 0 
+    ? true // Show button if not loaded yet (will be checked after load)
+    : orderContragents.some(
+        (c) => !c.hasRequest || !requestedContragentIds.has(c._id)
+      );
+  
+  // Check if there are contragents from other tumans (need to request to punkt)
+  const punktTumanId = punkt?.tuman?._id;
+  const hasOtherTumanContragents = orderContragents.length === 0
+    ? true // Show button if not loaded yet (will be checked after load)
+    : orderContragents.some(
+        (c) => c.tuman?._id && c.tuman._id !== punktTumanId && (!c.hasRequest || !requestedContragentIds.has(c._id))
+      );
+  
   // Button visibility logic according to workflow:
   // Step 1: Respond to punkt request (if pending request to this punkt)
   const canRespondToPunktRequest = hasPendingPunktToPunktRequest;
@@ -328,39 +484,155 @@ export default function OrderDetailScreen() {
   // Step 2: Confirm order (if pending and this is the current punkt)
   const canConfirm = isPending && (isCurrentPunkt || !order.currentPunkt);
   
-  // Step 3: Request to contragent (if confirmed by this punkt and not yet requested/assigned)
+  // Step 3: Request to contragent (if confirmed by this punkt OR currentPunkt and not yet requested/assigned)
+  // According to API: allows if punkt is currentPunkt (even if not in region)
+  // Also allow if requested_to_contragent but there are still unrequested contragents
   const canRequestToContragent = 
-    isConfirmedByPunkt && 
-    isMyPunkt && 
+    (isMyPunkt || isCurrentPunkt) && 
     !isAssignedToAgent &&
-    !order.assignedToAgent;
+    !order.assignedToAgent &&
+    ((isConfirmedByPunkt || isRequestedToContragent || isCurrentPunkt) && hasUnrequestedContragents);
   
   // Step 4: Request to punkt (if confirmed by this punkt and not yet requested/assigned)
+  // Also allow if requested_to_contragent and there are contragents from other tumans
   const canRequestToPunkt = 
-    isConfirmedByPunkt && 
     isMyPunkt && 
     !isAssignedToAgent &&
-    !order.assignedToAgent;
+    !order.assignedToAgent &&
+    ((isConfirmedByPunkt || (isRequestedToContragent && hasOtherTumanContragents)));
   
-  // Step 5: Receive from contragent (if contragent has accepted/delivered and this punkt requested it)
+  // Check if there's an accepted punkt-to-punkt request where this punkt is the toPunkt (can send back to fromPunkt)
+  // This means B punkt received request from A punkt, accepted it, and now can send back to A punkt
+  // Also check for 'delivered' status in case the request was already processed but currentPunkt hasn't changed yet
+  const acceptedRequestToThisPunkt = order.punktToPunktRequests?.find(
+    (req) =>
+      typeof req.toPunktId === 'object' &&
+      req.toPunktId._id === punkt?._id &&
+      (req.status === 'accepted' || req.status === 'delivered')
+  );
+  
+  // Check if there's a delivered punkt-to-punkt request where this punkt is the fromPunkt (punkt already sent the order)
+  const hasDeliveredPunktToPunktRequest = order.punktToPunktRequests?.some(
+    (req) =>
+      typeof req.fromPunktId === 'object' &&
+      req.fromPunktId._id === punkt?._id &&
+      req.status === 'delivered'
+  ) || false;
+  
+  // Check if there's a delivered punkt-to-punkt request where this punkt is the toPunkt (punkt received the order)
+  // This is for Holat 3 - when Buloqboshi punkt receives from Asaka punkt
+  const hasReceivedFromPunktRequest = order.punktToPunktRequests?.some(
+    (req) => {
+      if (req.status !== 'delivered') return false;
+      const toPunktId = typeof req.toPunktId === 'object' && req.toPunktId !== null 
+        ? req.toPunktId._id 
+        : req.toPunktId;
+      const matches = toPunktId && punkt?._id && String(toPunktId) === String(punkt._id);
+      if (matches) {
+        console.log('Found received request:', { toPunktId, punktId: punkt._id, req });
+      }
+      return matches;
+    }
+  ) || false;
+  
+  // Step 5: Receive from contragent (if contragent has accepted/delivered and this punkt is currentPunkt)
+  // Workflow: Holat 1, 2 - o'z tumanidagi contragentdan qabul qilish
+  // Must show BEFORE "Assign to Agent" and "Send to Punkt" - only show if not yet delivered to punkt
   const canReceiveFromContragent = 
     (isAcceptedByContragent || hasAcceptedContragentRequest) &&
-    isMyPunkt &&
+    (isMyPunkt || isCurrentPunkt) &&
     !isDeliveredToPunkt &&
-    !isAssignedToAgent;
+    !isAssignedToAgent &&
+    !order.assignedToAgent &&
+    !hasDeliveredPunktToPunktRequest; // Don't show if already sent to another punkt
   
-  // Step 6: Receive from punkt (if there's an accepted punkt-to-punkt request to this punkt)
+  // Step 6: Receive from punkt (if there's a pending, accepted, or delivered punkt-to-punkt request to this punkt)
+  // Workflow: Holat 3 - boshqa punktdan qabul qilish (buyurtmachi tumani punkti)
+  // According to API: if pending, it will auto-accept and confirm; if accepted, just receive; if delivered, receive after sending
+  // Show receive button for accepted/delivered requests, or as alternative to accept/reject for pending
   const canReceiveFromPunkt = 
-    hasAcceptedPunktToPunktRequest &&
+    (hasPendingPunktToPunktRequest || hasAcceptedPunktToPunktRequest || hasDeliveredPunktToPunktRequestToThisPunkt) &&
     !isDeliveredToPunkt &&
-    !isAssignedToAgent;
+    !isAssignedToAgent &&
+    !order.assignedToAgent &&
+    !canReceiveFromContragent; // Don't show if can receive from contragent
+  
+  // Check if order is in this punkt's tuman (needed for canSendToPunkt and canAssignToAgent)
+  // Check both object and string ID formats
+  const orderTumanId = order.deliveryTuman?._id || order.deliveryTuman;
+  const punktTumanIdForOrder = punkt?.tuman?._id || punkt?.tuman;
+  const isOrderInPunktTuman = orderTumanId && punktTumanIdForOrder && 
+    orderTumanId === punktTumanIdForOrder;
+  
+  // Step 6.5: Send to punkt (if this punkt is currentPunkt, has received from contragent, and there's an accepted request)
+  // Workflow: Holat 3 - kontragent tumani punkti contragentdan qabul qilib, buyurtmachi tumani punktiga yuboradi
+  // According to API: B punkt can send to A punkt after receiving from contragent
+  // Conditions:
+  // 1. This punkt is currentPunkt (kontragent tumani punkti)
+  // 2. Order is delivered_to_punkt (contragentdan qabul qilingan)
+  // 3. There's an accepted request TO this punkt (from buyurtmachi tumani punkti)
+  // 4. This punkt hasn't already sent the order (hasDeliveredPunktToPunktRequest = false)
+  // 5. Order is NOT in this punkt's tuman (for Holat 3, this should be different tuman - kontragent tumani punkti)
+  // 6. Request status is 'accepted' (not 'delivered' - if delivered, it means already sent)
+  const canSendToPunkt = 
+    isCurrentPunkt &&
+    !isOrderInPunktTuman && // This punkt is not in the order's tuman (kontragent tumani punkti, not buyurtmachi tumani)
+    isDeliveredToPunkt &&
+    acceptedRequestToThisPunkt !== undefined &&
+    acceptedRequestToThisPunkt.status === 'accepted' && // Only show if request is accepted, not delivered
+    acceptedRequestToThisPunkt.fromPunktId !== undefined && // Ensure fromPunktId exists
+    !hasDeliveredPunktToPunktRequest && // Don't show if already sent
+    !isAssignedToAgent &&
+    !order.assignedToAgent &&
+    !canReceiveFromContragent && // Don't show if can receive from contragent
+    !canReceiveFromPunkt; // Don't show if can receive from punkt
   
   // Step 7: Assign to agent (if delivered to punkt and this punkt has it, and not yet assigned)
+  // Workflow: Holat 1, 2 - o'z tumanidagi buyurtmalar uchun agentga yuborish
+  // Holat 3 - faqat buyurtmachi tumani punkti uchun agentga yuborish (kontragent tumani punkti uchun emas)
+  // Must show AFTER "Receive from Contragent" or "Receive from Punkt" - only show if already delivered to punkt
+  // Only show if order is in this punkt's tuman (not for second punkt in Holat 3)
+  
+  // For Holat 3: Buloqboshi punkt can assign to agent if:
+  // 1. Order is in Buloqboshi tuman (isOrderInPunktTuman = true)
+  // 2. Has received from punkt (hasReceivedFromPunktRequest = true) OR is currentPunkt OR isMyPunkt
+  // For Holat 1, 2: O'z tumanidagi buyurtmalar uchun agentga yuborish
   const canAssignToAgent = 
     isDeliveredToPunkt &&
-    (isMyPunkt || isCurrentPunkt) &&
+    isOrderInPunktTuman && // Only show if order is in this punkt's tuman (buyurtmachi tumani punkti)
+    (isMyPunkt || isCurrentPunkt || hasReceivedFromPunktRequest) && // Allow if punkt received from another punkt (Holat 3)
     !isAssignedToAgent &&
-    !order.assignedToAgent;
+    !order.assignedToAgent &&
+    !canReceiveFromContragent && // Ensure this only shows when receive from contragent is not available
+    !canReceiveFromPunkt && // Ensure this only shows when receive from punkt is not available (pending/accepted only, not delivered)
+    !canSendToPunkt; // Ensure this only shows when send to punkt is not available (only for second punkt)
+  
+  // Debug: Log button visibility for troubleshooting
+  if (order && punkt) {
+    const currentPunktId = order.currentPunkt 
+      ? (typeof order.currentPunkt === 'object' ? order.currentPunkt._id : order.currentPunkt)
+      : null;
+    console.log('Button visibility debug:', {
+      isDeliveredToPunkt,
+      isOrderInPunktTuman,
+      isMyPunkt,
+      isCurrentPunkt,
+      hasReceivedFromPunktRequest,
+      canReceiveFromContragent,
+      canReceiveFromPunkt,
+      canSendToPunkt,
+      canAssignToAgent,
+      orderTumanId,
+      punktTumanIdForOrder,
+      punktId: punkt._id,
+      currentPunktId,
+      punktToPunktRequests: order.punktToPunktRequests?.map(req => ({
+        status: req.status,
+        toPunktId: typeof req.toPunktId === 'object' ? req.toPunktId._id : req.toPunktId,
+        fromPunktId: typeof req.fromPunktId === 'object' ? req.fromPunktId._id : req.fromPunktId,
+      })),
+    });
+  }
 
   return (
     <View style={styles.container}>
@@ -371,7 +643,12 @@ export default function OrderDetailScreen() {
         <Text style={styles.topHeaderTitle}>Buyurtma tafsilotlari</Text>
         <View style={styles.placeholder} />
       </View>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.orderNumber}>#{order.orderNumber}</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
@@ -591,10 +868,11 @@ export default function OrderDetailScreen() {
 
       <View style={styles.actions}>
         {/* Step 1: Respond to punkt request (if pending request to this punkt) */}
-        {canRespondToPunktRequest && (
+        {/* According to API: Can either accept/reject OR receive (which auto-accepts) */}
+        {canRespondToPunktRequest && hasPendingPunktToPunktRequest && (
           <>
             <Button
-              title="Qabul qilish"
+              title="Qabul qilish va tasdiqlash"
               onPress={() => handleRespondToPunktRequest('accepted')}
               variant="secondary"
               loading={actionLoading}
@@ -644,6 +922,7 @@ export default function OrderDetailScreen() {
         )}
 
         {/* Step 5: Receive from contragent (if contragent has accepted/delivered) */}
+        {/* Workflow: Holat 1, 2 - o'z tumanidagi contragentdan qabul qilish */}
         {canReceiveFromContragent && (
           <Button
             title="Contragentdan qabul qilish"
@@ -654,12 +933,37 @@ export default function OrderDetailScreen() {
           />
         )}
 
-        {/* Step 6: Receive from punkt (if there's an accepted punkt-to-punkt request) */}
-        {canReceiveFromPunkt && (
+        {/* Step 5.5: Send to punkt (if this punkt received from contragent and needs to send to customer's district punkt) */}
+        {/* Workflow: Holat 3 - kontragent tumani punkti contragentdan qabul qilib, buyurtmachi tumani punktiga yuboradi */}
+        {canSendToPunkt && (
           <Button
-            title="Punktdan qabul qilish"
+            title="Boshqa punktga yuborish"
+            onPress={handleSendToPunkt}
+            variant="secondary"
+            loading={actionLoading}
+            style={styles.actionButton}
+          />
+        )}
+
+        {/* Step 6: Receive from punkt (if there's a pending or accepted punkt-to-punkt request) */}
+        {/* Workflow: Holat 3 - buyurtmachi tumani punkti boshqa punktdan qabul qiladi */}
+        {/* For pending: Receive auto-accepts and confirms. For accepted: just receives */}
+        {canReceiveFromPunkt && !canRespondToPunktRequest && (
+          <Button
+            title={hasPendingPunktToPunktRequest ? "Punktdan qabul qilish (avtomatik qabul va tasdiqlash)" : "Punktdan qabul qilish"}
             onPress={handleReceiveFromPunkt}
             variant="secondary"
+            loading={actionLoading}
+            style={styles.actionButton}
+          />
+        )}
+        
+        {/* Alternative: Receive directly from pending (auto-accepts) - shown alongside accept/reject */}
+        {canReceiveFromPunkt && canRespondToPunktRequest && hasPendingPunktToPunktRequest && (
+          <Button
+            title="Yoki to'g'ridan-to'g'ri qabul qilish (avtomatik qabul)"
+            onPress={handleReceiveFromPunkt}
+            variant="outline"
             loading={actionLoading}
             style={styles.actionButton}
           />
@@ -682,6 +986,7 @@ export default function OrderDetailScreen() {
          !canRequestToContragent && 
          !canRequestToPunkt && 
          !canReceiveFromContragent && 
+         !canSendToPunkt &&
          !canReceiveFromPunkt && 
          !canAssignToAgent && (
           <View style={styles.noActionsContainer}>
@@ -787,6 +1092,7 @@ export default function OrderDetailScreen() {
                 viloyatId={order?.deliveryViloyat._id}
                 tumanId={order?.deliveryTuman?._id}
                 orderItems={order?.items}
+                currentPunktTumanId={punkt?.tuman?._id}
               />
               {selectedToPunkt && (
                 <View style={styles.selectedPunktInfo}>
@@ -865,9 +1171,19 @@ export default function OrderDetailScreen() {
                     </Text>
                   )}
                   {selectedContragent.products && selectedContragent.products.length > 0 && (
-                    <Text style={styles.selectedPunktDetails}>
-                      {selectedContragent.products.length} ta mahsulot
-                    </Text>
+                    <View style={styles.productsContainer}>
+                      <Text style={styles.productsLabel}>
+                        Bu contragentdan so'raladigan mahsulotlar ({selectedContragent.products.length} ta):
+                      </Text>
+                      {selectedContragent.products.map((product, index) => (
+                        <View key={product._id || index} style={styles.productItem}>
+                          <Text style={styles.productName}>• {product.name}</Text>
+                          <Text style={styles.productDetails}>
+                            Miqdor: {product.quantity} ta • Narx: {product.price.toLocaleString()} so'm
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
                   )}
                   {selectedContragent.hasRequest && selectedContragent.requestStatus && (
                     <Text style={styles.selectedPunktDetails}>
@@ -893,6 +1209,68 @@ export default function OrderDetailScreen() {
                 onPress={submitRequestToContragent}
                 loading={actionLoading}
                 disabled={!selectedContragent}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={sendToPunktModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSendToPunktModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Punktga yuborish</Text>
+              <TouchableOpacity onPress={() => {
+                setSendToPunktModalVisible(false);
+                setSelectedSendToPunkt(null);
+              }}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalLabel}>Punktni tanlang</Text>
+              <PunktPicker
+                selectedPunkt={selectedSendToPunkt}
+                onSelect={setSelectedSendToPunkt}
+                viloyatId={order?.deliveryViloyat._id}
+                tumanId={order?.deliveryTuman?._id}
+                orderItems={order?.items}
+                currentPunktTumanId={punkt?.tuman?._id}
+              />
+              {selectedSendToPunkt && (
+                <View style={styles.selectedPunktInfo}>
+                  <Text style={styles.selectedPunktLabel}>Tanlangan punkt:</Text>
+                  <Text style={styles.selectedPunktName}>{selectedSendToPunkt.name}</Text>
+                  <Text style={styles.selectedPunktDetails}>
+                    {selectedSendToPunkt.phone} • {selectedSendToPunkt.viloyat.name}
+                    {selectedSendToPunkt.tuman && `, ${selectedSendToPunkt.tuman.name}`}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.modalFooter}>
+              <Button
+                title="Bekor qilish"
+                onPress={() => {
+                  setSendToPunktModalVisible(false);
+                  setSelectedSendToPunkt(null);
+                }}
+                variant="outline"
+                style={styles.modalButton}
+              />
+              <Button
+                title="Yuborish"
+                onPress={submitSendToPunkt}
+                loading={actionLoading}
+                disabled={!selectedSendToPunkt}
                 style={styles.modalButton}
               />
             </View>
@@ -1196,6 +1574,33 @@ const styles = StyleSheet.create({
   selectedPunktDetails: {
     fontSize: 14,
     color: '#666',
+  },
+  productsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  productsLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginBottom: 8,
+  },
+  productItem: {
+    marginBottom: 8,
+    paddingLeft: 8,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 2,
+  },
+  productDetails: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 16,
   },
   noActionsContainer: {
     padding: 16,

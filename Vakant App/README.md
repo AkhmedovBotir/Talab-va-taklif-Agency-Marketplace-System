@@ -1,50 +1,199 @@
-# Welcome to your Expo app 👋
+# Vakant - Vakansiya Ilovasi
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Vakant - bu O'zbekistondagi vakansiyalarni ko'rish, ariza yuborish va boshqarish uchun mo'ljallangan mobil ilova. Ilova React Native va Expo texnologiyalari asosida qurilgan.
 
-## Get started
+## 📱 Asosiy Xususiyatlar
 
-1. Install dependencies
+- **Vakansiyalar**: Barcha mavjud vakansiyalarni ko'rish, qidirish va filtrlash
+- **Ariza Yuborish**: Vakansiyaga ariza yuborish va ariza holatini kuzatish
+- **Profil Boshqaruvi**: Shaxsiy ma'lumotlarni yangilash, avatar o'rnatish, manzilni sozlash
+- **Bildirishnomalar**: Real-time bildirishnomalar va avtomatik yangilanish (har 1 sekunda)
+- **Bookmarklar**: Qiziqarli vakansiyalarni saqlash
+- **Autentifikatsiya**: Telefon raqami orqali ro'yxatdan o'tish va kirish
+- **Ariza Holati**: Arizalaringizning holatini kuzatish (pending, reviewed, accepted, rejected)
 
-   ```bash
-   npm install
-   ```
+## 🛠 Texnologiyalar
 
-2. Start the app
+- **React Native** 0.81.5
+- **Expo** ~54.0.26
+- **TypeScript** 5.9.2
+- **Expo Router** ~6.0.16 (file-based routing)
+- **React Navigation** 7.x
+- **AsyncStorage** - ma'lumotlarni saqlash uchun
+- **React Native Image Picker** - rasm tanlash uchun
 
-   ```bash
-   npx expo start
-   ```
+## 📋 Talablar
 
-In the output, you'll find options to open the app in a
+- Node.js (v18 yoki yuqori)
+- npm yoki yarn
+- Expo CLI
+- Android Studio (Android uchun)
+- Xcode (iOS uchun, faqat macOS)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 🚀 O'rnatish va Ishga Tushirish
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### 1. Dependencies o'rnatish
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Ilovani ishga tushirish
 
-## Learn more
+```bash
+# Development server
+npm start
 
-To learn more about developing your project with Expo, look at the following resources:
+# Android uchun
+npm run android
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# iOS uchun
+npm run ios
 
-## Join the community
+# Web uchun
+npm run web
+```
 
-Join our community of developers creating universal apps.
+### 3. API konfiguratsiyasi
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+`constants/config.ts` faylida API URL ni o'zgartiring:
+
+```typescript
+export const API_BASE_URL = 'http://your-api-url:5000';
+```
+
+## 📁 Proyekt Strukturasi
+
+```
+vakant/
+├── app/                    # Expo Router fayllari
+│   ├── (tabs)/            # Tab navigation ekranlari
+│   │   ├── vacancies/     # Vakansiyalar
+│   │   ├── applications/  # Arizalar
+│   │   ├── bookmarks/     # Bookmarklar
+│   │   ├── notifications/ # Bildirishnomalar
+│   │   └── index.tsx      # Profil ekrani
+│   ├── auth/              # Autentifikatsiya ekranlari
+│   │   ├── login/         # Kirish
+│   │   ├── register/      # Ro'yxatdan o'tish
+│   │   └── forgot-password/ # Parolni tiklash
+│   └── _layout.tsx        # Root layout
+├── components/            # Qayta ishlatiladigan komponentlar
+│   ├── Button.tsx
+│   ├── Input.tsx
+│   ├── DatePicker.tsx
+│   ├── RegionPicker.tsx
+│   └── ...
+├── contexts/              # React Context API
+│   ├── AuthContext.tsx    # Autentifikatsiya konteksti
+│   └── NotificationContext.tsx # Bildirishnomalar konteksti
+├── services/              # API xizmatlari
+│   ├── api.ts             # Asosiy API funksiyalari
+│   ├── vacancyApi.ts      # Vakansiya API
+│   ├── profileApi.ts      # Profil API
+│   └── notificationApi.ts # Bildirishnomalar API
+├── constants/             # Konstanta qiymatlar
+│   └── config.ts          # API URL va boshqa sozlamalar
+├── utils/                 # Yordamchi funksiyalar
+│   └── authUtils.ts       # Autentifikatsiya yordamchi funksiyalari
+└── assets/                # Rasmlar va boshqa resurslar
+```
+
+## 🔑 Asosiy Funksiyalar
+
+### Autentifikatsiya
+- Telefon raqami orqali ro'yxatdan o'tish
+- SMS kod orqali tasdiqlash
+- JWT token asosida autentifikatsiya
+- Avtomatik token yangilanish
+
+### Vakansiyalar
+- Vakansiyalarni ko'rish va qidirish
+- Vakansiya tafsilotlarini ko'rish
+- Arizalar yuborish (savollar bilan)
+- Bookmark qo'shish/olib tashlash
+
+### Profil
+- Shaxsiy ma'lumotlarni yangilash
+- Avatar yuklash (react-native-image-picker)
+- Manzilni sozlash (Viloyat, Tuman, MFY)
+- Parolni o'zgartirish
+
+### Bildirishnomalar
+- Real-time bildirishnomalar
+- Avtomatik yangilanish (har 1 sekunda)
+- O'qilmagan xabarlar soni
+- Barcha xabarlarni o'qilgan deb belgilash
+
+## 📱 Platformalar
+
+- ✅ Android
+- ✅ iOS
+- ✅ Web
+
+## 🔧 Sozlamalar
+
+### Android Permissions
+Ilova quyidagi ruxsatlarni talab qiladi:
+- `READ_MEDIA_IMAGES` - Rasm tanlash uchun
+- `CAMERA` - Kamera orqali rasm olish uchun
+
+### iOS Permissions
+- `NSPhotoLibraryUsageDescription` - Rasm tanlash uchun
+- `NSCameraUsageDescription` - Kamera orqali rasm olish uchun
+
+## 🧪 Development
+
+### Linting
+```bash
+npm run lint
+```
+
+### TypeScript tekshirish
+```bash
+npx tsc --noEmit
+```
+
+## 📦 Build
+
+### Android APK
+```bash
+npm run android
+```
+
+### iOS Build
+```bash
+npm run ios
+```
+
+## 🔐 Xavfsizlik
+
+- JWT token asosida autentifikatsiya
+- Token AsyncStorage da xavfsiz saqlanadi
+- Avtomatik token yangilanish
+- Unauthorized holatlar avtomatik boshqariladi
+
+## 📝 API Endpoints
+
+Ilova quyidagi API endpointlar bilan ishlaydi:
+
+- `/api/vacancy-auth` - Autentifikatsiya
+- `/api/vacancy` - Vakansiyalar va arizalar
+- `/api/vacancy-profile` - Profil ma'lumotlari
+- `/api/vacancy/notifications` - Bildirishnomalar
+
+## 🤝 Yordam
+
+Muammo yoki savol bo'lsa, iltimos issue oching yoki rivojlantiruvchilar bilan bog'laning.
+
+## 📄 Litsenziya
+
+Bu proyekt private litsenziya ostida.
+
+## 👨‍💻 Rivojlantiruvchi
+
+Proyekt O'zbekiston vakansiya tizimi uchun ishlab chiqilgan.
+
+---
+
+**Eslatma**: Ilovani ishga tushirishdan oldin, `constants/config.ts` faylida API URL ni to'g'ri sozlang.

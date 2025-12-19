@@ -6,7 +6,7 @@ import OrderTable from '../../components/Orders/OrderTable';
 import ViewOrderModal from '../../components/Orders/ViewOrderModal';
 import { Clear } from '@mui/icons-material';
 
-const ConfirmedByCustomersOrders = () => {
+const ConfirmedByCustomersOrders = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -99,16 +99,18 @@ const ConfirmedByCustomersOrders = () => {
 
   return (
     <div>
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Foydalanuvchi Qabul Qilgan Buyurtmalar</h1>
-          <p className="text-gray-600">Mijozlar tomonidan qabul qilingan va tasdiqlangan buyurtmalar</p>
-        </div>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Foydalanuvchi Qabul Qilgan Buyurtmalar</h1>
+            <p className="text-gray-600">Mijozlar tomonidan qabul qilingan va tasdiqlangan buyurtmalar</p>
+          </div>
+        </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -138,9 +140,13 @@ const ConfirmedByCustomersOrders = () => {
             >
               <option value="">Barcha statuslar</option>
               <option value="pending">Kutilmoqda</option>
-              <option value="processing">Jarayonda</option>
-              <option value="shipped">Yuborilgan</option>
-              <option value="delivered">Yetkazilgan</option>
+              <option value="confirmed_by_punkt">Punkt tomonidan tasdiqlangan</option>
+              <option value="requested_to_contragent">Contragentga so'rov yuborilgan</option>
+              <option value="accepted_by_contragent">Contragent tomonidan qabul qilingan</option>
+              <option value="delivered_to_punkt">Punktga yetkazilgan</option>
+              <option value="assigned_to_agent">Agentga yuborilgan</option>
+              <option value="confirmed_by_agent">Agent tomonidan tasdiqlangan</option>
+              <option value="confirmed_by_customer">Mijoz tomonidan tasdiqlangan</option>
               <option value="cancelled">Bekor qilingan</option>
             </select>
 

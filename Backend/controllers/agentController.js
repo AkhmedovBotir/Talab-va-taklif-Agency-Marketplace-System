@@ -1,13 +1,17 @@
 const Agent = require('../models/Agent');
 const jwt = require('jsonwebtoken');
+const { cacheInvalidators } = require('../middleware/cache');
 
 // Create new agent
 const createAgent = async (req, res) => {
   try {
     const { name, viloyat, tuman, mfy, phone, password, status } = req.body;
 
-    // Check if phone number already exists
-    const existingPhone = await Agent.findOne({ phone });
+    // Check if phone number already exists (only non-deleted)
+    const existingPhone = await Agent.findOne({
+      phone,
+      isDeleted: { $ne: true },
+    });
     if (existingPhone) {
       return res.status(400).json({
         success: false,
@@ -68,36 +72,87 @@ const createAgent = async (req, res) => {
       }
     }
 
-    const agent = await Agent.create({
-      name,
+    // Check if there's already an active agent in this position
+    // Position is determined by: viloyat + tuman + mfy (if provided)
+    const positionFilter = {
       viloyat,
-      tuman: tuman || null,
-      mfy: mfy || null,
-      phone,
-      password,
-      status: status || 'active',
-    });
+      isDeleted: { $ne: true },
+      status: 'active',
+    };
 
-    // Populate regions
-    await agent.populate('viloyat', 'name type code');
-    if (agent.tuman) {
-      await agent.populate('tuman', 'name type code');
-    }
-    if (agent.mfy) {
-      await agent.populate('mfy', 'name type code');
+    // Add tuman to filter if provided
+    if (tuman) {
+      positionFilter.tuman = tuman;
+    } else {
+      positionFilter.tuman = null;
     }
 
-    // Determine agent type
-    const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
+    // Add mfy to filter if provided
+    if (mfy) {
+      positionFilter.mfy = mfy;
+    } else {
+      positionFilter.mfy = null;
+    }
 
-    res.status(201).json({
-      success: true,
-      message: 'Agent muvaffaqiyatli yaratildi',
-      data: {
-        ...agent.toObject(),
-        agentType,
-      },
-    });
+    const existingAgentInPosition = await Agent.findOne(positionFilter);
+    if (existingAgentInPosition) {
+      let positionName = 'Bu viloyat';
+      if (tuman) {
+        positionName += ' va tuman';
+      }
+      if (mfy) {
+        positionName += ' va MFY';
+      }
+      return res.status(400).json({
+        success: false,
+        message: `${positionName} uchun allaqachon faol agent mavjud`,
+      });
+    }
+
+    try {
+      const agent = await Agent.create({
+        name,
+        viloyat,
+        tuman: tuman || null,
+        mfy: mfy || null,
+        phone,
+        password,
+        status: status || 'active',
+      });
+
+      // Populate regions
+      await agent.populate('viloyat', 'name type code');
+      if (agent.tuman) {
+        await agent.populate('tuman', 'name type code');
+      }
+      if (agent.mfy) {
+        await agent.populate('mfy', 'name type code');
+      }
+
+      // Determine agent type
+      const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
+
+      // Invalidate cache
+      await cacheInvalidators.invalidateAgentCache();
+
+      res.status(201).json({
+        success: true,
+        message: 'Agent muvaffaqiyatli yaratildi',
+        data: {
+          ...agent.toObject(),
+          agentType,
+        },
+      });
+    } catch (createError) {
+      // Handle duplicate key error (phone already exists)
+      if (createError.code === 11000 && createError.keyPattern && createError.keyPattern.phone) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu telefon raqami allaqachon mavjud (arxivda yoki faol agentda)',
+        });
+      }
+      throw createError;
+    }
   } catch (error) {
     console.error('Error creating agent:', error);
     res.status(500).json({
@@ -148,6 +203,9 @@ const getAllAgents = async (req, res) => {
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
+    // Only show non-deleted agents (include those without isDeleted field for backward compatibility)
+    filter.isDeleted = { $ne: true };
+
     // Get total count
     const total = await Agent.countDocuments(filter);
 
@@ -192,7 +250,10 @@ const getAgentById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const agent = await Agent.findById(id)
+    const agent = await Agent.findOne({
+      _id: id,
+      isDeleted: { $ne: true },
+    })
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
@@ -237,11 +298,12 @@ const updateAgent = async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    // If phone is being updated, check for duplicates
+    // If phone is being updated, check for duplicates (only non-deleted)
     if (updateData.phone) {
       const existingPhone = await Agent.findOne({
         phone: updateData.phone,
         _id: { $ne: id },
+        isDeleted: { $ne: true },
       });
       if (existingPhone) {
         return res.status(400).json({
@@ -320,10 +382,46 @@ const updateAgent = async (req, res) => {
           });
         }
       }
+
+      // Check if position is being changed
+      // If so, check if there's already an active agent in the new position
+      const positionFilter = {
+        viloyat: viloyatId,
+        isDeleted: { $ne: true },
+        status: 'active',
+        _id: { $ne: id }, // Exclude current agent
+      };
+
+      if (tumanId) {
+        positionFilter.tuman = tumanId;
+      } else {
+        positionFilter.tuman = null;
+      }
+
+      if (mfyId) {
+        positionFilter.mfy = mfyId;
+      } else {
+        positionFilter.mfy = null;
+      }
+
+      const existingAgentInPosition = await Agent.findOne(positionFilter);
+      if (existingAgentInPosition) {
+        let positionName = 'Bu viloyat';
+        if (tumanId) {
+          positionName += ' va tuman';
+        }
+        if (mfyId) {
+          positionName += ' va MFY';
+        }
+        return res.status(400).json({
+          success: false,
+          message: `${positionName} uchun allaqachon faol agent mavjud`,
+        });
+      }
     }
 
-    const agent = await Agent.findByIdAndUpdate(
-      id,
+    const agent = await Agent.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
       updateData,
       {
         new: true,
@@ -345,6 +443,9 @@ const updateAgent = async (req, res) => {
     // Add agentType
     const agentObj = agent.toObject();
     agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateAgentCache();
 
     res.status(200).json({
       success: true,
@@ -369,12 +470,23 @@ const updateAgent = async (req, res) => {
   }
 };
 
-// Delete agent
+// Delete agent (soft delete)
 const deleteAgent = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const agent = await Agent.findByIdAndDelete(id);
+    const agent = await Agent.findOneAndUpdate(
+      {
+        _id: id,
+        isDeleted: { $ne: true },
+      },
+      {
+        isDeleted: true,
+        deletedAt: new Date(),
+        status: 'inactive',
+      },
+      { new: true }
+    );
 
     if (!agent) {
       return res.status(404).json({
@@ -383,9 +495,12 @@ const deleteAgent = async (req, res) => {
       });
     }
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateAgentCache();
+
     res.status(200).json({
       success: true,
-      message: 'Agent muvaffaqiyatli o\'chirildi',
+      message: 'Agent muvaffaqiyatli o\'chirildi (arxivga o\'tkazildi)',
     });
   } catch (error) {
     console.error('Error deleting agent:', error);
@@ -410,8 +525,11 @@ const loginAgent = async (req, res) => {
   try {
     const { phone, password } = req.body;
 
-    // Find agent with password field included
-    const agent = await Agent.findOne({ phone }).select('+password');
+    // Find agent with password field included (only non-deleted)
+    const agent = await Agent.findOne({
+      phone,
+      isDeleted: { $ne: true },
+    }).select('+password');
 
     if (!agent) {
       return res.status(401).json({
@@ -492,6 +610,9 @@ const getAgentsForSelection = async (req, res) => {
   try {
     const { status, viloyat, tuman, mfy, agentType, search, page = 1, limit = 100 } = req.query;
     const filter = {};
+
+    // Only show non-deleted agents (include those without isDeleted field for backward compatibility)
+    filter.isDeleted = { $ne: true };
 
     // Only show active agents by default
     if (status) {

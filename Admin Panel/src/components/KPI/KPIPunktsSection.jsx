@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { kpiAPI, regionAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import RegionSelect from '../Regions/RegionSelect';
 import { Visibility } from '@mui/icons-material';
 import KPIPunktDetailModal from './KPIPunktDetailModal';
 
@@ -14,8 +15,6 @@ const KPIPunktsSection = () => {
   const { showError } = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [punkts, setPunkts] = useState([]);
-  const [viloyatlar, setViloyatlar] = useState([]);
-  const [tumanlar, setTumanlar] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -31,32 +30,6 @@ const KPIPunktsSection = () => {
   });
   const [selectedPunkt, setSelectedPunkt] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-
-  const fetchViloyatlar = async () => {
-    try {
-      const response = await regionAPI.getRegionsByType('viloyat', { status: 'active' });
-      if (response.success) {
-        setViloyatlar(response.data || []);
-      }
-    } catch (error) {
-      console.error('Viloyatlarni yuklashda xatolik:', error);
-    }
-  };
-
-  const fetchTumanlar = async (viloyatId) => {
-    if (!viloyatId) {
-      setTumanlar([]);
-      return;
-    }
-    try {
-      const response = await regionAPI.getRegionChildren(viloyatId, { status: 'active' });
-      if (response.success) {
-        setTumanlar(response.data || []);
-      }
-    } catch (error) {
-      console.error('Tumanlarni yuklashda xatolik:', error);
-    }
-  };
 
   const fetchPunkts = async ({ page, limit } = {}) => {
     setLoading(true);
@@ -93,14 +66,14 @@ const KPIPunktsSection = () => {
   };
 
   useEffect(() => {
-    fetchViloyatlar();
     fetchPunkts({ page: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    fetchTumanlar(filters.viloyatId);
-    setFilters(prev => ({ ...prev, tumanId: '' }));
+    if (filters.viloyatId) {
+      setFilters(prev => ({ ...prev, tumanId: '' }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.viloyatId]);
 
@@ -114,7 +87,6 @@ const KPIPunktsSection = () => {
 
   const handleResetFilters = () => {
     setFilters({ viloyatId: '', tumanId: '', isPaid: '', startDate: '', endDate: '' });
-    setTumanlar([]);
     setTimeout(() => fetchPunkts({ page: 1 }), 0);
   };
 
@@ -133,31 +105,27 @@ const KPIPunktsSection = () => {
       {/* Filters */}
       <div className="flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Viloyat</label>
-          <select
+          <RegionSelect
+            name="viloyatId"
             value={filters.viloyatId}
-            onChange={(e) => handleFilterChange('viloyatId', e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Barchasi</option>
-            {viloyatlar.map((v) => (
-              <option key={v._id} value={v._id}>{v.name}</option>
-            ))}
-          </select>
+            onChange={(e) => {
+              handleFilterChange('viloyatId', e.target.value);
+              handleFilterChange('tumanId', '');
+            }}
+            label="Viloyat"
+            type="region"
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tuman</label>
-          <select
+          <RegionSelect
+            name="tumanId"
             value={filters.tumanId}
             onChange={(e) => handleFilterChange('tumanId', e.target.value)}
+            label="Tuman"
+            type="district"
+            parentId={filters.viloyatId || undefined}
             disabled={!filters.viloyatId}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
-          >
-            <option value="">Barchasi</option>
-            {tumanlar.map((t) => (
-              <option key={t._id} value={t._id}>{t.name}</option>
-            ))}
-          </select>
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">To'lov holati</label>

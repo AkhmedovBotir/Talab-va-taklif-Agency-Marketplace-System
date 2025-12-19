@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService, Order } from '../../services/api';
+import { formatNumberDisplay } from '../../utils/formatNumber';
 
 type OrderStatus = 'pending' | 'accepted' | 'rejected' | 'delivered_to_punkt' | 'all';
 
@@ -35,14 +36,17 @@ export default function BuyurtmalarScreen() {
         status: status && status !== 'all' ? status : undefined,
       });
 
+      
       if (pageNum === 1) {
         setOrders(response.data);
+        console.log(response.data);
       } else {
         setOrders((prev) => [...prev, ...response.data]);
       }
 
       setHasMore(response.page < response.totalPages);
     } catch (error: any) {
+      console.error('Buyurtmalarni yuklashda xatolik:', error);
       Alert.alert('Xatolik', error.message || 'Buyurtmalarni yuklashda xatolik');
     } finally {
       setLoading(false);
@@ -113,6 +117,37 @@ export default function BuyurtmalarScreen() {
     return order.contragentRequests[0];
   };
 
+  // Get only items requested from this contragent
+  // Backend already filters items, but we check itemIds for safety
+  const getRequestedItems = (order: Order) => {
+    const request = getCurrentRequest(order);
+    if (!request) {
+      return order.items || [];
+    }
+    
+    // If backend already filtered (items length matches itemIds length), use items directly
+    // Otherwise, filter by itemIds
+    if (request.itemIds && request.itemIds.length > 0) {
+      const items = order.items || [];
+      // Check if backend already filtered
+      if (items.length === request.itemIds.length) {
+        return items;
+      }
+      // Filter items based on itemIds (indices in the original order)
+      return items.filter((_, index) => request.itemIds!.includes(index));
+    }
+    
+    return order.items || [];
+  };
+
+  // Calculate total price for requested items only
+  const calculateRequestedTotalPrice = (order: Order) => {
+    const requestedItems = getRequestedItems(order);
+    return requestedItems.reduce((total, item) => {
+      return total + (item.price * item.quantity);
+    }, 0);
+  };
+
   const handleOrderPress = (order: Order) => {
     router.push({
       pathname: '/(tabs)/buyurtmalar/order/view' as any,
@@ -123,6 +158,12 @@ export default function BuyurtmalarScreen() {
   const renderOrderItem = ({ item }: { item: Order }) => {
     const request = getCurrentRequest(item);
     const statusColor = getStatusColor(request.status);
+    const requestedTotalPrice = calculateRequestedTotalPrice(item);
+    
+    // currentPunkt ni to'g'ri olish - agar string bo'lsa yoki obyekt bo'lsa
+    const punktName = typeof item.currentPunkt === 'string' 
+      ? 'Punkt' 
+      : (item.currentPunkt?.name || 'Punkt topilmadi');
 
     return (
       <TouchableOpacity
@@ -130,40 +171,76 @@ export default function BuyurtmalarScreen() {
         onPress={() => handleOrderPress(item)}
         activeOpacity={0.7}
       >
-        <View style={styles.orderHeader}>
-          <View style={styles.orderNumberContainer}>
-            <Ionicons name="receipt-outline" size={20} color="#007AFF" />
-            <Text style={styles.orderNumber}>{item.orderNumber}</Text>
+        <View style={styles.orderCardContent}>
+          {/* Header Section */}
+          <View style={styles.orderHeader}>
+            <View style={styles.orderNumberContainer}>
+              <View style={[styles.orderIconContainer, { backgroundColor: `${statusColor}15` }]}>
+                <Ionicons name="receipt-outline" size={22} color={statusColor} />
+              </View>
+              <View style={styles.orderNumberWrapper}>
+                <Text style={styles.orderNumberLabel}>Buyurtma</Text>
+                <Text style={styles.orderNumber}>{item.orderNumber}</Text>
+              </View>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {getStatusText(request.status)}
+              </Text>
+            </View>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}20` }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {getStatusText(request.status)}
-            </Text>
-          </View>
-        </View>
 
-        <View style={styles.orderInfo}>
-          <View style={styles.infoRow}>
-            <Ionicons name="storefront-outline" size={16} color="#8E8E93" />
-            <Text style={styles.infoText}>{item.currentPunkt.name}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={16} color="#8E8E93" />
-            <Text style={styles.infoText}>
-              {new Date(request.requestedAt).toLocaleDateString('uz-UZ', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
-          </View>
-        </View>
+          {/* Divider */}
+          <View style={styles.divider} />
 
-        <View style={styles.arrowContainer}>
-          <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+          {/* Info Section */}
+          <View style={styles.orderInfo}>
+            <View style={styles.infoRow}>
+              <View style={styles.infoIconWrapper}>
+                <Ionicons name="storefront" size={18} color="#007AFF" />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Punkt</Text>
+                <Text style={styles.infoText} numberOfLines={1}>{punktName}</Text>
+              </View>
+            </View>
+            <View style={styles.infoRow}>
+              <View style={styles.infoIconWrapper}>
+                <Ionicons name="time" size={18} color="#FF9500" />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Vaqt</Text>
+                <Text style={styles.infoText}>
+                  {new Date(request.requestedAt).toLocaleDateString('uz-UZ', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+            </View>
+            {requestedTotalPrice > 0 && (
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconWrapper}>
+                  <Ionicons name="cash" size={18} color="#34C759" />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Jami summa</Text>
+                  <Text style={[styles.infoText, styles.priceText]}>
+                    {formatNumberDisplay(requestedTotalPrice)} so'm
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Arrow Icon */}
+          <View style={styles.arrowContainer}>
+            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -327,39 +404,61 @@ const styles = StyleSheet.create({
   },
   orderCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderRadius: 16,
+    marginBottom: 16,
+    marginHorizontal: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  orderCardContent: {
+    padding: 16,
+    position: 'relative',
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   orderNumberContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    flex: 1,
+  },
+  orderIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  orderNumberWrapper: {
+    flex: 1,
+  },
+  orderNumberLabel: {
+    fontSize: 11,
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   orderNumber: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     gap: 6,
   },
   statusDot: {
@@ -368,20 +467,52 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
+  divider: {
+    height: 1,
+    backgroundColor: '#F2F2F7',
+    marginVertical: 12,
+  },
   orderInfo: {
-    gap: 8,
+    gap: 12,
   },
   infoRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  infoIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F2F2F7',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    marginTop: 2,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   infoText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 15,
+    color: '#1C1C1E',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  priceText: {
+    color: '#34C759',
+    fontWeight: '600',
+    fontSize: 16,
   },
   arrowContainer: {
     position: 'absolute',

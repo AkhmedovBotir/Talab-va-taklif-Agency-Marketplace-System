@@ -37,6 +37,14 @@ const punktSchema = new mongoose.Schema(
       enum: ['active', 'inactive'],
       default: 'active',
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -73,8 +81,16 @@ punktSchema.methods.toJSON = function () {
 // Indexes
 punktSchema.index({ viloyat: 1 });
 punktSchema.index({ tuman: 1 });
-punktSchema.index({ phone: 1 }, { unique: true });
+// Unique index for phone - only for non-deleted punkts
+// Note: MongoDB partialFilterExpression doesn't support $or, so we handle duplicates in code
+// This index allows multiple deleted punkts to have the same phone
+punktSchema.index({ phone: 1 }, { 
+  unique: true, 
+  partialFilterExpression: { isDeleted: false } 
+});
 punktSchema.index({ status: 1 });
+punktSchema.index({ isDeleted: 1 });
+punktSchema.index({ deletedAt: 1 });
 
 const Punkt = mongoose.model('Punkt', punktSchema);
 

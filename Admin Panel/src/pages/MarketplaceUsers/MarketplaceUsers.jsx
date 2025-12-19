@@ -4,6 +4,7 @@ import { adminDataAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import MarketplaceUserTable from '../../components/MarketplaceUsers/MarketplaceUserTable';
 import ViewMarketplaceUserModal from '../../components/MarketplaceUsers/ViewMarketplaceUserModal';
+import RegionSelect from '../../components/Regions/RegionSelect';
 import { Search, Clear } from '@mui/icons-material';
 
 const MarketplaceUsers = () => {
@@ -198,40 +199,44 @@ const MarketplaceUsers = () => {
               <option value="false">Tasdiqlanmagan</option>
             </select>
 
-            <input
-              type="text"
-              placeholder="Viloyat ID..."
+            <RegionSelect
+              name="viloyat"
               value={filters.viloyat}
               onChange={(e) => {
-                setFilters({ ...filters, viloyat: e.target.value });
+                setFilters({ ...filters, viloyat: e.target.value, tuman: '', mfy: '' });
                 setPagination({ ...pagination, page: 1 });
               }}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              label="Viloyat"
+              type="region"
             />
 
-            <input
-              type="text"
-              placeholder="Tuman ID..."
+            <RegionSelect
+              name="tuman"
               value={filters.tuman}
               onChange={(e) => {
-                setFilters({ ...filters, tuman: e.target.value });
+                setFilters({ ...filters, tuman: e.target.value, mfy: '' });
                 setPagination({ ...pagination, page: 1 });
               }}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              label="Tuman"
+              type="district"
+              parentId={filters.viloyat || undefined}
+              disabled={!filters.viloyat}
             />
           </div>
 
           {/* Third Row: MFY, Limit */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              placeholder="MFY ID..."
+            <RegionSelect
+              name="mfy"
               value={filters.mfy}
               onChange={(e) => {
                 setFilters({ ...filters, mfy: e.target.value });
                 setPagination({ ...pagination, page: 1 });
               }}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              label="MFY"
+              type="mfy"
+              parentId={filters.tuman || undefined}
+              disabled={!filters.tuman}
             />
 
             <select

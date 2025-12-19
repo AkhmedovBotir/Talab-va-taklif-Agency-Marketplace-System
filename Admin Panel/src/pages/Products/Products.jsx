@@ -7,7 +7,7 @@ import ViewProductModal from '../../components/Products/ViewProductModal';
 import { Search, Clear } from '@mui/icons-material';
 import RegionSelect from '../../components/Regions/RegionSelect';
 
-const Products = () => {
+const Products = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -132,16 +132,18 @@ const Products = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Mahsulotlar</h1>
-          <p className="text-gray-600">Mahsulotlarni ko'rish va qidirish</p>
-        </div>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Mahsulotlar</h1>
+            <p className="text-gray-600">Mahsulotlarni ko'rish va qidirish</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Filters */}
       <motion.div

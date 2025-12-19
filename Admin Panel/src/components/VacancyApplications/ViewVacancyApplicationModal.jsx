@@ -678,33 +678,119 @@ const ViewVacancyApplicationModal = ({ open, onClose, application, onSuccess }) 
                         {activeTab === 'final' && (
                           <>
                             {displayData.finalDecision && displayData.finalDecision.result !== 'pending' ? (
-                              <div className="p-4 bg-gray-50 rounded-md">
-                                <div className="flex items-center gap-3 mb-3">
-                                  <span className={getFinalDecisionBadge(displayData.finalDecision.result)}>
-                                    {displayData.finalDecision.result === 'hired'
-                                      ? 'Ishga qabul qilindi'
-                                      : displayData.finalDecision.result === 'rejected'
-                                      ? 'Rad etildi'
-                                      : 'Kutilmoqda'}
-                                  </span>
-                                  {displayData.finalDecision.responseStatus === 'responded' && (
-                                    <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
-                                      Javob berildi
+                              <div className="space-y-4">
+                                <div className="p-4 bg-gray-50 rounded-md">
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <span className={getFinalDecisionBadge(displayData.finalDecision.result)}>
+                                      {displayData.finalDecision.result === 'hired'
+                                        ? 'Ishga qabul qilindi'
+                                        : displayData.finalDecision.result === 'rejected'
+                                        ? 'Rad etildi'
+                                        : 'Kutilmoqda'}
                                     </span>
+                                    {displayData.finalDecision.responseStatus === 'responded' && (
+                                      <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                                        Javob berildi
+                                      </span>
+                                    )}
+                                  </div>
+                                  {displayData.finalDecision.reason && (
+                                    <p className="text-gray-700 mb-2">{displayData.finalDecision.reason}</p>
+                                  )}
+                                  {displayData.finalDecision.decidedBy && (
+                                    <p className="text-sm text-gray-500">
+                                      Qaror qilgan: {displayData.finalDecision.decidedBy}
+                                    </p>
+                                  )}
+                                  {displayData.finalDecision.decidedAt && (
+                                    <p className="text-sm text-gray-500">
+                                      Sana: {formatDate(displayData.finalDecision.decidedAt)}
+                                    </p>
                                   )}
                                 </div>
-                                {displayData.finalDecision.reason && (
-                                  <p className="text-gray-700 mb-2">{displayData.finalDecision.reason}</p>
-                                )}
-                                {displayData.finalDecision.decidedBy && (
-                                  <p className="text-sm text-gray-500">
-                                    Qaror qilgan: {displayData.finalDecision.decidedBy}
-                                  </p>
-                                )}
-                                {displayData.finalDecision.decidedAt && (
-                                  <p className="text-sm text-gray-500">
-                                    Sana: {formatDate(displayData.finalDecision.decidedAt)}
-                                  </p>
+
+                                {/* Created User Info (if hired) */}
+                                {displayData.finalDecision.result === 'hired' && displayData.createdUser && (
+                                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                      Yaratilgan {displayData.createdUser.type === 'agent' ? 'Agent' : 'Punkt'} ma'lumotlari
+                                    </h3>
+                                    {displayData.createdUser.data && (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-500 mb-1">
+                                            Nomi
+                                          </label>
+                                          <p className="text-gray-900">{displayData.createdUser.data.name || '-'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-500 mb-1">
+                                            Telefon
+                                          </label>
+                                          <p className="text-gray-900">{displayData.createdUser.data.phone || '-'}</p>
+                                        </div>
+                                        {displayData.createdUser.data.viloyat && (
+                                          <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">
+                                              Viloyat
+                                            </label>
+                                            <p className="text-gray-900">
+                                              {displayData.createdUser.data.viloyat.name || '-'}
+                                            </p>
+                                          </div>
+                                        )}
+                                        {displayData.createdUser.data.tuman && (
+                                          <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">
+                                              Tuman
+                                            </label>
+                                            <p className="text-gray-900">
+                                              {displayData.createdUser.data.tuman.name || '-'}
+                                            </p>
+                                          </div>
+                                        )}
+                                        {displayData.createdUser.data.mfy && (
+                                          <div>
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">
+                                              MFY
+                                            </label>
+                                            <p className="text-gray-900">
+                                              {displayData.createdUser.data.mfy.name || '-'}
+                                            </p>
+                                          </div>
+                                        )}
+                                        {displayData.createdUser.type === 'agent' &&
+                                          displayData.createdUser.data.agentType && (
+                                            <div>
+                                              <label className="block text-sm font-medium text-gray-500 mb-1">
+                                                Agent turi
+                                              </label>
+                                              <p className="text-gray-900">
+                                                {displayData.createdUser.data.agentType === 'viloyat'
+                                                  ? 'Viloyat agenti'
+                                                  : displayData.createdUser.data.agentType === 'tuman'
+                                                  ? 'Tuman agenti'
+                                                  : 'MFY agenti'}
+                                              </p>
+                                            </div>
+                                          )}
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-500 mb-1">
+                                            Holati
+                                          </label>
+                                          <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                                            {displayData.createdUser.data.status === 'active' ? 'Faol' : 'Nofaol'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                      <p className="text-sm text-yellow-800">
+                                        <strong>Eslatma:</strong> Parol sifatida telefon raqami ishlatilgan.
+                                        Foydalanuvchi keyin o'zgartirishi mumkin.
+                                      </p>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
                             ) : (

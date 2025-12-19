@@ -4,9 +4,10 @@ import { adminDataAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import OrderTable from '../../components/Orders/OrderTable';
 import ViewOrderModal from '../../components/Orders/ViewOrderModal';
+import UserSelect from '../../components/Orders/UserSelect';
 import { Search, Clear } from '@mui/icons-material';
 
-const Orders = () => {
+const Orders = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -140,16 +141,18 @@ const Orders = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Barcha Buyurtmalar</h1>
-          <p className="text-gray-600">Barcha buyurtmalarni ko'rish va monitoring qilish</p>
-        </div>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Barcha Buyurtmalar</h1>
+            <p className="text-gray-600">Barcha buyurtmalarni ko'rish va monitoring qilish</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Filters */}
       <motion.div
@@ -195,9 +198,13 @@ const Orders = () => {
             >
               <option value="">Barcha statuslar</option>
               <option value="pending">Kutilmoqda</option>
-              <option value="processing">Jarayonda</option>
-              <option value="shipped">Yuborilgan</option>
-              <option value="delivered">Yetkazilgan</option>
+              <option value="confirmed_by_punkt">Punkt tomonidan tasdiqlangan</option>
+              <option value="requested_to_contragent">Contragentga so'rov yuborilgan</option>
+              <option value="accepted_by_contragent">Contragent tomonidan qabul qilingan</option>
+              <option value="delivered_to_punkt">Punktga yetkazilgan</option>
+              <option value="assigned_to_agent">Agentga yuborilgan</option>
+              <option value="confirmed_by_agent">Agent tomonidan tasdiqlangan</option>
+              <option value="confirmed_by_customer">Mijoz tomonidan tasdiqlangan</option>
               <option value="cancelled">Bekor qilingan</option>
             </select>
 
@@ -243,16 +250,17 @@ const Orders = () => {
               className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
 
-            <input
-              type="text"
-              placeholder="Foydalanuvchi ID..."
-              value={filters.user}
-              onChange={(e) => {
-                setFilters({ ...filters, user: e.target.value });
-                setPagination({ ...pagination, page: 1 });
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <div>
+              <UserSelect
+                name="user"
+                value={filters.user}
+                onChange={(e) => {
+                  setFilters({ ...filters, user: e.target.value });
+                  setPagination({ ...pagination, page: 1 });
+                }}
+                label=""
+              />
+            </div>
           </div>
 
           {/* Third Row: Date Range */}

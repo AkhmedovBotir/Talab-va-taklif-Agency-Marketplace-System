@@ -5,8 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  PermissionsAndroid,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiService } from '../../services/api';
 
@@ -63,58 +61,50 @@ export default function ProfileScreen() {
     }
   };
 
-  const requestGalleryPermission = async () => {
-    if (Platform.OS !== 'android') return true;
-
-    const permission =
-      Platform.Version >= 33
-        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
-        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-
-    const status = await PermissionsAndroid.request(permission, {
-      title: 'Ruxsat kerak',
-      message: 'Galereyadan rasm yuklash uchun ruxsat bering',
-      buttonPositive: 'OK',
-    });
-
-    return status === PermissionsAndroid.RESULTS.GRANTED;
-  };
-
   const uploadLogo = async () => {
     try {
       setUploadingLogo(true);
 
-      const hasPermission = await requestGalleryPermission();
-      if (!hasPermission) {
-        Alert.alert('Ruxsat kerak', 'Galereyaga ruxsat bering');
-        return;
-      }
+      launchImageLibrary(
+        {
+          mediaType: 'photo' as MediaType,
+          quality: 0.6,
+          includeBase64: true,
+          maxWidth: 2000,
+          maxHeight: 2000,
+        },
+        async (response: ImagePickerResponse) => {
+          if (response.didCancel) {
+            setUploadingLogo(false);
+            return;
+          }
 
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        includeBase64: true,
-        selectionLimit: 1,
-        quality: 0.6,
-      });
+          if (response.errorMessage) {
+            Alert.alert('Xatolik', response.errorMessage);
+            setUploadingLogo(false);
+            return;
+          }
 
-      if (!result.didCancel && result.assets?.[0]?.base64) {
-        const asset = result.assets[0];
-        const mimeType = asset.type || 'image/jpeg';
-        const base64 = `data:${mimeType};base64,${asset.base64}`;
+          if (response.assets && response.assets[0]?.base64) {
+            const asset = response.assets[0];
+            const mimeType = asset.type || 'image/jpeg';
+            const base64 = `data:${mimeType};base64,${asset.base64}`;
 
-        if (isValidImage(base64)) {
-          setLogoPreview(base64);
-          await apiService.updateLogo({ logo: base64 });
-          await refreshContragent();
-          Alert.alert('Muvaffaqiyatli', 'Logo yangilandi');
-        } else {
-          Alert.alert('Xatolik', 'Rasm formati noto‘g‘ri');
+            if (isValidImage(base64)) {
+              setLogoPreview(base64);
+              await apiService.updateLogo({ logo: base64 });
+              await refreshContragent();
+              Alert.alert('Muvaffaqiyatli', 'Logo yangilandi');
+            } else {
+              Alert.alert('Xatolik', 'Rasm formati noto‘g‘ri');
+            }
+          }
+          setUploadingLogo(false);
         }
-      }
+      );
     } catch (error: any) {
       const message = error?.message || 'Logo yangilashda xatolik yuz berdi';
       Alert.alert('Xatolik', message);
-    } finally {
       setUploadingLogo(false);
     }
   };

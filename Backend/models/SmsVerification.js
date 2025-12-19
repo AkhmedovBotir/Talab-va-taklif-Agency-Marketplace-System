@@ -5,7 +5,6 @@ const smsVerificationSchema = new mongoose.Schema(
     phone: {
       type: String,
       required: [true, 'Telefon raqami kiritilishi shart'],
-      index: true,
     },
     code: {
       type: String,

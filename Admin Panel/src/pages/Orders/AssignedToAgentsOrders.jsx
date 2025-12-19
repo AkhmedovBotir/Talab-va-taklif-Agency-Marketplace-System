@@ -6,7 +6,7 @@ import OrderTable from '../../components/Orders/OrderTable';
 import ViewOrderModal from '../../components/Orders/ViewOrderModal';
 import { Clear } from '@mui/icons-material';
 
-const AssignedToAgentsOrders = () => {
+const AssignedToAgentsOrders = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -99,6 +99,7 @@ const AssignedToAgentsOrders = () => {
 
   return (
     <div>
+      {!hideHeader && (
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -109,6 +110,7 @@ const AssignedToAgentsOrders = () => {
           <p className="text-gray-600">Punktlar tomonidan agentlarga yuborilgan buyurtmalar</p>
         </div>
       </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -138,9 +140,13 @@ const AssignedToAgentsOrders = () => {
             >
               <option value="">Barcha statuslar</option>
               <option value="pending">Kutilmoqda</option>
-              <option value="processing">Jarayonda</option>
-              <option value="shipped">Yuborilgan</option>
-              <option value="delivered">Yetkazilgan</option>
+              <option value="confirmed_by_punkt">Punkt tomonidan tasdiqlangan</option>
+              <option value="requested_to_contragent">Contragentga so'rov yuborilgan</option>
+              <option value="accepted_by_contragent">Contragent tomonidan qabul qilingan</option>
+              <option value="delivered_to_punkt">Punktga yetkazilgan</option>
+              <option value="assigned_to_agent">Agentga yuborilgan</option>
+              <option value="confirmed_by_agent">Agent tomonidan tasdiqlangan</option>
+              <option value="confirmed_by_customer">Mijoz tomonidan tasdiqlangan</option>
               <option value="cancelled">Bekor qilingan</option>
             </select>
 

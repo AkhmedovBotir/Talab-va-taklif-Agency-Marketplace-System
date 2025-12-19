@@ -261,15 +261,18 @@ export interface ApiError {
 
 // Contragent Order interfaces
 export interface ContragentRequest {
+  _id?: string;
   contragentId: {
     _id: string;
     name: string;
     inn: string;
+    phone?: string;
   };
+  itemIds: number[];
   status: 'pending' | 'accepted' | 'rejected' | 'delivered_to_punkt';
   requestedAt: string;
-  respondedAt?: string;
-  deliveredToPunktAt?: string;
+  respondedAt?: string | null;
+  deliveredToPunktAt?: string | null;
 }
 
 export interface OrderItem {
@@ -278,11 +281,16 @@ export interface OrderItem {
     name: string;
     images?: string[];
     productCode?: string;
+    price?: number;
+    contragent?: {
+      _id: string;
+      name: string;
+    };
   };
   quantity: number;
   price: number;
-  originalPrice: number;
-  kpiBonusPercent: number;
+  originalPrice?: number;
+  kpiBonusPercent?: number;
 }
 
 export interface Order {
@@ -707,7 +715,7 @@ class ApiService {
     
     const query = queryParams.toString();
     return this.request<OrderListResponse>(
-      `/api/contragent-orders/orders${query ? `?${query}` : ''}`,
+      `/api/contragent/orders${query ? `?${query}` : ''}`,
       {
         method: 'GET',
       }

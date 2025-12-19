@@ -18,7 +18,7 @@ import {
 } from '@mui/icons-material';
 import { formatDateRange } from '../../utils/dateFormatter';
 
-const Balance = () => {
+const Balance = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [balance, setBalance] = useState(null);
   const [totalReceived, setTotalReceived] = useState(null);
@@ -73,19 +73,20 @@ const Balance = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
-              <AccountBalance className="text-indigo-600" />
-              Moliya Balansi
-            </h1>
-            <p className="text-gray-600">Moliya bo'limi balanslari va statistikasi</p>
-          </div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                <AccountBalance className="text-indigo-600" />
+                Moliya Balansi
+              </h1>
+              <p className="text-gray-600">Moliya bo'limi balanslari va statistikasi</p>
+            </div>
           <div className="flex items-center gap-2">
             <input
               type="date"
@@ -112,6 +113,7 @@ const Balance = () => {
           </div>
         </div>
       </motion.div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center p-8">

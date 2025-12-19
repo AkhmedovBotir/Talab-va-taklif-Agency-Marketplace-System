@@ -6,7 +6,7 @@ import SubmissionTable from '../../components/Finance/SubmissionTable';
 import ViewSubmissionModal from '../../components/Finance/ViewSubmissionModal';
 import { PendingActions } from '@mui/icons-material';
 
-const Submissions = () => {
+const Submissions = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -39,19 +39,21 @@ const Submissions = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
-            <PendingActions className="text-indigo-600" />
-            Kutilayotgan Topshiruvlar
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+              <PendingActions className="text-indigo-600" />
+              Kutilayotgan Topshiruvlar
           </h1>
           <p className="text-gray-600">Moliya bo'limiga kutilayotgan topshiruvlar</p>
         </div>
       </motion.div>
+      )}
 
       {/* Table */}
       <SubmissionTable

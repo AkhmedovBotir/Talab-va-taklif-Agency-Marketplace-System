@@ -24,7 +24,7 @@ const tabs = [
   { id: 'custom', label: 'Belgilangan muddat', icon: DateRange },
 ];
 
-const Reports = () => {
+const Reports = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
   const [activeTab, setActiveTab] = useState('daily');
   
@@ -840,17 +840,19 @@ const Reports = () => {
   return (
     <div>
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex items-center gap-3 mb-2">
-          <Assessment className="text-indigo-600" />
-          <h1 className="text-3xl font-bold text-gray-800">Hisobotlar</h1>
-        </div>
-        <p className="text-gray-600">Moliya bo'limi hisobotlari</p>
-      </motion.div>
+      {!hideHeader && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <Assessment className="text-indigo-600" />
+            <h1 className="text-3xl font-bold text-gray-800">Hisobotlar</h1>
+          </div>
+          <p className="text-gray-600">Moliya bo'limi hisobotlari</p>
+        </motion.div>
+      )}
 
       {/* Tabs Navigation */}
       <motion.div

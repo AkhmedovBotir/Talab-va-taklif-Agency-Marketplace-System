@@ -84,6 +84,16 @@ All endpoints (except login) require authentication using JWT token from Punkt l
       "respondedAt": "string | null (ISO 8601 date)"
     }
   ],
+  "contragentRequests": [
+    {
+      "contragentId": "object (reference to Contragent)",
+      "itemIds": "array of numbers (indices of items requested from this contragent)",
+      "status": "string (enum: 'pending' | 'accepted' | 'rejected' | 'delivered_to_punkt')",
+      "requestedAt": "string (ISO 8601 date)",
+      "respondedAt": "string | null (ISO 8601 date)",
+      "deliveredToPunktAt": "string | null (ISO 8601 date)"
+    }
+  ],
   "confirmedByPunkt": "object | null (reference to Punkt)",
   "punktStatus": "string (enum: 'pending' | 'confirmed' | 'rejected' | 'requested')",
   "assignedToAgent": "object | null (reference to Agent)",
@@ -968,7 +978,7 @@ curl -X GET http://localhost:5000/api/punkt/orders/507f1f77bcf86cd799439011/cont
 
 ### Request to Contragent
 
-Send order request to a contragent.
+Send order request to a contragent. **Important:** This endpoint automatically filters and sends request only for products that belong to the selected contragent. If an order contains products from multiple contragents, you need to send separate requests to each contragent for their respective products.
 
 **Endpoint:** `POST /api/punkt/orders/:id/request-to-contragent`
 
@@ -983,9 +993,21 @@ Send order request to a contragent.
 }
 ```
 
+**Validation Rules:**
+- `contragentId`: Required, must be a valid MongoDB ObjectId
+- The contragent must have at least one product in the order
+- The contragent must be active
+- The contragent must not already have a pending request for this order
+
 **Status Changes:**
 - **Before:** `pending` or `confirmed_by_punkt`
 - **After:** `requested_to_contragent`
+
+**How It Works:**
+1. The system automatically identifies which items in the order belong to the selected contragent
+2. Only those items are included in the request sent to the contragent
+3. The `itemIds` array in `contragentRequests` contains the indices of items requested from this contragent
+4. When the contragent views the order, they will only see their own products
 
 **Success Response (200 OK):**
 
@@ -995,19 +1017,63 @@ Send order request to a contragent.
   "message": "Contragentga so'rov yuborildi",
   "data": {
     "orderId": "507f1f77bcf86cd799439011",
+    "orderNumber": "00001",
+    "contragent": {
+      "_id": "507f1f77bcf86cd799439020",
+      "name": "Contragent 1",
+      "inn": "123456789",
+      "phone": "+998901234567"
+    },
     "contragentRequests": [
       {
         "contragentId": {
           "_id": "507f1f77bcf86cd799439020",
-          "name": "Contragent 1"
+          "name": "Contragent 1",
+          "inn": "123456789",
+          "phone": "+998901234567"
         },
+        "itemIds": [0, 2],
         "status": "pending",
-        "requestedAt": "2024-01-15T10:00:00.000Z"
+        "requestedAt": "2024-01-15T10:00:00.000Z",
+        "respondedAt": null,
+        "deliveredToPunktAt": null
       }
     ]
   }
 }
 ```
+
+**Response Fields:**
+- `contragent`: The contragent object that received the request
+- `contragentRequests`: Array of contragent requests (includes the newly created request)
+  - `contragentId`: Reference to the contragent
+  - `itemIds`: Array of item indices (0-based) that belong to this contragent and are included in the request
+  - `status`: Request status ('pending', 'accepted', 'rejected', 'delivered_to_punkt')
+  - `requestedAt`: Date when request was sent
+  - `respondedAt`: Date when contragent responded (null if pending)
+  - `deliveredToPunktAt`: Date when contragent delivered to punkt (null if not delivered)
+
+**Error Responses:**
+
+- **400 Bad Request** - Contragent ID not provided OR contragent has no products in this order OR contragent already has a request for this order OR contragent is inactive
+- **401 Unauthorized** - Token not provided or invalid
+- **403 Forbidden** - Order does not belong to punkt's region
+- **404 Not Found** - Order not found OR contragent not found
+- **500 Internal Server Error** - Server error
+
+**Example Scenario:**
+
+If an order has 3 items:
+- Item 0: Product from Contragent A
+- Item 1: Product from Contragent B
+- Item 2: Product from Contragent A
+
+When you send a request to Contragent A:
+- Only items 0 and 2 will be included in the request
+- `itemIds` will be `[0, 2]`
+- Contragent A will only see items 0 and 2 when viewing the order
+
+You need to send a separate request to Contragent B for item 1.
 
 ---
 
@@ -1243,14 +1309,25 @@ Get all contragent IDs from order products. This endpoint helps punkts identify 
 
 4. **Request Response**: When a punkt receives a request, they can accept or reject it. If accepted, the order is automatically confirmed by that punkt.
 
-5. **KPI Bonus**: The `kpiBonusPercent` field is automatically removed from product objects in responses for security/privacy reasons.
+5. **Request to Contragent - Multiple Contragents Support**: 
+   - **Important:** When an order contains products from multiple contragents, you must send separate requests to each contragent
+   - The system automatically filters and sends requests only for products that belong to the selected contragent
+   - Each `contragentRequest` includes an `itemIds` array containing the indices (0-based) of items requested from that contragent
+   - When a contragent views the order, they will only see their own products (filtered by `itemIds`)
+   - Example: If an order has items [0, 1, 2] where item 0 and 2 belong to Contragent A, and item 1 belongs to Contragent B:
+     - Request to Contragent A will have `itemIds: [0, 2]`
+     - Request to Contragent B will have `itemIds: [1]`
+     - Contragent A will only see items 0 and 2
+     - Contragent B will only see item 1
 
-6. **Pagination**: All list endpoints support pagination with `page` and `limit` query parameters.
+6. **KPI Bonus**: The `kpiBonusPercent` field is automatically removed from product objects in responses for security/privacy reasons.
 
-7. **Agent Assignment**: After confirming an order, a punkt can assign it to an agent. Only the punkt that confirmed the order can assign it to an agent. Each order can only be assigned to one agent.
+7. **Pagination**: All list endpoints support pagination with `page` and `limit` query parameters.
+
+8. **Agent Assignment**: After confirming an order, a punkt can assign it to an agent. Only the punkt that confirmed the order can assign it to an agent. Each order can only be assigned to one agent.
    - **Status Change:** `delivered_to_punkt` or `confirmed_by_punkt` → `assigned_to_agent`
 
-8. **Status Tracking**: All status changes are automatically tracked and reflected in the order object. Each action updates the order status to reflect the current stage of the delivery process:
+9. **Status Tracking**: All status changes are automatically tracked and reflected in the order object. Each action updates the order status to reflect the current stage of the delivery process:
    - **Punkt confirms:** `pending` → `confirmed_by_punkt`
    - **Punkt requests to contragent:** `pending` or `confirmed_by_punkt` → `requested_to_contragent`
    - **Contragent accepts:** `requested_to_contragent` → `accepted_by_contragent`

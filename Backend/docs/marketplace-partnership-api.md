@@ -20,7 +20,10 @@ Marketplace Partnership Request API provides endpoints for marketplace users to 
 
 **Base Path:** `/api/marketplace`
 
-**Note:** All endpoints require authentication. Users can only have one pending partnership request at a time.
+**Note:** 
+- **POST /partnership-requests** - Authentication **optional** (tokensiz ham, token bilan ham ishlaydi)
+- **GET /partnership-requests** - Authentication **required**
+- Users can only have one pending partnership request at a time (only if authenticated)
 
 ---
 
@@ -34,7 +37,13 @@ http://localhost:5000/api/marketplace
 
 ## Authentication
 
-All endpoints require authentication. Include the JWT token in the `Authorization` header.
+### POST /partnership-requests (Optional Authentication)
+- **Token bilan:** Agar token bo'lsa, foydalanuvchi ID saqlanadi va pending request tekshiruvi amalga oshiriladi
+- **Tokensiz:** Token bo'lmasa, so'rov yuboriladi, lekin `marketplaceUser` field `null` bo'ladi
+
+### GET /partnership-requests (Required Authentication)
+- Token talab qilinadi
+- Faqat autentifikatsiya qilingan foydalanuvchining o'z so'rovlarini ko'rish mumkin
 
 **Format:** `Authorization: Bearer <token>`
 
@@ -112,7 +121,7 @@ Submit a new partnership request.
 
 **Endpoint:** `POST /partnership-requests`
 
-**Authentication:** Required
+**Authentication:** **Optional** (tokensiz ham, token bilan ham ishlaydi)
 
 **Request Body:**
 
@@ -227,7 +236,7 @@ Submit a new partnership request.
 }
 ```
 
-**400 Bad Request - Pending Request Exists:**
+**400 Bad Request - Pending Request Exists (only if authenticated):**
 
 ```json
 {
@@ -236,14 +245,7 @@ Submit a new partnership request.
 }
 ```
 
-**401 Unauthorized:**
-
-```json
-{
-  "success": false,
-  "message": "Token topilmadi"
-}
-```
+**Note:** Bu xato faqat token bilan yuborilgan so'rovlar uchun ko'rsatiladi. Tokensiz so'rovlar uchun bu tekshiruv o'tkazilmaydi.
 
 **500 Internal Server Error:**
 
@@ -460,7 +462,7 @@ All endpoints follow a consistent error response format:
 
 ## Examples
 
-### Example 1: Create Partnership Request
+### Example 1: Create Partnership Request (Token bilan)
 
 **Request:**
 
@@ -481,6 +483,72 @@ curl -X POST http://localhost:5000/api/marketplace/partnership-requests \
     "managerLastName": "Karimov",
     "managerPhone": "+998901234568"
   }'
+```
+
+### Example 1b: Create Partnership Request (Tokensiz)
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:5000/api/marketplace/partnership-requests \
+  -H "Content-Type: application/json" \
+  -d '{
+    "companyName": "O'zbekiston Tijorat MChJ",
+    "inn": "123456789",
+    "mfo": "00014",
+    "accountNumber": "22614840900000000001",
+    "viloyat": "65a1b2c3d4e5f6g7h8i9j0k3",
+    "tuman": "65a1b2c3d4e5f6g7h8i9j0k4",
+    "mfy": "65a1b2c3d4e5f6g7h8i9j0k5",
+    "activity": "Qishloq xo'jalik mahsulotlari yetkazib berish",
+    "managerFirstName": "Akmal",
+    "managerLastName": "Karimov",
+    "managerPhone": "+998901234568"
+  }'
+```
+
+**Response (Tokensiz):**
+
+```json
+{
+  "success": true,
+  "message": "Hamkorlik so'rovi muvaffaqiyatli yuborildi",
+  "data": {
+    "_id": "65a1b2c3d4e5f6g7h8i9j0k1",
+    "marketplaceUser": null,
+    "companyName": "O'zbekiston Tijorat MChJ",
+    "inn": "123456789",
+    "mfo": "00014",
+    "accountNumber": "22614840900000000001",
+    "viloyat": {
+      "_id": "65a1b2c3d4e5f6g7h8i9j0k3",
+      "name": "Toshkent viloyati",
+      "type": "region",
+      "code": "10"
+    },
+    "tuman": {
+      "_id": "65a1b2c3d4e5f6g7h8i9j0k4",
+      "name": "Chirchiq tumani",
+      "type": "district",
+      "code": "1001"
+    },
+    "mfy": {
+      "_id": "65a1b2c3d4e5f6g7h8i9j0k5",
+      "name": "Navruz MFY",
+      "type": "mfy",
+      "code": "1001001"
+    },
+    "activity": "Qishloq xo'jalik mahsulotlari yetkazib berish",
+    "managerFirstName": "Akmal",
+    "managerLastName": "Karimov",
+    "managerPhone": "+998901234568",
+    "contactStatus": "not_contacted",
+    "status": "pending",
+    "adminNotes": null,
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
 ```
 
 **Response:**

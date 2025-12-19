@@ -1,6 +1,7 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Region = require('../models/Region');
+const { cacheInvalidators } = require('../middleware/cache');
 
 // Create product
 const createProduct = async (req, res) => {
@@ -141,6 +142,9 @@ const createProduct = async (req, res) => {
     await product.populate('contragent', 'name inn phone');
     await product.populate('deliveryRegions.viloyat', 'name type code');
     await product.populate('deliveryRegions.tuman', 'name type code');
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateProductCache();
 
     res.status(201).json({
       success: true,
@@ -502,6 +506,9 @@ const updateProduct = async (req, res) => {
       .populate('deliveryRegions.viloyat', 'name type code')
       .populate('deliveryRegions.tuman', 'name type code');
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateProductCache();
+
     res.status(200).json({
       success: true,
       message: 'Maxsulot muvaffaqiyatli yangilandi',
@@ -570,6 +577,9 @@ const updateProductStatus = async (req, res) => {
       .populate('deliveryRegions.viloyat', 'name type code')
       .populate('deliveryRegions.tuman', 'name type code');
 
+    // Invalidate cache
+    await cacheInvalidators.invalidateProductCache();
+
     res.status(200).json({
       success: true,
       message: 'Maxsulot statusi muvaffaqiyatli yangilandi',
@@ -616,6 +626,9 @@ const deleteProduct = async (req, res) => {
     }
 
     await Product.findByIdAndDelete(id);
+
+    // Invalidate cache
+    await cacheInvalidators.invalidateProductCache();
 
     res.status(200).json({
       success: true,

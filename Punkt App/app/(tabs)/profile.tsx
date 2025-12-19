@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
 import {
     Alert,
     ScrollView,
@@ -11,12 +11,20 @@ import {
 } from 'react-native';
 import { KpiSummarySection } from '../components/KpiSummarySection';
 import { useAuth } from '../contexts/AuthContext';
+import { useKpiSummary } from '../hooks/useKpiSummary';
 import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
 
 export default function ProfileScreen() {
   const { punkt, logout } = useAuth();
   const router = useRouter();
   const { unreadCount } = useUnreadNotifications();
+  const { refresh: refreshKpiSummary } = useKpiSummary();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshKpiSummary();
+    }, [refreshKpiSummary])
+  );
 
   const handleLogout = () => {
     Alert.alert(
