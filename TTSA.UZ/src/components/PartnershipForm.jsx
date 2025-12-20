@@ -21,6 +21,32 @@ const PartnershipForm = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  // localStorage'dan viloyat va tuman ma'lumotlarini yuklash
+  useEffect(() => {
+    try {
+      const savedViloyat = localStorage.getItem('selectedViloyat');
+      const savedTuman = localStorage.getItem('selectedTuman');
+      
+      if (savedViloyat) {
+        const viloyat = JSON.parse(savedViloyat);
+        setFormData(prev => ({
+          ...prev,
+          viloyat: viloyat
+        }));
+      }
+      
+      if (savedTuman) {
+        const tuman = JSON.parse(savedTuman);
+        setFormData(prev => ({
+          ...prev,
+          tuman: tuman
+        }));
+      }
+    } catch (err) {
+      console.error('Error loading from localStorage:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (success) {
       const timer = setTimeout(() => {
@@ -45,9 +71,22 @@ const PartnershipForm = () => {
         newData.viloyat = region;
         newData.tuman = null;
         newData.mfy = null;
+        // Viloyat ma'lumotlarini localStorage'ga saqlash
+        if (region) {
+          localStorage.setItem('selectedViloyat', JSON.stringify(region));
+          localStorage.setItem('selectedViloyatId', region._id);
+          // Tuman va MFY ni tozalash
+          localStorage.removeItem('selectedTuman');
+          localStorage.removeItem('selectedTumanId');
+        }
       } else if (type === 'district') {
         newData.tuman = region;
         newData.mfy = null;
+        // Tuman ma'lumotlarini localStorage'ga saqlash
+        if (region) {
+          localStorage.setItem('selectedTuman', JSON.stringify(region));
+          localStorage.setItem('selectedTumanId', region._id);
+        }
       } else if (type === 'mfy') {
         newData.mfy = region;
       }
@@ -103,6 +142,11 @@ const PartnershipForm = () => {
         managerLastName: '',
         managerPhone: '',
       });
+      // localStorage ni tozalash
+      localStorage.removeItem('selectedViloyat');
+      localStorage.removeItem('selectedViloyatId');
+      localStorage.removeItem('selectedTuman');
+      localStorage.removeItem('selectedTumanId');
     } catch (err) {
       setError(
         err.response?.data?.message || 
@@ -203,21 +247,21 @@ const PartnershipForm = () => {
           required
         />
 
-        {formData.viloyat && (
+        {(formData.viloyat || localStorage.getItem('selectedViloyatId')) && (
           <RegionSelector
             type="district"
             label="Tuman"
-            parentId={formData.viloyat._id}
+            parentId={formData.viloyat?._id || localStorage.getItem('selectedViloyatId')}
             selectedRegion={formData.tuman}
             onSelect={(region) => handleRegionSelect('district', region)}
           />
         )}
 
-        {formData.tuman && (
+        {(formData.tuman || localStorage.getItem('selectedTumanId')) && (
           <RegionSelector
             type="mfy"
             label="MFY"
-            parentId={formData.tuman._id}
+            parentId={formData.tuman?._id || localStorage.getItem('selectedTumanId')}
             selectedRegion={formData.mfy}
             onSelect={(region) => handleRegionSelect('mfy', region)}
             required
