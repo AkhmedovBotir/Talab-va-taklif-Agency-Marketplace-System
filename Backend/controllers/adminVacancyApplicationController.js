@@ -4,7 +4,6 @@ const VacancyApplicant = require('../models/VacancyApplicant');
 const Punkt = require('../models/Punkt');
 const Agent = require('../models/Agent');
 const Region = require('../models/Region');
-const { cacheInvalidators } = require('../middleware/cache');
 
 // Get all applications for a vacancy (admin only)
 const getApplicationsByVacancy = async (req, res) => {
@@ -549,7 +548,6 @@ const makeFinalDecision = async (req, res) => {
         ]);
 
         // Invalidate cache
-        await cacheInvalidators.invalidatePunktCache();
 
         createdUser = {
           type: 'punkt',
@@ -679,7 +677,6 @@ const makeFinalDecision = async (req, res) => {
         const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
 
         // Invalidate cache
-        await cacheInvalidators.invalidateAgentCache();
 
         createdUser = {
           type: 'agent',

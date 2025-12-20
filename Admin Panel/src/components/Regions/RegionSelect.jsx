@@ -31,14 +31,48 @@ const RegionSelect = ({ value, onChange, disabled, label, required, name, type, 
           limit: 100,
         };
         
-        if (parentId !== undefined) {
-          params.parent = parentId || null;
+        // According to API docs:
+        // - type="region" -> parent should be null (top-level regions have no parent)
+        // - type="district" -> parent should be viloyat ID
+        // - type="mfy" -> parent should be tuman ID
+        if (type === 'region') {
+          // Regions are top-level, so parent should be null
+          params.parent = null;
+        } else if (parentId !== undefined) {
+          // For district and mfy, use parentId if provided
+          params.parent = parentId === null ? null : parentId;
         }
+        // If parentId is undefined and type is not 'region', don't filter by parent
+
+        console.log('🔵 RegionSelect - API Request Params:', {
+          type,
+          parentId,
+          params,
+          label
+        });
 
         const response = await regionAPI.getAllRegions(params);
+        
+        console.log('🟢 RegionSelect - API Response:', {
+          success: response.success,
+          count: response.count,
+          total: response.total,
+          page: response.page,
+          totalPages: response.totalPages,
+          dataLength: response.data?.length,
+          firstItem: response.data?.[0],
+          fullResponse: response
+        });
+
         if (response.success) {
           // API returns { success: true, count, total, page, limit, totalPages, data: [...] }
           const regions = response.data || [];
+          console.log('📦 RegionSelect - Extracted Regions:', {
+            regionsCount: regions.length,
+            regions: regions.slice(0, 3), // First 3 regions
+            allRegionsListBefore: allRegionsList.length
+          });
+          
           allRegionsList = [...allRegionsList, ...regions];
           
           // Check pagination
@@ -48,32 +82,58 @@ const RegionSelect = ({ value, onChange, disabled, label, required, name, type, 
             hasMore = false;
           }
         } else {
+          console.warn('⚠️ RegionSelect - API Response not successful:', response);
           hasMore = false;
         }
       }
 
+      console.log('✅ RegionSelect - Final Regions List:', {
+        totalRegions: allRegionsList.length,
+        sampleRegions: allRegionsList.slice(0, 3)
+      });
+
       setAllRegions(allRegionsList);
       setFilteredRegions(allRegionsList);
     } catch (err) {
+      console.error('❌ RegionSelect - Error fetching regions:', {
+        error: err,
+        message: err.message,
+        type,
+        parentId,
+        label
+      });
       setAllRegions([]);
       setFilteredRegions([]);
     } finally {
       setLoading(false);
     }
-  }, [type, parentId]);
+  }, [type, parentId, label]);
 
+  // Track previous parentId and type to detect changes
+  const prevParentIdRef = useRef(parentId);
+  const prevTypeRef = useRef(type);
+
+  // Fetch regions when dropdown opens
   useEffect(() => {
     if (isOpen && allRegions.length === 0) {
       fetchAllRegions();
     }
-  }, [isOpen, fetchAllRegions, allRegions.length]);
+  }, [isOpen, allRegions.length, fetchAllRegions]);
 
-  // Re-fetch when parentId changes
+  // Re-fetch when parentId or type changes (reset and fetch if dropdown is open)
   useEffect(() => {
-    if (isOpen && parentId !== undefined) {
+    const parentIdChanged = prevParentIdRef.current !== parentId;
+    const typeChanged = prevTypeRef.current !== type;
+    
+    if ((parentIdChanged || typeChanged) && isOpen) {
+      setAllRegions([]);
+      setFilteredRegions([]);
       fetchAllRegions();
     }
-  }, [parentId, isOpen, fetchAllRegions]);
+    
+    prevParentIdRef.current = parentId;
+    prevTypeRef.current = type;
+  }, [parentId, type, isOpen, fetchAllRegions]);
 
   // Fetch regions when value is set but not found in allRegions (for edit modals)
   useEffect(() => {

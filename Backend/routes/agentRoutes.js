@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   createAgent,
   getAllAgents,
@@ -26,13 +25,13 @@ router.post('/login', validate(agentValidationSchemas.login), loginAgent);
 router.post('/', validate(agentValidationSchemas.create), createAgent);
 
 // Get agents for selection (agent ID tanlash uchun, public endpoint)
-router.get('/selection', cacheMiddleware(1800), getAgentsForSelection); // 30 min cache
+router.get('/selection', getAgentsForSelection);
 
 // Get all agents (with optional filters: ?status=active&viloyat=regionId&tuman=districtId&mfy=mfyId&agentType=viloyat|tuman|mfy&page=1&limit=10)
-router.get('/', cacheMiddleware(1800), getAllAgents); // 30 min cache
+router.get('/', getAllAgents);
 
 // Get agent by ID
-router.get('/:id', cacheMiddleware(3600), getAgentById); // 1 hour cache
+router.get('/:id', getAgentById);
 
 // Update agent
 router.put('/:id', validate(agentValidationSchemas.update), updateAgent);
@@ -41,8 +40,8 @@ router.put('/:id', validate(agentValidationSchemas.update), updateAgent);
 router.delete('/:id', deleteAgent);
 
 // Notification routes for Agent (viloyat/tuman/mfy)
-router.get('/notifications/list', agentAuth, cacheMiddleware(60), getAgentNotifications); // 1 min cache
-router.get('/notifications/unread-count', agentAuth, cacheMiddleware(30), getAgentUnreadCount); // 30 sec cache
+router.get('/notifications/list', agentAuth, getAgentNotifications);
+router.get('/notifications/unread-count', agentAuth, getAgentUnreadCount);
 router.post('/notifications/:notificationId/read', agentAuth, markAgentNotificationRead);
 router.post('/notifications/read-all', agentAuth, markAllAgentNotificationsRead);
 

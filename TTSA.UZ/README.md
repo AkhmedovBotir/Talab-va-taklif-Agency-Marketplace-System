@@ -24,7 +24,7 @@ npm install
 
 `.env` fayl yarating va quyidagilarni qo'shing:
 ```env
-VITE_API_BASE_URL=http://localhost:5000/api
+VITE_API_BASE_URL=https://api.ttsa.uz/api
 ```
 
 3. **Development server ishga tushirish:**

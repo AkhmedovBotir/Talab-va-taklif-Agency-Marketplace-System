@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   createContragent,
   getAllContragents,
@@ -25,7 +24,7 @@ const { contragentAuth } = require('../middleware/auth');
 router.post('/login', validate(contragentValidationSchemas.login), loginContragent);
 
 // Get current contragent (me)
-router.get('/me', contragentAuth, cacheMiddleware(300), getMe); // 5 min cache
+router.get('/me', contragentAuth, getMe);
 
 // Update current contragent profile
 router.put('/me', contragentAuth, validate(contragentValidationSchemas.updateProfile), updateMyProfile);
@@ -37,10 +36,10 @@ router.patch('/me/logo', contragentAuth, validate(contragentValidationSchemas.up
 router.post('/', validate(contragentValidationSchemas.create), createContragent);
 
 // Get all contragents (with optional filters: ?status=active&address=regionId&page=1&limit=10)
-router.get('/', cacheMiddleware(1800), getAllContragents); // 30 min cache
+router.get('/', getAllContragents);
 
 // Get contragent by ID
-router.get('/:id', cacheMiddleware(3600), getContragentById); // 1 hour cache
+router.get('/:id', getContragentById);
 
 // Update contragent
 router.put('/:id', validate(contragentValidationSchemas.update), updateContragent);

@@ -158,3 +158,5 @@ const ArchivedPunktTable = ({ punkts, loading, pagination, onPageChange, onViewW
 
 export default ArchivedPunktTable;
 
+
+

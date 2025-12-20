@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://192.168.1.6:5000/api/marketplace';
-const REGIONS_BASE_URL = 'http://192.168.1.6:5000/api';
-const REVIEWS_BASE_URL = 'http://192.168.1.6:5000/api/reviews';
-const PAYMENT_BASE_URL = 'http://192.168.1.6:5000/api/payment';
+const BASE_URL = 'https://api.ttsa.uz/api/marketplace';
+const REGIONS_BASE_URL = 'https://api.ttsa.uz/api';
+const REVIEWS_BASE_URL = 'https://api.ttsa.uz/api/reviews';
+const PAYMENT_BASE_URL = 'https://api.ttsa.uz/api/payment';
 // Auth storage keys MUST match those used in AuthContext
 const TOKEN_KEY = '@marketplace:token';
 const USER_KEY = '@marketplace:user';
@@ -119,6 +119,11 @@ export interface ContragentsResponse {
   limit: number;
   totalPages: number;
   data: Contragent[];
+  imgBase?: string;
+  next?: {
+    page?: number;
+    limit?: number;
+  };
 }
 
 // Featured Contragents (short view)
@@ -865,11 +870,13 @@ class ApiService {
     status?: string;
     page?: number;
     limit?: number;
+    search?: string;
   }): Promise<ContragentsResponse> {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.search) queryParams.append('search', params.search);
 
     const queryString = queryParams.toString();
     const endpoint = `/contragents${queryString ? `?${queryString}` : ''}`;

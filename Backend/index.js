@@ -4,7 +4,6 @@ const cors = require('cors');
 const http = require('http');
 const connectDB = require('./config/database');
 const { initializeSocket } = require('./config/socket');
-const { getRedisClient } = require('./config/redis');
 
 // Import routes
 const adminRoutes = require('./routes/adminRoutes');
@@ -39,24 +38,6 @@ const io = initializeSocket(server);
 // Connect to MongoDB
 connectDB();
 
-// Connect to Redis
-(async () => {
-  try {
-    if (process.env.REDIS_URL) {
-      const client = await getRedisClient();
-      if (client) {
-        console.log('Redis Connected');
-      } else {
-        console.log('Redis connection failed, continuing without cache...');
-      }
-    } else {
-      console.log('Redis URL not configured, continuing without cache...');
-    }
-  } catch (err) {
-    console.error('Redis connection error:', err.message);
-    console.log('Continuing without Redis cache...');
-  }
-})();
 
 // Middleware
 app.use(cors());

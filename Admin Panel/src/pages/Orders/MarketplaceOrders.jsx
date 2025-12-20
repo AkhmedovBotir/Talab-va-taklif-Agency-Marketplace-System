@@ -118,16 +118,16 @@ const MarketplaceOrders = ({ hideHeader = false }) => {
   return (
     <div>
       {!hideHeader && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Marketplace Buyurtmalar</h1>
-            <p className="text-gray-600">Marketplace orqali qilingan yangi buyurtmalarni ko'rish</p>
-          </div>
-        </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Marketplace Buyurtmalar</h1>
+          <p className="text-gray-600">Marketplace orqali qilingan yangi buyurtmalarni ko'rish</p>
+        </div>
+      </motion.div>
       )}
 
       <motion.div

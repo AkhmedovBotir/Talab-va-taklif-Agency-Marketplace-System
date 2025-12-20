@@ -3,7 +3,6 @@ const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const MarketplaceUser = require('../models/MarketplaceUser');
 const Region = require('../models/Region');
-const { cacheInvalidators } = require('../middleware/cache');
 
 // Create order from cart
 const createOrder = async (req, res) => {
@@ -321,8 +320,6 @@ const createOrder = async (req, res) => {
     });
 
     // Invalidate cache
-    await cacheInvalidators.invalidateOrderCache();
-    await cacheInvalidators.invalidateCartCache(userId);
 
     res.status(201).json({
       success: true,
@@ -651,8 +648,6 @@ const cancelOrder = async (req, res) => {
     });
 
     // Invalidate cache
-    await cacheInvalidators.invalidateOrderCache();
-    await cacheInvalidators.invalidateCartCache(userId);
 
     res.status(200).json({
       success: true,
@@ -785,7 +780,6 @@ const confirmDelivery = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateOrderCache();
 
     res.status(200).json({
       success: true,

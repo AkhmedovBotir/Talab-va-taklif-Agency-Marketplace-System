@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const { punktAuth } = require('../middleware/auth');
 const {
   getMyOrders,
@@ -32,19 +31,19 @@ const {
 router.use(punktAuth);
 
 // Get orders for punkt (o'z hududidagi buyurtmalar)
-router.get('/orders', cacheMiddleware(60), getMyOrders); // 1 min cache
+router.get('/orders', getMyOrders);
 
 // Get today's orders (bugungi buyurtmalar)
-router.get('/orders/today', cacheMiddleware(60), getTodayOrders); // 1 min cache
+router.get('/orders/today', getTodayOrders);
 
 // Get order history (tarix - o'tgan kunlar)
-router.get('/orders/history', cacheMiddleware(300), getOrderHistory); // 5 min cache
+router.get('/orders/history', getOrderHistory);
 
 // Get order by ID
-router.get('/orders/:id', cacheMiddleware(60), getOrderById); // 1 min cache
+router.get('/orders/:id', getOrderById);
 
 // Get contragent IDs from order products (buyurtmadagi maxsulotlarning contragent ID'larini olish)
-router.get('/orders/:id/contragents', cacheMiddleware(300), getOrderContragentIds); // 5 min cache
+router.get('/orders/:id/contragents', getOrderContragentIds);
 
 // Confirm order (buyurtmani tasdiqlash)
 router.post('/orders/:id/confirm', confirmOrder);
@@ -71,13 +70,13 @@ router.post('/orders/:id/receive-from-punkt', receiveFromPunkt);
 router.post('/orders/:id/receive-from-contragent', receiveFromContragent);
 
 // Get punkt to punkt requests (punktdan punktga so'rovlar)
-router.get('/punkt-to-punkt-requests', cacheMiddleware(60), getPunktToPunktRequests); // 1 min cache
+router.get('/punkt-to-punkt-requests', getPunktToPunktRequests);
 
 // Respond to punkt to punkt request (punktdan punktga so'rovga javob berish)
 router.post('/punkt-to-punkt-requests/:orderId/respond', respondToPunktToPunktRequest);
 
 // Get requests to my punkt (o'z punktiga kelgan so'rovlar)
-router.get('/requests', cacheMiddleware(60), getPunktRequests); // 1 min cache
+router.get('/requests', getPunktRequests);
 
 // Respond to request (so'rovga javob berish)
 router.post('/requests/:orderId/respond', respondToRequest);

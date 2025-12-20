@@ -12,12 +12,11 @@ const {
   forgotPasswordConfirm,
   resendCode,
 } = require('../controllers/vacancyAuthController');
-const { cacheMiddleware } = require('../middleware/cache');
 // Phone check
-router.get('/register/check', cacheMiddleware(60), checkPhone); // 1 min cache
+router.get('/register/check', checkPhone);
 
 // Regions
-router.get('/regions', cacheMiddleware(3600), getRegions); // 1 hour cache
+router.get('/regions', getRegions);
 
 // Register
 router.post('/register/send-code', sendRegisterCode);

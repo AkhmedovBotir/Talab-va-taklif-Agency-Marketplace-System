@@ -235,3 +235,5 @@ const ContragentPaymentTable = ({
 
 export default ContragentPaymentTable;
 
+
+

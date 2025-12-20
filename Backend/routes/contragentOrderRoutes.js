@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const { contragentAuth } = require('../middleware/auth');
 const {
   getOrdersForContragent,
@@ -16,10 +15,10 @@ const {
 router.use(contragentAuth);
 
 // Get orders for contragent (contragentga kelgan so'rovlar)
-router.get('/orders', cacheMiddleware(60), getOrdersForContragent); // 1 min cache
+router.get('/orders', getOrdersForContragent);
 
 // Get order by ID
-router.get('/orders/:id', cacheMiddleware(60), getOrderById); // 1 min cache
+router.get('/orders/:id', getOrderById);
 
 // Respond to order request (buyurtma so'roviga javob berish)
 router.post('/orders/:orderId/respond', respondToOrderRequest);
@@ -28,13 +27,13 @@ router.post('/orders/:orderId/respond', respondToOrderRequest);
 router.post('/orders/:orderId/deliver-to-punkt', deliverToPunkt);
 
 // Get contragent statistics
-router.get('/statistics', cacheMiddleware(300), getContragentStatistics); // 5 min cache
+router.get('/statistics', getContragentStatistics);
 
 // Get today's orders (bugungi buyurtmalar)
-router.get('/today', cacheMiddleware(60), getTodayOrders); // 1 min cache
+router.get('/today', getTodayOrders);
 
 // Get order history (tarix - o'tgan kunlar)
-router.get('/history', cacheMiddleware(300), getOrderHistory); // 5 min cache
+router.get('/history', getOrderHistory);
 
 module.exports = router;
 

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://api.ttsa.uz/api';
 
 // Helper function to get token from localStorage
 const getToken = () => {
@@ -276,7 +276,27 @@ export const regionAPI = {
     if (type) queryParams.append('type', type);
     if (parent !== undefined) queryParams.append('parent', parent === null ? 'null' : parent);
     
-    return apiRequest(`/regions?${queryParams.toString()}`);
+    const url = `/regions?${queryParams.toString()}`;
+    console.log('🌐 regionAPI.getAllRegions - Request:', {
+      url,
+      params,
+      queryString: queryParams.toString()
+    });
+    
+    const response = await apiRequest(url);
+    
+    console.log('🌐 regionAPI.getAllRegions - Response:', {
+      success: response.success,
+      count: response.count,
+      total: response.total,
+      page: response.page,
+      totalPages: response.totalPages,
+      dataLength: response.data?.length,
+      firstItem: response.data?.[0],
+      fullResponse: response
+    });
+    
+    return response;
   },
 
   // Get regions by type

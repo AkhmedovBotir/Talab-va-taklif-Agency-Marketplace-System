@@ -95,7 +95,6 @@ const createContragent = async (req, res) => {
     await contragent.populate('mfy', 'name type code');
 
     // Invalidate cache
-    await cacheInvalidators.invalidateContragentCache();
 
     res.status(201).json({
       success: true,
@@ -340,7 +339,6 @@ const updateContragent = async (req, res) => {
       await contragent.populate('mfy', 'name type code');
 
       // Invalidate cache
-      await cacheInvalidators.invalidateContragentCache();
 
       return res.status(200).json({
         success: true,
@@ -383,7 +381,6 @@ const updateContragent = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateContragentCache();
 
     res.status(200).json({
       success: true,
@@ -423,7 +420,6 @@ const deleteContragent = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateContragentCache();
 
     res.status(200).json({
       success: true,
@@ -581,7 +577,6 @@ const updateMyProfile = async (req, res) => {
       .select('-password');
 
     // Invalidate cache
-    await cacheInvalidators.invalidateContragentCache();
 
     res.status(200).json({
       success: true,
@@ -615,7 +610,6 @@ const updateMyLogo = async (req, res) => {
       .select('-password');
 
     // Invalidate cache
-    await cacheInvalidators.invalidateContragentCache();
 
     res.status(200).json({
       success: true,

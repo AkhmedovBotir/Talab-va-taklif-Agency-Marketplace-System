@@ -142,16 +142,16 @@ const Orders = ({ hideHeader = false }) => {
     <div>
       {/* Header */}
       {!hideHeader && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Barcha Buyurtmalar</h1>
-            <p className="text-gray-600">Barcha buyurtmalarni ko'rish va monitoring qilish</p>
-          </div>
-        </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Barcha Buyurtmalar</h1>
+          <p className="text-gray-600">Barcha buyurtmalarni ko'rish va monitoring qilish</p>
+        </div>
+      </motion.div>
       )}
 
       {/* Filters */}
@@ -253,13 +253,13 @@ const Orders = ({ hideHeader = false }) => {
             <div>
               <UserSelect
                 name="user"
-                value={filters.user}
-                onChange={(e) => {
-                  setFilters({ ...filters, user: e.target.value });
-                  setPagination({ ...pagination, page: 1 });
-                }}
+              value={filters.user}
+              onChange={(e) => {
+                setFilters({ ...filters, user: e.target.value });
+                setPagination({ ...pagination, page: 1 });
+              }}
                 label=""
-              />
+            />
             </div>
           </div>
 

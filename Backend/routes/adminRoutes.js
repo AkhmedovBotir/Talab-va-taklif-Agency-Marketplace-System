@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   createAdmin,
   getAllAdmins,
@@ -105,113 +104,113 @@ router.post('/login', validate(adminValidationSchemas.login), loginAdmin);
 router.post('/', validate(adminValidationSchemas.create), createAdmin);
 
 // Get all admins
-router.get('/', cacheMiddleware(1800), getAllAdmins); // 30 min cache
+router.get('/', getAllAdmins);
 
 // Admin data endpoints (require authentication) - MUST be before /:id route
 // Dashboard overview
-router.get('/dashboard/overview', adminAuth, cacheMiddleware(300), getAdminDashboardOverview); // 5 min cache
+router.get('/dashboard/overview', adminAuth, getAdminDashboardOverview);
 
 // Get all categories (for admin)
-router.get('/data/categories', adminAuth, cacheMiddleware(3600), getAllCategoriesForAdmin); // 1 hour cache
+router.get('/data/categories', adminAuth, getAllCategoriesForAdmin);
 
 // Get all subcategories (for admin)
-router.get('/data/subcategories', adminAuth, cacheMiddleware(3600), getAllSubcategoriesForAdmin); // 1 hour cache
+router.get('/data/subcategories', adminAuth, getAllSubcategoriesForAdmin);
 
 // Get category by ID (for admin)
-router.get('/data/categories/:id', adminAuth, cacheMiddleware(3600), getCategoryByIdForAdmin); // 1 hour cache
+router.get('/data/categories/:id', adminAuth, getCategoryByIdForAdmin);
 
 // Get all products (for admin with advanced filters)
-router.get('/data/products', adminAuth, cacheMiddleware(1800), getAllProductsForAdmin); // 30 min cache
+router.get('/data/products', adminAuth, getAllProductsForAdmin);
 
 // Get product by ID (for admin)
-router.get('/data/products/:id', adminAuth, cacheMiddleware(3600), getProductByIdForAdmin); // 1 hour cache
+router.get('/data/products/:id', adminAuth, getProductByIdForAdmin);
 
 // Get all SMS verifications (for admin)
-router.get('/data/sms-verifications', adminAuth, cacheMiddleware(300), getAllSmsVerificationsForAdmin); // 5 min cache
+router.get('/data/sms-verifications', adminAuth, getAllSmsVerificationsForAdmin);
 
 // Get SMS verification by ID (for admin)
-router.get('/data/sms-verifications/:id', adminAuth, cacheMiddleware(300), getSmsVerificationByIdForAdmin); // 5 min cache
+router.get('/data/sms-verifications/:id', adminAuth, getSmsVerificationByIdForAdmin);
 
 // Get all marketplace users (for admin)
-router.get('/data/marketplace-users', adminAuth, cacheMiddleware(1800), getAllMarketplaceUsersForAdmin); // 30 min cache
+router.get('/data/marketplace-users', adminAuth, getAllMarketplaceUsersForAdmin);
 
 // Get marketplace user by ID (for admin)
-router.get('/data/marketplace-users/:id', adminAuth, cacheMiddleware(3600), getMarketplaceUserByIdForAdmin); // 1 hour cache
+router.get('/data/marketplace-users/:id', adminAuth, getMarketplaceUserByIdForAdmin);
 
 // Get all orders (for admin) - Barcha buyurtmalar
-router.get('/data/orders', adminAuth, cacheMiddleware(300), getAllOrdersForAdmin); // 5 min cache
+router.get('/data/orders', adminAuth, getAllOrdersForAdmin);
 
 // Get marketplace orders (Marketplace buyurtmalari) - MUST be before /:id route
-router.get('/data/orders/marketplace', adminAuth, cacheMiddleware(300), getMarketplaceOrdersForAdmin); // 5 min cache
+router.get('/data/orders/marketplace', adminAuth, getMarketplaceOrdersForAdmin);
 
 // Get orders confirmed by punkt but nothing done (Punkt qabul qilgan) - MUST be before /:id route
-router.get('/data/orders/confirmed-by-punkt', adminAuth, cacheMiddleware(300), getOrdersConfirmedByPunktForAdmin); // 5 min cache
+router.get('/data/orders/confirmed-by-punkt', adminAuth, getOrdersConfirmedByPunktForAdmin);
 
 // Get orders requested to contragents (Kontragentlarga yuborilgan) - MUST be before /:id route
-router.get('/data/orders/requested-to-contragents', adminAuth, cacheMiddleware(300), getOrdersRequestedToContragentsForAdmin); // 5 min cache
+router.get('/data/orders/requested-to-contragents', adminAuth, getOrdersRequestedToContragentsForAdmin);
 
 // Get orders delivered to punkt (Kontragent punktga yetkazgan) - MUST be before /:id route
-router.get('/data/orders/delivered-to-punkt', adminAuth, cacheMiddleware(300), getOrdersDeliveredToPunktForAdmin); // 5 min cache
+router.get('/data/orders/delivered-to-punkt', adminAuth, getOrdersDeliveredToPunktForAdmin);
 
 // Get orders assigned to agents (Agentga yuborilgan) - MUST be before /:id route
-router.get('/data/orders/assigned-to-agents', adminAuth, cacheMiddleware(300), getOrdersAssignedToAgentsForAdmin); // 5 min cache
+router.get('/data/orders/assigned-to-agents', adminAuth, getOrdersAssignedToAgentsForAdmin);
 
 // Get orders confirmed by agents (Agent topshirgan buyurtmalar) - MUST be before /:id route
-router.get('/data/orders/confirmed-by-agents', adminAuth, cacheMiddleware(300), getOrdersConfirmedByAgentsForAdmin); // 5 min cache
+router.get('/data/orders/confirmed-by-agents', adminAuth, getOrdersConfirmedByAgentsForAdmin);
 
 // Get orders confirmed by customers (Foydalanuvchi qabul qilgan buyurtmalar) - MUST be before /:id route
-router.get('/data/orders/confirmed-by-customers', adminAuth, cacheMiddleware(300), getOrdersConfirmedByCustomersForAdmin); // 5 min cache
+router.get('/data/orders/confirmed-by-customers', adminAuth, getOrdersConfirmedByCustomersForAdmin);
 
 // Get cancelled orders (Qaytarilgan buyurtmalar) - MUST be before /:id route
-router.get('/data/orders/cancelled', adminAuth, cacheMiddleware(300), getCancelledOrdersForAdmin); // 5 min cache
+router.get('/data/orders/cancelled', adminAuth, getCancelledOrdersForAdmin);
 
 // Get order by ID (for admin) - MUST be last to avoid conflicts with specific routes
-router.get('/data/orders/:id', adminAuth, cacheMiddleware(300), getOrderByIdForAdmin); // 5 min cache
+router.get('/data/orders/:id', adminAuth, getOrderByIdForAdmin);
 
 // Get agents in region (o'z hududidagi agentlar)
-router.get('/data/agents', adminAuth, cacheMiddleware(1800), getAgentsInRegion); // 30 min cache
+router.get('/data/agents', adminAuth, getAgentsInRegion);
 
 // Get punkts in region (o'z hududidagi punktlar)
-router.get('/data/punkts', adminAuth, cacheMiddleware(1800), getPunktsInRegion); // 30 min cache
+router.get('/data/punkts', adminAuth, getPunktsInRegion);
 
 // Archive endpoints (Arxiv API)
-router.get('/archive/punkts', adminAuth, cacheMiddleware(1800), getArchivedPunkts); // 30 min cache
-router.get('/archive/agents', adminAuth, cacheMiddleware(1800), getArchivedAgents); // 30 min cache
-router.get('/archive/punkts/:id/work', adminAuth, cacheMiddleware(1800), getArchivedPunktWithWork); // 30 min cache
-router.get('/archive/agents/:id/work', adminAuth, cacheMiddleware(1800), getArchivedAgentWithWork); // 30 min cache
+router.get('/archive/punkts', adminAuth, getArchivedPunkts);
+router.get('/archive/agents', adminAuth, getArchivedAgents);
+router.get('/archive/punkts/:id/work', adminAuth, getArchivedPunktWithWork);
+router.get('/archive/agents/:id/work', adminAuth, getArchivedAgentWithWork);
 
 // Sales Statistics endpoints
-router.get('/stats/sales/summary', adminAuth, cacheMiddleware(300), getSalesStatsSummary); // 5 min cache
-router.get('/stats/sales/viloyats', adminAuth, cacheMiddleware(1800), getSalesStatsByViloyats); // 30 min cache
-router.get('/stats/sales/viloyats/:viloyatId', adminAuth, cacheMiddleware(1800), getSalesStatsByViloyatId); // 30 min cache
-router.get('/stats/sales/tumans/:tumanId', adminAuth, cacheMiddleware(1800), getSalesStatsByTumanId); // 30 min cache
-router.get('/stats/sales/mfys/:mfyId', adminAuth, cacheMiddleware(1800), getSalesStatsByMfyId); // 30 min cache
+router.get('/stats/sales/summary', adminAuth, getSalesStatsSummary);
+router.get('/stats/sales/viloyats', adminAuth, getSalesStatsByViloyats);
+router.get('/stats/sales/viloyats/:viloyatId', adminAuth, getSalesStatsByViloyatId);
+router.get('/stats/sales/tumans/:tumanId', adminAuth, getSalesStatsByTumanId);
+router.get('/stats/sales/mfys/:mfyId', adminAuth, getSalesStatsByMfyId);
 
 // KPI Bonus Distribution endpoints
 router.post('/kpi/distributions', adminAuth, createKpiDistribution);
-router.get('/kpi/distributions', adminAuth, cacheMiddleware(3600), getAllKpiDistributions); // 1 hour cache
-router.get('/kpi/distributions/:id', adminAuth, cacheMiddleware(3600), getKpiDistributionById); // 1 hour cache
+router.get('/kpi/distributions', adminAuth, getAllKpiDistributions);
+router.get('/kpi/distributions/:id', adminAuth, getKpiDistributionById);
 router.put('/kpi/distributions/:id', adminAuth, updateKpiDistribution);
 router.delete('/kpi/distributions/:id', adminAuth, deleteKpiDistribution);
-router.get('/kpi/distributions/initial/defaults', adminAuth, cacheMiddleware(3600), getInitialKpiDistribution); // 1 hour cache
+router.get('/kpi/distributions/initial/defaults', adminAuth, getInitialKpiDistribution);
 
 // KPI Bonus Transactions endpoints
-router.get('/kpi/transactions', adminAuth, cacheMiddleware(300), getAllKpiTransactions); // 5 min cache
-router.get('/kpi/transactions/:id', adminAuth, cacheMiddleware(300), getKpiTransactionById); // 5 min cache
+router.get('/kpi/transactions', adminAuth, getAllKpiTransactions);
+router.get('/kpi/transactions/:id', adminAuth, getKpiTransactionById);
 
 // KPI Statistics
-router.get('/kpi/statistics', adminAuth, cacheMiddleware(300), getKpiStatistics); // 5 min cache
+router.get('/kpi/statistics', adminAuth, getKpiStatistics);
 
 // KPI Data endpoints - Agents and Punkts KPI
-router.get('/kpi/data/viloyat-agents', adminAuth, cacheMiddleware(300), getViloyatAgentsKpi); // 5 min cache
-router.get('/kpi/data/tuman-agents', adminAuth, cacheMiddleware(300), getTumanAgentsKpi); // 5 min cache
-router.get('/kpi/data/mfy-agents', adminAuth, cacheMiddleware(300), getMfyAgentsKpi); // 5 min cache
-router.get('/kpi/data/punkts', adminAuth, cacheMiddleware(300), getPunktsKpi); // 5 min cache
-router.get('/kpi/data/agents/:agentId', adminAuth, cacheMiddleware(300), getAgentKpiDetails); // 5 min cache
-router.get('/kpi/data/punkts/:punktId', adminAuth, cacheMiddleware(300), getPunktKpiDetails); // 5 min cache
+router.get('/kpi/data/viloyat-agents', adminAuth, getViloyatAgentsKpi);
+router.get('/kpi/data/tuman-agents', adminAuth, getTumanAgentsKpi);
+router.get('/kpi/data/mfy-agents', adminAuth, getMfyAgentsKpi);
+router.get('/kpi/data/punkts', adminAuth, getPunktsKpi);
+router.get('/kpi/data/agents/:agentId', adminAuth, getAgentKpiDetails);
+router.get('/kpi/data/punkts/:punktId', adminAuth, getPunktKpiDetails);
 
 // Featured contragents endpoints
-router.get('/featured-contragents', adminAuth, cacheMiddleware(1800), getFeaturedContragentsForAdmin); // 30 min cache
+router.get('/featured-contragents', adminAuth, getFeaturedContragentsForAdmin);
 router.put(
   '/featured-contragents',
   adminAuth,
@@ -220,30 +219,30 @@ router.put(
 );
 
 // Partnership request endpoints
-router.get('/partnership-requests', adminAuth, cacheMiddleware(300), getAllPartnershipRequests); // 5 min cache
-router.get('/partnership-requests/:id', adminAuth, cacheMiddleware(300), getPartnershipRequestById); // 5 min cache
+router.get('/partnership-requests', adminAuth, getAllPartnershipRequests);
+router.get('/partnership-requests/:id', adminAuth, getPartnershipRequestById);
 router.patch('/partnership-requests/:id/contact-status', adminAuth, validate(partnershipRequestValidationSchemas.updateContactStatus), updateContactStatus);
 router.patch('/partnership-requests/:id/status', adminAuth, validate(partnershipRequestValidationSchemas.updateRequestStatus), updateRequestStatus);
 router.post('/partnership-requests/:id/convert-to-contragent', adminAuth, convertPartnershipRequestToContragent);
 
 // Vacancies (admin only)
 router.post('/vacancies', adminAuth, createVacancy);
-router.get('/vacancies', adminAuth, cacheMiddleware(1800), getVacancies); // 30 min cache
-router.get('/vacancies/:id', adminAuth, cacheMiddleware(3600), getVacancyById); // 1 hour cache
+router.get('/vacancies', adminAuth, getVacancies);
+router.get('/vacancies/:id', adminAuth, getVacancyById);
 router.put('/vacancies/:id', adminAuth, updateVacancy);
 router.delete('/vacancies/:id', adminAuth, deleteVacancy);
 
 // Vacancy Applications (admin only)
 // Get all applications for a vacancy
-router.get('/vacancies/:vacancyId/applications', adminAuth, cacheMiddleware(300), getApplicationsByVacancy); // 5 min cache
+router.get('/vacancies/:vacancyId/applications', adminAuth, getApplicationsByVacancy);
 // Get application by ID
-router.get('/applications/:id', adminAuth, cacheMiddleware(300), getApplicationById); // 5 min cache
+router.get('/applications/:id', adminAuth, getApplicationById);
 // Accept or reject application
 router.post('/applications/:id/decide', adminAuth, decideApplication);
 // Add interview stage
 router.post('/applications/:id/interview-stages', adminAuth, addInterviewStage);
 // Get interview stage by ID
-router.get('/applications/:id/interview-stages/:stageId', adminAuth, cacheMiddleware(300), getInterviewStage); // 5 min cache
+router.get('/applications/:id/interview-stages/:stageId', adminAuth, getInterviewStage);
 // Update interview stage
 router.put('/applications/:id/interview-stages/:stageId', adminAuth, updateInterviewStage);
 // Submit interview result
@@ -254,7 +253,7 @@ router.delete('/applications/:id/interview-stages/:stageId', adminAuth, deleteIn
 router.post('/applications/:id/final-decision', adminAuth, makeFinalDecision);
 
 // Get admin by ID (must be after /data/* routes)
-router.get('/:id', cacheMiddleware(3600), getAdminById); // 1 hour cache
+router.get('/:id', getAdminById);
 
 // Update admin
 router.put('/:id', validate(adminValidationSchemas.update), updateAdmin);
@@ -263,4 +262,3 @@ router.put('/:id', validate(adminValidationSchemas.update), updateAdmin);
 router.delete('/:id', deleteAdmin);
 
 module.exports = router;
-

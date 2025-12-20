@@ -611,3 +611,5 @@ async function getStatistics(token) {
 - To'lovlar tasdiqlanganda Contragentlarga bildirishnoma yuboriladi
 - Bir xil Contragent va bir xil dueDate uchun to'lovlar birlashtiriladi
 
+
+

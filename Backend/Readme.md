@@ -1,7 +1,7 @@
 # TTSA Backend - Talab va Taklif Agency Backend API
 
 **Versiya:** 1.0.0  
-**Texnologiyalar:** Node.js, Express.js, MongoDB, Redis, Socket.io  
+**Texnologiyalar:** Node.js, Express.js, MongoDB, Socket.io  
 **Status:** Production Ready ✅
 
 ---
@@ -18,7 +18,6 @@ TTSA Backend - bu keng qamrovli e-commerce marketplace platformasi bo'lib, quyid
 - **Vakansiya tizimi** (Ishga qabul jarayoni, intervyu bosqichlari)
 - **Real-time bildirishnomalar** (Socket.io)
 - **Review va baholash tizimi**
-- **Redis caching** (Performance optimizatsiyasi)
 
 ---
 
@@ -28,7 +27,6 @@ TTSA Backend - bu keng qamrovli e-commerce marketplace platformasi bo'lib, quyid
 
 - Node.js (v16 yoki yuqori)
 - MongoDB (v5 yoki yuqori)
-- Redis (v6 yoki yuqori) - ixtiyoriy, lekin tavsiya etiladi
 
 ### O'rnatish
 
@@ -44,7 +42,7 @@ npm install
 cp .env.example .env
 # .env faylini to'ldiring
 
-# MongoDB va Redis'ni ishga tushiring
+# MongoDB'ni ishga tushiring
 
 # Server'ni ishga tushiring
 npm start
@@ -71,9 +69,6 @@ PORT=5000
 # SMS (Eskiz)
 ESKIZ_EMAIL=your-email@example.com
 ESKIZ_PASSWORD=your-password
-
-# Redis (ixtiyoriy)
-REDIS_URL=redis://localhost:6379
 ```
 
 ---
@@ -84,7 +79,6 @@ REDIS_URL=redis://localhost:6379
 backend/
 ├── config/              # Konfiguratsiya fayllari
 │   ├── database.js      # MongoDB connection
-│   ├── redis.js         # Redis client va cache funksiyalari
 │   └── socket.js        # Socket.io konfiguratsiyasi
 ├── controllers/         # Business logic
 │   ├── admin*.js        # Admin controller'lar
@@ -106,8 +100,7 @@ backend/
 │   └── ...
 ├── middleware/          # Custom middleware'lar
 │   ├── auth.js         # Authentication middleware
-│   ├── validation.js   # Joi validation
-│   └── cache.js        # Redis cache middleware
+│   └── validation.js   # Joi validation
 ├── services/            # External services
 │   └── smsService.js   # SMS xizmati (Eskiz)
 ├── utils/               # Utility funksiyalar
@@ -254,19 +247,7 @@ backend/
 - `POST /api/admins/applications/:id/final-decision` - Yakuniy qaror
 - `GET /api/vacancy/vacancies` - Vakansiyalarni ko'rish
 
-### 6. Redis Caching
-
-**Cache Strategiyasi:**
-- Static ma'lumotlar (categories, regions): 1 hour
-- Dynamic ma'lumotlar (orders, notifications): 1-5 min
-- Real-time ma'lumotlar (unread count): 30 sec
-- User-specific ma'lumotlar (cart, profile): 1-5 min
-
-**Avtomatik Cache Invalidation:**
-- POST/PUT/DELETE request'larda tegishli cache'lar invalidate qilinadi
-- Pattern-based cache deletion
-
-### 7. Real-time Bildirishnomalar
+### 6. Real-time Bildirishnomalar
 
 **Socket.io Events:**
 - `notification` - Yangi bildirishnoma
@@ -351,9 +332,6 @@ npm run import-regions
 - **MongoDB** - Database
 - **Mongoose** - ODM
 
-### Caching
-- **Redis** - In-memory cache
-
 ### Real-time
 - **Socket.io** - WebSocket communication
 
@@ -372,11 +350,6 @@ npm run import-regions
 ---
 
 ## 📊 Performance Optimizatsiyasi
-
-### Redis Caching
-- Barcha GET endpoint'lar cache qilinadi
-- Cache duration ma'lumot turiga qarab (30 sec - 1 hour)
-- Avtomatik cache invalidation (POST/PUT/DELETE)
 
 ### Database Indexing
 - Barcha asosiy field'lar uchun indexlar
@@ -421,13 +394,6 @@ npm run import-regions
 mongod
 ```
 
-### Redis Connection Error
-```bash
-# Redis ishlamayapti
-# Yechim: Redis'ni ishga tushiring yoki REDIS_URL'ni o'chiring
-redis-server
-```
-
 ### Port Already in Use
 ```bash
 # Port allaqachon ishlatilmoqda
@@ -445,7 +411,6 @@ PORT=5001 npm start
 - ✅ Contragent to'lov tizimi
 - ✅ Moliya boshqaruvi
 - ✅ Vakansiya tizimi (Punkt/Agent yaratish bilan)
-- ✅ Redis caching
 - ✅ Real-time bildirishnomalar
 - ✅ To'liq API dokumentatsiyasi
 

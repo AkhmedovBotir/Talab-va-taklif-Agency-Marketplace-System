@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   getVacancies,
   getVacancyById,
@@ -27,10 +26,10 @@ const { vacancyApplicantAuth } = require('../middleware/auth');
 router.use(vacancyApplicantAuth);
 
 // Get all vacancies (with filters)
-router.get('/vacancies', cacheMiddleware(1800), getVacancies); // 30 min cache
+router.get('/vacancies', getVacancies);
 
 // Get vacancy by ID
-router.get('/vacancies/:id', cacheMiddleware(3600), getVacancyById); // 1 hour cache
+router.get('/vacancies/:id', getVacancyById);
 
 // Track vacancy view
 router.post('/vacancies/:id/view', trackVacancyView);
@@ -39,19 +38,19 @@ router.post('/vacancies/:id/view', trackVacancyView);
 router.post('/vacancies/:id/apply', applyToVacancy);
 
 // Get my applications
-router.get('/applications', cacheMiddleware(300), getMyApplications); // 5 min cache
+router.get('/applications', getMyApplications);
 
 // Get application by ID (with full details)
-router.get('/applications/:id', cacheMiddleware(300), getApplicationById); // 5 min cache
+router.get('/applications/:id', getApplicationById);
 
 // Get application evaluations
-router.get('/applications/:id/evaluations', cacheMiddleware(300), getApplicationEvaluations); // 5 min cache
+router.get('/applications/:id/evaluations', getApplicationEvaluations);
 
 // Get application interview stages
-router.get('/applications/:id/interview-stages', cacheMiddleware(300), getApplicationInterviewStages); // 5 min cache
+router.get('/applications/:id/interview-stages', getApplicationInterviewStages);
 
 // Get single interview stage by ID
-router.get('/applications/:id/interview-stages/:stageId', cacheMiddleware(300), getInterviewStageById); // 5 min cache
+router.get('/applications/:id/interview-stages/:stageId', getInterviewStageById);
 
 // Respond to final decision
 router.post('/applications/:id/final-decision/respond', respondToFinalDecision);
@@ -60,11 +59,11 @@ router.post('/applications/:id/final-decision/respond', respondToFinalDecision);
 router.post('/vacancies/:id/bookmark', toggleBookmark);
 
 // Get bookmarked vacancies
-router.get('/bookmarks', cacheMiddleware(300), getBookmarkedVacancies); // 5 min cache
+router.get('/bookmarks', getBookmarkedVacancies);
 
 // Notifications
-router.get('/notifications/list', cacheMiddleware(60), getVacancyNotifications); // 1 min cache
-router.get('/notifications/unread-count', cacheMiddleware(30), getVacancyUnreadCount); // 30 sec cache
+router.get('/notifications/list', getVacancyNotifications);
+router.get('/notifications/unread-count', getVacancyUnreadCount);
 router.post('/notifications/:notificationId/read', markVacancyNotificationRead);
 router.post('/notifications/read-all', markAllVacancyNotificationsRead);
 

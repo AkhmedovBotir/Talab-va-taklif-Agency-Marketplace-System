@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
+import FilterModal from '../../components/ui/FilterModal';
 import ProductCard from '../../components/ui/ProductCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
@@ -38,6 +39,11 @@ export default function SearchScreen() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [contragentFilter, setContragentFilter] = useState<string | undefined>(contragentId || undefined);
     const [contragentFilterName, setContragentFilterName] = useState<string | undefined>(contragentName || undefined);
+    const [filterModalVisible, setFilterModalVisible] = useState(false);
+    const [activeFilters, setActiveFilters] = useState<{
+        category?: string;
+        subcategory?: string;
+    }>({});
 
     // Debounce search query - 500ms delay
     useEffect(() => {
@@ -78,9 +84,11 @@ export default function SearchScreen() {
                     setPage(response.results.products.page);
                     setHasMore(response.results.products.page < response.results.products.totalPages);
                 } else if (contragentFilter) {
-                    // Use filter API with only contragent filter
+                    // Use filter API with contragent and category/subcategory filters
                     const response = await apiService.filterProducts({
                         contragent: contragentFilter,
+                        category: activeFilters.category,
+                        subcategory: activeFilters.subcategory,
                         page: pageNum,
                         limit: 20,
                     });
@@ -91,6 +99,7 @@ export default function SearchScreen() {
                         setProducts(response.results.data);
                     }
 
+                    console.log(response.results);
                     setPage(response.results.page);
                     setHasMore(response.results.page < response.results.totalPages);
                 } else {
@@ -119,7 +128,7 @@ export default function SearchScreen() {
                 setLoadingMore(false);
             }
         },
-        [debouncedSearchQuery, contragentFilter]
+        [debouncedSearchQuery, contragentFilter, activeFilters]
     );
 
     // Load products when debounced search query changes
@@ -137,6 +146,15 @@ export default function SearchScreen() {
             loadProducts(1, false);
         }
     }, [contragentFilter, debouncedSearchQuery, loadProducts]);
+
+    // Load products when active filters change
+    useEffect(() => {
+        if (!debouncedSearchQuery && contragentFilter) {
+            setPage(1);
+            setHasMore(true);
+            loadProducts(1, false);
+        }
+    }, [activeFilters, contragentFilter, debouncedSearchQuery, loadProducts]);
 
     // Reset search when coming from shops
     useEffect(() => {
@@ -239,56 +257,114 @@ export default function SearchScreen() {
         <View style={styles.container}>
             <Header title="Mahsulotlar" onNotificationPress={handleNotificationPress} unreadCount={unreadCount} />
 
-            {/* Search Bar */}
+            {/* Search Bar with Filter Button */}
             <View style={styles.searchContainer}>
-                <View style={styles.searchBar}>
-                    <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Mahsulot qidirish..."
-                        placeholderTextColor="#999"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        onSubmitEditing={handleSearch}
-                        returnKeyType="search"
-                    />
-                    {searchQuery.length > 0 && (
+                <View style={styles.searchInputGroup}>
+                    <View style={styles.searchBar}>
+                        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Mahsulot qidirish..."
+                            placeholderTextColor="#999"
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearch}
+                            returnKeyType="search"
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSearchQuery('');
+                                    setDebouncedSearchQuery('');
+                                    setPage(1);
+                                    setHasMore(true);
+                                    loadProducts(1, false, '');
+                                }}
+                                style={styles.clearButton}
+                            >
+                                <Ionicons name="close-circle" size={20} color="#999" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    {/* Filter Button - only show when contragent is selected */}
+                    {contragentFilter && (
                         <TouchableOpacity
-                            onPress={() => {
-                                setSearchQuery('');
-                                setDebouncedSearchQuery('');
-                                setPage(1);
-                                setHasMore(true);
-                                loadProducts(1, false, '');
-                            }}
-                            style={styles.clearButton}
+                            style={styles.filterButtonInline}
+                            onPress={() => setFilterModalVisible(true)}
+                            activeOpacity={0.7}
                         >
-                            <Ionicons name="close-circle" size={20} color="#999" />
+                            <Ionicons name="options" size={20} color="#007AFF" />
+                            {(activeFilters.category || activeFilters.subcategory) && (
+                                <View style={styles.filterBadgeInline}>
+                                    <Text style={styles.filterBadgeTextInline}>
+                                        {(activeFilters.category ? 1 : 0) + (activeFilters.subcategory ? 1 : 0)}
+                                    </Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
                     )}
                 </View>
             </View>
 
-            {/* Active Contragent Filter */}
-            {contragentFilterName && (
+            {/* Active Filters */}
+            {(contragentFilterName || activeFilters.category || activeFilters.subcategory) && (
                 <View style={styles.filterContainer}>
-                    <View style={styles.filterBadgeItem}>
-                        <Ionicons name="storefront" size={16} color="#007AFF" />
-                        <Text style={styles.filterBadgeItemText}>{contragentFilterName}</Text>
-                        <TouchableOpacity 
-                            onPress={() => {
-                                setContragentFilter(undefined);
-                                setContragentFilterName(undefined);
-                                setPage(1);
-                                setHasMore(true);
-                                loadProducts(1, false);
-                            }}
-                        >
-                            <Ionicons name="close-circle" size={18} color="#007AFF" />
-                        </TouchableOpacity>
-                    </View>
+                    {contragentFilterName && (
+                        <View style={styles.filterBadgeItem}>
+                            <Ionicons name="storefront" size={16} color="#007AFF" />
+                            <Text style={styles.filterBadgeItemText}>{contragentFilterName}</Text>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setContragentFilter(undefined);
+                                    setContragentFilterName(undefined);
+                                    setActiveFilters({});
+                                    setPage(1);
+                                    setHasMore(true);
+                                    loadProducts(1, false);
+                                }}
+                            >
+                                <Ionicons name="close-circle" size={18} color="#007AFF" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                    {activeFilters.category && (
+                        <View style={styles.filterBadgeItem}>
+                            <Ionicons name="folder" size={16} color="#007AFF" />
+                            <Text style={styles.filterBadgeItemText}>Kategoriya</Text>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setActiveFilters(prev => {
+                                        const newFilters = { ...prev };
+                                        delete newFilters.category;
+                                        delete newFilters.subcategory;
+                                        return newFilters;
+                                    });
+                                }}
+                            >
+                                <Ionicons name="close-circle" size={18} color="#007AFF" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                    {activeFilters.subcategory && (
+                        <View style={styles.filterBadgeItem}>
+                            <Ionicons name="albums" size={16} color="#007AFF" />
+                            <Text style={styles.filterBadgeItemText}>Kichik kategoriya</Text>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setActiveFilters(prev => {
+                                        const newFilters = { ...prev };
+                                        delete newFilters.subcategory;
+                                        return newFilters;
+                                    });
+                                }}
+                            >
+                                <Ionicons name="close-circle" size={18} color="#007AFF" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             )}
+
 
             {/* Products List */}
             {loading && products.length === 0 ? (
@@ -317,6 +393,23 @@ export default function SearchScreen() {
                 />
             )}
 
+            {/* Filter Modal */}
+            <FilterModal
+                visible={filterModalVisible}
+                onClose={() => setFilterModalVisible(false)}
+                onApply={(filters) => {
+                    setActiveFilters({
+                        category: filters.category,
+                        subcategory: filters.subcategory,
+                    });
+                }}
+                initialFilters={{
+                    contragent: contragentFilter,
+                    category: activeFilters.category,
+                    subcategory: activeFilters.subcategory,
+                }}
+                hideContragentFilter={!!contragentFilter}
+            />
         </View>
     );
 }
@@ -332,7 +425,13 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#e5e5e7',
     },
+    searchInputGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
     searchBar: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#f5f5f5',
@@ -377,6 +476,36 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#007AFF',
         fontWeight: '500',
+    },
+    filterButtonInline: {
+        width: 48,
+        height: 48,
+        backgroundColor: '#f0f7ff',
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#007AFF',
+        position: 'relative',
+    },
+    filterBadgeInline: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#FF3B30',
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    filterBadgeTextInline: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#fff',
     },
     listContent: {
         padding: 8,

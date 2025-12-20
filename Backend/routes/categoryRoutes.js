@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   createCategory,
   createSubcategory,
@@ -18,15 +17,15 @@ const { contragentAuth, optionalContragentAuth } = require('../middleware/auth')
 
 // Category routes
 router.post('/create', contragentAuth, validate(categoryValidationSchemas.create), createCategory);
-router.get('/list', optionalContragentAuth, cacheMiddleware(3600), getAllCategories); // 1 hour cache
+router.get('/list', optionalContragentAuth, getAllCategories);
 router.put('/:id/status', contragentAuth, validate(categoryValidationSchemas.updateStatus), updateCategoryStatus);
 router.put('/:id', contragentAuth, validate(categoryValidationSchemas.update), updateCategory);
 router.delete('/:id', contragentAuth, deleteCategory);
-router.get('/:id', optionalContragentAuth, cacheMiddleware(3600), getCategoryById); // 1 hour cache
+router.get('/:id', optionalContragentAuth, getCategoryById);
 
 // Subcategory routes
 router.post('/subcategory/create', contragentAuth, validate(categoryValidationSchemas.createSubcategory), createSubcategory);
-router.get('/subcategory/list', optionalContragentAuth, cacheMiddleware(3600), getAllSubcategories); // 1 hour cache
+router.get('/subcategory/list', optionalContragentAuth, getAllSubcategories);
 router.put('/subcategory/:id/status', contragentAuth, validate(categoryValidationSchemas.updateStatus), updateCategoryStatus);
 router.put('/subcategory/:id', contragentAuth, validate(categoryValidationSchemas.updateSubcategory), updateSubcategory);
 router.delete('/subcategory/:id', contragentAuth, deleteSubcategory);

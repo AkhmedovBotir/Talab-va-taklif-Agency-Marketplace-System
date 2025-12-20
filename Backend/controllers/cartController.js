@@ -1,6 +1,5 @@
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
-const { cacheInvalidators } = require('../middleware/cache');
 
 // Get user's cart
 const getCart = async (req, res) => {
@@ -216,7 +215,6 @@ const addToCart = async (req, res) => {
       });
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCartCache(userId);
 
     res.status(200).json({
       success: true,
@@ -352,7 +350,6 @@ const updateCartItem = async (req, res) => {
       });
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCartCache(userId);
 
     res.status(200).json({
       success: true,
@@ -453,7 +450,6 @@ const removeFromCart = async (req, res) => {
       });
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCartCache(userId);
 
     res.status(200).json({
       success: true,
@@ -502,7 +498,6 @@ const clearCart = async (req, res) => {
     await cart.save();
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCartCache(userId);
 
     res.status(200).json({
       success: true,

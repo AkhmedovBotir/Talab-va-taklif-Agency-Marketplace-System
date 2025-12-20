@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   // MFY Agent
   getMfyDailyReport,
@@ -26,10 +25,10 @@ const { agentAuth } = require('../middleware/auth');
 // ==================== MFY AGENT ROUTES ====================
 
 // Kunlik hisobot
-router.get('/mfy/daily-report', agentAuth, cacheMiddleware(300), getMfyDailyReport); // 5 min cache
+router.get('/mfy/daily-report', agentAuth, getMfyDailyReport);
 
 // Kutilayotgan to'lovlar
-router.get('/mfy/pending-payments', agentAuth, cacheMiddleware(60), getMfyPendingPayments); // 1 min cache
+router.get('/mfy/pending-payments', agentAuth, getMfyPendingPayments);
 
 // To'lovni qabul qilish
 router.post('/mfy/collect-payment/:transactionId', agentAuth, collectPayment);
@@ -38,15 +37,15 @@ router.post('/mfy/collect-payment/:transactionId', agentAuth, collectPayment);
 router.post('/mfy/submit-to-district', agentAuth, submitToDistrict);
 
 // Statistika
-router.get('/mfy/statistics', agentAuth, cacheMiddleware(300), getMfyStatistics); // 5 min cache
+router.get('/mfy/statistics', agentAuth, getMfyStatistics);
 
 // ==================== TUMAN AGENT ROUTES ====================
 
 // Tuman hisoboti
-router.get('/district/report', agentAuth, cacheMiddleware(300), getDistrictReport); // 5 min cache
+router.get('/district/report', agentAuth, getDistrictReport);
 
 // MFY agentlardan kelgan topshiruvlar
-router.get('/district/submissions', agentAuth, cacheMiddleware(60), getDistrictSubmissions); // 1 min cache
+router.get('/district/submissions', agentAuth, getDistrictSubmissions);
 
 // Topshiruvni tasdiqlash
 router.post('/district/confirm-submission/:submissionId', agentAuth, confirmDistrictSubmission);
@@ -55,15 +54,15 @@ router.post('/district/confirm-submission/:submissionId', agentAuth, confirmDist
 router.post('/district/submit-to-province', agentAuth, submitToProvince);
 
 // Statistika
-router.get('/district/statistics', agentAuth, cacheMiddleware(300), getDistrictStatistics); // 5 min cache
+router.get('/district/statistics', agentAuth, getDistrictStatistics);
 
 // ==================== VILOYAT AGENT ROUTES ====================
 
 // Viloyat hisoboti
-router.get('/province/report', agentAuth, cacheMiddleware(300), getProvinceReport); // 5 min cache
+router.get('/province/report', agentAuth, getProvinceReport);
 
 // Tuman agentlardan kelgan topshiruvlar
-router.get('/province/submissions', agentAuth, cacheMiddleware(60), getProvinceSubmissions); // 1 min cache
+router.get('/province/submissions', agentAuth, getProvinceSubmissions);
 
 // Topshiruvni tasdiqlash
 router.post('/province/confirm-submission/:submissionId', agentAuth, confirmProvinceSubmission);
@@ -72,7 +71,7 @@ router.post('/province/confirm-submission/:submissionId', agentAuth, confirmProv
 router.post('/province/submit-to-finance', agentAuth, submitToFinance);
 
 // Statistika
-router.get('/province/statistics', agentAuth, cacheMiddleware(300), getProvinceStatistics); // 5 min cache
+router.get('/province/statistics', agentAuth, getProvinceStatistics);
 
 module.exports = router;
 

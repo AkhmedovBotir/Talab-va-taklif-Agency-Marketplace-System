@@ -1,7 +1,6 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Region = require('../models/Region');
-const { cacheInvalidators } = require('../middleware/cache');
 
 // Create product
 const createProduct = async (req, res) => {
@@ -144,7 +143,6 @@ const createProduct = async (req, res) => {
     await product.populate('deliveryRegions.tuman', 'name type code');
 
     // Invalidate cache
-    await cacheInvalidators.invalidateProductCache();
 
     res.status(201).json({
       success: true,
@@ -507,7 +505,6 @@ const updateProduct = async (req, res) => {
       .populate('deliveryRegions.tuman', 'name type code');
 
     // Invalidate cache
-    await cacheInvalidators.invalidateProductCache();
 
     res.status(200).json({
       success: true,
@@ -578,7 +575,6 @@ const updateProductStatus = async (req, res) => {
       .populate('deliveryRegions.tuman', 'name type code');
 
     // Invalidate cache
-    await cacheInvalidators.invalidateProductCache();
 
     res.status(200).json({
       success: true,
@@ -628,7 +624,6 @@ const deleteProduct = async (req, res) => {
     await Product.findByIdAndDelete(id);
 
     // Invalidate cache
-    await cacheInvalidators.invalidateProductCache();
 
     res.status(200).json({
       success: true,

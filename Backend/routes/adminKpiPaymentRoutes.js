@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   getUnpaidPayments,
   getUnpaidPaymentsGrouped,
@@ -14,10 +13,10 @@ const { adminAuth } = require('../middleware/auth');
 // ==================== TO'LANMAGAN TO'LOVLAR ====================
 
 // Barcha to'lanmagan to'lovlar ro'yxati
-router.get('/unpaid', adminAuth, cacheMiddleware(300), getUnpaidPayments); // 5 min cache
+router.get('/unpaid', adminAuth, getUnpaidPayments);
 
 // To'lanmagan to'lovlar (guruhlangan)
-router.get('/unpaid/grouped', adminAuth, cacheMiddleware(300), getUnpaidPaymentsGrouped); // 5 min cache
+router.get('/unpaid/grouped', adminAuth, getUnpaidPaymentsGrouped);
 
 // ==================== TO'LOVNI TASDIQLASH ====================
 
@@ -27,12 +26,12 @@ router.post('/mark-as-paid', adminAuth, markPaymentsAsPaid);
 // ==================== TO'LOVLAR STATISTIKASI ====================
 
 // To'lovlar statistikasi
-router.get('/statistics', adminAuth, cacheMiddleware(300), getPaymentStatistics); // 5 min cache
+router.get('/statistics', adminAuth, getPaymentStatistics);
 
 // ==================== TO'LANGAN TO'LOVLAR ====================
 
 // To'langan to'lovlar ro'yxati
-router.get('/paid', adminAuth, cacheMiddleware(300), getPaidPayments); // 5 min cache
+router.get('/paid', adminAuth, getPaidPayments);
 
 // ==================== SINXRONLASHTIRISH ====================
 

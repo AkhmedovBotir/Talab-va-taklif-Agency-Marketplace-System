@@ -1,7 +1,6 @@
 const Punkt = require('../models/Punkt');
 const Contragent = require('../models/Contragent');
 const jwt = require('jsonwebtoken');
-const { cacheInvalidators } = require('../middleware/cache');
 
 // Create new punkt
 const createPunkt = async (req, res) => {
@@ -83,7 +82,6 @@ const createPunkt = async (req, res) => {
       ]);
 
       // Invalidate cache
-      await cacheInvalidators.invalidatePunktCache();
 
       res.status(201).json({
         success: true,
@@ -331,7 +329,6 @@ const updatePunkt = async (req, res) => {
       ]);
 
       // Invalidate cache
-      await cacheInvalidators.invalidatePunktCache();
 
       return res.status(200).json({
         success: true,
@@ -372,7 +369,6 @@ const updatePunkt = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidatePunktCache();
 
     res.status(200).json({
       success: true,
@@ -423,7 +419,6 @@ const deletePunkt = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidatePunktCache();
 
     res.status(200).json({
       success: true,

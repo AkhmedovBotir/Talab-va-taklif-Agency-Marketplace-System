@@ -30,6 +30,7 @@ interface FilterModalProps {
     category?: string;
     subcategory?: string;
   };
+  hideContragentFilter?: boolean;
 }
 
 export default function FilterModal({
@@ -37,6 +38,7 @@ export default function FilterModal({
   onClose,
   onApply,
   initialFilters = {},
+  hideContragentFilter = false,
 }: FilterModalProps) {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
@@ -65,15 +67,15 @@ export default function FilterModal({
     initialFilters.maxPrice?.toString() || ''
   );
 
-  // Search states for filters
   const [contragentSearch, setContragentSearch] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
+  const [categoryDropdownVisible, setCategoryDropdownVisible] = useState(false);
+  const [subcategoryDropdownVisible, setSubcategoryDropdownVisible] = useState(false);
 
   const loadFilters = useCallback(async (currentFilters?: any) => {
     const filtersToUse = currentFilters !== undefined ? currentFilters : filters;
     setLoading(true);
     try {
-      // Load filters with current filter values to get available options
       const response = await apiService.filterProducts({
         minPrice: filtersToUse.minPrice,
         maxPrice: filtersToUse.maxPrice,
@@ -81,7 +83,7 @@ export default function FilterModal({
         category: filtersToUse.category,
         subcategory: filtersToUse.subcategory,
         page: 1,
-        limit: 1, // We only need availableFilters, not products
+        limit: 1,
       });
 
       if (response && response.availableFilters) {
@@ -90,14 +92,7 @@ export default function FilterModal({
           categories: response.availableFilters.categories || [],
           subcategories: response.availableFilters.subcategories || [],
         });
-        console.log('Available filters loaded:', {
-          contragents: response.availableFilters.contragents?.length || 0,
-          categories: response.availableFilters.categories?.length || 0,
-          subcategories: response.availableFilters.subcategories?.length || 0,
-        });
       } else {
-        // If availableFilters is missing, set empty arrays
-        console.warn('availableFilters is missing in response');
         setAvailableFilters({
           contragents: [],
           categories: [],
@@ -106,7 +101,6 @@ export default function FilterModal({
       }
     } catch (error: any) {
         console.error('Error loading filters:', error);
-        // If error, try loading without any filters to get initial available options
         try {
           const initialResponse = await apiService.filterProducts({
             page: 1,
@@ -119,7 +113,6 @@ export default function FilterModal({
               subcategories: initialResponse.availableFilters.subcategories || [],
             });
           } else {
-            // If still no availableFilters, try loading all categories and contragents separately
             try {
               const [categoriesResponse, contragentsResponse] = await Promise.all([
                 apiService.getCategories({ status: 'active' }),
@@ -142,7 +135,6 @@ export default function FilterModal({
           }
         } catch (initialError: any) {
           console.error('Error loading initial filters:', initialError);
-          // Set empty filters on error
           setAvailableFilters({
             contragents: [],
             categories: [],
@@ -156,7 +148,6 @@ export default function FilterModal({
 
   useEffect(() => {
     if (visible) {
-      // Reset filters when modal opens
       const resetFilters = {
         minPrice: initialFilters.minPrice || undefined,
         maxPrice: initialFilters.maxPrice || undefined,
@@ -169,13 +160,15 @@ export default function FilterModal({
       setMaxPriceText(initialFilters.maxPrice?.toString() || '');
       setContragentSearch('');
       setCategorySearch('');
+      setCategoryDropdownVisible(false);
+      setSubcategoryDropdownVisible(false);
       
-      // Load filters with reset filters - use setTimeout to ensure state is updated
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         loadFilters(resetFilters);
       }, 100);
+      
+      return () => clearTimeout(timer);
     } else {
-      // Reset available filters when modal closes
       setAvailableFilters({
         contragents: [],
         categories: [],
@@ -183,19 +176,20 @@ export default function FilterModal({
       });
       setContragentSearch('');
       setCategorySearch('');
+      setCategoryDropdownVisible(false);
+      setSubcategoryDropdownVisible(false);
     }
-  }, [visible, initialFilters]);
+  }, [visible, initialFilters, loadFilters]);
 
-  // Reload filters when contragent or category changes (but not on initial load)
   useEffect(() => {
     if (visible && (filters.contragent || filters.category || filters.subcategory)) {
       const timer = setTimeout(() => {
         loadFilters(filters);
-      }, 300); // Debounce to avoid too many API calls
+      }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [filters.contragent, filters.category, filters.subcategory, visible]);
+  }, [filters.contragent, filters.category, filters.subcategory, visible, loadFilters]);
 
   const handleApply = () => {
     const appliedFilters: any = {};
@@ -225,7 +219,6 @@ export default function FilterModal({
       categories: [],
       subcategories: [],
     });
-    // Reload filters after reset
     loadFilters(resetFilters);
   };
 
@@ -245,6 +238,13 @@ export default function FilterModal({
     }
   };
 
+  const activeFiltersCount = 
+    (filters.contragent ? 1 : 0) +
+    (filters.category ? 1 : 0) +
+    (filters.subcategory ? 1 : 0) +
+    (filters.minPrice ? 1 : 0) +
+    (filters.maxPrice ? 1 : 0);
+
   return (
     <Modal
       visible={visible}
@@ -253,30 +253,35 @@ export default function FilterModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalContainer}>
+        <TouchableOpacity 
+          style={styles.backdrop} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
         <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <View style={styles.headerIconContainer}>
-                <Ionicons name="options" size={24} color="#007AFF" />
-              </View>
-              <View>
-                <Text style={styles.headerTitle}>Filterlar</Text>
-                <Text style={styles.headerSubtitle}>
-                  {String(
-                    (filters.contragent ? 1 : 0) +
-                    (filters.category ? 1 : 0) +
-                    (filters.subcategory ? 1 : 0) +
-                    (filters.minPrice ? 1 : 0) +
-                    (filters.maxPrice ? 1 : 0)
-                  )}{' '}
-                  filter tanlangan
-                </Text>
-              </View>
+            <View style={styles.headerTop}>
+              <View style={styles.headerDragIndicator} />
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close-circle" size={28} color="#999" />
-            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <View style={styles.headerLeft}>
+                <View style={styles.headerIconContainer}>
+                  <Ionicons name="filter" size={22} color="#007AFF" />
+                </View>
+                <View>
+                  <Text style={styles.headerTitle}>Filterlar</Text>
+                  {activeFiltersCount > 0 && (
+                    <Text style={styles.headerSubtitle}>
+                      {activeFiltersCount} ta filter tanlangan
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView
@@ -287,15 +292,15 @@ export default function FilterModal({
             {/* Price Range */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="pricetag-outline" size={20} color="#007AFF" />
+                <View style={styles.sectionIconContainer}>
+                  <Ionicons name="cash-outline" size={20} color="#007AFF" />
+                </View>
                 <Text style={styles.sectionTitle}>Narx oralig'i</Text>
               </View>
-                <View style={styles.priceContainer}>
-                  <View style={styles.priceInputContainer}>
-                    <View style={styles.priceLabelContainer}>
-                      <Text style={styles.priceLabel}>Min narx</Text>
-                      <Text style={styles.priceLabelSuffix}>so'm</Text>
-                    </View>
+              <View style={styles.priceCard}>
+                <View style={styles.priceRow}>
+                  <View style={styles.priceInputGroup}>
+                    <Text style={styles.priceLabel}>Min narx</Text>
                     <View style={styles.priceInputWrapper}>
                       <TextInput
                         style={styles.priceInput}
@@ -305,16 +310,12 @@ export default function FilterModal({
                         onChangeText={(value) => handlePriceChange('min', value)}
                         keyboardType="numeric"
                       />
+                      <Text style={styles.priceSuffix}>so'm</Text>
                     </View>
                   </View>
-                  <View style={styles.priceSeparatorContainer}>
-                    <View style={styles.priceSeparator} />
-                  </View>
-                  <View style={styles.priceInputContainer}>
-                    <View style={styles.priceLabelContainer}>
-                      <Text style={styles.priceLabel}>Max narx</Text>
-                      <Text style={styles.priceLabelSuffix}>so'm</Text>
-                    </View>
+                  <View style={styles.priceDivider} />
+                  <View style={styles.priceInputGroup}>
+                    <Text style={styles.priceLabel}>Max narx</Text>
                     <View style={styles.priceInputWrapper}>
                       <TextInput
                         style={styles.priceInput}
@@ -324,25 +325,30 @@ export default function FilterModal({
                         onChangeText={(value) => handlePriceChange('max', value)}
                         keyboardType="numeric"
                       />
+                      <Text style={styles.priceSuffix}>so'm</Text>
                     </View>
                   </View>
                 </View>
               </View>
+            </View>
 
-              {/* Contragents */}
+            {/* Contragents */}
+            {!hideContragentFilter && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="storefront-outline" size={20} color="#007AFF" />
+                  <View style={styles.sectionIconContainer}>
+                    <Ionicons name="storefront-outline" size={20} color="#007AFF" />
+                  </View>
                   <Text style={styles.sectionTitle}>Do'konlar</Text>
                 </View>
                 {loading && (!availableFilters.contragents || availableFilters.contragents.length === 0) ? (
                   <View style={styles.emptyFilterContainer}>
                     <ActivityIndicator size="small" color="#007AFF" />
-                    <Text style={styles.emptyFilterText}>Do'konlar yuklanmoqda...</Text>
+                    <Text style={styles.emptyFilterText}>Yuklanmoqda...</Text>
                   </View>
                 ) : availableFilters.contragents && availableFilters.contragents.length > 0 ? (
                   <>
-                    <View style={styles.searchContainer}>
+                    <View style={styles.searchCard}>
                       <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
                       <TextInput
                         style={styles.searchInput}
@@ -364,272 +370,297 @@ export default function FilterModal({
                       .filter((contragent) =>
                         contragent.name.toLowerCase().includes(contragentSearch.toLowerCase())
                       ).length > 0 ? (
-                      availableFilters.contragents
-                        .filter((contragent) =>
-                          contragent.name.toLowerCase().includes(contragentSearch.toLowerCase())
-                        )
-                        .map((contragent) => (
-                        <TouchableOpacity
-                          key={contragent._id}
-                          activeOpacity={0.7}
-                          style={[
-                            styles.filterItem,
-                            filters.contragent === contragent._id &&
-                              styles.filterItemActive,
-                          ]}
-                          onPress={() => {
-                            console.log('Contragent pressed:', contragent.name);
-                            const newContragent =
-                              filters.contragent === contragent._id
-                                ? undefined
-                                : contragent._id;
-                            const newFilters = {
-                              ...filters,
-                              contragent: newContragent,
-                              category: undefined,
-                              subcategory: undefined,
-                            };
-                            console.log('New filters:', newFilters);
-                            setFilters(newFilters);
-                            loadFilters(newFilters);
-                          }}
-                        >
-                          <View style={styles.filterItemLeft}>
-                            <View
+                      <View style={styles.filterList}>
+                        {availableFilters.contragents
+                          .filter((contragent) =>
+                            contragent.name.toLowerCase().includes(contragentSearch.toLowerCase())
+                          )
+                          .map((contragent) => (
+                            <TouchableOpacity
+                              key={contragent._id}
+                              activeOpacity={0.7}
                               style={[
-                                styles.filterItemIcon,
-                                filters.contragent === contragent._id &&
-                                  styles.filterItemIconActive,
+                                styles.filterCard,
+                                filters.contragent === contragent._id && styles.filterCardActive,
                               ]}
+                              onPress={() => {
+                                const newContragent =
+                                  filters.contragent === contragent._id
+                                    ? undefined
+                                    : contragent._id;
+                                const newFilters = {
+                                  ...filters,
+                                  contragent: newContragent,
+                                  category: undefined,
+                                  subcategory: undefined,
+                                };
+                                setFilters(newFilters);
+                                loadFilters(newFilters);
+                              }}
                             >
-                              <Ionicons
-                                name={filters.contragent === contragent._id ? 'checkmark' : 'storefront'}
-                                size={18}
-                                color={filters.contragent === contragent._id ? '#007AFF' : '#666'}
-                              />
-                            </View>
-                            <Text
-                              style={[
-                                styles.filterItemText,
-                                filters.contragent === contragent._id &&
-                                  styles.filterItemTextActive,
-                              ]}
-                            >
-                              {contragent.name}
-                            </Text>
-                          </View>
-                          {filters.contragent === contragent._id && (
-                            <View style={styles.checkmarkContainer}>
-                              <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      ))
+                              <View style={styles.filterCardContent}>
+                                <View style={[
+                                  styles.filterCheckbox,
+                                  filters.contragent === contragent._id && styles.filterCheckboxActive,
+                                ]}>
+                                  {filters.contragent === contragent._id && (
+                                    <Ionicons name="checkmark" size={16} color="#fff" />
+                                  )}
+                                </View>
+                                <Text style={[
+                                  styles.filterCardText,
+                                  filters.contragent === contragent._id && styles.filterCardTextActive,
+                                ]}>
+                                  {contragent.name}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          ))}
+                      </View>
                     ) : (
                       <View style={styles.emptyFilterContainer}>
-                        <Ionicons name="search-outline" size={32} color="#ccc" />
+                        <Ionicons name="search-outline" size={40} color="#ddd" />
                         <Text style={styles.emptyFilterText}>
-                          "{contragentSearch}" bo'yicha do'konlar topilmadi
+                          "{contragentSearch}" bo'yicha topilmadi
                         </Text>
                       </View>
                     )}
                   </>
                 ) : (
                   <View style={styles.emptyFilterContainer}>
-                    <Ionicons name="storefront-outline" size={48} color="#ccc" />
+                    <Ionicons name="storefront-outline" size={40} color="#ddd" />
                     <Text style={styles.emptyFilterText}>Do'konlar topilmadi</Text>
                   </View>
                 )}
               </View>
+            )}
 
-              {/* Categories */}
+            {/* Categories - Select Dropdown */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionIconContainer}>
+                  <Ionicons name="folder-outline" size={20} color="#007AFF" />
+                </View>
+                <Text style={styles.sectionTitle}>Kategoriyalar</Text>
+              </View>
+              {loading && (!availableFilters.categories || availableFilters.categories.length === 0) ? (
+                <View style={styles.emptyFilterContainer}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                  <Text style={styles.emptyFilterText}>Yuklanmoqda...</Text>
+                </View>
+              ) : availableFilters.categories && availableFilters.categories.length > 0 ? (
+                <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={() => setCategoryDropdownVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.selectButtonText,
+                    filters.category && styles.selectButtonTextSelected
+                  ]}>
+                    {filters.category 
+                      ? availableFilters.categories.find(c => c._id === filters.category)?.name || 'Kategoriya tanlang'
+                      : 'Kategoriya tanlang'}
+                  </Text>
+                  <Ionicons 
+                    name={categoryDropdownVisible ? 'chevron-up' : 'chevron-down'} 
+                    size={20} 
+                    color={filters.category ? '#007AFF' : '#9CA3AF'} 
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.emptyFilterContainer}>
+                  <Ionicons name="folder-outline" size={40} color="#ddd" />
+                  <Text style={styles.emptyFilterText}>Kategoriyalar topilmadi</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Subcategories - Select Dropdown */}
+            {availableFilters.subcategories && availableFilters.subcategories.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="folder-outline" size={20} color="#007AFF" />
-                  <Text style={styles.sectionTitle}>Kategoriyalar</Text>
-                </View>
-                {loading && (!availableFilters.categories || availableFilters.categories.length === 0) ? (
-                  <View style={styles.emptyFilterContainer}>
-                    <ActivityIndicator size="small" color="#007AFF" />
-                    <Text style={styles.emptyFilterText}>Kategoriyalar yuklanmoqda...</Text>
-                  </View>
-                ) : availableFilters.categories && availableFilters.categories.length > 0 ? (
-                  <>
-                    <View style={styles.searchContainer}>
-                      <Ionicons name="search" size={18} color="#999" style={styles.searchIcon} />
-                      <TextInput
-                        style={styles.searchInput}
-                        placeholder="Kategoriya qidirish..."
-                        placeholderTextColor="#999"
-                        value={categorySearch}
-                        onChangeText={setCategorySearch}
-                      />
-                      {categorySearch.length > 0 && (
-                        <TouchableOpacity 
-                          onPress={() => setCategorySearch('')}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons name="close-circle" size={18} color="#999" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    {availableFilters.categories
-                      .filter((category) =>
-                        category.name.toLowerCase().includes(categorySearch.toLowerCase())
-                      ).length > 0 ? (
-                      availableFilters.categories
-                        .filter((category) =>
-                          category.name.toLowerCase().includes(categorySearch.toLowerCase())
-                        )
-                        .map((category) => (
-                        <TouchableOpacity
-                          key={category._id}
-                          activeOpacity={0.7}
-                          style={[
-                            styles.filterItem,
-                            filters.category === category._id &&
-                              styles.filterItemActive,
-                          ]}
-                          onPress={() => {
-                            console.log('Category pressed:', category.name);
-                            const newCategory =
-                              filters.category === category._id
-                                ? undefined
-                                : category._id;
-                            const newFilters = {
-                              ...filters,
-                              category: newCategory,
-                              subcategory: undefined,
-                            };
-                            console.log('New filters:', newFilters);
-                            setFilters(newFilters);
-                            loadFilters(newFilters);
-                          }}
-                        >
-                          <View style={styles.filterItemLeft}>
-                            <View
-                              style={[
-                                styles.filterItemIcon,
-                                filters.category === category._id &&
-                                  styles.filterItemIconActive,
-                              ]}
-                            >
-                              <Ionicons
-                                name={filters.category === category._id ? 'checkmark' : 'folder'}
-                                size={18}
-                                color={filters.category === category._id ? '#007AFF' : '#666'}
-                              />
-                            </View>
-                            <Text
-                              style={[
-                                styles.filterItemText,
-                                filters.category === category._id &&
-                                  styles.filterItemTextActive,
-                              ]}
-                            >
-                              {category.name}
-                            </Text>
-                          </View>
-                          {filters.category === category._id && (
-                            <View style={styles.checkmarkContainer}>
-                              <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      ))
-                    ) : (
-                      <View style={styles.emptyFilterContainer}>
-                        <Ionicons name="search-outline" size={32} color="#ccc" />
-                        <Text style={styles.emptyFilterText}>
-                          "{categorySearch}" bo'yicha kategoriyalar topilmadi
-                        </Text>
-                      </View>
-                    )}
-                  </>
-                ) : (
-                  <View style={styles.emptyFilterContainer}>
-                    <Ionicons name="folder-outline" size={48} color="#ccc" />
-                    <Text style={styles.emptyFilterText}>Kategoriyalar topilmadi</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Subcategories */}
-              {availableFilters.subcategories && availableFilters.subcategories.length > 0 && (
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
+                  <View style={styles.sectionIconContainer}>
                     <Ionicons name="albums-outline" size={20} color="#007AFF" />
-                    <Text style={styles.sectionTitle}>Kichik kategoriyalar</Text>
                   </View>
-                  {availableFilters.subcategories.map((subcategory) => (
+                  <Text style={styles.sectionTitle}>Kichik kategoriyalar</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.selectButton}
+                  onPress={() => setSubcategoryDropdownVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.selectButtonText,
+                    filters.subcategory && styles.selectButtonTextSelected
+                  ]}>
+                    {filters.subcategory 
+                      ? availableFilters.subcategories.find(s => s._id === filters.subcategory)?.name || 'Kichik kategoriya tanlang'
+                      : 'Kichik kategoriya tanlang'}
+                  </Text>
+                  <Ionicons 
+                    name={subcategoryDropdownVisible ? 'chevron-up' : 'chevron-down'} 
+                    size={20} 
+                    color={filters.subcategory ? '#007AFF' : '#9CA3AF'} 
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Category Dropdown Modal */}
+          <Modal
+            visible={categoryDropdownVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setCategoryDropdownVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.dropdownBackdrop}
+              activeOpacity={1}
+              onPress={() => setCategoryDropdownVisible(false)}
+            >
+              <View style={styles.dropdownContainer}>
+                <View style={styles.dropdownHeader}>
+                  <Text style={styles.dropdownTitle}>Kategoriya tanlang</Text>
+                  <TouchableOpacity onPress={() => setCategoryDropdownVisible(false)}>
+                    <Ionicons name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.dropdownScrollView}>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownItem,
+                      !filters.category && styles.dropdownItemActive,
+                    ]}
+                    onPress={() => {
+                      setFilters(prev => ({ ...prev, category: undefined, subcategory: undefined }));
+                      setCategoryDropdownVisible(false);
+                      loadFilters({ ...filters, category: undefined, subcategory: undefined });
+                    }}
+                  >
+                    <Text style={[
+                      styles.dropdownItemText,
+                      !filters.category && styles.dropdownItemTextActive,
+                    ]}>
+                      Barchasi
+                    </Text>
+                    {!filters.category && (
+                      <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                  {availableFilters.categories.map((category) => (
                     <TouchableOpacity
-                      key={subcategory._id}
-                      activeOpacity={0.7}
+                      key={category._id}
                       style={[
-                        styles.filterItem,
-                        filters.subcategory === subcategory._id &&
-                          styles.filterItemActive,
+                        styles.dropdownItem,
+                        filters.category === category._id && styles.dropdownItemActive,
                       ]}
                       onPress={() => {
-                        console.log('Subcategory pressed:', subcategory.name);
-                        setFilters((prev) => {
-                          const newSubcategory =
-                            prev.subcategory === subcategory._id
-                              ? undefined
-                              : subcategory._id;
-                          const newFilters = {
-                            ...prev,
-                            subcategory: newSubcategory,
-                          };
-                          console.log('New filters:', newFilters);
-                          return newFilters;
-                        });
+                        const newCategory = filters.category === category._id ? undefined : category._id;
+                        const newFilters = {
+                          ...filters,
+                          category: newCategory,
+                          subcategory: undefined,
+                        };
+                        setFilters(newFilters);
+                        setCategoryDropdownVisible(false);
+                        loadFilters(newFilters);
                       }}
                     >
-                      <View style={styles.filterItemLeft}>
-                        <View
-                          style={[
-                            styles.filterItemIcon,
-                            filters.subcategory === subcategory._id &&
-                              styles.filterItemIconActive,
-                          ]}
-                        >
-                          <Ionicons
-                            name={filters.subcategory === subcategory._id ? 'checkmark' : 'albums'}
-                            size={18}
-                            color={filters.subcategory === subcategory._id ? '#007AFF' : '#666'}
-                          />
-                        </View>
-                        <Text
-                          style={[
-                            styles.filterItemText,
-                            filters.subcategory === subcategory._id &&
-                              styles.filterItemTextActive,
-                          ]}
-                        >
-                          {subcategory.name}
-                        </Text>
-                      </View>
-                      {filters.subcategory === subcategory._id && (
-                        <View style={styles.checkmarkContainer}>
-                          <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
-                        </View>
+                      <Text style={[
+                        styles.dropdownItemText,
+                        filters.category === category._id && styles.dropdownItemTextActive,
+                      ]}>
+                        {category.name}
+                      </Text>
+                      {filters.category === category._id && (
+                        <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
                       )}
                     </TouchableOpacity>
                   ))}
-                </View>
-              )}
-            </ScrollView>
-          )}
+                </ScrollView>
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
-          {/* Footer Buttons */}
+          {/* Subcategory Dropdown Modal */}
+          <Modal
+            visible={subcategoryDropdownVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSubcategoryDropdownVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.dropdownBackdrop}
+              activeOpacity={1}
+              onPress={() => setSubcategoryDropdownVisible(false)}
+            >
+              <View style={styles.dropdownContainer}>
+                <View style={styles.dropdownHeader}>
+                  <Text style={styles.dropdownTitle}>Kichik kategoriya tanlang</Text>
+                  <TouchableOpacity onPress={() => setSubcategoryDropdownVisible(false)}>
+                    <Ionicons name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.dropdownScrollView}>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownItem,
+                      !filters.subcategory && styles.dropdownItemActive,
+                    ]}
+                    onPress={() => {
+                      setFilters(prev => ({ ...prev, subcategory: undefined }));
+                      setSubcategoryDropdownVisible(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.dropdownItemText,
+                      !filters.subcategory && styles.dropdownItemTextActive,
+                    ]}>
+                      Barchasi
+                    </Text>
+                    {!filters.subcategory && (
+                      <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                  {availableFilters.subcategories.map((subcategory) => (
+                    <TouchableOpacity
+                      key={subcategory._id}
+                      style={[
+                        styles.dropdownItem,
+                        filters.subcategory === subcategory._id && styles.dropdownItemActive,
+                      ]}
+                      onPress={() => {
+                        const newSubcategory = filters.subcategory === subcategory._id ? undefined : subcategory._id;
+                        setFilters(prev => ({ ...prev, subcategory: newSubcategory }));
+                        setSubcategoryDropdownVisible(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.dropdownItemText,
+                        filters.subcategory === subcategory._id && styles.dropdownItemTextActive,
+                      ]}>
+                        {subcategory.name}
+                      </Text>
+                      {filters.subcategory === subcategory._id && (
+                        <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+
+          {/* Footer */}
           <View style={styles.footer}>
             <TouchableOpacity
               style={styles.resetButton}
               onPress={handleReset}
               activeOpacity={0.7}
             >
-              <Ionicons name="refresh-outline" size={20} color="#333" />
+              <Ionicons name="refresh" size={18} color="#666" />
               <Text style={styles.resetButtonText}>Tozalash</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -637,8 +668,8 @@ export default function FilterModal({
               onPress={handleApply}
               activeOpacity={0.8}
             >
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
               <Text style={styles.applyButtonText}>Qo'llash</Text>
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
@@ -650,30 +681,45 @@ export default function FilterModal({
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    paddingTop: 8,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '92%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 20,
   },
   header: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
+  headerTop: {
+    paddingTop: 12,
+    paddingBottom: 8,
+    alignItems: 'center',
+  },
+  headerDragIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 16,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -682,28 +728,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f7ff',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: '#6B7280',
     marginTop: 2,
+    fontWeight: '500',
   },
   closeButton: {
-    padding: 4,
-  },
-  loadingContainer: {
-    padding: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   scrollView: {
@@ -711,188 +760,291 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   section: {
-    marginBottom: 28,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
+    gap: 10,
+    marginBottom: 14,
+  },
+  sectionIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1F2937',
+    letterSpacing: -0.3,
   },
-  searchContainer: {
+  priceCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: 12,
+  },
+  priceInputGroup: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  priceInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  priceInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '600',
+    padding: 0,
+  },
+  priceSuffix: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  priceDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: '#E5E7EB',
+    marginTop: 24,
+  },
+  searchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 12,
-    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   searchIcon: {
-    marginRight: 4,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
-    color: '#333',
+    fontSize: 15,
+    color: '#1F2937',
     padding: 0,
   },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+  filterList: {
+    gap: 8,
   },
-  priceInputContainer: {
-    flex: 1,
-  },
-  priceLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
-  },
-  priceLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-  },
-  priceLabelSuffix: {
-    fontSize: 12,
-    color: '#999',
-  },
-  priceInputWrapper: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e5e5e7',
-  },
-  priceInput: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  priceSeparatorContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 28,
-  },
-  priceSeparator: {
-    width: 1,
-    height: 32,
-    backgroundColor: '#e5e5e7',
-  },
-  filterItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  filterItemActive: {
-    backgroundColor: '#f0f7ff',
+  filterCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
     borderWidth: 1.5,
-    borderColor: '#007AFF',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  filterItemLeft: {
+  filterCardActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#007AFF',
+    borderWidth: 2,
+    shadowColor: '#007AFF',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  filterCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
   },
-  filterItemIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  filterCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  filterItemIconActive: {
-    backgroundColor: '#e6f3ff',
+  filterCheckboxActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
-  filterItemText: {
+  filterCardText: {
+    flex: 1,
     fontSize: 15,
-    color: '#333',
+    color: '#374151',
     fontWeight: '500',
   },
-  filterItemTextActive: {
+  filterCardTextActive: {
     color: '#007AFF',
     fontWeight: '600',
   },
-  checkmarkContainer: {
-    marginLeft: 8,
-  },
   emptyFilterContainer: {
-    paddingVertical: 32,
+    paddingVertical: 40,
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   emptyFilterText: {
     fontSize: 14,
-    color: '#999',
+    color: '#9CA3AF',
     fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 8,
+    paddingBottom: 12,
     gap: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#F3F4F6',
     backgroundColor: '#fff',
   },
   resetButton: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
     paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e7',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
   },
   resetButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#374151',
   },
   applyButton: {
     flex: 1,
     backgroundColor: '#007AFF',
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   applyButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
+    letterSpacing: 0.3,
+  },
+  selectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    minHeight: 52,
+  },
+  selectButtonText: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    flex: 1,
+  },
+  selectButtonTextSelected: {
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  dropdownBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  dropdownContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  dropdownScrollView: {
+    maxHeight: 400,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9FAFB',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#EFF6FF',
+  },
+  dropdownItemText: {
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+    flex: 1,
+  },
+  dropdownItemTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
 });

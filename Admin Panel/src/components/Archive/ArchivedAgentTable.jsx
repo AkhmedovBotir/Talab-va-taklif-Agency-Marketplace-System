@@ -201,3 +201,5 @@ const ArchivedAgentTable = ({ agents, loading, pagination, onPageChange, onViewW
 
 export default ArchivedAgentTable;
 
+
+

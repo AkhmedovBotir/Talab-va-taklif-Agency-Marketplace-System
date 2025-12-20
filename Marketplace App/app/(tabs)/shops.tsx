@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -9,6 +9,7 @@ import {
     RefreshControl,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -21,14 +22,17 @@ export default function ShopsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { unreadCount } = useNotification();
-    const [contragents, setContragents] = useState<Contragent[]>([]);
+    const [allContragents, setAllContragents] = useState<Contragent[]>([]); // Barcha yuklangan do'konlar
+    const [contragents, setContragents] = useState<Contragent[]>([]); // Ko'rsatiladigan do'konlar (filter qilingan)
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [imgBase, setImgBase] = useState<string | null>(null);
 
-    const loadContragents = useCallback(async (pageNum: number = 1, append: boolean = false) => {
+    const loadContragents = useCallback(async (pageNum: number = 1, append: boolean = false, search?: string) => {
         try {
             if (!append) {
                 setLoading(true);
@@ -40,16 +44,28 @@ export default function ShopsScreen() {
                 page: pageNum,
                 limit: 20,
                 status: 'active',
+                search: search || undefined,
             });
 
+            // imgBase ni saqlash (birinchi marta yoki yangilanganda)
+            if (response.imgBase) {
+                setImgBase(response.imgBase);
+            }
+
             if (append) {
-                setContragents((prev) => [...prev, ...response.data]);
+                setAllContragents((prev) => [...prev, ...response.data]);
             } else {
-                setContragents(response.data);
+                setAllContragents(response.data);
             }
 
             setPage(response.page);
-            setHasMore(response.page < response.totalPages);
+            
+            // next node dan hasMore ni aniqlash
+            if (response.next) {
+                setHasMore(true);
+            } else {
+                setHasMore(response.page < response.totalPages);
+            }
         } catch (error: any) {
             console.error('Error loading contragents:', error);
             Alert.alert('Xatolik', error.message || 'Do\'konlarni yuklashda xatolik yuz berdi');
@@ -64,18 +80,35 @@ export default function ShopsScreen() {
         loadContragents(1, false);
     }, []);
 
+    // Local filter - search query ga qarab do'konlarni filter qilish
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            // Search bo'sh bo'lsa, barcha do'konlarni ko'rsatish
+            setContragents(allContragents);
+        } else {
+            // Search query ga qarab filter qilish (do'kon nomiga qarab)
+            const query = searchQuery.toLowerCase().trim();
+            const filtered = allContragents.filter((contragent) =>
+                contragent.name.toLowerCase().includes(query)
+            );
+            setContragents(filtered);
+        }
+    }, [searchQuery, allContragents]);
+
     const handleRefresh = useCallback(() => {
         setRefreshing(true);
         setPage(1);
         setHasMore(true);
+        setSearchQuery(''); // Search ni tozalash
         loadContragents(1, false);
     }, [loadContragents]);
 
     const handleLoadMore = useCallback(() => {
-        if (!loadingMore && hasMore) {
+        // Search bo'lganda loadMore ishlamasligi kerak
+        if (!loadingMore && hasMore && !searchQuery.trim()) {
             loadContragents(page + 1, true);
         }
-    }, [loadingMore, hasMore, page, loadContragents]);
+    }, [loadingMore, hasMore, page, loadContragents, searchQuery]);
 
     const handleShopPress = (contragent: Contragent) => {
         // Navigate to search with contragent filter
@@ -89,38 +122,47 @@ export default function ShopsScreen() {
         router.push('/notifications' as any);
     };
 
-    const renderItem = ({ item }: { item: Contragent }) => (
-        <TouchableOpacity
-            style={styles.shopCard}
-            onPress={() => handleShopPress(item)}
-            activeOpacity={0.8}
-        >
-            <View style={styles.shopIconContainer}>
-                {item.logo ? (
-                    <Image 
-                        source={{ uri: item.logo }} 
-                        style={styles.shopLogo}
-                        resizeMode="cover"
-                    />
-                ) : (
-                    <Ionicons name="storefront" size={24} color="#007AFF" />
-                )}
-            </View>
-            <View style={styles.shopInfo}>
-                <Text style={styles.shopName} numberOfLines={1}>
-                    {item.name}
-                </Text>
-                <View style={styles.shopLocation}>
-                    <Text style={styles.locationText} >
-                        {item.viloyat?.name || ''}
-                        {item.tuman?.name ? `, ${item.tuman.name}` : ''}
-                        {item.mfy?.name ? `, ${item.mfy.name}` : ''}
-                    </Text>
+    const renderItem = ({ item }: { item: Contragent }) => {
+        // imgBase dan foydalanib logo URL ni to'g'ri qilish
+        const logoUrl = item.logo 
+            ? (imgBase && !item.logo.startsWith('http') 
+                ? `${imgBase}${item.logo}` 
+                : item.logo)
+            : null;
+
+        return (
+            <TouchableOpacity
+                style={styles.shopCard}
+                onPress={() => handleShopPress(item)}
+                activeOpacity={0.8}
+            >
+                <View style={styles.shopIconContainer}>
+                    {logoUrl ? (
+                        <Image 
+                            source={{ uri: logoUrl }} 
+                            style={styles.shopLogo}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <Ionicons name="storefront" size={24} color="#007AFF" />
+                    )}
                 </View>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="#ccc" />
-        </TouchableOpacity>
-    );
+                <View style={styles.shopInfo}>
+                    <Text style={styles.shopName} numberOfLines={1}>
+                        {item.name}
+                    </Text>
+                    <View style={styles.shopLocation}>
+                        <Text style={styles.locationText} >
+                            {item.viloyat?.name || ''}
+                            {item.tuman?.name ? `, ${item.tuman.name}` : ''}
+                            {item.mfy?.name ? `, ${item.mfy.name}` : ''}
+                        </Text>
+                    </View>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#ccc" />
+            </TouchableOpacity>
+        );
+    };
 
     const renderFooter = () => {
         if (!loadingMore) return null;
@@ -145,6 +187,30 @@ export default function ShopsScreen() {
         <View style={styles.container}>
             <Header title="Do'konlar" onNotificationPress={handleNotificationPress} unreadCount={unreadCount} />
 
+            {/* Search Input */}
+            <View style={styles.searchContainer}>
+                <View style={styles.searchInputWrapper}>
+                    <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Do'kon qidirish..."
+                        placeholderTextColor="#999"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity
+                            onPress={() => setSearchQuery('')}
+                            style={styles.clearButton}
+                        >
+                            <Ionicons name="close-circle" size={20} color="#666" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+
             {loading && contragents.length === 0 ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
@@ -161,7 +227,7 @@ export default function ShopsScreen() {
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                     }
-                    onEndReached={handleLoadMore}
+                    onEndReached={!searchQuery.trim() ? handleLoadMore : undefined}
                     onEndReachedThreshold={0.5}
                     ListFooterComponent={renderFooter}
                     ListEmptyComponent={renderEmpty}
@@ -176,6 +242,34 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
+    },
+    searchContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e5e7',
+    },
+    searchInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f5',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 44,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+        color: '#333',
+        paddingVertical: 0,
+    },
+    clearButton: {
+        marginLeft: 8,
+        padding: 4,
     },
     listContent: {
         padding: 16,

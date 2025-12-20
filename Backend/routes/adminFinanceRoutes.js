@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   // Hisobotlar
   getDailyReport,
@@ -31,24 +30,24 @@ const { adminAuth } = require('../middleware/auth');
 // ==================== HISOBOTLAR ====================
 
 // Kunlik hisobot
-router.get('/reports/daily', adminAuth, cacheMiddleware(300), getDailyReport); // 5 min cache
+router.get('/reports/daily', adminAuth, getDailyReport);
 
 // Haftalik hisobot
-router.get('/reports/weekly', adminAuth, cacheMiddleware(600), getWeeklyReport); // 10 min cache
+router.get('/reports/weekly', adminAuth, getWeeklyReport);
 
 // Oylik hisobot
-router.get('/reports/monthly', adminAuth, cacheMiddleware(1800), getMonthlyReport); // 30 min cache
+router.get('/reports/monthly', adminAuth, getMonthlyReport);
 
 // Yillik hisobot
-router.get('/reports/yearly', adminAuth, cacheMiddleware(3600), getYearlyReport); // 1 hour cache
+router.get('/reports/yearly', adminAuth, getYearlyReport);
 
 // Belgilangan muddat hisoboti
-router.get('/reports/custom', adminAuth, cacheMiddleware(300), getCustomReport); // 5 min cache
+router.get('/reports/custom', adminAuth, getCustomReport);
 
 // ==================== TOPSHIRUVLAR ====================
 
 // Kutilayotgan topshiruvlar
-router.get('/submissions/pending', adminAuth, cacheMiddleware(60), getPendingSubmissions); // 1 min cache
+router.get('/submissions/pending', adminAuth, getPendingSubmissions);
 
 // Topshiruvni tasdiqlash
 router.post('/submissions/:submissionId/confirm', adminAuth, confirmSubmission);
@@ -59,41 +58,41 @@ router.post('/submissions/:submissionId/reject', adminAuth, rejectSubmission);
 // ==================== TRANSAKSIYALAR ====================
 
 // Barcha transaksiyalar
-router.get('/transactions', adminAuth, cacheMiddleware(300), getAllTransactions); // 5 min cache
+router.get('/transactions', adminAuth, getAllTransactions);
 
 // ==================== STATISTIKA ====================
 
 // Umumiy statistika
-router.get('/statistics', adminAuth, cacheMiddleware(300), getStatistics); // 5 min cache
+router.get('/statistics', adminAuth, getStatistics);
 
 // Viloyat bo'yicha statistika
-router.get('/statistics/region', adminAuth, cacheMiddleware(300), getStatisticsByRegion); // 5 min cache
+router.get('/statistics/region', adminAuth, getStatisticsByRegion);
 
 // Tuman bo'yicha statistika
-router.get('/statistics/district', adminAuth, cacheMiddleware(300), getStatisticsByDistrict); // 5 min cache
+router.get('/statistics/district', adminAuth, getStatisticsByDistrict);
 
 // MFY bo'yicha statistika
-router.get('/statistics/mfy', adminAuth, cacheMiddleware(300), getStatisticsByMfy); // 5 min cache
+router.get('/statistics/mfy', adminAuth, getStatisticsByMfy);
 
 // Agentlar faolligi
-router.get('/statistics/agent-performance', adminAuth, cacheMiddleware(300), getAgentPerformance); // 5 min cache
+router.get('/statistics/agent-performance', adminAuth, getAgentPerformance);
 
 // ==================== MOLIYA BALANSLARI ====================
 
 // Umumiy balans (Umumiy tushgan summa, Tarqatilgan summa, Moliya bo'limiga ajratilgan summa)
-router.get('/balance', adminAuth, cacheMiddleware(300), getFinanceBalance); // 5 min cache
+router.get('/balance', adminAuth, getFinanceBalance);
 
 // Umumiy tushgan summa
-router.get('/balance/total-received', adminAuth, cacheMiddleware(300), getTotalReceived); // 5 min cache
+router.get('/balance/total-received', adminAuth, getTotalReceived);
 
 // Tarqatilgan summa (KPI bonuslar)
-router.get('/balance/total-distributed', adminAuth, cacheMiddleware(300), getTotalDistributed); // 5 min cache
+router.get('/balance/total-distributed', adminAuth, getTotalDistributed);
 
 // Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
-router.get('/balance/finance-kpi', adminAuth, cacheMiddleware(300), getFinanceKpiAmount); // 5 min cache
+router.get('/balance/finance-kpi', adminAuth, getFinanceKpiAmount);
 
 // Umumiy balans (Tushgan - Tarqatilgan)
-router.get('/balance/total-balance', adminAuth, cacheMiddleware(300), getTotalBalance); // 5 min cache
+router.get('/balance/total-balance', adminAuth, getTotalBalance);
 
 module.exports = router;
 

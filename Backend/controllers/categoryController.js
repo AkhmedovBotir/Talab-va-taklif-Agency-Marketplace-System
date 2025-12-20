@@ -1,5 +1,4 @@
 const Category = require('../models/Category');
-const { cacheInvalidators } = require('../middleware/cache');
 
 // Create category
 const createCategory = async (req, res) => {
@@ -32,7 +31,6 @@ const createCategory = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(201).json({
       success: true,
@@ -101,7 +99,6 @@ const createSubcategory = async (req, res) => {
     await category.populate('parent', 'name slug status');
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(201).json({
       success: true,
@@ -363,7 +360,6 @@ const updateCategory = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(200).json({
       success: true,
@@ -458,7 +454,6 @@ const updateSubcategory = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(200).json({
       success: true,
@@ -527,7 +522,6 @@ const updateCategoryStatus = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(200).json({
       success: true,
@@ -576,7 +570,6 @@ const deleteCategory = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(200).json({
       success: true,
@@ -615,7 +608,6 @@ const deleteSubcategory = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateCategoryCache();
 
     res.status(200).json({
       success: true,

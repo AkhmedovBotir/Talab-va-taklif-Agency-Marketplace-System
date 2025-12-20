@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { cacheMiddleware } = require('../middleware/cache');
 const {
   createNotification,
   getAllNotifications,
@@ -15,14 +14,14 @@ const { adminAuth } = require('../middleware/auth');
 
 // Admin routes
 router.post('/', adminAuth, createNotification);
-router.get('/', adminAuth, cacheMiddleware(300), getAllNotifications); // 5 min cache
-router.get('/stats', adminAuth, cacheMiddleware(300), getNotificationStats); // 5 min cache
-router.get('/:id', adminAuth, cacheMiddleware(300), getNotificationById); // 5 min cache
+router.get('/', adminAuth, getAllNotifications);
+router.get('/stats', adminAuth, getNotificationStats);
+router.get('/:id', adminAuth, getNotificationById);
 router.put('/:id', adminAuth, updateNotification);
 router.delete('/:id', adminAuth, deleteNotification);
 
 // User routes (for punkts, agents, marketplace users)
-router.get('/my/:userType/:userId', cacheMiddleware(60), getMyNotifications); // 1 min cache
+router.get('/my/:userType/:userId', getMyNotifications);
 router.post('/:notificationId/read', markAsRead);
 
 module.exports = router;

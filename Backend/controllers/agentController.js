@@ -1,6 +1,5 @@
 const Agent = require('../models/Agent');
 const jwt = require('jsonwebtoken');
-const { cacheInvalidators } = require('../middleware/cache');
 
 // Create new agent
 const createAgent = async (req, res) => {
@@ -133,7 +132,6 @@ const createAgent = async (req, res) => {
       const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
 
       // Invalidate cache
-      await cacheInvalidators.invalidateAgentCache();
 
       res.status(201).json({
         success: true,
@@ -445,7 +443,6 @@ const updateAgent = async (req, res) => {
     agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
 
     // Invalidate cache
-    await cacheInvalidators.invalidateAgentCache();
 
     res.status(200).json({
       success: true,
@@ -496,7 +493,6 @@ const deleteAgent = async (req, res) => {
     }
 
     // Invalidate cache
-    await cacheInvalidators.invalidateAgentCache();
 
     res.status(200).json({
       success: true,
