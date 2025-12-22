@@ -4,10 +4,9 @@ import { Close } from '@mui/icons-material';
 import { partnershipRequestAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 
-const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request }) => {
+const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request, action = 'reviewing' }) => {
   const { showSuccess, showError } = useSnackbar();
   const [formData, setFormData] = useState({
-    status: 'pending',
     adminNotes: '',
   });
   const [loading, setLoading] = useState(false);
@@ -16,7 +15,6 @@ const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request }) => {
   useEffect(() => {
     if (request && open) {
       setFormData({
-        status: request.status || 'pending',
         adminNotes: request.adminNotes || '',
       });
       setError('');
@@ -34,18 +32,28 @@ const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request }) => {
     setLoading(true);
 
     try {
-      // Prepare data
-      const updateData = {
-        status: formData.status,
-      };
+      let response;
       
-      // Only include adminNotes if it's provided
-      if (formData.adminNotes && formData.adminNotes.trim() !== '') {
-        updateData.adminNotes = formData.adminNotes.trim();
+      if (action === 'reviewing') {
+        response = await partnershipRequestAPI.updateStatusToReviewing(request._id);
+      } else if (action === 'approve') {
+        response = await partnershipRequestAPI.approvePartnershipRequest(
+          request._id,
+          formData.adminNotes
+        );
+      } else if (action === 'reject') {
+        if (!formData.adminNotes || formData.adminNotes.trim() === '') {
+          setError('Rad etish sababi (adminNotes) kiritilishi shart');
+          setLoading(false);
+          return;
+        }
+        response = await partnershipRequestAPI.rejectPartnershipRequest(
+          request._id,
+          formData.adminNotes
+        );
       }
 
-      const response = await partnershipRequestAPI.updateRequestStatus(request._id, updateData);
-      if (response.success) {
+      if (response && response.success) {
         showSuccess(response.message || 'So\'rov holati muvaffaqiyatli yangilandi');
         onSuccess();
         onClose();
@@ -62,10 +70,35 @@ const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request }) => {
   const handleClose = () => {
     setError('');
     setFormData({
-      status: 'pending',
       adminNotes: '',
     });
     onClose();
+  };
+
+  const getActionTitle = () => {
+    switch (action) {
+      case 'reviewing':
+        return 'Ko\'rib chiqilmoqda deb belgilash';
+      case 'approve':
+        return 'Tasdiqlash';
+      case 'reject':
+        return 'Rad etish';
+      default:
+        return 'So\'rov holatini yangilash';
+    }
+  };
+
+  const getActionDescription = () => {
+    switch (action) {
+      case 'reviewing':
+        return 'Bu so\'rovni "Ko\'rib chiqilmoqda" (reviewing) holatiga o\'tkazadi.';
+      case 'approve':
+        return 'Bu so\'rovni "Tasdiqlangan" (approved) holatiga o\'tkazadi. Tasdiqlangan so\'rovlar contragentga aylantirilishi mumkin.';
+      case 'reject':
+        return 'Bu so\'rovni "Rad etilgan" (rejected) holatiga o\'tkazadi. Rad etish sababi kiritilishi shart.';
+      default:
+        return '';
+    }
   };
 
   if (!request) return null;
@@ -93,7 +126,7 @@ const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request }) => {
             >
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800">So'rov holatini yangilash</h2>
+                <h2 className="text-2xl font-bold text-gray-800">{getActionTitle()}</h2>
                 <button
                   onClick={handleClose}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -122,31 +155,15 @@ const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request }) => {
                   </div>
                 )}
 
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    So'rov holati <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="pending">Ko'rib chiqilmoqda</option>
-                    <option value="approved">Tasdiqlangan</option>
-                    <option value="rejected">Rad etilgan</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    So'rov holatini tanlang
-                  </p>
+                {/* Info */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm text-blue-800">{getActionDescription()}</p>
                 </div>
 
                 {/* Admin Notes */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Admin izohi (ixtiyoriy)
+                    Admin izohi {action === 'reject' ? <span className="text-red-500">*</span> : '(ixtiyoriy)'}
                   </label>
                   <textarea
                     name="adminNotes"
@@ -154,21 +171,29 @@ const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request }) => {
                     onChange={handleChange}
                     rows={4}
                     maxLength={1000}
-                    placeholder="Admin izohini kiriting (maksimum 1000 belgi)..."
+                    required={action === 'reject'}
+                    placeholder={
+                      action === 'reject'
+                        ? 'Rad etish sababini kiriting (maksimum 1000 belgi, majburiy)...'
+                        : 'Admin izohini kiriting (maksimum 1000 belgi)...'
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    {formData.adminNotes.length}/1000 belgi. So'rov haqida qo'shimcha ma'lumot yozishingiz mumkin
+                    {formData.adminNotes.length}/1000 belgi
+                    {action === 'reject' && ' - Rad etish sababi kiritilishi shart'}
                   </p>
                 </div>
 
                 {/* Current Status Display */}
                 {request.status && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-xs text-blue-600 mb-1">Joriy holat:</p>
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                    <p className="text-xs text-gray-600 mb-1">Joriy holat:</p>
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
                       {request.status === 'approved' ? 'Tasdiqlangan' :
-                       request.status === 'rejected' ? 'Rad etilgan' : 'Ko\'rib chiqilmoqda'}
+                       request.status === 'rejected' ? 'Rad etilgan' :
+                       request.status === 'reviewing' ? 'Ko\'rib chiqilmoqda' :
+                       request.status === 'contacted' ? 'Aloqa qilingan' : 'Kutilmoqda'}
                     </span>
                   </div>
                 )}
@@ -184,10 +209,22 @@ const UpdateRequestStatusModal = ({ open, onClose, onSuccess, request }) => {
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors"
+                    disabled={loading || (action === 'reject' && !formData.adminNotes.trim())}
+                    className={`flex-1 px-4 py-2 rounded-md text-white transition-colors ${
+                      action === 'reject'
+                        ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-400'
+                        : action === 'approve'
+                        ? 'bg-green-600 hover:bg-green-700 disabled:bg-green-400'
+                        : 'bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400'
+                    } disabled:cursor-not-allowed`}
                   >
-                    {loading ? 'Yangilanmoqda...' : 'Yangilash'}
+                    {loading
+                      ? 'Jarayonda...'
+                      : action === 'reviewing'
+                      ? 'Ko\'rib chiqilmoqda deb belgilash'
+                      : action === 'approve'
+                      ? 'Tasdiqlash'
+                      : 'Rad etish'}
                   </button>
                 </div>
               </form>

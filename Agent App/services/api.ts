@@ -103,6 +103,33 @@ class ApiService {
     return await AsyncStorage.getItem(TOKEN_KEY);
   }
 
+  // Password Setup - Step 1: Request Phone
+  async passwordSetupStep1(phone: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.api.post<{ success: boolean; message: string }>(
+      API_ENDPOINTS.PASSWORD_SETUP_STEP1,
+      { phone }
+    );
+    return response.data;
+  }
+
+  // Password Setup - Step 2: Verify SMS Code
+  async passwordSetupStep2(phone: string, code: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.api.post<{ success: boolean; message: string }>(
+      API_ENDPOINTS.PASSWORD_SETUP_STEP2,
+      { phone, code }
+    );
+    return response.data;
+  }
+
+  // Password Setup - Step 3: Set Password
+  async passwordSetupStep3(phone: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.api.post<{ success: boolean; message: string }>(
+      API_ENDPOINTS.PASSWORD_SETUP_STEP3,
+      { phone, newPassword }
+    );
+    return response.data;
+  }
+
   // Get Orders (all)
   async getOrders(params?: GetOrdersParams): Promise<OrdersResponse> {
     const response = await this.api.get<OrdersResponse>(

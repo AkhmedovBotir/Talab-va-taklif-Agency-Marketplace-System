@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ImageGalleryModal from '../Common/ImageGalleryModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
 import { contragentAPI } from '../../services/api';
@@ -9,6 +10,7 @@ const ViewContragentModal = ({ open, onClose, contragent }) => {
   const [contragentData, setContragentData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [imageGalleryOpen, setImageGalleryOpen] = useState(false);
 
   useEffect(() => {
     if (open && contragent) {
@@ -115,7 +117,8 @@ const ViewContragentModal = ({ open, onClose, contragent }) => {
                           <img
                             src={contragentData.logo}
                             alt="Contragent logo"
-                            className="max-w-48 max-h-48 object-contain border border-gray-300 rounded"
+                            className="max-w-48 max-h-48 object-contain border border-gray-300 rounded cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setImageGalleryOpen(true)}
                           />
                         </div>
                       )}
@@ -213,6 +216,16 @@ const ViewContragentModal = ({ open, onClose, contragent }) => {
             </div>
           </motion.div>
         </>
+      )}
+
+      {/* Image Gallery Modal */}
+      {contragentData?.logo && (
+        <ImageGalleryModal
+          open={imageGalleryOpen}
+          onClose={() => setImageGalleryOpen(false)}
+          images={[contragentData.logo]}
+          title={contragentData.name || 'Logo'}
+        />
       )}
     </AnimatePresence>
   );

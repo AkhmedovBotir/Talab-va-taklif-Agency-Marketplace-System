@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { archiveAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import OrderTable from '../../components/Orders/OrderTable';
+import ViewOrderModal from '../../components/Orders/ViewOrderModal';
 import { ArrowBack, AssignmentInd, Assessment, ShoppingCart } from '@mui/icons-material';
 
 const formatNumber = (num) => {
@@ -23,6 +24,8 @@ const ArchivedAgentWorkHistory = () => {
     total: 0,
     count: 0,
   });
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchWorkHistory = async () => {
@@ -52,8 +55,13 @@ const ArchivedAgentWorkHistory = () => {
   }, [id, showError]);
 
   const handleViewOrder = (order) => {
-    // Navigate to order detail page or open modal
-    navigate(`/dashboard/orders/${order._id}`);
+    setSelectedOrder(order);
+    setIsOrderModalOpen(true);
+  };
+
+  const handleCloseOrderModal = () => {
+    setIsOrderModalOpen(false);
+    setSelectedOrder(null);
   };
 
   const getAgentTypeLabel = (agentType) => {
@@ -292,11 +300,19 @@ const ArchivedAgentWorkHistory = () => {
           )}
         </div>
       </motion.div>
+
+      {/* Order Modal */}
+      <ViewOrderModal
+        open={isOrderModalOpen}
+        onClose={handleCloseOrderModal}
+        order={selectedOrder}
+      />
     </div>
   );
 };
 
 export default ArchivedAgentWorkHistory;
+
 
 
 

@@ -10,7 +10,8 @@ const DEFAULT_INITIAL_DISTRIBUTION = Object.freeze({
   viloyatAgent: 15,
   tumanAgent: 15,
   mfyAgent: 35,
-  finance: 20,
+  finance: 15,
+  deliveryService: 5,
   punktTransfer: 0,
 });
 
@@ -34,7 +35,8 @@ const createKpiDistribution = async (req, res) => {
       (distribution.viloyatAgent || 0) +
       (distribution.tumanAgent || 0) +
       (distribution.mfyAgent || 0) +
-      (distribution.finance || 0);
+      (distribution.finance || 0) +
+      (distribution.deliveryService || 0);
 
     if (total !== 100) {
       return res.status(400).json({
@@ -193,7 +195,8 @@ const updateKpiDistribution = async (req, res) => {
         (distribution.viloyatAgent || 0) +
         (distribution.tumanAgent || 0) +
         (distribution.mfyAgent || 0) +
-        (distribution.finance || 0);
+        (distribution.finance || 0) +
+        (distribution.deliveryService || 0);
 
       if (total !== 100) {
         return res.status(400).json({
@@ -498,9 +501,10 @@ const getInitialKpiDistribution = async (req, res) => {
           'Tavsiyaviy boshlang\'ich taqsimlash. Admin kerak bo\'lsa qiymatlarni o\'zgartirishi mumkin.',
         distribution: DEFAULT_INITIAL_DISTRIBUTION,
         notes: [
-          'Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance) yig\'indisi 100% bo\'lishi shart',
+          'Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance, deliveryService) yig\'indisi 100% bo\'lishi shart',
           'Punkt transfer 0 bo\'lsa, transfer bonus ajratilmaydi',
           'Punkt transfer > 0 bo\'lsa, bu foizning yarmi fromPunkt ga, yarmi toPunkt ga ajratiladi',
+          'Yetkazib berish xizmati (deliveryService) faqat moliya bo\'limida saqlanadi va hech qanday recipient ga berilmaydi',
           'Bu qiymatlar faqat create formasi uchun boshlang\'ich tavsiya',
         ],
       },

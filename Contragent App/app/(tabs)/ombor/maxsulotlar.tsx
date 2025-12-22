@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -15,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { apiService, Product } from '../../../services/api';
+import { apiService, Product, Category } from '../../../services/api';
 import { formatNumberDisplay } from '../../../utils/formatNumber';
 
 export default function MaxsulotlarScreen() {
@@ -26,12 +27,19 @@ export default function MaxsulotlarScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterModerationStatus, setFilterModerationStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [hasActiveFilters, setHasActiveFilters] = useState(false);
   const router = useRouter();
 
   const loadProducts = useCallback(async () => {
     try {
       const response = await apiService.getMyProducts({ limit: 1000 });
       setProducts(response.data);
+      console.log('Products response:', response.data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Maxsulotlarni yuklashda xatolik');
     } finally {
@@ -40,9 +48,39 @@ export default function MaxsulotlarScreen() {
     }
   }, []);
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const response = await apiService.getCategories({ limit: 1000, status: 'active' });
+      if (response && response.success && response.data) {
+        if (response.data.length === 0) {
+          const allResponse = await apiService.getCategories({ limit: 1000 });
+          if (allResponse && allResponse.success && allResponse.data) {
+            const activeCategories = allResponse.data.filter((cat) => cat.status === 'active');
+            setCategories(activeCategories);
+          } else {
+            setCategories([]);
+          }
+        } else {
+          setCategories(response.data);
+        }
+      } else {
+        setCategories([]);
+      }
+    } catch (error: any) {
+      console.error('Error loading categories:', error);
+      setCategories([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadProducts();
-  }, [loadProducts]);
+    loadCategories();
+  }, [loadProducts, loadCategories]);
+
+  useEffect(() => {
+    const hasFilters = filterCategory !== null || filterStatus !== 'all' || filterModerationStatus !== 'all';
+    setHasActiveFilters(hasFilters);
+  }, [filterCategory, filterStatus, filterModerationStatus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -56,9 +94,29 @@ export default function MaxsulotlarScreen() {
     loadProducts();
   };
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = products.filter((product) => {
+    // Search filter
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Category filter
+    const matchesCategory = filterCategory === null || product.category._id === filterCategory;
+    
+    // Status filter
+    const matchesStatus = filterStatus === 'all' || product.status === filterStatus;
+    
+    // Moderation status filter
+    const matchesModerationStatus = 
+      filterModerationStatus === 'all' || 
+      product.moderationStatus === filterModerationStatus;
+    
+    return matchesSearch && matchesCategory && matchesStatus && matchesModerationStatus;
+  });
+
+  const handleResetFilters = () => {
+    setFilterCategory(null);
+    setFilterStatus('all');
+    setFilterModerationStatus('all');
+  };
 
   const handleView = (product: Product) => {
     router.push({
@@ -132,6 +190,17 @@ export default function MaxsulotlarScreen() {
             <Ionicons name="close-circle" size={20} color="#666" />
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          onPress={() => setShowFilterModal(true)}
+          style={[styles.filterButton, hasActiveFilters && styles.filterButtonActive]}
+        >
+          <Ionicons 
+            name="filter" 
+            size={20} 
+            color={hasActiveFilters ? "#007AFF" : "#666"} 
+          />
+          {hasActiveFilters && <View style={styles.filterBadge} />}
+        </TouchableOpacity>
       </View>
 
       {/* Products List */}
@@ -172,9 +241,30 @@ export default function MaxsulotlarScreen() {
             <View style={styles.productContent}>
               <View style={styles.productHeader}>
                 <View style={styles.productInfo}>
-                  <Text style={styles.productName} numberOfLines={1}>
-                    {item.name}
-                  </Text>
+                  <View style={styles.productNameRow}>
+                    <Text style={styles.productName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    {item.moderationStatus && (
+                      <View style={[
+                        styles.moderationBadge,
+                        item.moderationStatus === 'approved' && styles.moderationBadgeApproved,
+                        item.moderationStatus === 'rejected' && styles.moderationBadgeRejected,
+                        item.moderationStatus === 'pending' && styles.moderationBadgePending,
+                      ]}>
+                        <Text style={[
+                          styles.moderationBadgeText,
+                          item.moderationStatus === 'approved' && styles.moderationBadgeTextApproved,
+                          item.moderationStatus === 'rejected' && styles.moderationBadgeTextRejected,
+                          item.moderationStatus === 'pending' && styles.moderationBadgeTextPending,
+                        ]}>
+                          {item.moderationStatus === 'approved' ? 'Tasdiqlangan' : 
+                           item.moderationStatus === 'rejected' ? 'Rad etilgan' : 
+                           'Kutilmoqda'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.productCode}>Kod: {item.productCode}</Text>
                 </View>
                 <Switch
@@ -246,6 +336,139 @@ export default function MaxsulotlarScreen() {
       >
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
+
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilterModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={styles.filterModalOverlay}>
+          <View style={styles.filterModalContent}>
+            <View style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Filter</Text>
+              <TouchableOpacity
+                onPress={() => setShowFilterModal(false)}
+                style={styles.filterModalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.filterModalScroll} contentContainerStyle={styles.filterModalScrollContent}>
+              {/* Category Filter */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Kategoriya</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    filterCategory === null && styles.filterOptionActive,
+                  ]}
+                  onPress={() => setFilterCategory(null)}
+                >
+                  <Text style={[
+                    styles.filterOptionText,
+                    filterCategory === null && styles.filterOptionTextActive,
+                  ]}>
+                    Barchasi
+                  </Text>
+                  {filterCategory === null && (
+                    <Ionicons name="checkmark" size={20} color="#007AFF" />
+                  )}
+                </TouchableOpacity>
+                {categories.map((category) => (
+                  <TouchableOpacity
+                    key={category._id}
+                    style={[
+                      styles.filterOption,
+                      filterCategory === category._id && styles.filterOptionActive,
+                    ]}
+                    onPress={() => setFilterCategory(category._id)}
+                  >
+                    <Text style={[
+                      styles.filterOptionText,
+                      filterCategory === category._id && styles.filterOptionTextActive,
+                    ]}>
+                      {category.name}
+                    </Text>
+                    {filterCategory === category._id && (
+                      <Ionicons name="checkmark" size={20} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Status Filter */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Status</Text>
+                {(['all', 'active', 'inactive'] as const).map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.filterOption,
+                      filterStatus === status && styles.filterOptionActive,
+                    ]}
+                    onPress={() => setFilterStatus(status)}
+                  >
+                    <Text style={[
+                      styles.filterOptionText,
+                      filterStatus === status && styles.filterOptionTextActive,
+                    ]}>
+                      {status === 'all' ? 'Barchasi' : status === 'active' ? 'Faol' : 'Nofaol'}
+                    </Text>
+                    {filterStatus === status && (
+                      <Ionicons name="checkmark" size={20} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Moderation Status Filter */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Moderatsiya holati</Text>
+                {(['all', 'pending', 'approved', 'rejected'] as const).map((modStatus) => (
+                  <TouchableOpacity
+                    key={modStatus}
+                    style={[
+                      styles.filterOption,
+                      filterModerationStatus === modStatus && styles.filterOptionActive,
+                    ]}
+                    onPress={() => setFilterModerationStatus(modStatus)}
+                  >
+                    <Text style={[
+                      styles.filterOptionText,
+                      filterModerationStatus === modStatus && styles.filterOptionTextActive,
+                    ]}>
+                      {modStatus === 'all' ? 'Barchasi' : 
+                       modStatus === 'pending' ? 'Kutilmoqda' :
+                       modStatus === 'approved' ? 'Tasdiqlangan' : 'Rad etilgan'}
+                    </Text>
+                    {filterModerationStatus === modStatus && (
+                      <Ionicons name="checkmark" size={20} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <View style={styles.filterModalFooter}>
+              <TouchableOpacity
+                style={styles.filterResetButton}
+                onPress={handleResetFilters}
+              >
+                <Text style={styles.filterResetButtonText}>Tozalash</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.filterApplyButton}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <Text style={styles.filterApplyButtonText}>Qo'llash</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Delete Modal */}
       <Modal
@@ -327,6 +550,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  filterButton: {
+    marginLeft: 8,
+    padding: 4,
+    position: 'relative',
+  },
+  filterButtonActive: {
+    // Active state styling is handled by icon color
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#007AFF',
+  },
   listContent: {
     padding: 16,
     paddingBottom: 100,
@@ -384,11 +624,46 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  productNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
   productName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    flex: 1,
+  },
+  moderationBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  moderationBadgePending: {
+    backgroundColor: '#FFF3CD',
+  },
+  moderationBadgeApproved: {
+    backgroundColor: '#D1E7DD',
+  },
+  moderationBadgeRejected: {
+    backgroundColor: '#F8D7DA',
+  },
+  moderationBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  moderationBadgeTextPending: {
+    color: '#856404',
+  },
+  moderationBadgeTextApproved: {
+    color: '#0F5132',
+  },
+  moderationBadgeTextRejected: {
+    color: '#842029',
   },
   productCode: {
     fontSize: 11,
@@ -461,6 +736,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  filterModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
   deleteModalContent: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
@@ -514,6 +794,101 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   confirmDeleteButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  filterModalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '80%',
+    paddingBottom: 20,
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  filterModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  filterModalCloseButton: {
+    padding: 4,
+  },
+  filterModalScroll: {
+    flex: 1,
+  },
+  filterModalScrollContent: {
+    padding: 16,
+  },
+  filterSection: {
+    marginBottom: 24,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  filterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  filterOptionActive: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#007AFF',
+  },
+  filterOptionText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  filterOptionTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  filterModalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  filterResetButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    alignItems: 'center',
+  },
+  filterResetButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
+  },
+  filterApplyButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+  },
+  filterApplyButtonText: {
     fontSize: 16,
     color: '#fff',
     fontWeight: '600',

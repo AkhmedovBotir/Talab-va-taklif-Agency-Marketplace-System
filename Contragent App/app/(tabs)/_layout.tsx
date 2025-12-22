@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { apiService } from '../../services/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function BadgeIcon({ name, color, size, badgeCount }: { name: any; color: string; size: number; badgeCount: number }) {
   return (
@@ -19,6 +20,7 @@ function BadgeIcon({ name, color, size, badgeCount }: { name: any; color: string
 
 export default function TabLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -46,9 +48,9 @@ export default function TabLayout() {
         tabBarStyle: {
           borderTopWidth: 1,
           borderTopColor: '#e0e0e0',
-          paddingBottom: 15,
+          paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 10 : 10),
           paddingTop: 5,
-          height: 100,
+          height: 60 + insets.bottom,
         },
       }}
     >

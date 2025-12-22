@@ -2,12 +2,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 
 export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuth();
   const { unreadCount, refreshUnreadCount } = useNotifications();
-
+  const insets = useSafeAreaInsets();
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -31,9 +32,9 @@ export default function TabsLayout() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
-          paddingBottom: 8,
+          paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 10 : 10),
           paddingTop: 8,
-          height: 80,
+          height: 60 + insets.bottom,
         },
       }}
     >

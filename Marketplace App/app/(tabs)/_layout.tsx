@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform, StyleSheet, TouchableOpacity, View, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCart } from '../../contexts/CartContext';
 
 export default function TabsLayout() {
   const { totalItems } = useCart();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -16,12 +18,12 @@ export default function TabsLayout() {
           borderTopWidth: 1,
           borderTopColor: '#e5e5e7',
           backgroundColor: '#fff',
-          height: 85,
-          paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+          height: 60 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 10 : 10),
           paddingTop: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: '500',
         },
       }}
@@ -57,7 +59,7 @@ export default function TabsLayout() {
             >
               <Ionicons
                 name="search"
-                size={28}
+                size={30}
                 color={'#FFF'}
               />
             </View>

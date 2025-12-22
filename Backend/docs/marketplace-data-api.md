@@ -35,6 +35,8 @@
 
 Marketplace Data API provides public endpoints for viewing products, categories, and contragents. These endpoints are designed for marketplace users to browse and search for products.
 
+**Important:** Only products with `moderationStatus: 'approved'` and `status: 'active'` are visible in the marketplace. Products that are pending moderation or rejected by admins are not displayed.
+
 **Base Path:** `/api/marketplace`
 
 **Note:** These endpoints are public and do not require authentication. However, sensitive information like `kpiBonusPercent` (for products) and `inn` (for contragents) are excluded from responses.
@@ -842,12 +844,16 @@ Get a specific contragent by its ID with optional categories, subcategories, and
   "contragent": "object (reference to Contragent, inn excluded)",
   "deliveryRegions": "array of objects",
   "productCode": "string (auto-generated)",
+  "moderationStatus": "string (always 'approved' for marketplace products)",
   "createdAt": "string (ISO 8601 date)",
   "updatedAt": "string (ISO 8601 date)"
 }
 ```
 
-**Note:** `kpiBonusPercent` is excluded from all product responses.
+**Note:** 
+- `kpiBonusPercent` is excluded from all product responses.
+- Only products with `moderationStatus: 'approved'` and `status: 'active'` are displayed in the marketplace.
+- `moderatedBy`, `moderatedAt`, and `rejectionReason` fields are not included in marketplace responses.
 
 ### Category Object
 

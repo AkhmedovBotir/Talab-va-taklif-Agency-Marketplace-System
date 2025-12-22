@@ -12,6 +12,12 @@ const {
   updateMyLogo,
 } = require('../controllers/contragentController');
 const {
+  passwordSetupStep1,
+  passwordSetupStep2,
+  passwordSetupStep3,
+  loginContragent: loginContragentAuth,
+} = require('../controllers/contragentAuthController');
+const {
   getContragentNotifications,
   getContragentUnreadCount,
   markContragentNotificationRead,
@@ -20,8 +26,16 @@ const {
 const { validate, contragentValidationSchemas } = require('../middleware/validation');
 const { contragentAuth } = require('../middleware/auth');
 
-// Login contragent
+// Password setup (for new contragents from partnership requests)
+router.post('/password-setup/step1', validate(contragentValidationSchemas.passwordSetupStep1), passwordSetupStep1);
+router.post('/password-setup/step2', validate(contragentValidationSchemas.passwordSetupStep2), passwordSetupStep2);
+router.post('/password-setup/step3', validate(contragentValidationSchemas.passwordSetupStep3), passwordSetupStep3);
+
+// Login contragent (old endpoint - kept for backward compatibility)
 router.post('/login', validate(contragentValidationSchemas.login), loginContragent);
+
+// Login contragent (new endpoint - same functionality)
+router.post('/auth/login', validate(contragentValidationSchemas.login), loginContragentAuth);
 
 // Get current contragent (me)
 router.get('/me', contragentAuth, getMe);

@@ -1,134 +1,358 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, FlatList } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  FlatList,
+  ActivityIndicator,
+  TextInput,
+  Platform,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService, Region } from '@/services/api';
 
 interface RegionPickerProps {
   label: string;
-  type: 'region' | 'district' | 'mfy';
-  parentId?: string;
   value?: string;
-  initialRegion?: Region | null;
   onSelect: (region: Region) => void;
-  placeholder?: string;
-  disabled?: boolean;
+  type?: 'region' | 'district' | 'mfy';
+  parentId?: string;
   error?: string;
+  disabled?: boolean;
+  displayValue?: string;
+  initialRegion?: Region | null;
+  placeholder?: string;
 }
 
 export function RegionPicker({
   label,
-  type,
-  parentId,
   value,
-  initialRegion,
   onSelect,
-  placeholder = 'Tanlang...',
-  disabled = false,
+  type = 'region',
+  parentId,
   error,
+  disabled = false,
+  displayValue,
+  initialRegion,
+  placeholder,
 }: RegionPickerProps) {
-  const [regions, setRegions] = useState<Region[]>([]);
+  const insets = useSafeAreaInsets();
+  const [visible, setVisible] = useState(false);
+  const [allRegions, setAllRegions] = useState<Region[]>([]);
+  const [filteredRegions, setFilteredRegions] = useState<Region[]>([]);
   const [loading, setLoading] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(initialRegion || null);
+  const [displayText, setDisplayText] = useState<string>('');
 
-  // Update selected region when initialRegion changes
-  useEffect(() => {
-    if (initialRegion) {
-      setSelectedRegion(initialRegion);
-    } else if (!value) {
-      setSelectedRegion(null);
-    }
-  }, [initialRegion, value]);
+  // Sort regions alphabetically by name (Uzbek alphabet)
+  const sortRegionsAlphabetically = useCallback((regions: Region[]): Region[] => {
+    return [...regions].sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB, 'uz');
+    });
+  }, []);
 
-  // Load regions when modal opens or parentId/type changes
-  useEffect(() => {
-    if (modalVisible && (!parentId || parentId)) {
-      loadRegions();
-    }
-  }, [modalVisible, parentId, type]);
+  // Load all regions at once
+  const loadAllRegions = useCallback(async () => {
+    if (disabled) return;
 
-  // Update selected region from regions list when it loads (if value is provided)
-  useEffect(() => {
-    if (value && regions.length > 0) {
-      const found = regions.find((r) => r._id === value);
-      if (found && (!selectedRegion || selectedRegion._id !== found._id)) {
-        setSelectedRegion(found);
-      }
-    }
-  }, [regions, value]);
-
-  const loadRegions = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getRegions(type, parentId);
-      setRegions(data);
+      const params: any = {
+        type,
+        page: 1,
+        limit: 1000,
+      };
+
+      if (parentId) {
+        params.parent = parentId;
+      }
+
+      const response = await apiService.getRegions(params);
+      
+      // If there are more pages, load them all
+      let allData = [...response.data];
+      let currentPage = response.page;
+      
+      while (currentPage < response.totalPages) {
+        currentPage++;
+        const nextParams = { ...params, page: currentPage };
+        const nextResponse = await apiService.getRegions(nextParams);
+        allData = [...allData, ...nextResponse.data];
+      }
+
+      // Sort alphabetically
+      const sortedRegions = sortRegionsAlphabetically(allData);
+      setAllRegions(sortedRegions);
+      setFilteredRegions(sortedRegions);
     } catch (error) {
       console.error('Error loading regions:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [disabled, type, parentId, sortRegionsAlphabetically]);
+
+  // Load regions when modal opens
+  useEffect(() => {
+    if (visible) {
+      setSearchText('');
+      loadAllRegions();
+    }
+  }, [visible, loadAllRegions]);
+
+  // When parentId changes, clear selection and reload regions
+  useEffect(() => {
+    if (type !== 'region') {
+      // For district and mfy, when parentId changes, clear selection
+      setSelectedRegion(null);
+      setDisplayText('');
+      
+      if (parentId) {
+        // If parentId exists, reload regions (even if modal is closed, prepare for next open)
+        if (visible) {
+          loadAllRegions();
+        } else {
+          // Clear regions if modal is closed, they will be loaded when modal opens
+          setAllRegions([]);
+          setFilteredRegions([]);
+        }
+      } else {
+        // If parentId is cleared, clear everything
+        setAllRegions([]);
+        setFilteredRegions([]);
+      }
+    }
+  }, [parentId, type, visible, loadAllRegions]);
+
+  // Update selected region when value or allRegions change
+  useEffect(() => {
+    if (value && allRegions.length > 0) {
+      const region = allRegions.find((r) => r._id === value);
+      if (region) {
+        setSelectedRegion(region);
+        setDisplayText(region.name);
+      } else {
+        // If value doesn't exist in current regions (e.g., parent changed), clear it
+        setSelectedRegion(null);
+        setDisplayText('');
+      }
+    } else if (!value) {
+      setSelectedRegion(null);
+      setDisplayText('');
+    }
+  }, [value, allRegions]);
+
+  useEffect(() => {
+    if (displayValue && value) {
+      setDisplayText(displayValue);
+    } else if (!value) {
+      setDisplayText('');
+    }
+  }, [displayValue, value]);
+
+  // Update from initialRegion
+  useEffect(() => {
+    if (initialRegion) {
+      setSelectedRegion(initialRegion);
+      setDisplayText(initialRegion.name);
+    } else if (!value) {
+      setSelectedRegion(null);
+      setDisplayText('');
+    }
+  }, [initialRegion, value]);
+
+  // Filter regions locally based on search text
+  useEffect(() => {
+    if (!searchText.trim()) {
+      setFilteredRegions(allRegions);
+    } else {
+      const searchLower = searchText.toLowerCase();
+      const filtered = allRegions.filter((region) =>
+        region.name?.toLowerCase().includes(searchLower)
+      );
+      setFilteredRegions(filtered);
+    }
+  }, [searchText, allRegions]);
+
+  const handleSearch = useCallback((text: string) => {
+    setSearchText(text);
+  }, []);
 
   const handleSelect = (region: Region) => {
     setSelectedRegion(region);
+    setDisplayText(region.name);
     onSelect(region);
-    setModalVisible(false);
+    setVisible(false);
+    setSearchText('');
+  };
+
+  const getPlaceholder = () => {
+    if (placeholder) return placeholder;
+    switch (type) {
+      case 'region':
+        return 'Viloyatni tanlang';
+      case 'district':
+        return 'Tumanni tanlang';
+      case 'mfy':
+        return 'MFY ni tanlang';
+      default:
+        return 'Tanlang';
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      {label && <Text style={styles.label}>{label}</Text>}
       <TouchableOpacity
-        style={[styles.picker, disabled && styles.disabled, error && styles.pickerError]}
-        onPress={() => !disabled && setModalVisible(true)}
+        style={[
+          styles.input,
+          error && styles.inputError,
+          disabled && styles.inputDisabled,
+        ]}
+        onPress={() => !disabled && setVisible(true)}
         disabled={disabled}
+        activeOpacity={0.7}
       >
-        <Text style={[styles.pickerText, !selectedRegion && styles.placeholder]}>
-          {selectedRegion ? selectedRegion.name : placeholder}
-        </Text>
+        <View style={styles.inputContent}>
+          <Ionicons 
+            name={type === 'region' ? 'location' : type === 'district' ? 'map' : 'home'} 
+            size={20} 
+            color={displayText ? '#007AFF' : '#999'} 
+            style={styles.inputIcon}
+          />
+          <Text style={[styles.inputText, !displayText && styles.placeholder]}>
+            {displayText || getPlaceholder()}
+          </Text>
+        </View>
+        <Ionicons name="chevron-down" size={20} color="#666" />
       </TouchableOpacity>
       {error && <Text style={styles.errorText}>{error}</Text>}
 
       <Modal
-        visible={modalVisible}
+        visible={visible}
+        transparent
         animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => setVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom }]}>
+            {/* Drag Indicator */}
+            <View style={styles.dragIndicator} />
+            
+            {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{label}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+              <View style={styles.modalHeaderLeft}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons 
+                    name={type === 'region' ? 'location' : type === 'district' ? 'map' : 'home'} 
+                    size={24} 
+                    color="#007AFF" 
+                  />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>{label}</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {filteredRegions.length} ta {type === 'region' ? 'viloyat' : type === 'district' ? 'tuman' : 'MFY'}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setVisible(false)}
+                style={styles.closeButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close-circle" size={28} color="#999" />
               </TouchableOpacity>
             </View>
-            
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" />
-              </View>
-            ) : (
-              <FlatList
-                data={regions}
-                keyExtractor={(item) => item._id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.regionItem}
-                    onPress={() => handleSelect(item)}
-                  >
-                    <Text style={styles.regionText}>{item.name}</Text>
-                    {selectedRegion?._id === item._id && (
-                      <Text style={styles.checkmark}>✓</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>Ma'lumot topilmadi</Text>
-                  </View>
-                }
+
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Qidirish..."
+                value={searchText}
+                onChangeText={handleSearch}
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                autoCorrect={false}
               />
-            )}
+              {searchText.length > 0 && (
+                <TouchableOpacity 
+                  onPress={() => handleSearch('')}
+                  style={styles.clearSearchButton}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Regions List */}
+            <FlatList
+              data={filteredRegions}
+              keyExtractor={(item, index) => item._id || `region-${index}`}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.item,
+                    selectedRegion?._id === item._id && styles.itemSelected,
+                  ]}
+                  onPress={() => handleSelect(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.itemContent}>
+                    <View style={[
+                      styles.itemIconContainer,
+                      selectedRegion?._id === item._id && styles.itemIconContainerActive
+                    ]}>
+                      <Ionicons 
+                        name={type === 'region' ? 'location' : type === 'district' ? 'map' : 'home'} 
+                        size={18} 
+                        color={selectedRegion?._id === item._id ? '#007AFF' : '#999'} 
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.itemText,
+                        selectedRegion?._id === item._id && styles.itemTextSelected,
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                  </View>
+                  {selectedRegion?._id === item._id && (
+                    <View style={styles.checkmarkContainer}>
+                      <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+              removeClippedSubviews={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ 
+                paddingBottom: Math.max(insets.bottom + 20, 40) 
+              }}
+              ListEmptyComponent={
+                loading ? (
+                  <View style={styles.emptyContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                    <Text style={styles.emptyText}>Yuklanmoqda...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="search-outline" size={48} color="#ccc" />
+                    <Text style={styles.emptyText}>Hech narsa topilmadi</Text>
+                    <Text style={styles.emptySubtext}>Boshqa so'z bilan qidiring</Text>
+                  </View>
+                )
+              }
+            />
           </View>
         </View>
       </Modal>
@@ -138,31 +362,67 @@ export function RegionPicker({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: 0,
+    width: '100%',
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#333',
     marginBottom: 8,
-    color: '#1F2937',
   },
-  picker: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  input: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
     borderRadius: 12,
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     backgroundColor: '#fff',
+    minHeight: 52,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
   },
-  disabled: {
+  inputError: {
+    borderColor: '#ef4444',
+  },
+  inputDisabled: {
     backgroundColor: '#f5f5f5',
     opacity: 0.6,
   },
-  pickerText: {
+  inputContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  inputText: {
+    flex: 1,
     fontSize: 16,
-    color: '#1F2937',
+    color: '#333',
+    fontWeight: '500',
   },
   placeholder: {
-    color: '#9CA3AF',
+    color: '#999',
+    fontWeight: '400',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginTop: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -171,62 +431,144 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '85%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  dragIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#ddd',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
   },
   modalHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  modalClose: {
-    fontSize: 24,
-    color: '#6B7280',
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  regionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  regionText: {
-    fontSize: 16,
-    color: '#1F2937',
+  modalHeaderLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  checkmark: {
-    fontSize: 18,
-    color: '#2563EB',
+  modalIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f0f8ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    gap: 12,
+  },
+  searchIcon: {
+    marginRight: 0,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    padding: 0,
+  },
+  clearSearchButton: {
+    padding: 4,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  itemSelected: {
+    backgroundColor: '#f0f8ff',
+  },
+  itemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  itemIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemIconContainerActive: {
+    backgroundColor: '#e6f3ff',
+  },
+  itemText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  itemTextSelected: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  checkmarkContainer: {
+    marginLeft: 8,
   },
   emptyContainer: {
-    padding: 40,
+    padding: 48,
     alignItems: 'center',
+    gap: 12,
   },
   emptyText: {
     fontSize: 16,
     color: '#999',
+    fontWeight: '500',
   },
-  pickerError: {
-    borderColor: '#EF4444',
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#EF4444',
-    marginTop: 4,
+  emptySubtext: {
+    fontSize: 14,
+    color: '#ccc',
   },
 });
-

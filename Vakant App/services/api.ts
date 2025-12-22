@@ -73,17 +73,68 @@ class ApiService {
     }
   }
 
-  // Regions
-  async getRegions(type: 'region' | 'district' | 'mfy', parentId?: string): Promise<Region[]> {
-    const params = new URLSearchParams({ type });
-    if (parentId) {
-      params.append('parentId', parentId);
+  // Regions - overloaded methods
+  async getRegions(
+    typeOrParams: 'region' | 'district' | 'mfy' | {
+      type: 'region' | 'district' | 'mfy';
+      parent?: string;
+      page?: number;
+      limit?: number;
+    },
+    parentId?: string
+  ): Promise<Region[] | {
+    data: Region[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }> {
+    // Check if first parameter is an object (new API) or string (old API)
+    if (typeof typeOrParams === 'object') {
+      // New API with pagination
+      const params = typeOrParams;
+      const queryParams = new URLSearchParams();
+      queryParams.append('type', params.type);
+      if (params.parent) {
+        queryParams.append('parentId', params.parent);
+      }
+      if (params.page) {
+        queryParams.append('page', params.page.toString());
+      }
+      if (params.limit) {
+        queryParams.append('limit', params.limit.toString());
+      }
+      
+      const response = await this.request<{
+        data: Region[];
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      }>(`/regions?${queryParams.toString()}`, {
+        method: 'GET',
+      });
+      
+      return {
+        data: response.data || [],
+        page: response.page || 1,
+        limit: response.limit || 1000,
+        total: response.count || 0,
+        totalPages: response.totalPages || 1,
+      };
+    } else {
+      // Old API (backward compatibility)
+      const type = typeOrParams;
+      const params = new URLSearchParams({ type });
+      if (parentId) {
+        params.append('parentId', parentId);
+      }
+      
+      const response = await this.request<Region[]>(`/regions?${params.toString()}`, {
+        method: 'GET',
+      });
+      return response.data || [];
     }
-    
-    const response = await this.request<Region[]>(`/regions?${params.toString()}`, {
-      method: 'GET',
-    });
-    return response.data || [];
   }
 
   // Register: Check phone

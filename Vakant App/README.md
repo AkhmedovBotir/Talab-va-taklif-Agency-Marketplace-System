@@ -34,13 +34,13 @@ Vakant - bu O'zbekistondagi vakansiyalarni ko'rish, ariza yuborish va boshqarish
 
 ### 1. Dependencies o'rnatish
 
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
 ### 2. Ilovani ishga tushirish
 
-```bash
+   ```bash
 # Development server
 npm start
 

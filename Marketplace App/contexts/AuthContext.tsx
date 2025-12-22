@@ -88,10 +88,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await Promise.all([
-        AsyncStorage.removeItem(TOKEN_KEY),
-        AsyncStorage.removeItem(USER_KEY),
-      ]);
+      // Get all keys from AsyncStorage
+      const allKeys = await AsyncStorage.getAllKeys();
+      
+      // Filter keys that start with @marketplace:
+      const marketplaceKeys = allKeys.filter(key => key.startsWith('@marketplace:'));
+      
+      // Remove all marketplace-related keys
+      if (marketplaceKeys.length > 0) {
+        await AsyncStorage.multiRemove(marketplaceKeys);
+        console.log('Cleared all marketplace data from storage:', marketplaceKeys);
+      }
+      
       setToken(null);
       setUser(null);
     } catch (error) {

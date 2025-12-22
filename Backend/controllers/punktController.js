@@ -468,6 +468,14 @@ const loginPunkt = async (req, res) => {
       });
     }
 
+    // Check if password is set
+    if (!punkt.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parol o\'rnatilmagan. Iltimos, avval parol o\'rnating',
+      });
+    }
+
     // Compare password
     const isPasswordValid = await punkt.comparePassword(password);
 

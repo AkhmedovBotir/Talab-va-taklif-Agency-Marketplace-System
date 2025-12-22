@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'https://api.ttsa.uz/api/marketplace';
-const REGIONS_BASE_URL = 'https://api.ttsa.uz/api';
-const REVIEWS_BASE_URL = 'https://api.ttsa.uz/api/reviews';
-const PAYMENT_BASE_URL = 'https://api.ttsa.uz/api/payment';
+const BASE_URL = 'http://192.168.1.6:5000/api/marketplace';
+const REGIONS_BASE_URL = 'http://192.168.1.6:5000/api';
+const REVIEWS_BASE_URL = 'http://192.168.1.6:5000/api/reviews';
+const PAYMENT_BASE_URL = 'http://192.168.1.6:5000/api/payment';
 // Auth storage keys MUST match those used in AuthContext
 const TOKEN_KEY = '@marketplace:token';
 const USER_KEY = '@marketplace:user';
@@ -91,6 +91,7 @@ export interface Product {
     tuman: Region | null;
   }>;
   productCode: string;
+  censored?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -409,7 +410,7 @@ export interface ProductReviewsResponse {
 
 // Partnership Request Interfaces
 export type ContactStatus = 'not_contacted' | 'contacted' | 'in_progress' | 'completed';
-export type RequestStatus = 'pending' | 'approved' | 'rejected';
+export type RequestStatus = 'pending' | 'reviewing' | 'contacted' | 'approved' | 'rejected';
 
 export interface PartnershipRequest {
   _id: string;
@@ -430,9 +431,18 @@ export interface PartnershipRequest {
   managerFirstName: string;
   managerLastName: string;
   managerPhone: string;
-  contactStatus: ContactStatus;
+  contactStatus?: ContactStatus;
   status: RequestStatus;
   adminNotes?: string | null;
+  reviewedBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  } | null;
+  reviewedAt?: string | null;
+  contactedAt?: string | null;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -460,6 +470,10 @@ export interface PartnershipRequestResponse {
 export interface PartnershipRequestsResponse {
   success: boolean;
   count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
   data: PartnershipRequest[];
 }
 
@@ -522,12 +536,21 @@ class ApiService {
         data: data,
       }, null, 2));
       
-      // Handle 401 Unauthorized - logout user
+      // Handle 401 Unauthorized - logout user and clear all marketplace data
       if (response.status === 401) {
-        // Clear auth data from storage
+        // Clear all marketplace data from storage
         try {
-          await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
-          console.log('User logged out due to 401 error');
+          // Get all keys from AsyncStorage
+          const allKeys = await AsyncStorage.getAllKeys();
+          
+          // Filter keys that start with @marketplace:
+          const marketplaceKeys = allKeys.filter(key => key.startsWith('@marketplace:'));
+          
+          // Remove all marketplace-related keys
+          if (marketplaceKeys.length > 0) {
+            await AsyncStorage.multiRemove(marketplaceKeys);
+            console.log('User logged out due to 401 error. Cleared all marketplace data:', marketplaceKeys);
+          }
         } catch (storageError) {
           console.error('Error clearing auth data:', storageError);
         }
@@ -1123,6 +1146,37 @@ class ApiService {
     }, token);
   }
 
+  // Get Viloyat and Tuman
+  async getViloyatTuman(token: string): Promise<ApiResponse<{
+    _id: string;
+    viloyat: Region | null;
+    tuman: Region | null;
+    mfy: Region | null;
+  }>> {
+    return this.request<{
+      _id: string;
+      viloyat: Region | null;
+      tuman: Region | null;
+      mfy: Region | null;
+    }>('/me/viloyat-tuman', {
+      method: 'GET',
+    }, token);
+  }
+
+  // Update Viloyat and Tuman
+  async updateViloyatTuman(
+    data: {
+      viloyat?: string;
+      tuman?: string | null;
+    },
+    token: string
+  ): Promise<ApiResponse<User>> {
+    return this.request<User>('/me/viloyat-tuman', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, token);
+  }
+
   // Order Methods
   async createOrder(
     data: CreateOrderRequest,
@@ -1309,14 +1363,32 @@ class ApiService {
     data: CreatePartnershipRequest,
     token: string
   ): Promise<PartnershipRequestResponse> {
-    return this.request<PartnershipRequest>('/partnership-requests', {
+    return this.request<PartnershipRequest>('/marketplace-partnership-requests', {
       method: 'POST',
       body: JSON.stringify(data),
     }, token) as any;
   }
 
-  async getMyPartnershipRequests(token: string): Promise<PartnershipRequestsResponse> {
-    return this.request<PartnershipRequest[]>('/partnership-requests', {
+  async getMyPartnershipRequests(
+    params?: { status?: string; page?: number; limit?: number },
+    token?: string
+  ): Promise<PartnershipRequestsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const url = `/marketplace-partnership-requests${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.request<PartnershipRequest[]>(url, {
+      method: 'GET',
+    }, token) as any;
+  }
+
+  async getPartnershipRequestById(
+    id: string,
+    token: string
+  ): Promise<PartnershipRequestResponse> {
+    return this.request<PartnershipRequest>(`/marketplace-partnership-requests/${id}`, {
       method: 'GET',
     }, token) as any;
   }

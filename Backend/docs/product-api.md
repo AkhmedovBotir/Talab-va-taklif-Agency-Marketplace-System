@@ -24,6 +24,8 @@
 
 Product API provides endpoints for managing products in the system. Products can be created by Contragents, and each product includes detailed information such as pricing, images, categories, delivery regions, and KPI bonus percentages.
 
+**Important:** All new products require moderation by Admin before they appear in the marketplace. Products are created with `moderationStatus: 'pending'` and must be approved by an Admin to be visible to marketplace users.
+
 **Base Path:** `/api/product`
 
 ---
@@ -80,6 +82,11 @@ Most endpoints require authentication using JWT token from Contragent login. The
   "deliveryRegions": "array of objects (viloyat, tuman)",
   "kpiBonusPercent": "number (required, 0-100)",
   "productCode": "string (auto-generated, unique)",
+  "moderationStatus": "string (enum: 'pending' | 'approved' | 'rejected', default: 'pending')",
+  "moderatedBy": "ObjectId | null (reference to Admin, set when moderated)",
+  "moderatedAt": "Date | null (set when moderated)",
+  "rejectionReason": "string | null (set when rejected, max 1000 chars)",
+  "censored": "boolean (inherited from category/subcategory, default: false)",
   "createdAt": "string (ISO 8601 date)",
   "updatedAt": "string (ISO 8601 date)"
 }
@@ -185,8 +192,18 @@ Create a new product. Product code is automatically generated.
 - `price`: Required, number, minimum 0
 - `originalPrice`: Required, number, minimum 0
 - `images`: Optional, array of base64 strings, maximum 5 images
-- `category`: Required, must be a valid Category ID
-- `subcategory`: Optional, must be a valid Category ID and child of the selected category
+- `category`: Required, must be a valid Category ID that is:
+  - Active (`status: 'active'`)
+  - Created by Admin (`createdByModel: 'Admin'`)
+  - Top-level category (no parent)
+- `subcategory`: Optional, must be a valid Category ID that is:
+  - Active (`status: 'active'`)
+  - Created by Admin (`createdByModel: 'Admin'`)
+  - Child of the selected category
+- `censored`: Automatically inherited from category or subcategory:
+  - If subcategory is selected, uses subcategory's `censored` value (which inherits from parent category)
+  - If only category is selected, uses category's `censored` value
+  - `censored: true` means the product is for 18+ users only
 - `quantity`: Required, number, minimum 0
 - `unit`: Required, must be 'dona', 'litr', or 'kg'
 - `unitSize`: Optional, number, minimum 0. If provided, quantity should be in this unit format
@@ -202,7 +219,7 @@ Create a new product. Product code is automatically generated.
 ```json
 {
   "success": true,
-  "message": "Maxsulot muvaffaqiyatli yaratildi",
+  "message": "Maxsulot muvaffaqiyatli yaratildi va moderatsiya uchun yuborildi. Admin tomonidan tasdiqlangandan keyin marketplace ga chiqadi",
   "data": {
     "_id": "507f1f77bcf86cd799439011",
     "name": "Coca Cola 1.5L",
@@ -520,6 +537,10 @@ Get a specific product by its ID. This endpoint is public.
 
 Update an existing product. Only the product owner (contragent) can update their products.
 
+**Important Notes:**
+- If `category` or `subcategory` is changed, the `censored` field is automatically updated based on the new category/subcategory, and `moderationStatus` is reset to `pending` (requires re-approval by Admin).
+- The `censored` field cannot be manually set - it is always inherited from the selected category or subcategory.
+
 **Endpoint:** `PUT /api/product/:id`
 
 **Headers:**
@@ -539,8 +560,8 @@ All fields are optional. Only include fields you want to update.
   "price": "number (optional, min: 0)",
   "originalPrice": "number (optional, min: 0)",
   "images": "array of strings (optional, max 5)",
-  "category": "string (optional, MongoDB ObjectId)",
-  "subcategory": "string | null (optional, MongoDB ObjectId)",
+  "category": "string (optional, MongoDB ObjectId - must be Admin-created and active)",
+  "subcategory": "string | null (optional, MongoDB ObjectId - must be Admin-created and active)",
   "quantity": "number (optional, min: 0)",
   "unit": "string (optional, 'dona' | 'litr' | 'kg')",
   "unitSize": "number | null (optional, min: 0)",

@@ -23,6 +23,7 @@ const {
   getTotalReceived,
   getTotalDistributed,
   getFinanceKpiAmount,
+  getDeliveryServiceKpiAmount,
   getTotalBalance,
 } = require('../controllers/adminFinanceController');
 const { adminAuth } = require('../middleware/auth');
@@ -90,6 +91,9 @@ router.get('/balance/total-distributed', adminAuth, getTotalDistributed);
 
 // Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
 router.get('/balance/finance-kpi', adminAuth, getFinanceKpiAmount);
+
+// Yetkazib berish xizmati summasi (KPI bonuslardan)
+router.get('/balance/delivery-service-kpi', adminAuth, getDeliveryServiceKpiAmount);
 
 // Umumiy balans (Tushgan - Tarqatilgan)
 router.get('/balance/total-balance', adminAuth, getTotalBalance);

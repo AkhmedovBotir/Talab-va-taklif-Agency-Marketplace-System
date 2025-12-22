@@ -202,6 +202,24 @@ export default function LoginScreen() {
                   </>
                 )}
               </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>yoki</Text>
+                <View style={styles.divider} />
+              </View>
+
+              {/* Password Setup Button */}
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => router.push('/password-setup/step1')}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="lock-open-outline" size={20} color="#007AFF" style={styles.secondaryButtonIcon} />
+                <Text style={styles.secondaryButtonText}>Yangi Kontragent uchun</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -342,6 +360,40 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginLeft: 8,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: '#999',
+  },
+  secondaryButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    borderWidth: 1.5,
+    borderColor: '#007AFF',
+  },
+  secondaryButtonIcon: {
+    marginRight: 8,
+  },
+  secondaryButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });
 

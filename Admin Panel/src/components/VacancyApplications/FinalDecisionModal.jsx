@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Close, CheckCircle, Cancel, Person, Phone, LocationOn, CheckCircleOutline } from '@mui/icons-material';
+import { Close, CheckCircle, Cancel } from '@mui/icons-material';
 import { vacancyApplicationAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 
@@ -10,14 +10,10 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
   const [result, setResult] = useState('hired');
   const [reason, setReason] = useState('');
   const [decidedBy, setDecidedBy] = useState('');
-  const [createdUser, setCreatedUser] = useState(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setCreatedUser(null);
-    setShowSuccessMessage(false);
 
     try {
       const decisionData = {
@@ -34,19 +30,12 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
           : 'Yakuniy qaror: Rad etildi';
         
         showSuccess(message);
-        
-        // If hired and user was created, show success message with user info
-        if (result === 'hired' && response.data?.createdUser) {
-          setCreatedUser(response.data.createdUser);
-          setShowSuccessMessage(true);
-        } else {
-          onSuccess();
-          onClose();
-          // Reset form
-          setResult('hired');
-          setReason('');
-          setDecidedBy('');
-        }
+        onSuccess();
+        onClose();
+        // Reset form
+        setResult('hired');
+        setReason('');
+        setDecidedBy('');
       }
     } catch (err) {
       showError(err.message || 'Yakuniy qaror qilishda xatolik yuz berdi');
@@ -56,11 +45,6 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
   };
 
   const handleClose = () => {
-    if (showSuccessMessage && createdUser) {
-      onSuccess();
-    }
-    setShowSuccessMessage(false);
-    setCreatedUser(null);
     setResult('hired');
     setReason('');
     setDecidedBy('');
@@ -101,112 +85,7 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
 
               {/* Content */}
               <div className="p-6">
-                {showSuccessMessage && createdUser ? (
-                  <div className="space-y-6">
-                    {/* Success Message */}
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CheckCircleOutline className="text-green-600" />
-                        <p className="text-sm font-medium text-green-800">
-                          Muvaffaqiyatli! {createdUser.type === 'agent' ? 'Agent' : 'Punkt'} yaratildi
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Created User Info */}
-                    <div className="p-4 bg-gray-50 rounded-md space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        Yaratilgan {createdUser.type === 'agent' ? 'Agent' : 'Punkt'} ma'lumotlari
-                      </h3>
-                      
-                      {createdUser.data && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                              <Person className="w-4 h-4" />
-                              Nomi
-                            </label>
-                            <p className="text-gray-900">{createdUser.data.name || '-'}</p>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                              <Phone className="w-4 h-4" />
-                              Telefon
-                            </label>
-                            <p className="text-gray-900">{createdUser.data.phone || '-'}</p>
-                          </div>
-                          {createdUser.data.viloyat && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                                <LocationOn className="w-4 h-4" />
-                                Viloyat
-                              </label>
-                              <p className="text-gray-900">{createdUser.data.viloyat.name || '-'}</p>
-                            </div>
-                          )}
-                          {createdUser.data.tuman && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                                <LocationOn className="w-4 h-4" />
-                                Tuman
-                              </label>
-                              <p className="text-gray-900">{createdUser.data.tuman.name || '-'}</p>
-                            </div>
-                          )}
-                          {createdUser.data.mfy && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                                <LocationOn className="w-4 h-4" />
-                                MFY
-                              </label>
-                              <p className="text-gray-900">{createdUser.data.mfy.name || '-'}</p>
-                            </div>
-                          )}
-                          {createdUser.type === 'agent' && createdUser.data.agentType && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-500 mb-1">
-                                Agent turi
-                              </label>
-                              <p className="text-gray-900">
-                                {createdUser.data.agentType === 'viloyat'
-                                  ? 'Viloyat agenti'
-                                  : createdUser.data.agentType === 'tuman'
-                                  ? 'Tuman agenti'
-                                  : 'MFY agenti'}
-                              </p>
-                            </div>
-                          )}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-500 mb-1">
-                              Holati
-                            </label>
-                            <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
-                              {createdUser.data.status === 'active' ? 'Faol' : 'Nofaol'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                        <p className="text-sm text-yellow-800">
-                          <strong>Eslatma:</strong> Parol sifatida telefon raqami ishlatilgan. Foydalanuvchi keyin o'zgartirishi mumkin.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                      <button
-                        type="button"
-                        onClick={handleClose}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-                      >
-                        Yopish
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Info */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-blue-800">
@@ -219,8 +98,8 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
                           <br />
                           <strong>Maqsad:</strong> {application.vacancy.target === 'agent' ? 'Agent' : 'Punkt'}
                           <br />
-                          Agar "Ishga qabul qilish" tanlansa, avtomatik ravishda yangi{' '}
-                          {application.vacancy.target === 'agent' ? 'Agent' : 'Punkt'} yaratiladi.
+                          Agar "Ishga qabul qilish" tanlansa, keyin topshirishni{' '}
+                          {application.vacancy.target === 'agent' ? 'Agent' : 'Punkt'} ga aylantirishingiz mumkin.
                         </>
                       )}
                     </p>
@@ -303,7 +182,6 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
                   </button>
                 </div>
               </form>
-                )}
               </div>
             </div>
           </motion.div>

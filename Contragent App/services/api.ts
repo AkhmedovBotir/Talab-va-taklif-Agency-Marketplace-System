@@ -1,10 +1,39 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'https://api.ttsa.uz';
+const BASE_URL = 'http://192.168.1.6:5000';
 
 export interface LoginRequest {
   phone: string;
   password: string;
+}
+
+export interface PasswordSetupStep1Request {
+  phone: string;
+}
+
+export interface PasswordSetupStep1Response {
+  success: boolean;
+  message: string;
+}
+
+export interface PasswordSetupStep2Request {
+  phone: string;
+  code: string;
+}
+
+export interface PasswordSetupStep2Response {
+  success: boolean;
+  message: string;
+}
+
+export interface PasswordSetupStep3Request {
+  phone: string;
+  newPassword: string;
+}
+
+export interface PasswordSetupStep3Response {
+  success: boolean;
+  message: string;
 }
 
 export interface Contragent {
@@ -71,6 +100,8 @@ export interface Category {
   _id: string;
   name: string;
   slug: string;
+  image?: string | null;
+  censored?: boolean;
   parent: Category | null | string;
   status: 'active' | 'inactive';
   createdBy?: {
@@ -80,7 +111,14 @@ export interface Category {
     username?: string;
   };
   createdByModel?: string;
-  subcategories?: Category[];
+  subcategories?: Array<{
+    _id: string;
+    name: string;
+    slug: string;
+    parent: string;
+    status: 'active' | 'inactive';
+    id?: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -169,6 +207,14 @@ export interface Product {
   width?: number | null;
   weight?: number | null;
   status: 'active' | 'inactive' | 'archived';
+  moderationStatus?: 'pending' | 'approved' | 'rejected';
+  moderatedBy?: {
+    _id: string;
+    name: string;
+    username?: string;
+  } | null;
+  moderatedAt?: string | null;
+  rejectionReason?: string | null;
   contragent?: {
     _id: string;
     name: string;
@@ -411,9 +457,30 @@ class ApiService {
   }
 
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/api/contragents/login', {
+    return this.request<LoginResponse>('/api/contragents/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
+    });
+  }
+
+  async passwordSetupStep1(data: PasswordSetupStep1Request): Promise<PasswordSetupStep1Response> {
+    return this.request<PasswordSetupStep1Response>('/api/contragents/password-setup/step1', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async passwordSetupStep2(data: PasswordSetupStep2Request): Promise<PasswordSetupStep2Response> {
+    return this.request<PasswordSetupStep2Response>('/api/contragents/password-setup/step2', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async passwordSetupStep3(data: PasswordSetupStep3Request): Promise<PasswordSetupStep3Response> {
+    return this.request<PasswordSetupStep3Response>('/api/contragents/password-setup/step3', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

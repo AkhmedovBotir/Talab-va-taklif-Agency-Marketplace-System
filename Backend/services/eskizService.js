@@ -144,6 +144,24 @@ class EskizService {
     const message = `Talab va Taklif Agency platformasida parolingizni tiklash uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
     return await this.sendSMS(phone, message);
   }
+
+  // Send verification code for contragent password setup
+  async sendContragentPasswordSetupCode(phone, code) {
+    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    return await this.sendSMS(phone, message);
+  }
+
+  // Send verification code for punkt password setup
+  async sendPunktPasswordSetupCode(phone, code) {
+    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    return await this.sendSMS(phone, message);
+  }
+
+  // Send verification code for agent password setup
+  async sendAgentPasswordSetupCode(phone, code) {
+    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    return await this.sendSMS(phone, message);
+  }
 }
 
 module.exports = new EskizService();

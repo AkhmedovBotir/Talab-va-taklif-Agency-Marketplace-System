@@ -272,6 +272,54 @@ export default function ProductViewScreen() {
             </View>
           </View>
 
+          {product.moderationStatus && (
+            <View style={styles.moderationContainer}>
+              <View style={styles.moderationHeader}>
+                <Text style={styles.moderationLabel}>Moderatsiya holati:</Text>
+                <View style={[
+                  styles.moderationBadge,
+                  product.moderationStatus === 'approved' && styles.moderationBadgeApproved,
+                  product.moderationStatus === 'rejected' && styles.moderationBadgeRejected,
+                  product.moderationStatus === 'pending' && styles.moderationBadgePending,
+                ]}>
+                  <Text style={[
+                    styles.moderationBadgeText,
+                    product.moderationStatus === 'approved' && styles.moderationBadgeTextApproved,
+                    product.moderationStatus === 'rejected' && styles.moderationBadgeTextRejected,
+                    product.moderationStatus === 'pending' && styles.moderationBadgeTextPending,
+                  ]}>
+                    {product.moderationStatus === 'approved' ? 'Tasdiqlangan' : 
+                     product.moderationStatus === 'rejected' ? 'Rad etilgan' : 
+                     'Kutilmoqda'}
+                  </Text>
+                </View>
+              </View>
+              {product.moderatedBy && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Tekshiruvchi</Text>
+                  <Text style={styles.infoValue}>
+                    {product.moderatedBy.name}
+                    {product.moderatedBy.username && ` (@${product.moderatedBy.username})`}
+                  </Text>
+                </View>
+              )}
+              {product.moderatedAt && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Tekshirilgan vaqti</Text>
+                  <Text style={styles.infoValue}>
+                    {new Date(product.moderatedAt).toLocaleString('uz-UZ')}
+                  </Text>
+                </View>
+              )}
+              {product.rejectionReason && (
+                <View style={styles.rejectionReasonContainer}>
+                  <Text style={styles.rejectionReasonLabel}>Rad etish sababi:</Text>
+                  <Text style={styles.rejectionReasonText}>{product.rejectionReason}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Nomi</Text>
             <Text style={styles.infoValue}>{product.name}</Text>
@@ -673,6 +721,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     flex: 1,
+  },
+  moderationContainer: {
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  moderationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  moderationLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  moderationBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  moderationBadgePending: {
+    backgroundColor: '#FFF3CD',
+  },
+  moderationBadgeApproved: {
+    backgroundColor: '#D1E7DD',
+  },
+  moderationBadgeRejected: {
+    backgroundColor: '#F8D7DA',
+  },
+  moderationBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  moderationBadgeTextPending: {
+    color: '#856404',
+  },
+  moderationBadgeTextApproved: {
+    color: '#0F5132',
+  },
+  moderationBadgeTextRejected: {
+    color: '#842029',
+  },
+  rejectionReasonContainer: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderLeftWidth: 3,
+    borderLeftColor: '#dc3545',
+  },
+  rejectionReasonLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#842029',
+    marginBottom: 6,
+  },
+  rejectionReasonText: {
+    fontSize: 13,
+    color: '#333',
+    lineHeight: 18,
   },
 });
 

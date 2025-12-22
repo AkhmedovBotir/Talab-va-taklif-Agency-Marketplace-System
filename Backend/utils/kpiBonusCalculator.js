@@ -64,6 +64,7 @@ const calculateAndCreateKpiBonus = async (orderId, status) => {
         tumanAgent: (totalKpiAmount * distribution.distribution.tumanAgent) / 100,
         mfyAgent: (totalKpiAmount * distribution.distribution.mfyAgent) / 100,
         finance: (totalKpiAmount * distribution.distribution.finance) / 100,
+        deliveryService: (totalKpiAmount * distribution.distribution.deliveryService) / 100,
         punktTransfer: 0,
       };
 

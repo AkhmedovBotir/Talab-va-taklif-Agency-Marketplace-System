@@ -114,6 +114,32 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    moderationStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+      required: true,
+    },
+    moderatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+      default: null,
+    },
+    moderatedAt: {
+      type: Date,
+      default: null,
+    },
+    rejectionReason: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: [1000, 'Rad etish sababi 1000 ta belgidan oshmasligi kerak'],
+    },
+    censored: {
+      type: Boolean,
+      default: false,
+      required: true,
+    },
   },
   {
     timestamps: true,
@@ -125,9 +151,11 @@ productSchema.index({ contragent: 1 });
 productSchema.index({ category: 1 });
 productSchema.index({ subcategory: 1 });
 productSchema.index({ status: 1 });
+productSchema.index({ moderationStatus: 1 });
 productSchema.index({ productCode: 1 }, { unique: true });
 productSchema.index({ 'deliveryRegions.viloyat': 1 });
 productSchema.index({ 'deliveryRegions.tuman': 1 });
+productSchema.index({ createdAt: -1 });
 
 // Method to generate product code (global sequence for all products)
 productSchema.statics.generateProductCode = async function (contragentId) {

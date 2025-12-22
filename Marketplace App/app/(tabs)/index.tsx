@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -23,11 +23,37 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { useLocation } from '../../contexts/LocationContext';
 import apiService, { FeaturedContragent, Product } from '../../services/api';
 
+// Helper function to calculate age from birthDate
+const calculateAge = (birthDate: string | null | undefined): number | null => {
+  if (!birthDate) return null;
+  
+  try {
+    const birth = new Date(birthDate);
+    const today = new Date();
+    
+    if (isNaN(birth.getTime())) return null;
+    
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  } catch (error) {
+    console.error('Error calculating age:', error);
+    return null;
+  }
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { autoOpenLocation } = useLocalSearchParams<{ autoOpenLocation?: string }>();
   const { unreadCount } = useNotification();
-  const { selectedTuman } = useLocation();
+  const { user } = useAuth();
+  const { selectedViloyat, selectedTuman } = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,11 +83,39 @@ export default function HomeScreen() {
       if (selectedTuman) {
         filteredProducts = response.data.filter((product) => {
           if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
-            return false; // Hide products without delivery regions
+            // Show products without delivery regions if no tuman is selected
+            return false;
           }
-          return product.deliveryRegions.some((region) => {
-            return region.tuman?._id === selectedTuman._id;
+          // Check if product is deliverable to selected tuman
+          const matches = product.deliveryRegions.some((region) => {
+            // If region has tuman, check if it matches selected tuman
+            if (region.tuman) {
+              return region.tuman._id === selectedTuman._id;
+            }
+            // If region has viloyat but no tuman, check if viloyat matches selected viloyat
+            if (region.viloyat && selectedViloyat) {
+              return region.viloyat._id === selectedViloyat._id;
+            }
+            return false;
           });
+          if (!matches) {
+            console.log('HomeScreen: Product filtered out:', product.name, 'deliveryRegions:', product.deliveryRegions.map(r => `${r.viloyat?.name || 'no viloyat'}${r.tuman ? `, ${r.tuman.name}` : ''}`).join(' | '));
+          }
+          return matches;
+        });
+      } else {
+        console.log('HomeScreen: No tuman selected, showing all products');
+      }
+
+      // Filter censored products for users under 18
+      const userAge = calculateAge(user?.birthDate);
+      if (userAge !== null && userAge < 18) {
+        filteredProducts = filteredProducts.filter((product) => {
+          if (product.censored === true) {
+            console.log('HomeScreen: Censored product filtered out for user under 18:', product.name);
+            return false;
+          }
+          return true;
         });
       }
 
@@ -81,7 +135,7 @@ export default function HomeScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [selectedTuman]);
+  }, [selectedTuman, user?.birthDate]);
 
   const loadFeaturedContragents = useCallback(async () => {
     try {
@@ -127,10 +181,12 @@ export default function HomeScreen() {
 
   // Reload products when location changes
   useEffect(() => {
-    setPage(1);
-    setHasMore(true);
-    loadProducts(1, false);
-  }, [selectedTuman]);
+    if (selectedTuman) {
+      setPage(1);
+      setHasMore(true);
+      loadProducts(1, false);
+    }
+  }, [selectedTuman?._id, loadProducts]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -330,7 +386,7 @@ export default function HomeScreen() {
         onNotificationPress={handleNotificationPress} 
         unreadCount={unreadCount}
       />
-      <LocationSelector />
+      <LocationSelector autoOpen={autoOpenLocation === 'true'} />
       
       {loading && products.length === 0 ? (
         <View style={styles.loadingContainer}>

@@ -10,6 +10,11 @@ const {
   getAgentsForSelection,
 } = require('../controllers/agentController');
 const {
+  passwordSetupStep1,
+  passwordSetupStep2,
+  passwordSetupStep3,
+} = require('../controllers/agentAuthController');
+const {
   getAgentNotifications,
   getAgentUnreadCount,
   markAgentNotificationRead,
@@ -17,6 +22,11 @@ const {
 } = require('../controllers/notificationController');
 const { validate, agentValidationSchemas } = require('../middleware/validation');
 const { agentAuth } = require('../middleware/auth');
+
+// Password setup (for new agents from vacancy applications)
+router.post('/password-setup/step1', validate(agentValidationSchemas.passwordSetupStep1), passwordSetupStep1);
+router.post('/password-setup/step2', validate(agentValidationSchemas.passwordSetupStep2), passwordSetupStep2);
+router.post('/password-setup/step3', validate(agentValidationSchemas.passwordSetupStep3), passwordSetupStep3);
 
 // Login agent
 router.post('/login', validate(agentValidationSchemas.login), loginAgent);

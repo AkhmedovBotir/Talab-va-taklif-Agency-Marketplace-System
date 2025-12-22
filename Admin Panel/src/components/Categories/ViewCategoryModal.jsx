@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { motion } from 'framer-motion';
+import ImageGalleryModal from '../Common/ImageGalleryModal';
 
 const ViewCategoryModal = ({ open, onClose, category }) => {
+  const [imageGalleryOpen, setImageGalleryOpen] = useState(false);
+
   if (!category) return null;
 
   const formatDate = (dateString) => {
@@ -36,6 +40,24 @@ const ViewCategoryModal = ({ open, onClose, category }) => {
           transition={{ delay: 0.1 }}
           className="space-y-4"
         >
+          {/* Image */}
+          {category.image && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rasm</label>
+              <div className="flex justify-center">
+                <img
+                  src={category.image}
+                  alt={category.name}
+                  className="max-w-full max-h-64 rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setImageGalleryOpen(true)}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nomi</label>
@@ -56,6 +78,20 @@ const ViewCategoryModal = ({ open, onClose, category }) => {
                   }`}
                 >
                   {category.status === 'active' ? 'Faol' : 'Nofaol'}
+                </span>
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Censored</label>
+              <p className="text-sm">
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${
+                    category.censored
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}
+                >
+                  {category.censored ? 'Censored' : 'Not Censored'}
                 </span>
               </p>
             </div>
@@ -135,15 +171,26 @@ const ViewCategoryModal = ({ open, onClose, category }) => {
                         <p className="text-sm font-medium text-gray-900">{sub.name}</p>
                         <p className="text-xs text-gray-500">{sub.slug}</p>
                       </div>
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          sub.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {sub.status === 'active' ? 'Faol' : 'Nofaol'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            sub.status === 'active'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {sub.status === 'active' ? 'Faol' : 'Nofaol'}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            sub.censored
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {sub.censored ? 'Censored' : 'Not Censored'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -157,6 +204,16 @@ const ViewCategoryModal = ({ open, onClose, category }) => {
           Yopish
         </Button>
       </DialogActions>
+
+      {/* Image Gallery Modal */}
+      {category.image && (
+        <ImageGalleryModal
+          open={imageGalleryOpen}
+          onClose={() => setImageGalleryOpen(false)}
+          images={[category.image]}
+          title={category.name}
+        />
+      )}
     </Dialog>
   );
 };

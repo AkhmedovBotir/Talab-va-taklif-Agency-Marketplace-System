@@ -145,6 +145,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 32,
     paddingHorizontal: 20,
+    paddingTop: 50,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
   },

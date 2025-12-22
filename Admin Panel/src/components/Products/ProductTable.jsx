@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
-import { Visibility } from '@mui/icons-material';
+import { Visibility, CheckCircle, Cancel } from '@mui/icons-material';
 
-const ProductTable = ({ products, loading, onView, pagination, onPageChange }) => {
+const ProductTable = ({ products, loading, onView, onApprove, onReject, pagination, onPageChange }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -59,6 +59,33 @@ const ProductTable = ({ products, loading, onView, pagination, onPageChange }) =
     }
   };
 
+  const getModerationStatusBadge = (status) => {
+    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
+    switch (status) {
+      case 'pending':
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+      case 'approved':
+        return `${baseClasses} bg-green-100 text-green-800`;
+      case 'rejected':
+        return `${baseClasses} bg-red-100 text-red-800`;
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`;
+    }
+  };
+
+  const getModerationStatusLabel = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'Kutilmoqda';
+      case 'approved':
+        return 'Tasdiqlangan';
+      case 'rejected':
+        return 'Rad etilgan';
+      default:
+        return status || '-';
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
@@ -106,6 +133,9 @@ const ProductTable = ({ products, loading, onView, pagination, onPageChange }) =
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Moderatsiya
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Amallar
@@ -162,14 +192,41 @@ const ProductTable = ({ products, loading, onView, pagination, onPageChange }) =
                     {getStatusLabel(product.status)}
                   </span>
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {product.moderationStatus && (
+                    <span className={getModerationStatusBadge(product.moderationStatus)}>
+                      {getModerationStatusLabel(product.moderationStatus)}
+                    </span>
+                  )}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => onView(product)}
-                    className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                    title="Batafsil ko'rish"
-                  >
-                    <Visibility className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    {product.moderationStatus === 'pending' && onApprove && (
+                      <button
+                        onClick={() => onApprove(product)}
+                        className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
+                        title="Tasdiqlash"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                    {product.moderationStatus === 'pending' && onReject && (
+                      <button
+                        onClick={() => onReject(product)}
+                        className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                        title="Rad etish"
+                      >
+                        <Cancel className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onView(product)}
+                      className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                      title="Batafsil ko'rish"
+                    >
+                      <Visibility className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </motion.tr>
             ))}

@@ -1,38 +1,15 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Visibility, Edit, CheckCircle, Business } from '@mui/icons-material';
-import { partnershipRequestAPI } from '../../services/api';
-import { useSnackbar } from '../../contexts/SnackbarContext';
+import { Visibility, Settings } from '@mui/icons-material';
 
 const PartnershipRequestTable = ({ 
   requests, 
   loading, 
   onView, 
-  onUpdateContactStatus, 
-  onUpdateRequestStatus,
-  onSuccess,
+  onManage,
   pagination, 
   onPageChange 
 }) => {
-  const { showSuccess, showError } = useSnackbar();
-  const [convertingId, setConvertingId] = useState(null);
-
-  const handleConvertToContragent = async (request) => {
-    if (convertingId) return;
-    
-    setConvertingId(request._id);
-    try {
-      const response = await partnershipRequestAPI.convertToContragent(request._id);
-      if (response.success) {
-        showSuccess(response.message || 'Muvaffaqiyatli kontragentga aylantirildi');
-        if (onSuccess) onSuccess();
-      }
-    } catch (err) {
-      showError(err.message || 'Kontragentga aylantirishda xatolik yuz berdi');
-    } finally {
-      setConvertingId(null);
-    }
-  };
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -52,24 +29,13 @@ const PartnershipRequestTable = ({
         return `${baseClasses} bg-green-100 text-green-800`;
       case 'rejected':
         return `${baseClasses} bg-red-100 text-red-800`;
+      case 'reviewing':
+        return `${baseClasses} bg-blue-100 text-blue-800`;
+      case 'contacted':
+        return `${baseClasses} bg-purple-100 text-purple-800`;
       case 'pending':
       default:
         return `${baseClasses} bg-yellow-100 text-yellow-800`;
-    }
-  };
-
-  const getContactStatusBadge = (contactStatus) => {
-    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
-    switch (contactStatus) {
-      case 'completed':
-        return `${baseClasses} bg-blue-100 text-blue-800`;
-      case 'in_progress':
-        return `${baseClasses} bg-indigo-100 text-indigo-800`;
-      case 'contacted':
-        return `${baseClasses} bg-purple-100 text-purple-800`;
-      case 'not_contacted':
-      default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
     }
   };
 
@@ -79,23 +45,13 @@ const PartnershipRequestTable = ({
         return 'Tasdiqlangan';
       case 'rejected':
         return 'Rad etilgan';
-      case 'pending':
-      default:
+      case 'reviewing':
         return 'Ko\'rib chiqilmoqda';
-    }
-  };
-
-  const getContactStatusLabel = (contactStatus) => {
-    switch (contactStatus) {
-      case 'completed':
-        return 'Tugallangan';
-      case 'in_progress':
-        return 'Jarayonda';
       case 'contacted':
         return 'Aloqa qilingan';
-      case 'not_contacted':
+      case 'pending':
       default:
-        return 'Aloqa qilinmagan';
+        return 'Kutilmoqda';
     }
   };
 
@@ -139,9 +95,6 @@ const PartnershipRequestTable = ({
                 Menejer
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Aloqa holati
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -183,11 +136,6 @@ const PartnershipRequestTable = ({
                   <div className="text-xs text-gray-500">{request.managerPhone}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={getContactStatusBadge(request.contactStatus)}>
-                    {getContactStatusLabel(request.contactStatus)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
                   <span className={getStatusBadge(request.status)}>
                     {getStatusLabel(request.status)}
                   </span>
@@ -206,44 +154,21 @@ const PartnershipRequestTable = ({
                       <Visibility className="w-4 h-4" />
                     </button>
                     
-                    {/* Kontragentga aylantirilgan bo'lsa faqat badge */}
+                    {/* Boshqarish tugmasi - rejected va convertedToContragent dan tashqari barcha holatlar uchun */}
                     {request.convertedToContragent ? (
                       <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium">
                         Kontragent
                       </span>
-                    ) : request.status === 'approved' ? (
-                      /* Approved bo'lganda faqat Kontragentga aylantirish tugmasi */
+                    ) : request.status !== 'rejected' ? (
                       <button
-                        onClick={() => handleConvertToContragent(request)}
-                        disabled={convertingId === request._id}
-                        className="flex items-center gap-1 px-2 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Kontragentga aylantirish"
+                        onClick={() => onManage(request)}
+                        className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50 transition-colors"
+                        title="So'rovni boshqarish"
                       >
-                        {convertingId === request._id ? (
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Business style={{ fontSize: 14 }} />
-                        )}
-                        <span>Kontragent</span>
+                        <Settings className="w-4 h-4" />
                       </button>
                     ) : (
-                      /* Pending yoki rejected bo'lganda boshqa tugmalar */
-                      <>
-                        <button
-                          onClick={() => onUpdateContactStatus(request)}
-                          className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50 transition-colors"
-                          title="Aloqa holatini yangilash"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onUpdateRequestStatus(request)}
-                          className="text-orange-600 hover:text-orange-900 p-1 rounded hover:bg-orange-50 transition-colors"
-                          title="So'rov holatini yangilash"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      </>
+                      <span className="text-xs text-gray-500">Rad etilgan</span>
                     )}
                   </div>
                 </td>

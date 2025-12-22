@@ -12,7 +12,7 @@ const smsVerificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['login', 'register', 'forgot_password'],
+      enum: ['login', 'register', 'forgot_password', 'contragent_password_setup', 'punkt_password_setup', 'agent_password_setup'],
       required: [true, 'Kod turi kiritilishi shart'],
     },
     isUsed: {

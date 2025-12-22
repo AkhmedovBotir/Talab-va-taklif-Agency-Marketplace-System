@@ -89,6 +89,7 @@ const KPISettings = () => {
         tumanAgent: Number(payload.distribution.tumanAgent) || 0,
         mfyAgent: Number(payload.distribution.mfyAgent) || 0,
         finance: Number(payload.distribution.finance) || 0,
+        deliveryService: Number(payload.distribution.deliveryService) || 0,
         punktTransfer: Number(payload.distribution.punktTransfer) || 0,
       },
       isActive: payload.isActive,

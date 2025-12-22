@@ -13,6 +13,8 @@ import {
   Assessment,
   WorkHistory,
   Gavel as GavelIcon,
+  Person,
+  Business,
 } from '@mui/icons-material';
 import { vacancyApplicationAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
@@ -20,6 +22,8 @@ import DecideApplicationModal from './DecideApplicationModal';
 import InterviewStageModal from './InterviewStageModal';
 import InterviewStageResultModal from './InterviewStageResultModal';
 import FinalDecisionModal from './FinalDecisionModal';
+import ConvertToPunktModal from './ConvertToPunktModal';
+import ConvertToAgentModal from './ConvertToAgentModal';
 
 const ViewVacancyApplicationModal = ({ open, onClose, application, onSuccess }) => {
   const { showError, showSuccess } = useSnackbar();
@@ -32,6 +36,8 @@ const ViewVacancyApplicationModal = ({ open, onClose, application, onSuccess }) 
   const [interviewStageModalOpen, setInterviewStageModalOpen] = useState(false);
   const [interviewStageResultModalOpen, setInterviewStageResultModalOpen] = useState(false);
   const [finalDecisionModalOpen, setFinalDecisionModalOpen] = useState(false);
+  const [convertToPunktModalOpen, setConvertToPunktModalOpen] = useState(false);
+  const [convertToAgentModalOpen, setConvertToAgentModalOpen] = useState(false);
   const [editingStage, setEditingStage] = useState(null);
   const [resultStage, setResultStage] = useState(null);
   const [activeTab, setActiveTab] = useState('info');
@@ -70,6 +76,11 @@ const ViewVacancyApplicationModal = ({ open, onClose, application, onSuccess }) 
   };
 
   const handleFinalDecisionSuccess = () => {
+    fetchApplicationDetails();
+    if (onSuccess) onSuccess();
+  };
+
+  const handleConvertSuccess = () => {
     fetchApplicationDetails();
     if (onSuccess) onSuccess();
   };
@@ -709,6 +720,35 @@ const ViewVacancyApplicationModal = ({ open, onClose, application, onSuccess }) 
                                   )}
                                 </div>
 
+                                {/* Convert Button (if hired but not converted yet) */}
+                                {displayData.finalDecision.result === 'hired' && !displayData.createdUser && (
+                                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                                      Punkt/Agent ga Aylantirish
+                                    </h3>
+                                    <p className="text-sm text-gray-700 mb-4">
+                                      Topshirish qabul qilingan. Endi uni {displayData.vacancy?.target === 'punkt' ? 'Punkt' : 'Agent'} ga aylantirishingiz mumkin.
+                                    </p>
+                                    {displayData.vacancy?.target === 'punkt' ? (
+                                      <button
+                                        onClick={() => setConvertToPunktModalOpen(true)}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-md hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold text-sm shadow-md hover:shadow-lg"
+                                      >
+                                        <Business className="w-4 h-4" />
+                                        Punkt ga Aylantirish
+                                      </button>
+                                    ) : displayData.vacancy?.target === 'agent' ? (
+                                      <button
+                                        onClick={() => setConvertToAgentModalOpen(true)}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-md hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold text-sm shadow-md hover:shadow-lg"
+                                      >
+                                        <Person className="w-4 h-4" />
+                                        Agent ga Aylantirish
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                )}
+
                                 {/* Created User Info (if hired) */}
                                 {displayData.finalDecision.result === 'hired' && displayData.createdUser && (
                                   <div className="p-4 bg-green-50 border border-green-200 rounded-md">
@@ -855,6 +895,24 @@ const ViewVacancyApplicationModal = ({ open, onClose, application, onSuccess }) 
             onSuccess={handleFinalDecisionSuccess}
             application={displayData}
           />
+
+          {displayData.vacancy?.target === 'punkt' && (
+            <ConvertToPunktModal
+              open={convertToPunktModalOpen}
+              onClose={() => setConvertToPunktModalOpen(false)}
+              onSuccess={handleConvertSuccess}
+              application={displayData}
+            />
+          )}
+
+          {displayData.vacancy?.target === 'agent' && (
+            <ConvertToAgentModal
+              open={convertToAgentModalOpen}
+              onClose={() => setConvertToAgentModalOpen(false)}
+              onSuccess={handleConvertSuccess}
+              application={displayData}
+            />
+          )}
         </>
       )}
     </>

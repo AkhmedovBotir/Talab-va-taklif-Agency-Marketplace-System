@@ -1,4 +1,4 @@
-const BASE_URL = 'https://api.ttsa.uz/api';
+const BASE_URL = 'http://192.168.1.6:5000/api';
 
 export interface LoginRequest {
   phone: string;
@@ -12,6 +12,35 @@ export interface LoginResponse {
     token: string;
     punkt: Punkt;
   };
+}
+
+export interface PasswordSetupStep1Request {
+  phone: string;
+}
+
+export interface PasswordSetupStep1Response {
+  success: boolean;
+  message: string;
+}
+
+export interface PasswordSetupStep2Request {
+  phone: string;
+  code: string;
+}
+
+export interface PasswordSetupStep2Response {
+  success: boolean;
+  message: string;
+}
+
+export interface PasswordSetupStep3Request {
+  phone: string;
+  newPassword: string;
+}
+
+export interface PasswordSetupStep3Response {
+  success: boolean;
+  message: string;
 }
 
 export interface Punkt {
@@ -570,6 +599,27 @@ class ApiService {
     return this.request<LoginResponse>('/punkts/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
+    });
+  }
+
+  async passwordSetupStep1(data: PasswordSetupStep1Request): Promise<PasswordSetupStep1Response> {
+    return this.request<PasswordSetupStep1Response>('/punkts/password-setup/step1', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async passwordSetupStep2(data: PasswordSetupStep2Request): Promise<PasswordSetupStep2Response> {
+    return this.request<PasswordSetupStep2Response>('/punkts/password-setup/step2', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async passwordSetupStep3(data: PasswordSetupStep3Request): Promise<PasswordSetupStep3Response> {
+    return this.request<PasswordSetupStep3Response>('/punkts/password-setup/step3', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

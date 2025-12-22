@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://api.ttsa.uz/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 // Helper function to get token from localStorage
 const getToken = () => {
@@ -465,6 +465,167 @@ export const punktAPI = {
   deletePunkt: async (id) => {
     return apiRequest(`/punkts/${id}`, {
       method: 'DELETE',
+    });
+  },
+};
+
+// Admin Category Management API functions
+export const categoryManagementAPI = {
+  // Category Management
+  // Create category
+  createCategory: async (categoryData) => {
+    return apiRequest('/admins/categories', {
+      method: 'POST',
+      body: JSON.stringify(categoryData),
+    });
+  },
+
+  // Get all categories
+  getAllCategories: async (params = {}) => {
+    const { page = 1, limit = 50, status, censored } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) queryParams.append('status', status);
+    if (censored !== undefined) queryParams.append('censored', censored.toString());
+    
+    return apiRequest(`/admins/categories?${queryParams.toString()}`);
+  },
+
+  // Get category by ID
+  getCategoryById: async (id) => {
+    return apiRequest(`/admins/categories/${id}`);
+  },
+
+  // Update category
+  updateCategory: async (id, categoryData) => {
+    return apiRequest(`/admins/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(categoryData),
+    });
+  },
+
+  // Update category status
+  updateCategoryStatus: async (id, status) => {
+    return apiRequest(`/admins/categories/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  // Delete category
+  deleteCategory: async (id) => {
+    return apiRequest(`/admins/categories/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Subcategory Management
+  // Create subcategory
+  createSubcategory: async (subcategoryData) => {
+    return apiRequest('/admins/categories/subcategories', {
+      method: 'POST',
+      body: JSON.stringify(subcategoryData),
+    });
+  },
+
+  // Get all subcategories
+  getAllSubcategories: async (params = {}) => {
+    const { page = 1, limit = 50, status, censored, parent } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) queryParams.append('status', status);
+    if (censored !== undefined) queryParams.append('censored', censored.toString());
+    if (parent) queryParams.append('parent', parent);
+    
+    return apiRequest(`/admins/categories/subcategories?${queryParams.toString()}`);
+  },
+
+  // Update subcategory
+  updateSubcategory: async (id, subcategoryData) => {
+    return apiRequest(`/admins/categories/subcategories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(subcategoryData),
+    });
+  },
+
+  // Update subcategory status
+  updateSubcategoryStatus: async (id, status) => {
+    return apiRequest(`/admins/categories/subcategories/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  // Delete subcategory
+  deleteSubcategory: async (id) => {
+    return apiRequest(`/admins/categories/subcategories/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Admin Product Moderation API functions
+export const productModerationAPI = {
+  // Get pending products
+  getPendingProducts: async (params = {}) => {
+    const { page = 1, limit = 50, contragent, category } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (contragent) queryParams.append('contragent', contragent);
+    if (category) queryParams.append('category', category);
+    
+    return apiRequest(`/admins/products/moderation/pending?${queryParams.toString()}`);
+  },
+
+  // Get pending product by ID
+  getPendingProductById: async (id) => {
+    return apiRequest(`/admins/products/moderation/pending/${id}`);
+  },
+
+  // Get all products with moderation filter
+  getAllProductsWithModeration: async (params = {}) => {
+    const { 
+      page = 1, 
+      limit = 50, 
+      moderationStatus, 
+      contragent, 
+      category, 
+      status 
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (moderationStatus) queryParams.append('moderationStatus', moderationStatus);
+    if (contragent) queryParams.append('contragent', contragent);
+    if (category) queryParams.append('category', category);
+    if (status) queryParams.append('status', status);
+    
+    return apiRequest(`/admins/products/moderation?${queryParams.toString()}`);
+  },
+
+  // Approve product
+  approveProduct: async (id) => {
+    return apiRequest(`/admins/products/moderation/${id}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  // Reject product
+  rejectProduct: async (id, rejectionReason) => {
+    return apiRequest(`/admins/products/moderation/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason }),
     });
   },
 };
@@ -1587,42 +1748,67 @@ export const reviewAPI = {
 export const partnershipRequestAPI = {
   // Get all partnership requests with pagination and filters
   getAllPartnershipRequests: async (params = {}) => {
-    const { page = 1, limit = 20, status, contactStatus } = params;
+    const { page = 1, limit = 20, status } = params;
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
     
     if (status) queryParams.append('status', status);
-    if (contactStatus) queryParams.append('contactStatus', contactStatus);
     
-    return apiRequest(`/admins/partnership-requests?${queryParams.toString()}`);
+    return apiRequest(`/admins/marketplace-partnership-requests?${queryParams.toString()}`);
   },
 
   // Get partnership request by ID
   getPartnershipRequestById: async (id) => {
-    return apiRequest(`/admins/partnership-requests/${id}`);
+    return apiRequest(`/admins/marketplace-partnership-requests/${id}`);
   },
 
-  // Update contact status
-  updateContactStatus: async (id, contactStatus) => {
-    return apiRequest(`/admins/partnership-requests/${id}/contact-status`, {
+  // Update status to reviewing
+  updateStatusToReviewing: async (id) => {
+    return apiRequest(`/admins/marketplace-partnership-requests/${id}/reviewing`, {
       method: 'PATCH',
-      body: JSON.stringify({ contactStatus }),
     });
   },
 
-  // Update request status
-  updateRequestStatus: async (id, statusData) => {
-    return apiRequest(`/admins/partnership-requests/${id}/status`, {
+  // Update status to contacted
+  updateStatusToContacted: async (id, adminNotes = '') => {
+    const body = {};
+    if (adminNotes && adminNotes.trim() !== '') {
+      body.adminNotes = adminNotes.trim();
+    }
+    return apiRequest(`/admins/marketplace-partnership-requests/${id}/contacted`, {
       method: 'PATCH',
-      body: JSON.stringify(statusData),
+      body: JSON.stringify(body),
+    });
+  },
+
+  // Approve partnership request
+  approvePartnershipRequest: async (id, adminNotes = '') => {
+    const body = {};
+    if (adminNotes && adminNotes.trim() !== '') {
+      body.adminNotes = adminNotes.trim();
+    }
+    return apiRequest(`/admins/marketplace-partnership-requests/${id}/approve`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  },
+
+  // Reject partnership request
+  rejectPartnershipRequest: async (id, adminNotes) => {
+    if (!adminNotes || adminNotes.trim() === '') {
+      throw new Error('Rad etish sababi (adminNotes) kiritilishi shart');
+    }
+    return apiRequest(`/admins/marketplace-partnership-requests/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ adminNotes: adminNotes.trim() }),
     });
   },
 
   // Convert partnership request to contragent
   convertToContragent: async (id) => {
-    return apiRequest(`/admins/partnership-requests/${id}/convert-to-contragent`, {
+    return apiRequest(`/admins/marketplace-partnership-requests/${id}/convert-to-contragent`, {
       method: 'POST',
     });
   },
@@ -1759,6 +1945,22 @@ export const vacancyApplicationAPI = {
     return apiRequest(`/admins/applications/${id}/final-decision`, {
       method: 'POST',
       body: JSON.stringify(decisionData),
+    });
+  },
+
+  // Convert application to Punkt
+  convertToPunkt: async (id, convertData) => {
+    return apiRequest(`/admins/applications/${id}/convert-to-punkt`, {
+      method: 'POST',
+      body: JSON.stringify(convertData),
+    });
+  },
+
+  // Convert application to Agent
+  convertToAgent: async (id, convertData) => {
+    return apiRequest(`/admins/applications/${id}/convert-to-agent`, {
+      method: 'POST',
+      body: JSON.stringify(convertData),
     });
   },
 };
@@ -1957,6 +2159,17 @@ export const financeAPI = {
     
     const queryString = queryParams.toString();
     return apiRequest(`/admin-finance/balance/total-balance${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get delivery service KPI amount
+  getDeliveryServiceKpi: async (params = {}) => {
+    const { startDate, endDate } = params;
+    const queryParams = new URLSearchParams();
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    const queryString = queryParams.toString();
+    return apiRequest(`/admin-finance/balance/delivery-service-kpi${queryString ? `?${queryString}` : ''}`);
   },
 };
 

@@ -52,24 +52,29 @@ const ViewPartnershipRequestModal = ({ open, onClose, request }) => {
         return `${baseClasses} bg-green-100 text-green-800`;
       case 'rejected':
         return `${baseClasses} bg-red-100 text-red-800`;
+      case 'reviewing':
+        return `${baseClasses} bg-blue-100 text-blue-800`;
+      case 'contacted':
+        return `${baseClasses} bg-purple-100 text-purple-800`;
       case 'pending':
       default:
         return `${baseClasses} bg-yellow-100 text-yellow-800`;
     }
   };
 
-  const getContactStatusBadge = (contactStatus) => {
-    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
-    switch (contactStatus) {
-      case 'completed':
-        return `${baseClasses} bg-blue-100 text-blue-800`;
-      case 'in_progress':
-        return `${baseClasses} bg-indigo-100 text-indigo-800`;
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'approved':
+        return 'Tasdiqlangan';
+      case 'rejected':
+        return 'Rad etilgan';
+      case 'reviewing':
+        return 'Ko\'rib chiqilmoqda';
       case 'contacted':
-        return `${baseClasses} bg-purple-100 text-purple-800`;
-      case 'not_contacted':
+        return 'Aloqa qilingan';
+      case 'pending':
       default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
+        return 'Kutilmoqda';
     }
   };
 
@@ -122,16 +127,10 @@ const ViewPartnershipRequestModal = ({ open, onClose, request }) => {
                   </div>
                 ) : displayData ? (
                   <div className="space-y-6">
-                    {/* Status Badges */}
+                    {/* Status Badge */}
                     <div className="flex gap-3">
                       <span className={getStatusBadge(displayData.status)}>
-                        {displayData.status === 'approved' ? 'Tasdiqlangan' : 
-                         displayData.status === 'rejected' ? 'Rad etilgan' : 'Ko\'rib chiqilmoqda'}
-                      </span>
-                      <span className={getContactStatusBadge(displayData.contactStatus)}>
-                        {displayData.contactStatus === 'completed' ? 'Tugallangan' :
-                         displayData.contactStatus === 'in_progress' ? 'Jarayonda' :
-                         displayData.contactStatus === 'contacted' ? 'Aloqa qilingan' : 'Aloqa qilinmagan'}
+                        {getStatusLabel(displayData.status)}
                       </span>
                     </div>
 
@@ -237,6 +236,35 @@ const ViewPartnershipRequestModal = ({ open, onClose, request }) => {
                           <label className="block text-sm font-medium text-gray-500 mb-1">Yangilangan sana</label>
                           <p className="text-gray-900">{formatDate(displayData.updatedAt)}</p>
                         </div>
+                        {displayData.reviewedAt && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Ko'rib chiqilgan sana</label>
+                            <p className="text-gray-900">{formatDate(displayData.reviewedAt)}</p>
+                            {displayData.reviewedBy && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {displayData.reviewedBy.firstName} {displayData.reviewedBy.lastName} tomonidan
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {displayData.contactedAt && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Aloqa qilingan sana</label>
+                            <p className="text-gray-900">{formatDate(displayData.contactedAt)}</p>
+                          </div>
+                        )}
+                        {displayData.approvedAt && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Tasdiqlangan sana</label>
+                            <p className="text-gray-900">{formatDate(displayData.approvedAt)}</p>
+                          </div>
+                        )}
+                        {displayData.rejectedAt && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Rad etilgan sana</label>
+                            <p className="text-gray-900">{formatDate(displayData.rejectedAt)}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

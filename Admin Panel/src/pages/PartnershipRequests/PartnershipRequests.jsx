@@ -4,8 +4,7 @@ import { partnershipRequestAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import PartnershipRequestTable from '../../components/PartnershipRequests/PartnershipRequestTable';
 import ViewPartnershipRequestModal from '../../components/PartnershipRequests/ViewPartnershipRequestModal';
-import UpdateContactStatusModal from '../../components/PartnershipRequests/UpdateContactStatusModal';
-import UpdateRequestStatusModal from '../../components/PartnershipRequests/UpdateRequestStatusModal';
+import ManagePartnershipRequestModal from '../../components/PartnershipRequests/ManagePartnershipRequestModal';
 import { Search, Clear } from '@mui/icons-material';
 
 const PartnershipRequests = () => {
@@ -23,14 +22,12 @@ const PartnershipRequests = () => {
   // Filters
   const [filters, setFilters] = useState({
     status: '',
-    contactStatus: '',
     search: '',
   });
 
   // Modals
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [contactStatusModalOpen, setContactStatusModalOpen] = useState(false);
-  const [requestStatusModalOpen, setRequestStatusModalOpen] = useState(false);
+  const [manageModalOpen, setManageModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Fetch requests
@@ -44,7 +41,6 @@ const PartnershipRequests = () => {
       };
       
       if (filters.status) params.status = filters.status;
-      if (filters.contactStatus) params.contactStatus = filters.contactStatus;
 
       const response = await partnershipRequestAPI.getAllPartnershipRequests(params);
 
@@ -68,21 +64,16 @@ const PartnershipRequests = () => {
 
   useEffect(() => {
     fetchRequests();
-  }, [pagination.page, pagination.limit, filters.status, filters.contactStatus]);
+  }, [pagination.page, pagination.limit, filters.status]);
 
   const handleView = (request) => {
     setSelectedRequest(request);
     setViewModalOpen(true);
   };
 
-  const handleUpdateContactStatus = (request) => {
+  const handleManage = (request) => {
     setSelectedRequest(request);
-    setContactStatusModalOpen(true);
-  };
-
-  const handleUpdateRequestStatus = (request) => {
-    setSelectedRequest(request);
-    setRequestStatusModalOpen(true);
+    setManageModalOpen(true);
   };
 
   const handlePageChange = (newPage) => {
@@ -112,7 +103,6 @@ const PartnershipRequests = () => {
   const handleClearFilters = () => {
     setFilters({
       status: '',
-      contactStatus: '',
       search: '',
     });
     setPagination({ ...pagination, page: 1 });
@@ -149,7 +139,7 @@ const PartnershipRequests = () => {
             <span>Tozalash</span>
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -172,25 +162,11 @@ const PartnershipRequests = () => {
             className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="">Barcha statuslar</option>
-            <option value="pending">Ko'rib chiqilmoqda</option>
+            <option value="pending">Kutilmoqda</option>
+            <option value="reviewing">Ko'rib chiqilmoqda</option>
+            <option value="contacted">Aloqa qilingan</option>
             <option value="approved">Tasdiqlangan</option>
             <option value="rejected">Rad etilgan</option>
-          </select>
-
-          {/* Contact Status Filter */}
-          <select
-            value={filters.contactStatus}
-            onChange={(e) => {
-              setFilters({ ...filters, contactStatus: e.target.value });
-              setPagination({ ...pagination, page: 1 });
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Barcha aloqa holatlari</option>
-            <option value="not_contacted">Aloqa qilinmagan</option>
-            <option value="contacted">Aloqa qilingan</option>
-            <option value="in_progress">Jarayonda</option>
-            <option value="completed">Tugallangan</option>
           </select>
 
           {/* Limit */}
@@ -220,9 +196,7 @@ const PartnershipRequests = () => {
         requests={filteredRequests}
         loading={loading}
         onView={handleView}
-        onUpdateContactStatus={handleUpdateContactStatus}
-        onUpdateRequestStatus={handleUpdateRequestStatus}
-        onSuccess={handleSuccess}
+        onManage={handleManage}
         pagination={pagination}
         onPageChange={handlePageChange}
       />
@@ -239,20 +213,10 @@ const PartnershipRequests = () => {
             request={selectedRequest}
           />
 
-          <UpdateContactStatusModal
-            open={contactStatusModalOpen}
+          <ManagePartnershipRequestModal
+            open={manageModalOpen}
             onClose={() => {
-              setContactStatusModalOpen(false);
-              setSelectedRequest(null);
-            }}
-            onSuccess={handleSuccess}
-            request={selectedRequest}
-          />
-
-          <UpdateRequestStatusModal
-            open={requestStatusModalOpen}
-            onClose={() => {
-              setRequestStatusModalOpen(false);
+              setManageModalOpen(false);
               setSelectedRequest(null);
             }}
             onSuccess={handleSuccess}

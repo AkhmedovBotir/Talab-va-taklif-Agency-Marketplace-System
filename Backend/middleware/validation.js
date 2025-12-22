@@ -360,6 +360,55 @@ const contragentValidationSchemas = {
         'string.pattern.base': 'Logo base64 formatida bo\'lishi kerak (data:image/png;base64,... yoki data:image/jpeg;base64,...)',
       }),
   }),
+
+  passwordSetupStep1: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+  }),
+
+  passwordSetupStep2: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+    code: Joi.string()
+      .length(5)
+      .required()
+      .messages({
+        'string.empty': 'Kod kiritilishi shart',
+        'string.length': 'Kod 5 ta raqamdan iborat bo\'lishi kerak',
+        'any.required': 'Kod kiritilishi shart',
+      }),
+  }),
+
+  passwordSetupStep3: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+    newPassword: Joi.string()
+      .min(6)
+      .required()
+      .messages({
+        'string.empty': 'Parol kiritilishi shart',
+        'string.min': 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+        'any.required': 'Parol kiritilishi shart',
+      }),
+  }),
 };
 
 const agentValidationSchemas = {
@@ -463,6 +512,55 @@ const agentValidationSchemas = {
         'string.empty': 'Parol kiritilishi shart',
       }),
   }),
+
+  passwordSetupStep1: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+  }),
+
+  passwordSetupStep2: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+    code: Joi.string()
+      .length(5)
+      .required()
+      .messages({
+        'string.empty': 'Kod kiritilishi shart',
+        'string.length': 'Kod 5 ta raqamdan iborat bo\'lishi kerak',
+        'any.required': 'Kod kiritilishi shart',
+      }),
+  }),
+
+  passwordSetupStep3: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+    newPassword: Joi.string()
+      .min(6)
+      .required()
+      .messages({
+        'string.empty': 'Parol kiritilishi shart',
+        'string.min': 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+        'any.required': 'Parol kiritilishi shart',
+      }),
+  }),
 };
 
 const punktValidationSchemas = {
@@ -556,6 +654,55 @@ const punktValidationSchemas = {
         'string.empty': 'Parol kiritilishi shart',
       }),
   }),
+
+  passwordSetupStep1: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+  }),
+
+  passwordSetupStep2: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+    code: Joi.string()
+      .length(5)
+      .required()
+      .messages({
+        'string.empty': 'Kod kiritilishi shart',
+        'string.length': 'Kod 5 ta raqamdan iborat bo\'lishi kerak',
+        'any.required': 'Kod kiritilishi shart',
+      }),
+  }),
+
+  passwordSetupStep3: Joi.object({
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+    newPassword: Joi.string()
+      .min(6)
+      .required()
+      .messages({
+        'string.empty': 'Parol kiritilishi shart',
+        'string.min': 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+        'any.required': 'Parol kiritilishi shart',
+      }),
+  }),
 };
 
 const categoryValidationSchemas = {
@@ -592,6 +739,111 @@ const categoryValidationSchemas = {
       .allow(null, '')
       .messages({
         'string.base': 'Ota kategoriya ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+
+  createSubcategory: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Sub kategoriya nomi kiritilishi shart',
+        'string.min': 'Sub kategoriya nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+      }),
+    parent: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Ota kategoriya kiritilishi shart',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .default('active')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+
+  updateSubcategory: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .trim()
+      .messages({
+        'string.min': 'Sub kategoriya nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+      }),
+    parent: Joi.string()
+      .messages({
+        'string.empty': 'Ota kategoriya kiritilishi shart',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+
+  updateStatus: Joi.object({
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .required()
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+        'any.required': 'Status kiritilishi shart',
+      }),
+  }),
+};
+
+// Admin Category Validation Schemas
+const adminCategoryValidationSchemas = {
+  create: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Kategoriya nomi kiritilishi shart',
+        'string.min': 'Kategoriya nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+      }),
+    image: Joi.string()
+      .allow(null, '')
+      .trim()
+      .messages({
+        'string.base': 'Rasm to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    censored: Joi.boolean()
+      .default(false)
+      .messages({
+        'boolean.base': 'Senzura true yoki false bo\'lishi kerak',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .default('active')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+
+  update: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .trim()
+      .messages({
+        'string.min': 'Kategoriya nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+      }),
+    image: Joi.string()
+      .allow(null, '')
+      .trim()
+      .messages({
+        'string.base': 'Rasm to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    censored: Joi.boolean()
+      .messages({
+        'boolean.base': 'Senzura true yoki false bo\'lishi kerak',
       }),
     status: Joi.string()
       .valid('active', 'inactive')
@@ -1270,6 +1522,18 @@ const marketplaceProfileValidationSchemas = {
         'string.base': 'MFY ID to\'g\'ri formatda bo\'lishi kerak',
       }),
   }),
+
+  updateViloyatTuman: Joi.object({
+    viloyat: Joi.string()
+      .messages({
+        'string.base': 'Viloyat ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    tuman: Joi.string()
+      .allow(null, '')
+      .messages({
+        'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+  }),
 };
 
 const partnershipRequestValidationSchemas = {
@@ -1396,6 +1660,135 @@ const partnershipRequestValidationSchemas = {
   }),
 };
 
+const marketplacePartnershipRequestValidationSchemas = {
+  create: Joi.object({
+    companyName: Joi.string()
+      .min(2)
+      .max(200)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Kompaniya nomi kiritilishi shart',
+        'string.min': 'Kompaniya nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Kompaniya nomi 200 ta belgidan oshmasligi kerak',
+        'any.required': 'Kompaniya nomi kiritilishi shart',
+      }),
+    inn: Joi.string()
+      .pattern(/^\d{9}$|^\d{12}$/)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'INN kiritilishi shart',
+        'string.pattern.base': 'INN 9 yoki 12 ta raqamdan iborat bo\'lishi kerak',
+        'any.required': 'INN kiritilishi shart',
+      }),
+    mfo: Joi.string()
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'MFO kiritilishi shart',
+        'any.required': 'MFO kiritilishi shart',
+      }),
+    accountNumber: Joi.string()
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Hisob raqami kiritilishi shart',
+        'any.required': 'Hisob raqami kiritilishi shart',
+      }),
+    viloyat: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Viloyat kiritilishi shart',
+        'any.required': 'Viloyat kiritilishi shart',
+      }),
+    tuman: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Tuman kiritilishi shart',
+        'any.required': 'Tuman kiritilishi shart',
+      }),
+    mfy: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'MFY kiritilishi shart',
+        'any.required': 'MFY kiritilishi shart',
+      }),
+    activity: Joi.string()
+      .required()
+      .trim()
+      .max(500)
+      .messages({
+        'string.empty': 'Faoliyat kiritilishi shart',
+        'string.max': 'Faoliyat 500 ta belgidan oshmasligi kerak',
+        'any.required': 'Faoliyat kiritilishi shart',
+      }),
+    managerFirstName: Joi.string()
+      .min(2)
+      .max(50)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Rahbar ismi kiritilishi shart',
+        'string.min': 'Rahbar ismi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Rahbar ismi 50 ta belgidan oshmasligi kerak',
+        'any.required': 'Rahbar ismi kiritilishi shart',
+      }),
+    managerLastName: Joi.string()
+      .min(2)
+      .max(50)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Rahbar familiyasi kiritilishi shart',
+        'string.min': 'Rahbar familiyasi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Rahbar familiyasi 50 ta belgidan oshmasligi kerak',
+        'any.required': 'Rahbar familiyasi kiritilishi shart',
+      }),
+    managerPhone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Rahbar telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Rahbar telefon raqami kiritilishi shart',
+      }),
+  }),
+
+  updateContacted: Joi.object({
+    adminNotes: Joi.string()
+      .trim()
+      .max(1000)
+      .allow(null, '')
+      .messages({
+        'string.max': 'Admin eslatmasi 1000 ta belgidan oshmasligi kerak',
+      }),
+  }),
+
+  approve: Joi.object({
+    adminNotes: Joi.string()
+      .trim()
+      .max(1000)
+      .allow(null, '')
+      .messages({
+        'string.max': 'Admin eslatmasi 1000 ta belgidan oshmasligi kerak',
+      }),
+  }),
+
+  reject: Joi.object({
+    adminNotes: Joi.string()
+      .trim()
+      .max(1000)
+      .required()
+      .messages({
+        'string.empty': 'Rad etish sababi (adminNotes) kiritilishi shart',
+        'string.max': 'Admin eslatmasi 1000 ta belgidan oshmasligi kerak',
+        'any.required': 'Rad etish sababi (adminNotes) kiritilishi shart',
+      }),
+  }),
+};
+
 const featuredContragentValidationSchemas = {
   updateFeaturedList: Joi.object({
     contragentIds: Joi.array()
@@ -1410,6 +1803,59 @@ const featuredContragentValidationSchemas = {
   }),
 };
 
+// Admin Product Moderation Validation Schemas
+const adminProductModerationValidationSchemas = {
+  reject: Joi.object({
+    rejectionReason: Joi.string()
+      .trim()
+      .min(1)
+      .max(1000)
+      .required()
+      .messages({
+        'string.empty': 'Rad etish sababi kiritilishi shart',
+        'string.min': 'Rad etish sababi kamida 1 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Rad etish sababi 1000 ta belgidan oshmasligi kerak',
+        'any.required': 'Rad etish sababi kiritilishi shart',
+      }),
+  }),
+};
+
+// Admin Vacancy Application Validation Schemas
+const adminVacancyApplicationValidationSchemas = {
+  convertToPunkt: Joi.object({
+    viloyat: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Viloyat kiritilishi shart',
+        'any.required': 'Viloyat kiritilishi shart',
+      }),
+    tuman: Joi.string()
+      .allow(null, '')
+      .messages({
+        'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+  }),
+
+  convertToAgent: Joi.object({
+    viloyat: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Viloyat kiritilishi shart',
+        'any.required': 'Viloyat kiritilishi shart',
+      }),
+    tuman: Joi.string()
+      .allow(null, '')
+      .messages({
+        'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    mfy: Joi.string()
+      .allow(null, '')
+      .messages({
+        'string.base': 'MFY ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+  }),
+};
+
 module.exports = {
   validate,
   adminValidationSchemas,
@@ -1418,11 +1864,15 @@ module.exports = {
   agentValidationSchemas,
   punktValidationSchemas,
   categoryValidationSchemas,
+  adminCategoryValidationSchemas,
   productValidationSchemas,
   marketplaceValidationSchemas,
   cartValidationSchemas,
   orderValidationSchemas,
   marketplaceProfileValidationSchemas,
   partnershipRequestValidationSchemas,
+  marketplacePartnershipRequestValidationSchemas,
   featuredContragentValidationSchemas,
+  adminProductModerationValidationSchemas,
+  adminVacancyApplicationValidationSchemas,
 };

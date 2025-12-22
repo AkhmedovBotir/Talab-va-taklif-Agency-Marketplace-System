@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    FlatList,
     Image,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
@@ -13,15 +15,21 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 import QuillEditor, { QuillEditorRef } from '../../../../components/QuillEditor';
 import { apiService, Category, DeliveryRegion, DeltaFormat } from '../../../../services/api';
 import { formatNumberInput, unformatNumber } from '../../../../utils/formatNumber';
 
 export default function ProductCreateScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
+  const [loadingSubcategories, setLoadingSubcategories] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  const [subcategorySearchQuery, setSubcategorySearchQuery] = useState('');
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -67,12 +75,82 @@ export default function ProductCreateScreen() {
 
   const loadCategories = useCallback(async () => {
     try {
+      setLoading(true);
+      // API dokumentatsiyasiga ko'ra, default holatda faqat active kategoriyalar qaytariladi
+      // Lekin agar status parametri bilan muammo bo'lsa, status parametrisiz so'rov yuboramiz
       const response = await apiService.getCategories({ limit: 1000, status: 'active' });
-      setCategories(response.data);
+      
+      if (response && response.success && response.data) {
+        if (response.data.length === 0) {
+          const allResponse = await apiService.getCategories({ limit: 1000 });
+          if (allResponse && allResponse.success && allResponse.data) {
+            const activeCategories = allResponse.data.filter((cat) => cat.status === 'active');
+            console.log('Active categories from all:', activeCategories.length);
+            setCategories(activeCategories);
+            if (activeCategories.length === 0) {
+              Alert.alert('Ogohlantirish', 'Faol kategoriyalar mavjud emas. Iltimos, admin bilan bog\'laning.');
+            }
+          } else {
+            setCategories([]);
+            Alert.alert('Ogohlantirish', 'Kategoriyalar mavjud emas. Iltimos, admin bilan bog\'laning.');
+          }
+        } else {
+          setCategories(response.data);
+        }
+      } else {
+        console.error('Invalid response format:', response);
+        Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
+        setCategories([]);
+      }
     } catch (error: any) {
       console.error('Error loading categories:', error);
+      const errorMessage = error?.message || error?.status || 'Kategoriyalarni yuklashda xatolik yuz berdi';
+      Alert.alert('Xatolik', `Kategoriyalarni yuklashda xatolik: ${errorMessage}`);
+      setCategories([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadSubcategories = useCallback(async (categoryId: string) => {
+    if (!categoryId) {
+      setSubcategories([]);
+      return;
+    }
+    
+    setLoadingSubcategories(true);
+    try {
+      // API dokumentatsiyasiga ko'ra, default holatda faqat active subcategorylar qaytariladi
+      const response = await apiService.getSubcategories({ 
+        parent: categoryId, 
+        limit: 1000,
+        status: 'active'
+      });
+      
+      if (response && response.success && response.data) {
+        // Agar bo'sh bo'lsa, status parametrisiz urinib ko'ramiz
+        if (response.data.length === 0) {
+          const allResponse = await apiService.getSubcategories({ 
+            parent: categoryId, 
+            limit: 1000
+          });
+          if (allResponse && allResponse.success && allResponse.data) {
+            const activeSubcategories = allResponse.data.filter((sub) => sub.status === 'active');
+            setSubcategories(activeSubcategories);
+          } else {
+            setSubcategories([]);
+          }
+        } else {
+          setSubcategories(response.data);
+        }
+      } else {
+        setSubcategories([]);
+      }
+    } catch (error: any) {
+      console.error('Error loading subcategories:', error);
+      setSubcategories([]);
+    } finally {
+      setLoadingSubcategories(false);
     }
   }, []);
 
@@ -86,32 +164,39 @@ export default function ProductCreateScreen() {
       return;
     }
 
-    launchImageLibrary(
-      {
-        mediaType: 'photo' as MediaType,
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Ruxsat kerak', 'Rasmlarni tanlash uchun ruxsat berishingiz kerak');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
         quality: 0.6,
-        includeBase64: true,
-        maxWidth: 2000,
-        maxHeight: 2000,
-      },
-      (response: ImagePickerResponse) => {
-        if (response.didCancel) {
-          return;
-        }
+        base64: true,
+        allowsEditing: false,
+      });
 
-        if (response.errorMessage) {
-          Alert.alert('Xatolik', response.errorMessage);
-          return;
-        }
+      if (result.canceled) {
+        return;
+      }
 
-        if (response.assets && response.assets[0]?.base64) {
-          const asset = response.assets[0];
+      if (result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        if (asset.base64) {
           const mimeType = asset.type || 'image/jpeg';
           const base64 = `data:${mimeType};base64,${asset.base64}`;
           setImages([...images, base64]);
         }
       }
-    );
+    } catch (error: any) {
+      console.error('Error picking image:', error);
+      Alert.alert('Xatolik', error.message || 'Rasm tanlashda xatolik yuz berdi');
+    }
   };
 
   const removeImage = (index: number) => {
@@ -217,7 +302,16 @@ export default function ProductCreateScreen() {
   };
 
   const selectedCategory = categories.find((c) => c._id === categoryId);
-  const subcategories = selectedCategory?.subcategories || [];
+  const selectedSubcategory = subcategories.find((s) => s._id === subcategoryId);
+
+  useEffect(() => {
+    if (categoryId) {
+      loadSubcategories(categoryId);
+    } else {
+      setSubcategories([]);
+      setSubcategoryId(null);
+    }
+  }, [categoryId, loadSubcategories]);
 
   if (loading) {
     return (
@@ -272,83 +366,244 @@ export default function ProductCreateScreen() {
           <Text style={styles.blockTitle}>Kategoriya</Text>
           
           <Text style={styles.label}>Kategoriya *</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryScroll}
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => setShowCategoryModal(true)}
           >
-            {categories.map((cat) => (
-              <TouchableOpacity
-                key={cat._id}
-                style={[
-                  styles.categoryChip,
-                  categoryId === cat._id && styles.categoryChipActive,
-                ]}
-                onPress={() => {
-                  setCategoryId(cat._id);
-                  setSubcategoryId(null);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.categoryChipText,
-                    categoryId === cat._id && styles.categoryChipTextActive,
-                  ]}
-                >
-                  {cat.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+            <Text style={[styles.selectButtonText, !categoryId && styles.selectButtonPlaceholder]}>
+              {selectedCategory ? selectedCategory.name : 'Kategoriyani tanlang'}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#666" />
+          </TouchableOpacity>
 
           {/* Subcategory */}
-          {subcategories.length > 0 && (
+          {categoryId && (
             <>
-              <Text style={styles.label}>Sub kategoriya</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.categoryScroll}
+              <Text style={styles.label}>Sub kategoriya (ixtiyoriy)</Text>
+              <TouchableOpacity
+                style={styles.selectButton}
+                onPress={() => setShowSubcategoryModal(true)}
+                disabled={loadingSubcategories}
               >
-                <TouchableOpacity
-                  style={[
-                    styles.categoryChip,
-                    subcategoryId === null && styles.categoryChipActive,
-                  ]}
-                  onPress={() => setSubcategoryId(null)}
-                >
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      subcategoryId === null && styles.categoryChipTextActive,
-                    ]}
-                  >
-                    Yo'q
-                  </Text>
-                </TouchableOpacity>
-                {subcategories.map((sub) => (
-                  <TouchableOpacity
-                    key={sub._id}
-                    style={[
-                      styles.categoryChip,
-                      subcategoryId === sub._id && styles.categoryChipActive,
-                    ]}
-                    onPress={() => setSubcategoryId(sub._id)}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        subcategoryId === sub._id && styles.categoryChipTextActive,
-                      ]}
-                    >
-                      {sub.name}
+                {loadingSubcategories ? (
+                  <ActivityIndicator size="small" color="#007AFF" />
+                ) : (
+                  <>
+                    <Text style={[styles.selectButtonText, !subcategoryId && styles.selectButtonPlaceholder]}>
+                      {selectedSubcategory ? selectedSubcategory.name : 'Sub kategoriyani tanlang (ixtiyoriy)'}
                     </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+                    <Ionicons name="chevron-down" size={20} color="#666" />
+                  </>
+                )}
+              </TouchableOpacity>
             </>
           )}
         </View>
+
+        {/* Category Modal */}
+        <Modal
+          visible={showCategoryModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowCategoryModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Kategoriyani tanlang</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowCategoryModal(false);
+                    setCategorySearchQuery('');
+                  }}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Search Input */}
+              <View style={styles.modalSearchContainer}>
+                <Ionicons name="search" size={20} color="#999" style={styles.modalSearchIcon} />
+                <TextInput
+                  style={styles.modalSearchInput}
+                  placeholder="Kategoriyani qidirish..."
+                  value={categorySearchQuery}
+                  onChangeText={setCategorySearchQuery}
+                  placeholderTextColor="#999"
+                />
+                {categorySearchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setCategorySearchQuery('')}
+                    style={styles.modalSearchClear}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#999" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              
+              <FlatList
+                data={categories.filter((cat) =>
+                  cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                )}
+                keyExtractor={(item) => item._id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.modalItem,
+                      categoryId === item._id && styles.modalItemActive,
+                    ]}
+                    onPress={() => {
+                      setCategoryId(item._id);
+                      setSubcategoryId(null);
+                      setShowCategoryModal(false);
+                      setCategorySearchQuery('');
+                    }}
+                  >
+                    <View style={styles.modalItemContent}>
+                      <View style={styles.modalItemLeft}>
+                        <Text
+                          style={[
+                            styles.modalItemText,
+                            categoryId === item._id && styles.modalItemTextActive,
+                          ]}
+                        >
+                          {item.name}
+                        </Text>
+                        <View style={styles.modalItemBadges}>
+                          {item.censored && (
+                            <View style={styles.badgeCensored}>
+                              <Ionicons name="warning" size={12} color="#FF6B6B" />
+                              <Text style={styles.badgeCensoredText}>18+</Text>
+                            </View>
+                          )}
+                          {item.status === 'inactive' && (
+                            <View style={styles.badgeInactive}>
+                              <Text style={styles.badgeInactiveText}>Nofaol</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      {categoryId === item._id && (
+                        <Ionicons name="checkmark" size={20} color="#007AFF" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.modalEmpty}>
+                    <Ionicons name="folder-outline" size={48} color="#ccc" />
+                    <Text style={styles.modalEmptyText}>Kategoriyalar mavjud emas</Text>
+                    <Text style={styles.modalEmptySubtext}>
+                      Iltimos, admin bilan bog'laning yoki keyinroq urinib ko'ring
+                    </Text>
+                  </View>
+                }
+              />
+            </View>
+          </View>
+        </Modal>
+
+        {/* Subcategory Modal */}
+        <Modal
+          visible={showSubcategoryModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowSubcategoryModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Sub kategoriyani tanlang</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowSubcategoryModal(false);
+                    setSubcategorySearchQuery('');
+                  }}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Search Input */}
+              <View style={styles.modalSearchContainer}>
+                <Ionicons name="search" size={20} color="#999" style={styles.modalSearchIcon} />
+                <TextInput
+                  style={styles.modalSearchInput}
+                  placeholder="Sub kategoriyani qidirish..."
+                  value={subcategorySearchQuery}
+                  onChangeText={setSubcategorySearchQuery}
+                  placeholderTextColor="#999"
+                />
+                {subcategorySearchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setSubcategorySearchQuery('')}
+                    style={styles.modalSearchClear}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#999" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              
+              <FlatList
+                data={[{ _id: 'none', name: "Yo'q", slug: 'none' } as Category, ...subcategories].filter((sub) =>
+                  sub.name.toLowerCase().includes(subcategorySearchQuery.toLowerCase())
+                )}
+                keyExtractor={(item) => item._id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.modalItem,
+                      (subcategoryId === item._id || (item._id === 'none' && subcategoryId === null)) && styles.modalItemActive,
+                    ]}
+                    onPress={() => {
+                      setSubcategoryId(item._id === 'none' ? null : item._id);
+                      setShowSubcategoryModal(false);
+                      setSubcategorySearchQuery('');
+                    }}
+                  >
+                    <View style={styles.modalItemContent}>
+                      <View style={styles.modalItemLeft}>
+                        <Text
+                          style={[
+                            styles.modalItemText,
+                            (subcategoryId === item._id || (item._id === 'none' && subcategoryId === null)) && styles.modalItemTextActive,
+                          ]}
+                        >
+                          {item.name}
+                        </Text>
+                        {item._id !== 'none' && (
+                          <View style={styles.modalItemBadges}>
+                            {item.censored && (
+                              <View style={styles.badgeCensored}>
+                                <Ionicons name="warning" size={12} color="#FF6B6B" />
+                                <Text style={styles.badgeCensoredText}>18+</Text>
+                              </View>
+                            )}
+                            {item.status === 'inactive' && (
+                              <View style={styles.badgeInactive}>
+                                <Text style={styles.badgeInactiveText}>Nofaol</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                      {(subcategoryId === item._id || (item._id === 'none' && subcategoryId === null)) && (
+                        <Ionicons name="checkmark" size={20} color="#007AFF" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.modalEmpty}>
+                    <Text style={styles.modalEmptyText}>Sub kategoriyalar mavjud emas</Text>
+                  </View>
+                }
+              />
+            </View>
+          </View>
+        </Modal>
 
         {/* Narx blok */}
         <View style={styles.block}>
@@ -619,29 +874,146 @@ const styles = StyleSheet.create({
     borderTopColor: '#e0e0e0',
     backgroundColor: '#f9f9f9',
   },
-  categoryScroll: {
-    marginVertical: 8,
+  selectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: '#d0d0d0',
+    borderRadius: 12,
+    padding: 14,
+    backgroundColor: '#ffffff',
+    minHeight: 56,
   },
-  categoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  selectButtonText: {
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  selectButtonPlaceholder: {
+    color: '#999',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  modalSearchIcon: {
     marginRight: 8,
   },
-  categoryChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+  modalSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    padding: 0,
   },
-  categoryChipText: {
-    fontSize: 14,
-    color: '#666',
+  modalSearchClear: {
+    marginLeft: 8,
+    padding: 4,
   },
-  categoryChipTextActive: {
-    color: '#fff',
+  modalItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalItemActive: {
+    backgroundColor: '#E3F2FD',
+  },
+  modalItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalItemLeft: {
+    flex: 1,
+  },
+  modalItemBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+  },
+  badgeCensored: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  badgeCensoredText: {
+    fontSize: 11,
+    color: '#FF6B6B',
     fontWeight: '600',
+  },
+  badgeInactive: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeInactiveText: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '500',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  modalItemTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  modalEmpty: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  modalEmptyText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  modalEmptySubtext: {
+    fontSize: 14,
+    color: '#ccc',
+    marginTop: 8,
+    textAlign: 'center',
   },
   unitContainer: {
     flexDirection: 'row',

@@ -24,6 +24,7 @@ export default function ApplicationsLayout() {
       <Stack.Screen
         name="[id]"
         options={{
+          headerShown: false,
           title: 'Ariza batafsil',
         }}
       />

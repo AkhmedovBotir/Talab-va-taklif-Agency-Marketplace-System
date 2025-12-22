@@ -1,4 +1,5 @@
 const MarketplaceUser = require('../models/MarketplaceUser');
+const MarketplaceUserRegionSelection = require('../models/MarketplaceUserRegionSelection');
 const Region = require('../models/Region');
 const bcrypt = require('bcrypt');
 
@@ -296,12 +297,184 @@ const updateLocation = async (req, res) => {
   }
 };
 
+// Get viloyat and tuman only (separate API - from separate model)
+const getViloyatTuman = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Check if user exists
+    const user = await MarketplaceUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Foydalanuvchi topilmadi',
+      });
+    }
+
+    // Get or create region selection
+    let regionSelection = await MarketplaceUserRegionSelection.findOne({ user: userId })
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code');
+
+    // If doesn't exist, create empty one
+    if (!regionSelection) {
+      regionSelection = await MarketplaceUserRegionSelection.create({
+        user: userId,
+        viloyat: null,
+        tuman: null,
+      });
+      await regionSelection.populate('viloyat', 'name type code');
+      await regionSelection.populate('tuman', 'name type code');
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: regionSelection._id,
+        user: regionSelection.user,
+        viloyat: regionSelection.viloyat,
+        tuman: regionSelection.tuman,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching viloyat and tuman:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Viloyat va tumanni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Update viloyat and tuman only (separate API - from separate model)
+const updateViloyatTuman = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { viloyat, tuman } = req.body;
+
+    // Check if user exists
+    const user = await MarketplaceUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Foydalanuvchi topilmadi',
+      });
+    }
+
+    // Get or create region selection
+    let regionSelection = await MarketplaceUserRegionSelection.findOne({ user: userId });
+
+    if (!regionSelection) {
+      regionSelection = await MarketplaceUserRegionSelection.create({
+        user: userId,
+        viloyat: null,
+        tuman: null,
+      });
+    }
+
+    // Validate viloyat if provided
+    if (viloyat !== undefined) {
+      if (viloyat === null || viloyat === '') {
+        // Allow clearing viloyat
+        regionSelection.viloyat = null;
+        // Also clear tuman if viloyat is cleared
+        regionSelection.tuman = null;
+      } else {
+        const viloyatRegion = await Region.findById(viloyat);
+        if (!viloyatRegion || viloyatRegion.type !== 'region') {
+          return res.status(400).json({
+            success: false,
+            message: 'Viloyat topilmadi yoki noto\'g\'ri tur',
+          });
+        }
+        regionSelection.viloyat = viloyat;
+
+        // If viloyat is changed and tuman is not provided, clear tuman if it doesn't belong to new viloyat
+        if (tuman === undefined && regionSelection.tuman) {
+          const currentTuman = await Region.findById(regionSelection.tuman);
+          if (currentTuman && currentTuman.parent?.toString() !== viloyat) {
+            regionSelection.tuman = null;
+          }
+        }
+      }
+    }
+
+    // Validate tuman if provided
+    if (tuman !== undefined) {
+      if (tuman === null || tuman === '') {
+        // Allow clearing tuman
+        regionSelection.tuman = null;
+      } else {
+        const tumanRegion = await Region.findById(tuman);
+        if (!tumanRegion || tumanRegion.type !== 'district') {
+          return res.status(400).json({
+            success: false,
+            message: 'Tuman topilmadi yoki noto\'g\'ri tur',
+          });
+        }
+
+        // Validate hierarchy - tuman must belong to viloyat
+        const targetViloyat = viloyat !== undefined ? viloyat : regionSelection.viloyat;
+        if (!targetViloyat) {
+          return res.status(400).json({
+            success: false,
+            message: 'Avval viloyat tanlashingiz kerak',
+          });
+        }
+
+        if (tumanRegion.parent?.toString() !== targetViloyat.toString()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Tuman tanlangan viloyatga tegishli emas',
+          });
+        }
+
+        regionSelection.tuman = tuman;
+      }
+    }
+
+    await regionSelection.save();
+
+    // Populate regions
+    await regionSelection.populate('viloyat', 'name type code');
+    await regionSelection.populate('tuman', 'name type code');
+
+    res.status(200).json({
+      success: true,
+      message: 'Viloyat va tuman yangilandi',
+      data: {
+        _id: regionSelection._id,
+        user: regionSelection.user,
+        viloyat: regionSelection.viloyat,
+        tuman: regionSelection.tuman,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating viloyat and tuman:', error);
+
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Noto\'g\'ri region ID',
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Viloyat va tumanni yangilashda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getMe,
   updateProfile,
   updatePassword,
   updateAvatar,
   updateLocation,
+  getViloyatTuman,
+  updateViloyatTuman,
 };
 
 

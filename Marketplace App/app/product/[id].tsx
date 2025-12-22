@@ -18,10 +18,35 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import apiService, { Product } from '../../services/api';
 
+// Helper function to calculate age from birthDate
+const calculateAge = (birthDate: string | null | undefined): number | null => {
+    if (!birthDate) return null;
+    
+    try {
+        const birth = new Date(birthDate);
+        const today = new Date();
+        
+        if (isNaN(birth.getTime())) return null;
+        
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+        
+        return age;
+    } catch (error) {
+        console.error('Error calculating age:', error);
+        return null;
+    }
+};
+
 export default function ProductDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
+    const { user } = useAuth();
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
     const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -38,7 +63,21 @@ export default function ProductDetailScreen() {
         setLoading(true);
         try {
             const response = await apiService.getProductById(id!);
-            setProduct(response.data);
+            const loadedProduct = response.data;
+            
+            // Check if product is censored and user is under 18
+            const userAge = calculateAge(user?.birthDate);
+            if (userAge !== null && userAge < 18 && loadedProduct.censored === true) {
+                console.log('ProductDetailScreen: Censored product blocked for user under 18:', loadedProduct.name);
+                Alert.alert(
+                    'Kirish taqiqlangan',
+                    'Bu mahsulot 18 yoshdan kichik foydalanuvchilar uchun taqiqlangan.',
+                    [{ text: 'OK', onPress: () => router.back() }]
+                );
+                return;
+            }
+            
+            setProduct(loadedProduct);
         } catch (error: any) {
             console.error('Error loading product:', error);
             Alert.alert('Xatolik', error.message || 'Mahsulotni yuklashda xatolik yuz berdi');
@@ -121,7 +160,6 @@ export default function ProductDetailScreen() {
     // Table data rows
     const tableRows = [
         { label: 'Narxi', value: formatPrice(product.price) },
-        { label: 'Mahsulot kodi', value: product.productCode },
         { label: 'Miqdori', value: `${product.quantity} ${product.unit}` },
         { label: 'O\'lchami', value: product.unitSize ? `${product.unitSize} ${product.unit}` : 'N/A' },
         { label: 'Sotuvchi', value: product.contragent.name },

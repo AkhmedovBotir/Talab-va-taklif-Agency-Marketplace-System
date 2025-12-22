@@ -16,6 +16,8 @@ const distributionFields = [
   { label: 'Viloyat', key: 'totalViloyatAgent', color: 'text-blue-600' },
   { label: 'Tuman', key: 'totalTumanAgent', color: 'text-green-600' },
   { label: 'MFY', key: 'totalMfyAgent', color: 'text-purple-600' },
+  { label: 'Moliya', key: 'totalFinance', color: 'text-teal-600' },
+  { label: 'Yetkazib Berish', key: 'totalDeliveryService', color: 'text-cyan-600' },
   { label: 'Transfer', key: 'totalPunktTransfer', color: 'text-rose-600' },
 ];
 
@@ -115,7 +117,7 @@ const KPIStatisticsOverview = ({
             ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4">
         {distributionFields.map((field) => (
           <div key={field.key} className="bg-gray-50 border border-gray-100 rounded-lg p-4">
             <p className="text-xs uppercase text-gray-500 font-semibold">{field.label}</p>

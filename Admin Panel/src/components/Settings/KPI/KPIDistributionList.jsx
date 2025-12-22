@@ -115,7 +115,7 @@ const KPIDistributionList = ({
                       <div className="space-y-2">
                         {/* Asosiy taqsimlashlar */}
                         <div className="flex flex-wrap gap-2">
-                          {['punkt', 'viloyatAgent', 'tumanAgent', 'mfyAgent', 'finance'].map(
+                          {['punkt', 'viloyatAgent', 'tumanAgent', 'mfyAgent', 'finance', 'deliveryService'].map(
                             (key) => (
                               <span
                                 key={key}
@@ -130,7 +130,9 @@ const KPIDistributionList = ({
                                     ? 'Tuman'
                                     : key === 'mfyAgent'
                                     ? 'MFY'
-                                    : 'Moliya'}
+                                    : key === 'finance'
+                                    ? 'Moliya'
+                                    : 'Yetkazib Berish'}
                                   :
                                 </span>
                                 <span className="text-indigo-900 font-semibold">

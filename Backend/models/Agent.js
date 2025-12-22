@@ -33,9 +33,15 @@ const agentSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      required: function() {
+        return !this.passwordSetupAllowed; // Password is not required if passwordSetupAllowed is true
+      },
       minlength: [6, 'Password must be at least 6 characters'],
       select: false, // Don't return password by default
+    },
+    passwordSetupAllowed: {
+      type: Boolean,
+      default: false,
     },
     status: {
       type: String,
@@ -69,7 +75,10 @@ agentSchema.virtual('agentType').get(function () {
 
 // Hash password before saving
 agentSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
+  if (this.passwordSetupAllowed && !this.password) {
+    return next(); // Skip hashing if passwordSetupAllowed is true and no password is provided
+  }
+  if (!this.isModified('password') || !this.password) {
     return next();
   }
 

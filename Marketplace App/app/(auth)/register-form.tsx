@@ -13,6 +13,7 @@ import {
     View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
@@ -23,6 +24,7 @@ import apiService, { Region } from '../../services/api';
 
 export default function RegisterFormScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { phone } = useLocalSearchParams<{ phone: string }>();
   const { login } = useAuth();
   
@@ -76,16 +78,6 @@ export default function RegisterFormScreen() {
       if (isNaN(birth.getTime())) {
         newErrors.birthDate = 'Tug\'ilgan sana noto\'g\'ri formatda';
       } else {
-        const age =
-          today.getFullYear() -
-          birth.getFullYear() -
-          (today.getMonth() < birth.getMonth() ||
-          (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())
-            ? 1
-            : 0);
-        if (age < 16) {
-          newErrors.birthDate = 'Ro\'yxatdan o\'tish uchun kamida 16 yosh bo\'lishi kerak';
-        }
         if (birth > today) {
           newErrors.birthDate = 'Tug\'ilgan sana kelajakda bo\'lishi mumkin emas';
         }
@@ -180,7 +172,10 @@ export default function RegisterFormScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 24 }
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -438,7 +433,7 @@ export default function RegisterFormScreen() {
                 <Text style={styles.sectionTitle}>Kirish ma'lumotlari</Text>
             <PasswordInput
               label="Parol"
-              placeholder="Parol (kamida 6 belgi)"
+              placeholder="Parol kiriting"
               value={formData.password}
               onChangeText={(text) => {
                 setFormData({ ...formData, password: text });
@@ -449,6 +444,7 @@ export default function RegisterFormScreen() {
               returnKeyType="next"
               onSubmitEditing={() => confirmPasswordRef.current?.focus()}
               blurOnSubmit={false}
+              showRules={true}
             />
 
             <PasswordInput

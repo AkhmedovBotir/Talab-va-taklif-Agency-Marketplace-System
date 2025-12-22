@@ -1188,6 +1188,57 @@ const getFinanceKpiAmount = async (req, res) => {
   }
 };
 
+// Get delivery service KPI amount (yetkazib berish xizmati summasi)
+const getDeliveryServiceKpiAmount = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        dateFilter.createdAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.createdAt.$lte = end;
+      }
+    }
+
+    const kpiTransactions = await KpiBonusTransaction.find({
+      orderStatus: 'confirmed_by_customer',
+      ...dateFilter,
+    });
+
+    const totalDeliveryServiceKpi = kpiTransactions.reduce(
+      (sum, t) => sum + (t.amounts.deliveryService || 0),
+      0
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        period: {
+          startDate: dateFilter.createdAt?.$gte || null,
+          endDate: dateFilter.createdAt?.$lte || null,
+        },
+        totalDeliveryServiceKpi,
+        transactionsCount: kpiTransactions.length,
+      },
+    });
+  } catch (error) {
+    console.error('Error in getDeliveryServiceKpiAmount:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Yetkazib berish xizmati summasini olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 // Umumiy balans (Tushgan - Tarqatilgan)
 const getTotalBalance = async (req, res) => {
   try {
@@ -1298,6 +1349,7 @@ module.exports = {
   getTotalReceived,
   getTotalDistributed,
   getFinanceKpiAmount,
+  getDeliveryServiceKpiAmount,
   getTotalBalance,
 };
 

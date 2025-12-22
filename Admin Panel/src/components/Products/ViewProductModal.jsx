@@ -1,8 +1,18 @@
+import { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { motion } from 'framer-motion';
+import ImageGalleryModal from '../Common/ImageGalleryModal';
 
 const ViewProductModal = ({ open, onClose, product }) => {
+  const [imageGalleryOpen, setImageGalleryOpen] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
   if (!product) return null;
+
+  const handleImageClick = (index) => {
+    setSelectedImageIndex(index);
+    setImageGalleryOpen(true);
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -276,7 +286,11 @@ const ViewProductModal = ({ open, onClose, product }) => {
                     <img
                       src={image}
                       alt={`${product.name} - ${index + 1}`}
-                      className="w-full h-32 object-cover rounded border border-gray-200"
+                      className="w-full h-32 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => handleImageClick(index)}
+                      onError={(e) => {
+                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="150"%3E%3Crect fill="%23ddd" width="200" height="150"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ERasm yuklanmadi%3C/text%3E%3C/svg%3E';
+                      }}
                     />
                   </div>
                 ))}
@@ -309,6 +323,17 @@ const ViewProductModal = ({ open, onClose, product }) => {
           Yopish
         </Button>
       </DialogActions>
+
+      {/* Image Gallery Modal */}
+      {product.images && product.images.length > 0 && (
+        <ImageGalleryModal
+          open={imageGalleryOpen}
+          onClose={() => setImageGalleryOpen(false)}
+          images={product.images}
+          currentIndex={selectedImageIndex}
+          title={product.name}
+        />
+      )}
     </Dialog>
   );
 };

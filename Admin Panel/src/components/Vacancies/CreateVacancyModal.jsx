@@ -427,7 +427,7 @@ const CreateVacancyModal = ({ open, onClose, onSuccess }) => {
                       name="minAge"
                       value={formData.minAge || ''}
                       onChange={handleChange}
-                      min="18"
+                      min="10"
                       max="100"
                       className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
@@ -442,7 +442,7 @@ const CreateVacancyModal = ({ open, onClose, onSuccess }) => {
                       name="maxAge"
                       value={formData.maxAge || ''}
                       onChange={handleChange}
-                      min="18"
+                      min="10"
                       max="100"
                       className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />

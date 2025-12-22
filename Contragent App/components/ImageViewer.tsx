@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Modal,
@@ -29,7 +29,34 @@ export default function ImageViewer({
   onClose,
 }: ImageViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const scrollViewRefs = useRef<(ScrollView | null)[]>([]);
+
+  useEffect(() => {
+    if (visible && images[currentIndex]) {
+      Image.getSize(
+        images[currentIndex],
+        (width, height) => {
+          const aspectRatio = width / height;
+          const screenAspectRatio = SCREEN_WIDTH / SCREEN_HEIGHT;
+          let displayWidth = SCREEN_WIDTH;
+          let displayHeight = SCREEN_HEIGHT;
+
+          if (aspectRatio > screenAspectRatio) {
+            displayHeight = SCREEN_WIDTH / aspectRatio;
+          } else {
+            displayWidth = SCREEN_HEIGHT * aspectRatio;
+          }
+
+          setImageDimensions({ width: displayWidth, height: displayHeight });
+        },
+        (error) => {
+          console.error('Error getting image size:', error);
+          setImageDimensions({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+        }
+      );
+    }
+  }, [visible, currentIndex, images]);
 
   const handleClose = () => {
     setCurrentIndex(initialIndex);
@@ -121,12 +148,22 @@ export default function ImageViewer({
           bouncesZoom={true}
           centerContent={true}
           scrollEventThrottle={16}
+          pinchGestureEnabled={true}
+          scrollEnabled={true}
         >
-          <Image
-            source={{ uri: currentImage }}
-            style={styles.image}
-            resizeMode="contain"
-          />
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: currentImage }}
+              style={[
+                styles.image,
+                imageDimensions && {
+                  width: imageDimensions.width,
+                  height: imageDimensions.height,
+                },
+              ]}
+              resizeMode="contain"
+            />
+          </View>
         </ScrollView>
         {images.length > 1 && (
           <View style={styles.indicators}>
@@ -172,6 +209,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minWidth: SCREEN_WIDTH,
     minHeight: SCREEN_HEIGHT,
+  },
+  imageContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   image: {
     width: SCREEN_WIDTH,

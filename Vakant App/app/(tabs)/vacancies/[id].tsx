@@ -12,12 +12,14 @@ import {
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
 } from 'react-native';
 
 export default function VacancyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [vacancy, setVacancy] = useState<Vacancy | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
   useEffect(() => {
@@ -26,10 +28,14 @@ export default function VacancyDetailScreen() {
     }
   }, [id]);
 
-  const loadVacancy = async () => {
+  const loadVacancy = async (isRefresh: boolean = false) => {
     if (!id) return;
     
-    setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const data = await vacancyApi.getVacancyById(id);
       setVacancy(data);
@@ -38,10 +44,17 @@ export default function VacancyDetailScreen() {
       trackView(data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Vakansiyani yuklashda xatolik');
-      router.back();
+      if (!isRefresh) {
+        router.back();
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    loadVacancy(true);
   };
 
   const trackView = async (vacancyData?: Vacancy) => {
@@ -88,7 +101,21 @@ export default function VacancyDetailScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color="#111827" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Vakansiya</Text>
+        <View style={{ width: 32 }} />
+      </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
       <View style={styles.card}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -228,7 +255,8 @@ export default function VacancyDetailScreen() {
           />
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -242,6 +270,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingTop: 30,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 16,

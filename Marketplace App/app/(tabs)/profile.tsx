@@ -8,6 +8,7 @@ import {
   Image,
   ImageBackground,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
 import PartnershipBlock from '../../components/PartnershipBlock';
@@ -45,6 +47,8 @@ export default function ProfileScreen() {
   });
   const [editLoading, setEditLoading] = useState(false);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   // Password Modal
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -68,10 +72,12 @@ export default function ProfileScreen() {
   });
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationErrors, setLocationErrors] = useState<Record<string, string>>({});
+  const [hasPartnershipRequest, setHasPartnershipRequest] = useState(false);
 
   useEffect(() => {
     if (token) {
       loadProfile();
+      checkPartnershipRequests();
     }
   }, [token]);
 
@@ -80,6 +86,7 @@ export default function ProfileScreen() {
     React.useCallback(() => {
       if (token) {
         loadProfile();
+        checkPartnershipRequests();
       }
     }, [token])
   );
@@ -101,6 +108,22 @@ export default function ProfileScreen() {
     }
   };
 
+  const checkPartnershipRequests = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await apiService.getMyPartnershipRequests({ limit: 1 }, token);
+      if (response.success && response.data && response.data.length > 0) {
+        setHasPartnershipRequest(true);
+      } else {
+        setHasPartnershipRequest(false);
+      }
+    } catch (error: any) {
+      // Don't show error, just assume no requests
+      setHasPartnershipRequest(false);
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadProfile();
@@ -110,12 +133,22 @@ export default function ProfileScreen() {
   const handleEditProfile = () => {
     if (!profile) return;
     
+    const birthDateStr = profile.birthDate ? profile.birthDate.split('T')[0] : '';
+    let initialDate: Date | null = null;
+    if (birthDateStr) {
+      const date = new Date(birthDateStr);
+      if (!isNaN(date.getTime())) {
+        initialDate = date;
+      }
+    }
+    
     setEditFormData({
       firstName: profile.firstName,
       lastName: profile.lastName,
       gender: profile.gender,
-      birthDate: profile.birthDate ? profile.birthDate.split('T')[0] : '',
+      birthDate: birthDateStr,
     });
+    setSelectedDate(initialDate);
     setEditErrors({});
     setEditModalVisible(true);
   };
@@ -144,8 +177,8 @@ export default function ProfileScreen() {
       setEditLoading(true);
       const response = await apiService.updateProfile(editFormData, token);
       if (response.success && response.data) {
-        setProfile(response.data);
-        updateUser(response.data);
+        // Reload profile to get latest data
+        await loadProfile();
         setEditModalVisible(false);
         Alert.alert('Muvaffaqiyatli', 'Profil yangilandi');
       }
@@ -236,8 +269,8 @@ export default function ProfileScreen() {
       setLocationLoading(true);
       const response = await apiService.updateLocation(locationUpdate, token);
       if (response.success && response.data) {
-        setProfile(response.data);
-        updateUser(response.data);
+        // Reload profile to get latest data
+        await loadProfile();
         setLocationModalVisible(false);
         Alert.alert('Muvaffaqiyatli', 'Manzil yangilandi');
       }
@@ -283,8 +316,8 @@ export default function ProfileScreen() {
       setLoading(true);
       const response = await apiService.updateAvatar(base64Image, token);
       if (response.success && response.data) {
-        setProfile(response.data);
-        updateUser(response.data);
+        // Reload profile to get latest data
+        await loadProfile();
         Alert.alert('Muvaffaqiyatli', 'Avatar yangilandi');
       }
     } catch (error: any) {
@@ -404,9 +437,27 @@ export default function ProfileScreen() {
         <View style={styles.partnershipSection}>
           <PartnershipBlock compact />
         </View>
+        
 
         {/* Profile Info Cards */}
         <View style={styles.infoSection}>
+
+        {hasPartnershipRequest && (
+            <TouchableOpacity
+              style={styles.infoCard}
+              onPress={() => router.push('/partnership-requests' as any)}
+            >
+              <View style={styles.infoCardLeft}>
+                <Ionicons name="business-outline" size={24} color="#007AFF" />
+                <View style={styles.infoCardContent}>
+                  <Text style={styles.infoCardLabel}>Hamkorlik</Text>
+                  <Text style={styles.infoCardValue}>Hamkorlik so'rovim</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#999" />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity style={styles.infoCard} onPress={handleEditProfile}>
             <View style={styles.infoCardLeft}>
               <Ionicons name="person-outline" size={24} color="#007AFF" />
@@ -547,13 +598,115 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <Input
-              label="Tug'ilgan sana"
-              value={editFormData.birthDate}
-              onChangeText={(text) => setEditFormData({ ...editFormData, birthDate: text })}
-              error={editErrors.birthDate}
-              placeholder="YYYY-MM-DD"
-            />
+            <View style={styles.dateContainer}>
+              <Text style={styles.dateLabel}>Tug'ilgan sana</Text>
+              <TouchableOpacity
+                style={[
+                  styles.dateInput,
+                  editErrors.birthDate && styles.dateInputError,
+                ]}
+                onPress={() => {
+                  if (editFormData.birthDate) {
+                    const date = new Date(editFormData.birthDate);
+                    if (!isNaN(date.getTime())) {
+                      setSelectedDate(date);
+                    } else {
+                      setSelectedDate(new Date());
+                    }
+                  } else {
+                    setSelectedDate(new Date());
+                  }
+                  setShowDatePicker(true);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.dateInputText,
+                    !editFormData.birthDate && styles.dateInputPlaceholder,
+                  ]}
+                >
+                  {editFormData.birthDate || 'YYYY-MM-DD'}
+                </Text>
+              </TouchableOpacity>
+              {editErrors.birthDate && (
+                <Text style={styles.errorText}>{editErrors.birthDate}</Text>
+              )}
+            </View>
+
+            {showDatePicker && (
+              <>
+                {Platform.OS === 'ios' ? (
+                  <Modal
+                    visible={showDatePicker}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowDatePicker(false)}
+                  >
+                    <View style={styles.modalDateContainer}>
+                      <View style={styles.modalDateContent}>
+                        <View style={styles.modalDateHeader}>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(false)}
+                          >
+                            <Text style={styles.modalDateCancel}>Bekor qilish</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => {
+                              if (selectedDate) {
+                                const formattedDate = selectedDate.toISOString().split('T')[0];
+                                setEditFormData({
+                                  ...editFormData,
+                                  birthDate: formattedDate,
+                                });
+                                if (editErrors.birthDate) {
+                                  setEditErrors({ ...editErrors, birthDate: '' });
+                                }
+                              }
+                              setShowDatePicker(false);
+                            }}
+                          >
+                            <Text style={styles.modalDateDone}>Tasdiqlash</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <DateTimePicker
+                          value={selectedDate || new Date()}
+                          mode="date"
+                          display="spinner"
+                          maximumDate={new Date()}
+                          onChange={(event, date) => {
+                            if (date) {
+                              setSelectedDate(date);
+                            }
+                          }}
+                          style={styles.datePicker}
+                        />
+                      </View>
+                    </View>
+                  </Modal>
+                ) : (
+                  <DateTimePicker
+                    value={selectedDate || new Date()}
+                    mode="date"
+                    display="default"
+                    maximumDate={new Date()}
+                    onChange={(event, date) => {
+                      setShowDatePicker(false);
+                      if (event.type === 'set' && date) {
+                        const formattedDate = date.toISOString().split('T')[0];
+                        setEditFormData({
+                          ...editFormData,
+                          birthDate: formattedDate,
+                        });
+                        setSelectedDate(date);
+                        if (editErrors.birthDate) {
+                          setEditErrors({ ...editErrors, birthDate: '' });
+                        }
+                      }
+                    }}
+                  />
+                )}
+              </>
+            )}
           </ScrollView>
         </View>
       </Modal>
@@ -928,6 +1081,74 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  dateContainer: {
+    marginBottom: 16,
+  },
+  dateLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  dateInputError: {
+    borderColor: '#ef4444',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  dateInputPlaceholder: {
+    color: '#999',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginTop: 4,
+  },
+  modalDateContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalDateContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  modalDateHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalDateCancel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  modalDateDone: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  datePicker: {
+    width: '100%',
+  },
 });
+
 
 

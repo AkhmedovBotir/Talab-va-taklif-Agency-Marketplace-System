@@ -12,6 +12,16 @@ const categorySchema = new mongoose.Schema(
       type: String,
       lowercase: true,
     },
+    image: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    censored: {
+      type: Boolean,
+      default: false,
+      required: true,
+    },
     parent: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',

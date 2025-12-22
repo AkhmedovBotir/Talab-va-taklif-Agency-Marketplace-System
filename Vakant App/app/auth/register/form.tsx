@@ -5,8 +5,9 @@ import { RegionPicker } from '@/components/RegionPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiService, Region } from '@/services/api';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function RegisterFormScreen() {
   const { phone, code } = useLocalSearchParams<{ phone: string; code: string }>();
@@ -25,14 +26,44 @@ export default function RegisterFormScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Parol talablarini tekshirish
+  const passwordRequirements = useMemo(() => {
+    return {
+      minLength: password.length >= 6,
+      hasUpperCase: /[A-Z]/.test(password),
+      hasLowerCase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+      hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    };
+  }, [password]);
+
+  const passwordStrength = useMemo(() => {
+    const requirements = Object.values(passwordRequirements);
+    const metCount = requirements.filter(Boolean).length;
+    return {
+      score: metCount,
+      maxScore: requirements.length,
+      percentage: (metCount / requirements.length) * 100,
+    };
+  }, [passwordRequirements]);
+
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!firstName.trim()) newErrors.firstName = 'Ismni kiriting';
     if (!lastName.trim()) newErrors.lastName = 'Familiyani kiriting';
-    if (!password) newErrors.password = 'Parolni kiriting';
-    if (password.length < 6) newErrors.password = 'Parol kamida 6 ta belgi bo\'lishi kerak';
-    if (password !== confirmPassword) newErrors.confirmPassword = 'Parollar mos kelmadi';
+    if (!password) {
+      newErrors.password = 'Parolni kiriting';
+    } else if (password.length < 6) {
+      newErrors.password = 'Parol kamida 6 ta belgi bo\'lishi kerak';
+    } else if (!passwordRequirements.hasUpperCase || !passwordRequirements.hasLowerCase || !passwordRequirements.hasNumber) {
+      newErrors.password = 'Parol katta harf, kichik harf va raqamni o\'z ichiga olishi kerak';
+    }
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Parolni tasdiqlang';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Parollar mos kelmadi';
+    }
     if (!birthDate) newErrors.birthDate = 'Tug\'ilgan sanani kiriting';
     if (!viloyat) newErrors.viloyat = 'Viloyatni tanlang';
     if (!tuman) newErrors.tuman = 'Tumanni tanlang';
@@ -187,15 +218,128 @@ export default function RegisterFormScreen() {
                 error={errors.mfy}
               />
 
-              <Input
-                label="Parol"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                showPasswordToggle
-                error={errors.password}
-                placeholder="Kamida 6 ta belgi"
-              />
+              <View style={styles.passwordSection}>
+                <Input
+                  label="Parol"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  showPasswordToggle
+                  error={errors.password}
+                  placeholder="Parolni kiriting"
+                />
+                
+                {/* Parol kuchi ko'rsatkich */}
+                {password.length > 0 && (
+                  <View style={styles.passwordStrengthContainer}>
+                    <View style={styles.passwordStrengthBar}>
+                      <View
+                        style={[
+                          styles.passwordStrengthFill,
+                          {
+                            width: `${passwordStrength.percentage}%`,
+                            backgroundColor:
+                              passwordStrength.percentage < 40
+                                ? '#EF4444'
+                                : passwordStrength.percentage < 70
+                                ? '#F59E0B'
+                                : '#10B981',
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.passwordStrengthText}>
+                      {passwordStrength.percentage < 40
+                        ? 'Zaif'
+                        : passwordStrength.percentage < 70
+                        ? 'O\'rtacha'
+                        : 'Kuchli'}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Parol talablari */}
+                {password.length > 0 && (
+                  <View style={styles.passwordRequirements}>
+                    <Text style={styles.passwordRequirementsTitle}>Parol talablari:</Text>
+                    <View style={styles.requirementItem}>
+                      <Ionicons
+                        name={passwordRequirements.minLength ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={passwordRequirements.minLength ? '#10B981' : '#9CA3AF'}
+                      />
+                      <Text
+                        style={[
+                          styles.requirementText,
+                          passwordRequirements.minLength && styles.requirementTextMet,
+                        ]}
+                      >
+                        Kamida 6 ta belgi
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Ionicons
+                        name={passwordRequirements.hasUpperCase ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={passwordRequirements.hasUpperCase ? '#10B981' : '#9CA3AF'}
+                      />
+                      <Text
+                        style={[
+                          styles.requirementText,
+                          passwordRequirements.hasUpperCase && styles.requirementTextMet,
+                        ]}
+                      >
+                        Kamida 1 ta katta harf (A-Z)
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Ionicons
+                        name={passwordRequirements.hasLowerCase ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={passwordRequirements.hasLowerCase ? '#10B981' : '#9CA3AF'}
+                      />
+                      <Text
+                        style={[
+                          styles.requirementText,
+                          passwordRequirements.hasLowerCase && styles.requirementTextMet,
+                        ]}
+                      >
+                        Kamida 1 ta kichik harf (a-z)
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Ionicons
+                        name={passwordRequirements.hasNumber ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={passwordRequirements.hasNumber ? '#10B981' : '#9CA3AF'}
+                      />
+                      <Text
+                        style={[
+                          styles.requirementText,
+                          passwordRequirements.hasNumber && styles.requirementTextMet,
+                        ]}
+                      >
+                        Kamida 1 ta raqam (0-9)
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Ionicons
+                        name={passwordRequirements.hasSpecialChar ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={passwordRequirements.hasSpecialChar ? '#10B981' : '#9CA3AF'}
+                      />
+                      <Text
+                        style={[
+                          styles.requirementText,
+                          passwordRequirements.hasSpecialChar && styles.requirementTextMet,
+                        ]}
+                      >
+                        Kamida 1 ta maxsus belgi (!@#$%...)
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
 
               <Input
                 label="Parolni tasdiqlash"
@@ -206,6 +350,25 @@ export default function RegisterFormScreen() {
                 error={errors.confirmPassword}
                 placeholder="Parolni qayta kiriting"
               />
+              
+              {/* Parol mos kelish ko'rsatkich */}
+              {confirmPassword.length > 0 && password.length > 0 && (
+                <View style={styles.passwordMatchContainer}>
+                  <Ionicons
+                    name={password === confirmPassword ? 'checkmark-circle' : 'close-circle'}
+                    size={18}
+                    color={password === confirmPassword ? '#10B981' : '#EF4444'}
+                  />
+                  <Text
+                    style={[
+                      styles.passwordMatchText,
+                      password === confirmPassword && styles.passwordMatchTextSuccess,
+                    ]}
+                  >
+                    {password === confirmPassword ? 'Parollar mos keladi' : 'Parollar mos kelmaydi'}
+                  </Text>
+                </View>
+              )}
 
               <Button
                 title="Ro'yxatdan o'tish"
@@ -303,5 +466,74 @@ const styles = StyleSheet.create({
   },
   genderButtonTextActive: {
     color: '#FFFFFF',
+  },
+  passwordSection: {
+    marginBottom: 16,
+  },
+  passwordStrengthContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  passwordStrengthBar: {
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  passwordStrengthFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  passwordStrengthText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    textAlign: 'right',
+  },
+  passwordRequirements: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  passwordRequirementsTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  requirementText: {
+    fontSize: 12,
+    color: '#6B7280',
+    flex: 1,
+  },
+  requirementTextMet: {
+    color: '#10B981',
+    fontWeight: '500',
+  },
+  passwordMatchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: -8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  passwordMatchText: {
+    fontSize: 12,
+    color: '#EF4444',
+    fontWeight: '500',
+  },
+  passwordMatchTextSuccess: {
+    color: '#10B981',
   },
 });

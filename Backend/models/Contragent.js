@@ -39,9 +39,15 @@ const contragentSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      required: function() {
+        return !this.passwordSetupAllowed;
+      },
       minlength: [6, 'Password must be at least 6 characters'],
       select: false, // Don't return password by default
+    },
+    passwordSetupAllowed: {
+      type: Boolean,
+      default: false,
     },
     logo: {
       type: String,
@@ -66,7 +72,12 @@ const contragentSchema = new mongoose.Schema(
 
 // Hash password before saving
 contragentSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
+  // Skip password hashing if passwordSetupAllowed is true and password is not set
+  if (this.passwordSetupAllowed && !this.password) {
+    return next();
+  }
+
+  if (!this.isModified('password') || !this.password) {
     return next();
   }
 

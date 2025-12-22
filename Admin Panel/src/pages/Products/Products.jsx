@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { adminDataAPI } from '../../services/api';
+import { productModerationAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import ProductTable from '../../components/Products/ProductTable';
 import ViewProductModal from '../../components/Products/ViewProductModal';
+import RejectProductModal from '../../components/Products/RejectProductModal';
 import { Search, Clear } from '@mui/icons-material';
 import RegionSelect from '../../components/Regions/RegionSelect';
 
 const Products = ({ hideHeader = false }) => {
-  const { showError } = useSnackbar();
+  const { showError, showSuccess } = useSnackbar();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,23 +22,18 @@ const Products = ({ hideHeader = false }) => {
 
   // Filters
   const [filters, setFilters] = useState({
+    moderationStatus: '',
     status: '',
     category: '',
-    subcategory: '',
     contragent: '',
-    viloyat: '',
-    tuman: '',
-    minPrice: '',
-    maxPrice: '',
-    minQuantity: '',
-    maxQuantity: '',
-    unit: '',
     search: '',
   });
 
   // Modals
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [rejectingProduct, setRejectingProduct] = useState(null);
 
   // Fetch products
   const fetchProducts = async () => {
@@ -49,20 +45,19 @@ const Products = ({ hideHeader = false }) => {
         limit: pagination.limit,
       };
 
+      if (filters.moderationStatus) params.moderationStatus = filters.moderationStatus;
       if (filters.status) params.status = filters.status;
       if (filters.category) params.category = filters.category;
-      if (filters.subcategory) params.subcategory = filters.subcategory;
       if (filters.contragent) params.contragent = filters.contragent;
-      if (filters.viloyat) params.viloyat = filters.viloyat;
-      if (filters.tuman) params.tuman = filters.tuman;
-      if (filters.minPrice) params.minPrice = Number(filters.minPrice);
-      if (filters.maxPrice) params.maxPrice = Number(filters.maxPrice);
-      if (filters.minQuantity) params.minQuantity = Number(filters.minQuantity);
-      if (filters.maxQuantity) params.maxQuantity = Number(filters.maxQuantity);
-      if (filters.unit) params.unit = filters.unit;
-      if (filters.search) params.search = filters.search;
 
-      const response = await adminDataAPI.getAllProducts(params);
+      let response;
+      if (filters.moderationStatus === 'pending' && !filters.status && !filters.category && !filters.contragent) {
+        // Use pending endpoint if only moderationStatus is pending
+        response = await productModerationAPI.getPendingProducts(params);
+      } else {
+        // Use moderation endpoint with filters
+        response = await productModerationAPI.getAllProductsWithModeration(params);
+      }
 
       if (response.success) {
         setProducts(response.data || []);
@@ -87,18 +82,10 @@ const Products = ({ hideHeader = false }) => {
   }, [
     pagination.page,
     pagination.limit,
+    filters.moderationStatus,
     filters.status,
     filters.category,
-    filters.subcategory,
     filters.contragent,
-    filters.viloyat,
-    filters.tuman,
-    filters.minPrice,
-    filters.maxPrice,
-    filters.minQuantity,
-    filters.maxQuantity,
-    filters.unit,
-    filters.search,
   ]);
 
   const handlePageChange = (newPage) => {
@@ -110,20 +97,48 @@ const Products = ({ hideHeader = false }) => {
     setViewModalOpen(true);
   };
 
+  const handleApprove = async (product) => {
+    try {
+      const response = await productModerationAPI.approveProduct(product._id);
+      if (response.success) {
+        showSuccess(response.message || 'Mahsulot muvaffaqiyatli tasdiqlandi');
+        fetchProducts();
+      }
+    } catch (err) {
+      const errorMsg = err.message || 'Mahsulotni tasdiqlashda xatolik yuz berdi';
+      showError(errorMsg);
+    }
+  };
+
+  const handleReject = (product) => {
+    setRejectingProduct(product);
+    setRejectModalOpen(true);
+  };
+
+  const handleRejectSuccess = () => {
+    fetchProducts();
+  };
+
+  // Filter by search (client-side)
+  const filteredProducts = products.filter((product) => {
+    if (!filters.search) return true;
+    const search = filters.search.toLowerCase();
+    return (
+      product.name?.toLowerCase().includes(search) ||
+      product.productCode?.toLowerCase().includes(search) ||
+      product.category?.name?.toLowerCase().includes(search) ||
+      product.subcategory?.name?.toLowerCase().includes(search) ||
+      product.contragent?.name?.toLowerCase().includes(search)
+    );
+  });
+
   // Clear all filters
   const handleClearFilters = () => {
     setFilters({
+      moderationStatus: '',
       status: '',
       category: '',
-      subcategory: '',
       contragent: '',
-      viloyat: '',
-      tuman: '',
-      minPrice: '',
-      maxPrice: '',
-      minQuantity: '',
-      maxQuantity: '',
-      unit: '',
       search: '',
     });
     setPagination({ ...pagination, page: 1 });
@@ -162,155 +177,64 @@ const Products = ({ hideHeader = false }) => {
             <span>Tozalash</span>
           </button>
         </div>
-        <div className="space-y-4">
-          {/* First Row: Search, Status, Unit */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Qidirish (nomi yoki kod bo'yicha)..."
-                value={filters.search}
-                onChange={(e) => {
-                  setFilters({ ...filters, search: e.target.value });
-                  setPagination({ ...pagination, page: 1 });
-                }}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            <select
-              value={filters.status}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Qidirish..."
+              value={filters.search}
               onChange={(e) => {
-                setFilters({ ...filters, status: e.target.value });
+                setFilters({ ...filters, search: e.target.value });
                 setPagination({ ...pagination, page: 1 });
               }}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Barcha statuslar</option>
-              <option value="active">Faol</option>
-              <option value="inactive">Nofaol</option>
-              <option value="archived">Arxivlangan</option>
-            </select>
-
-            <select
-              value={filters.unit}
-              onChange={(e) => {
-                setFilters({ ...filters, unit: e.target.value });
-                setPagination({ ...pagination, page: 1 });
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Barcha o'lchov birliklari</option>
-              <option value="dona">dona</option>
-              <option value="litr">litr</option>
-              <option value="kg">kg</option>
-            </select>
-          </div>
-
-          {/* Second Row: Price Range */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Min narx</label>
-              <input
-                type="number"
-                placeholder="Min narx"
-                value={filters.minPrice}
-                onChange={(e) => {
-                  setFilters({ ...filters, minPrice: e.target.value });
-                  setPagination({ ...pagination, page: 1 });
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max narx</label>
-              <input
-                type="number"
-                placeholder="Max narx"
-                value={filters.maxPrice}
-                onChange={(e) => {
-                  setFilters({ ...filters, maxPrice: e.target.value });
-                  setPagination({ ...pagination, page: 1 });
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-
-          {/* Third Row: Quantity Range */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Min miqdor</label>
-              <input
-                type="number"
-                placeholder="Min miqdor"
-                value={filters.minQuantity}
-                onChange={(e) => {
-                  setFilters({ ...filters, minQuantity: e.target.value });
-                  setPagination({ ...pagination, page: 1 });
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max miqdor</label>
-              <input
-                type="number"
-                placeholder="Max miqdor"
-                value={filters.maxQuantity}
-                onChange={(e) => {
-                  setFilters({ ...filters, maxQuantity: e.target.value });
-                  setPagination({ ...pagination, page: 1 });
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-
-          {/* Fourth Row: Region Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <RegionSelect
-              name="viloyat"
-              value={filters.viloyat}
-              onChange={(e) => {
-                setFilters({ ...filters, viloyat: e.target.value, tuman: '' });
-                setPagination({ ...pagination, page: 1 });
-              }}
-              label="Viloyat bo'yicha filter"
-              type="region"
-              isFilter={true}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
-            {filters.viloyat && (
-              <RegionSelect
-                name="tuman"
-                value={filters.tuman}
-                onChange={(e) => {
-                  setFilters({ ...filters, tuman: e.target.value });
-                  setPagination({ ...pagination, page: 1 });
-                }}
-                label="Tuman bo'yicha filter"
-                type="district"
-                parent={filters.viloyat}
-                isFilter={true}
-              />
-            )}
           </div>
+
+          {/* Moderation Status */}
+          <select
+            value={filters.moderationStatus}
+            onChange={(e) => {
+              setFilters({ ...filters, moderationStatus: e.target.value });
+              setPagination({ ...pagination, page: 1 });
+            }}
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">Barcha (Moderatsiya)</option>
+            <option value="pending">Kutilmoqda</option>
+            <option value="approved">Tasdiqlangan</option>
+            <option value="rejected">Rad etilgan</option>
+          </select>
+
+          {/* Status */}
+          <select
+            value={filters.status}
+            onChange={(e) => {
+              setFilters({ ...filters, status: e.target.value });
+              setPagination({ ...pagination, page: 1 });
+            }}
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">Barcha statuslar</option>
+            <option value="active">Faol</option>
+            <option value="inactive">Nofaol</option>
+            <option value="archived">Arxivlangan</option>
+          </select>
 
           {/* Limit */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <select
-              value={pagination.limit}
-              onChange={(e) => {
-                setPagination({ ...pagination, limit: Number(e.target.value), page: 1 });
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="25">25 ta</option>
-              <option value="50">50 ta</option>
-              <option value="100">100 ta</option>
-            </select>
-          </div>
+          <select
+            value={pagination.limit}
+            onChange={(e) => {
+              setPagination({ ...pagination, limit: Number(e.target.value), page: 1 });
+            }}
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="25">25 ta</option>
+            <option value="50">50 ta</option>
+            <option value="100">100 ta</option>
+          </select>
         </div>
       </motion.div>
 
@@ -323,9 +247,11 @@ const Products = ({ hideHeader = false }) => {
 
       {/* Table */}
       <ProductTable
-        products={products}
+        products={filteredProducts}
         loading={loading}
         onView={handleView}
+        onApprove={handleApprove}
+        onReject={handleReject}
         pagination={pagination}
         onPageChange={handlePageChange}
       />
@@ -339,6 +265,18 @@ const Products = ({ hideHeader = false }) => {
             setSelectedProduct(null);
           }}
           product={selectedProduct}
+        />
+      )}
+
+      {rejectingProduct && (
+        <RejectProductModal
+          open={rejectModalOpen}
+          onClose={() => {
+            setRejectModalOpen(false);
+            setRejectingProduct(null);
+          }}
+          onSuccess={handleRejectSuccess}
+          product={rejectingProduct}
         />
       )}
     </div>

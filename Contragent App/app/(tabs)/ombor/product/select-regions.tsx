@@ -67,10 +67,20 @@ export default function SelectRegionsScreen() {
         status: 'active',
       });
 
+      // Sort regions alphabetically by name
+      const sortedRegions = [...response.data].sort((a, b) => 
+        a.name.localeCompare(b.name, 'uz', { sensitivity: 'base' })
+      );
+
       if (append) {
-        setRegions((prev) => [...prev, ...response.data]);
+        setRegions((prev) => {
+          const combined = [...prev, ...sortedRegions];
+          return combined.sort((a, b) => 
+            a.name.localeCompare(b.name, 'uz', { sensitivity: 'base' })
+          );
+        });
       } else {
-        setRegions(response.data);
+        setRegions(sortedRegions);
       }
 
       setHasMore(response.data.length === 1000);
@@ -91,7 +101,11 @@ export default function SelectRegionsScreen() {
         parent: viloyatId,
         status: 'active',
       });
-      setDistricts(response.data);
+      // Sort districts alphabetically by name
+      const sortedDistricts = [...response.data].sort((a, b) => 
+        a.name.localeCompare(b.name, 'uz', { sensitivity: 'base' })
+      );
+      setDistricts(sortedDistricts);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Tumanlarni yuklashda xatolik');
     } finally {
@@ -199,13 +213,15 @@ export default function SelectRegionsScreen() {
     });
   };
 
-  const filteredRegions = regions.filter((r) =>
-    r.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter and sort regions alphabetically
+  const filteredRegions = regions
+    .filter((r) => r.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name, 'uz', { sensitivity: 'base' }));
 
-  const filteredDistricts = districts.filter((d) =>
-    d.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter and sort districts alphabetically
+  const filteredDistricts = districts
+    .filter((d) => d.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name, 'uz', { sensitivity: 'base' }));
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

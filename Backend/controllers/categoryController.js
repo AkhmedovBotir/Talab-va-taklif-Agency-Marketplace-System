@@ -124,18 +124,16 @@ const createSubcategory = async (req, res) => {
   }
 };
 
-// Get all categories
+// Get all categories (read-only - categories are now managed by admins)
 const getAllCategories = async (req, res) => {
   try {
     const { status, parent, page = 1, limit = 10 } = req.query;
-    const filter = { parent: null }; // Only top-level categories
+    const filter = { 
+      parent: null, // Only top-level categories
+      createdByModel: 'Admin', // Only admin-created categories
+    };
 
-    // If user is authenticated as contragent, filter by their own categories
-    if (req.user && req.user.userType === 'Contragent') {
-      filter.createdBy = req.user.userId;
-      filter.createdByModel = 'Contragent';
-    }
-
+    // Add status filter only if specified, otherwise return all admin categories
     if (status) {
       filter.status = status;
     }
@@ -152,10 +150,10 @@ const getAllCategories = async (req, res) => {
     const categories = await Category.find(filter)
       .populate({
         path: 'createdBy',
-        select: 'name username phone',
+        select: 'name username telefonRaqam',
         options: { strictPopulate: false },
       })
-      .populate('subcategories', 'name slug status')
+      .populate('subcategories', 'name slug status image censored')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -179,18 +177,16 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-// Get all subcategories
+// Get all subcategories (read-only - subcategories are now managed by admins)
 const getAllSubcategories = async (req, res) => {
   try {
     const { status, parent, page = 1, limit = 10 } = req.query;
-    const filter = { parent: { $ne: null } }; // Only subcategories
+    const filter = { 
+      parent: { $ne: null }, // Only subcategories
+      createdByModel: 'Admin', // Only admin-created subcategories
+    };
 
-    // If user is authenticated as contragent, filter by their own subcategories
-    if (req.user && req.user.userType === 'Contragent') {
-      filter.createdBy = req.user.userId;
-      filter.createdByModel = 'Contragent';
-    }
-
+    // Add status filter only if specified, otherwise return all admin subcategories
     if (status) {
       filter.status = status;
     }
@@ -209,10 +205,10 @@ const getAllSubcategories = async (req, res) => {
 
     // Get subcategories with pagination
     const subcategories = await Category.find(filter)
-      .populate('parent', 'name slug status')
+      .populate('parent', 'name slug status image censored')
       .populate({
         path: 'createdBy',
-        select: 'name username phone',
+        select: 'name username telefonRaqam',
         options: { strictPopulate: false },
       })
       .sort({ createdAt: -1 })
@@ -238,37 +234,28 @@ const getAllSubcategories = async (req, res) => {
   }
 };
 
-// Get category by ID
+// Get category by ID (read-only - categories are now managed by admins)
 const getCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const category = await Category.findById(id)
-      .populate('parent', 'name slug status')
-      .populate('subcategories', 'name slug status')
+    const category = await Category.findOne({
+      _id: id,
+      createdByModel: 'Admin', // Only admin-created categories
+    })
+      .populate('parent', 'name slug status image censored')
+      .populate('subcategories', 'name slug status image censored')
       .populate({
         path: 'createdBy',
-        select: 'name username phone',
+        select: 'name username telefonRaqam',
         options: { strictPopulate: false },
       });
 
     if (!category) {
       return res.status(404).json({
         success: false,
-        message: 'Kategoriya topilmadi',
+        message: 'Kategoriya topilmadi yoki Admin tomonidan yaratilmagan',
       });
-    }
-
-    // If user is authenticated as contragent, check if category belongs to them
-    if (req.user && req.user.userType === 'Contragent') {
-      const createdById = category.createdBy?._id?.toString() || category.createdBy?.toString();
-      if (category.createdByModel !== 'Contragent' || 
-          createdById !== req.user.userId.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: 'Bu kategoriyaga kirish huquqingiz yo\'q',
-        });
-      }
     }
 
     res.status(200).json({

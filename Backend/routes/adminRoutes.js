@@ -9,6 +9,18 @@ const {
   loginAdmin,
 } = require('../controllers/adminController');
 const {
+  createCategory,
+  createSubcategory,
+  getAllCategories,
+  getAllSubcategories,
+  getCategoryById,
+  updateCategory,
+  updateSubcategory,
+  updateCategoryStatus,
+  deleteCategory,
+  deleteSubcategory,
+} = require('../controllers/adminCategoryController');
+const {
   getAllCategoriesForAdmin,
   getAllSubcategoriesForAdmin,
   getAllProductsForAdmin,
@@ -61,6 +73,13 @@ const {
   getPunktKpiDetails,
 } = require('../controllers/adminKpiController');
 const {
+  getPendingProducts,
+  getPendingProductById,
+  approveProduct,
+  rejectProduct,
+  getAllProductsForModeration,
+} = require('../controllers/adminProductModerationController');
+const {
   getAllPartnershipRequests,
   getPartnershipRequestById,
   updateContactStatus,
@@ -84,6 +103,8 @@ const {
   getInterviewStage,
   submitInterviewResult,
   makeFinalDecision,
+  convertApplicationToPunkt,
+  convertApplicationToAgent,
 } = require('../controllers/adminVacancyApplicationController');
 const {
   updateFeaturedContragents,
@@ -92,7 +113,11 @@ const {
 const {
   validate,
   adminValidationSchemas,
+  adminCategoryValidationSchemas,
+  adminProductModerationValidationSchemas,
+  adminVacancyApplicationValidationSchemas,
   partnershipRequestValidationSchemas,
+  marketplacePartnershipRequestValidationSchemas,
   featuredContragentValidationSchemas,
 } = require('../middleware/validation');
 const { adminAuth } = require('../middleware/auth');
@@ -116,14 +141,48 @@ router.get('/data/categories', adminAuth, getAllCategoriesForAdmin);
 // Get all subcategories (for admin)
 router.get('/data/subcategories', adminAuth, getAllSubcategoriesForAdmin);
 
-// Get category by ID (for admin)
+// Get category by ID (for admin - old endpoint, kept for backward compatibility)
 router.get('/data/categories/:id', adminAuth, getCategoryByIdForAdmin);
+
+// ==================== ADMIN CATEGORY MANAGEMENT ====================
+
+// Category CRUD
+router.post('/categories', adminAuth, validate(adminCategoryValidationSchemas.create), createCategory);
+router.get('/categories', adminAuth, getAllCategories);
+router.get('/categories/:id', adminAuth, getCategoryById);
+router.put('/categories/:id', adminAuth, validate(adminCategoryValidationSchemas.update), updateCategory);
+router.put('/categories/:id/status', adminAuth, validate(adminCategoryValidationSchemas.updateStatus), updateCategoryStatus);
+router.delete('/categories/:id', adminAuth, deleteCategory);
+
+// Subcategory CRUD
+router.post('/categories/subcategories', adminAuth, validate(adminCategoryValidationSchemas.createSubcategory), createSubcategory);
+router.get('/categories/subcategories', adminAuth, getAllSubcategories);
+router.put('/categories/subcategories/:id', adminAuth, validate(adminCategoryValidationSchemas.updateSubcategory), updateSubcategory);
+router.put('/categories/subcategories/:id/status', adminAuth, validate(adminCategoryValidationSchemas.updateStatus), updateCategoryStatus);
+router.delete('/categories/subcategories/:id', adminAuth, deleteSubcategory);
 
 // Get all products (for admin with advanced filters)
 router.get('/data/products', adminAuth, getAllProductsForAdmin);
 
 // Get product by ID (for admin)
 router.get('/data/products/:id', adminAuth, getProductByIdForAdmin);
+
+// ==================== ADMIN PRODUCT MODERATION ====================
+
+// Get all pending products
+router.get('/products/moderation/pending', adminAuth, getPendingProducts);
+
+// Get pending product by ID
+router.get('/products/moderation/pending/:id', adminAuth, getPendingProductById);
+
+// Get all products with moderation status filter
+router.get('/products/moderation', adminAuth, getAllProductsForModeration);
+
+// Approve product
+router.post('/products/moderation/:id/approve', adminAuth, approveProduct);
+
+// Reject product
+router.post('/products/moderation/:id/reject', adminAuth, validate(adminProductModerationValidationSchemas.reject), rejectProduct);
 
 // Get all SMS verifications (for admin)
 router.get('/data/sms-verifications', adminAuth, getAllSmsVerificationsForAdmin);
@@ -225,6 +284,25 @@ router.patch('/partnership-requests/:id/contact-status', adminAuth, validate(par
 router.patch('/partnership-requests/:id/status', adminAuth, validate(partnershipRequestValidationSchemas.updateRequestStatus), updateRequestStatus);
 router.post('/partnership-requests/:id/convert-to-contragent', adminAuth, convertPartnershipRequestToContragent);
 
+// Marketplace partnership request endpoints (new system)
+const {
+  getAllMarketplacePartnershipRequests,
+  getMarketplacePartnershipRequestById,
+  updateStatusToReviewing,
+  updateStatusToContacted,
+  approveMarketplacePartnershipRequest,
+  rejectMarketplacePartnershipRequest,
+  convertMarketplacePartnershipRequestToContragent,
+} = require('../controllers/marketplacePartnershipRequestController');
+
+router.get('/marketplace-partnership-requests', adminAuth, getAllMarketplacePartnershipRequests);
+router.get('/marketplace-partnership-requests/:id', adminAuth, getMarketplacePartnershipRequestById);
+router.patch('/marketplace-partnership-requests/:id/reviewing', adminAuth, updateStatusToReviewing);
+router.patch('/marketplace-partnership-requests/:id/contacted', adminAuth, validate(marketplacePartnershipRequestValidationSchemas.updateContacted), updateStatusToContacted);
+router.patch('/marketplace-partnership-requests/:id/approve', adminAuth, validate(marketplacePartnershipRequestValidationSchemas.approve), approveMarketplacePartnershipRequest);
+router.patch('/marketplace-partnership-requests/:id/reject', adminAuth, validate(marketplacePartnershipRequestValidationSchemas.reject), rejectMarketplacePartnershipRequest);
+router.post('/marketplace-partnership-requests/:id/convert-to-contragent', adminAuth, convertMarketplacePartnershipRequestToContragent);
+
 // Vacancies (admin only)
 router.post('/vacancies', adminAuth, createVacancy);
 router.get('/vacancies', adminAuth, getVacancies);
@@ -251,6 +329,10 @@ router.post('/applications/:id/interview-stages/:stageId/result', adminAuth, sub
 router.delete('/applications/:id/interview-stages/:stageId', adminAuth, deleteInterviewStage);
 // Make final decision
 router.post('/applications/:id/final-decision', adminAuth, makeFinalDecision);
+// Convert application to Punkt
+router.post('/applications/:id/convert-to-punkt', adminAuth, validate(adminVacancyApplicationValidationSchemas.convertToPunkt), convertApplicationToPunkt);
+// Convert application to Agent
+router.post('/applications/:id/convert-to-agent', adminAuth, validate(adminVacancyApplicationValidationSchemas.convertToAgent), convertApplicationToAgent);
 
 // Get admin by ID (must be after /data/* routes)
 router.get('/:id', getAdminById);

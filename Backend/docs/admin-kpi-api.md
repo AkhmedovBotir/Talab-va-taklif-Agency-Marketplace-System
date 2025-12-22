@@ -68,6 +68,7 @@ All endpoints require admin authentication using JWT token from Admin login.
       "tumanAgent": "number (0-100, required)",
       "mfyAgent": "number (0-100, required)",
       "finance": "number (0-100, required)",
+      "deliveryService": "number (0-100, required)",
       "punktTransfer": "number (0-100, optional, default: 0)"
     },
   "isActive": "boolean (default: true)",
@@ -78,7 +79,8 @@ All endpoints require admin authentication using JWT token from Admin login.
 ```
 
 **Important:** 
-- The sum of `punkt`, `viloyatAgent`, `tumanAgent`, `mfyAgent`, and `finance` must equal 100%.
+- The sum of `punkt`, `viloyatAgent`, `tumanAgent`, `mfyAgent`, `finance`, and `deliveryService` must equal 100%.
+- `deliveryService` (yetkazib berish xizmati) is stored separately in finance department and is not assigned to any recipient.
 - `punktTransfer` is optional and represents additional bonus percentage for inter-punkt transfers.
 - If `punktTransfer` > 0, this percentage is automatically split 50/50 between `fromPunkt` and `toPunkt` (no separate distribution config needed).
 
@@ -103,6 +105,7 @@ All endpoints require admin authentication using JWT token from Admin login.
       "tumanAgent": "number",
       "mfyAgent": "number",
       "finance": "number",
+      "deliveryService": "number",
       "punktTransfer": "number"
     },
   "recipients": {
@@ -152,13 +155,15 @@ Get default/initial KPI distribution values that admin can use to prefill the cr
           "viloyatAgent": 15,
           "tumanAgent": 15,
           "mfyAgent": 35,
-          "finance": 20,
+          "finance": 15,
+          "deliveryService": 5,
           "punktTransfer": 0
         },
         "notes": [
-          "Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent) yig'indisi 100% bo'lishi shart",
+          "Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance, deliveryService) yig'indisi 100% bo'lishi shart",
           "Punkt transfer 0 bo'lsa, transfer bonus ajratilmaydi",
           "Punkt transfer > 0 bo'lsa, bu foizning yarmi fromPunkt ga, yarmi toPunkt ga ajratiladi",
+          "Yetkazib berish xizmati (deliveryService) faqat moliya bo'limida saqlanadi va hech qanday recipient ga berilmaydi",
           "Bu qiymatlar faqat create formasi uchun boshlang'ich tavsiya"
         ]
   }
@@ -191,23 +196,26 @@ Create a new KPI bonus distribution configuration.
     "viloyatAgent": 20,
     "tumanAgent": 20,
     "mfyAgent": 40,
+    "finance": 15,
+    "deliveryService": 5,
     "punktTransfer": 10
   }
 }
 ```
 
 **Qanday yuborish kerak?**
-- Avval asosiy to'rtta foiz (punkt, viloyatAgent, tumanAgent, mfyAgent) summasini tekshiring — **100% bo'lishi majburiy**.
+- Avval asosiy oltita foiz (punkt, viloyatAgent, tumanAgent, mfyAgent, finance, deliveryService) summasini tekshiring — **100% bo'lishi majburiy**.
 - `punktTransfer` ni 0 yoki kerakli qiymatga qo'yishingiz mumkin; bu asosiy yig'indiga kirmaydi va transfer bo'lsa avtomatik 5/5 ga bo'linadi.
-- Agar asosiy foizlar 100% dan kam bo'lsa (masalan, 10 + 20 + 20 + 40 = 90%), server xatolik qaytaradi.
+- Agar asosiy foizlar 100% dan kam bo'lsa (masalan, 10 + 20 + 20 + 40 + 15 + 5 = 110%), server xatolik qaytaradi.
 
 **Validation Rules:**
 - `name`: Required, unique
-- **Asosiy taqsimlashlar:** `distribution.punkt + viloyatAgent + tumanAgent + mfyAgent + finance` must equal 100
+- **Asosiy taqsimlashlar:** `distribution.punkt + viloyatAgent + tumanAgent + mfyAgent + finance + deliveryService` must equal 100
+- `deliveryService`: Required, 0-100. This amount is stored separately in finance department and not assigned to any recipient
 - `punktTransfer`: Optional, 0-100. If > 0, automatically split 50/50 between fromPunkt and toPunkt
 - **Faqat bitta active distribution:** Agar yangi distribution `isActive: true` bo'lsa, boshqa barcha distributionlar avtomatik `isActive: false` bo'ladi
 
-> **Eslatma:** `punktTransfer` qo'shimcha bonus bo'lib, asosiy foizlar yig'indisiga kirmaydi. Avvalo `punkt + viloyatAgent + tumanAgent + mfyAgent + finance = 100%` ekanligiga ishonch hosil qiling, so'ng zaruratga qarab `punktTransfer` qo'shing.
+> **Eslatma:** `punktTransfer` qo'shimcha bonus bo'lib, asosiy foizlar yig'indisiga kirmaydi. Avvalo `punkt + viloyatAgent + tumanAgent + mfyAgent + finance + deliveryService = 100%` ekanligiga ishonch hosil qiling, so'ng zaruratga qarab `punktTransfer` qo'shing.
 
 **Success Response (201 Created):**
 
@@ -224,7 +232,8 @@ Create a new KPI bonus distribution configuration.
       "viloyatAgent": 15,
       "tumanAgent": 15,
       "mfyAgent": 35,
-      "finance": 20,
+      "finance": 15,
+      "deliveryService": 5,
       "punktTransfer": 10
     },
     "isActive": true,
@@ -236,7 +245,7 @@ Create a new KPI bonus distribution configuration.
 
 **Error Responses:**
 - **400 Bad Request** - Validation error:
-  - `Asosiy taqsimlashlar yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: X%` - Asosiy 5 ta foiz (punkt, viloyatAgent, tumanAgent, mfyAgent, finance) yig'indisi 100% bo'lishi kerak
+  - `Asosiy taqsimlashlar yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: X%` - Asosiy 6 ta foiz (punkt, viloyatAgent, tumanAgent, mfyAgent, finance, deliveryService) yig'indisi 100% bo'lishi kerak
   - Duplicate name error
 - **401 Unauthorized** - Token missing or invalid
 - **500 Internal Server Error** - Server error
@@ -355,8 +364,10 @@ Update an existing KPI bonus distribution configuration.
     "punkt": 25,
     "viloyatAgent": 25,
     "tumanAgent": 25,
-    "mfyAgent": 25,
-    "punktTransfer": 5
+      "mfyAgent": 25,
+      "finance": 15,
+      "deliveryService": 5,
+      "punktTransfer": 5
   },
   "isActive": true
 }
@@ -479,11 +490,12 @@ Get all KPI bonus transactions with filters.
       },
         "amounts": {
           "punkt": 450,
-          "viloyatAgent": 450,
-          "tumanAgent": 450,
-          "mfyAgent": 1050,
-          "finance": 600,
-          "punktTransfer": 0
+      "viloyatAgent": 450,
+      "tumanAgent": 450,
+      "mfyAgent": 1050,
+      "finance": 450,
+      "deliveryService": 150,
+      "punktTransfer": 0
         },
         "recipients": {
           "punkt": {
@@ -543,9 +555,10 @@ Get a specific KPI bonus transaction.
         "amounts": {
           "punkt": 450,
           "viloyatAgent": 450,
-          "tumanAgent": 450,
-          "mfyAgent": 1050,
-          "finance": 600
+      "tumanAgent": 450,
+      "mfyAgent": 1050,
+      "finance": 450,
+      "deliveryService": 150
         },
         "recipients": {
           "punkt": {
@@ -1035,7 +1048,8 @@ Aniq bir punktning batafsil KPI ma'lumotlari va transaksiyalarini olish.
      - `viloyatAgent = 15%` → `viloyatAgentAmount = 15`
      - `tumanAgent = 15%` → `tumanAgentAmount = 15`
      - `mfyAgent = 35%` → `mfyAgentAmount = 35`
-     - `finance = 20%` → `financeAmount = 20`
+     - `finance = 15%` → `financeAmount = 15`
+     - `deliveryService = 5%` → `deliveryServiceAmount = 5` (stored in finance department, not assigned to any recipient)
 
 3. **Punkt Transfer Bonus:**
    - If `punktTransfer > 0` and order has `punktToPunktRequests`:
@@ -1053,6 +1067,7 @@ Aniq bir punktning batafsil KPI ma'lumotlari va transaksiyalarini olish.
    - **Tuman Agent:** Active agent for the delivery tuman (no mfy)
    - **MFY Agent:** The agent assigned to the order (`assignedToAgent`)
    - **Finance (Moliya Bo'limi):** Avtomatik ajratiladi (distribution.finance foiziga qarab)
+   - **Delivery Service (Yetkazib berish xizmati):** Avtomatik ajratiladi (distribution.deliveryService foiziga qarab). Bu summa faqat moliya bo'limida saqlanadi va hech qanday recipient ga berilmaydi
    - **Punkt Transfer:** From `punktToPunktRequests` if order was transferred between punkts (50/50 split)
 
 ---
@@ -1095,7 +1110,8 @@ curl -X POST http://localhost:5000/api/admins/kpi/distributions \
       "viloyatAgent": 15,
       "tumanAgent": 15,
       "mfyAgent": 35,
-      "finance": 20
+      "finance": 15,
+      "deliveryService": 5
     }
   }'
 ```
@@ -1128,10 +1144,67 @@ curl -X GET "http://localhost:5000/api/admins/kpi/transactions?orderId=507f1f77b
 
 5. **Payment Tracking:** Use the `isPaid` field to track which bonuses have been paid out. This can be updated manually or through a separate payment API.
 
-6. **Validation Messages:**
-   - Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance) yig'indisi 100% bo'lishi shart
+6. **Delivery Service:** Yetkazib berish xizmati (deliveryService) summasi faqat moliya bo'limida saqlanadi va hech qanday recipient ga berilmaydi. Bu summa alohida API orqali olinadi: `GET /api/admins/finance/balance/delivery-service-kpi`
+
+7. **Validation Messages:**
+   - Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance, deliveryService) yig'indisi 100% bo'lishi shart
    - Punkt transfer foizi alohida va 0-100% orasida bo'lishi mumkin
    - Punkt transfer > 0 bo'lsa, bu foizning yarmi avtomatik fromPunkt ga, yarmi toPunkt ga ajratiladi (50/50 split)
+   - Yetkazib berish xizmati (deliveryService) faqat moliya bo'limida saqlanadi va hech qanday recipient ga berilmaydi
+
+---
+
+## Moliya Bo'limi - Yetkazib Berish Xizmati Summasi
+
+### Get Delivery Service KPI Amount
+
+Moliya bo'limida saqlangan yetkazib berish xizmati KPI bonus summasi.
+
+**Endpoint:** `GET /api/admins/finance/balance/delivery-service-kpi`
+
+**Headers:**
+- `Authorization: Bearer <token>` (required)
+
+**Query Parameters:**
+- `startDate` (optional) - Boshlanish sanasi (ISO 8601 format)
+- `endDate` (optional) - Tugash sanasi (ISO 8601 format)
+
+**Success Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "period": {
+      "startDate": "2024-01-01T00:00:00.000Z",
+      "endDate": "2024-01-31T23:59:59.999Z"
+    },
+    "totalDeliveryServiceKpi": 50000,
+    "transactionsCount": 150
+  }
+}
+```
+
+**Response Fields:**
+- `period` - Filter qo'llangan davr (agar ko'rsatilgan bo'lsa)
+- `totalDeliveryServiceKpi` - Jami yetkazib berish xizmati summasi
+- `transactionsCount` - Transaksiyalar soni
+
+**Error Responses:**
+- **401 Unauthorized** - Token missing or invalid
+- **500 Internal Server Error** - Server error
+
+**Example Request:**
+
+```bash
+curl -X GET "http://localhost:5000/api/admins/finance/balance/delivery-service-kpi?startDate=2024-01-01&endDate=2024-01-31" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Note:** 
+- Bu summa faqat moliya bo'limida saqlanadi
+- Hech qanday agent, punkt yoki boshqa recipient ga berilmaydi
+- Faqat `confirmed_by_customer` holatidagi buyurtmalar hisobga olinadi
 
 ---
 

@@ -11,6 +11,11 @@ const {
   getContragentsInRegion,
 } = require('../controllers/punktController');
 const {
+  passwordSetupStep1,
+  passwordSetupStep2,
+  passwordSetupStep3,
+} = require('../controllers/punktAuthController');
+const {
   getPunktNotifications,
   getPunktUnreadCount,
   markPunktNotificationRead,
@@ -18,6 +23,11 @@ const {
 } = require('../controllers/notificationController');
 const { validate, punktValidationSchemas } = require('../middleware/validation');
 const { punktAuth } = require('../middleware/auth');
+
+// Password setup (for new punkts from vacancy applications)
+router.post('/password-setup/step1', validate(punktValidationSchemas.passwordSetupStep1), passwordSetupStep1);
+router.post('/password-setup/step2', validate(punktValidationSchemas.passwordSetupStep2), passwordSetupStep2);
+router.post('/password-setup/step3', validate(punktValidationSchemas.passwordSetupStep3), passwordSetupStep3);
 
 // Login punkt
 router.post('/login', validate(punktValidationSchemas.login), loginPunkt);

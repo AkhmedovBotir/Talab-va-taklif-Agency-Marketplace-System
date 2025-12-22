@@ -920,6 +920,345 @@ const submitInterviewResult = async (req, res) => {
   }
 };
 
+// Convert application to Punkt (admin only)
+const convertApplicationToPunkt = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { viloyat, tuman } = req.body;
+    const adminId = req.user.userId;
+
+    if (!viloyat) {
+      return res.status(400).json({
+        success: false,
+        message: 'Viloyat kiritilishi shart',
+      });
+    }
+
+    const application = await VacancyApplication.findById(id)
+      .populate('vacancy')
+      .populate('applicant');
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Topshirish topilmadi',
+      });
+    }
+
+    // Check if vacancy target is punkt
+    if (application.vacancy.target !== 'punkt') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu vakansiya punkt uchun emas',
+      });
+    }
+
+    // Check if application is accepted
+    if (application.status !== 'accepted' || application.finalDecision?.result !== 'hired') {
+      return res.status(400).json({
+        success: false,
+        message: 'Faqat qabul qilingan (hired) topshirishlar punkt ga aylantirilishi mumkin',
+      });
+    }
+
+    const applicant = application.applicant;
+
+    // Validate viloyat
+    const viloyatRegion = await Region.findById(viloyat);
+    if (!viloyatRegion || viloyatRegion.type !== 'region') {
+      return res.status(400).json({
+        success: false,
+        message: 'Viloyat topilmadi yoki noto\'g\'ri tur',
+      });
+    }
+
+    // Validate tuman if provided
+    if (tuman) {
+      const tumanRegion = await Region.findById(tuman).populate('parent');
+      if (!tumanRegion || tumanRegion.type !== 'district') {
+        return res.status(400).json({
+          success: false,
+          message: 'Tuman topilmadi yoki noto\'g\'ri tur',
+        });
+      }
+      if (tumanRegion.parent && tumanRegion.parent._id.toString() !== viloyat.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tuman viloyatga tegishli emas',
+        });
+      }
+    }
+
+    // Check if phone already exists
+    const existingPhone = await Punkt.findOne({
+      phone: applicant.phone,
+      isDeleted: { $ne: true },
+    });
+    if (existingPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu telefon raqami allaqachon punkt sifatida mavjud',
+      });
+    }
+
+    // Check if there's already an active punkt in this position
+    const positionFilter = {
+      viloyat: viloyat,
+      tuman: tuman || null,
+      isDeleted: { $ne: true },
+      status: 'active',
+    };
+
+    const existingPunktInPosition = await Punkt.findOne(positionFilter);
+    if (existingPunktInPosition) {
+      const tumanName = tuman ? ' va tuman' : '';
+      return res.status(400).json({
+        success: false,
+        message: `Bu viloyat${tumanName} uchun allaqachon faol punkt mavjud`,
+      });
+    }
+
+    // Create Punkt without password (passwordSetupAllowed = true)
+    const punktName = `${applicant.firstName} ${applicant.lastName}`;
+    const punkt = await Punkt.create({
+      name: punktName,
+      phone: applicant.phone,
+      viloyat: viloyat,
+      tuman: tuman || null,
+      status: 'active',
+      passwordSetupAllowed: true, // Set to true for password setup flow
+    });
+
+    // Populate regions
+    await punkt.populate([
+      { path: 'viloyat', select: 'name type code' },
+      { path: 'tuman', select: 'name type code' },
+    ]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Topshirish muvaffaqiyatli punkt ga aylantirildi. Parol o\'rnatish uchun telefon raqam orqali kirish kerak.',
+      data: {
+        punkt: {
+          _id: punkt._id,
+          name: punkt.name,
+          phone: punkt.phone,
+          viloyat: punkt.viloyat,
+          tuman: punkt.tuman,
+          passwordSetupAllowed: punkt.passwordSetupAllowed,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error converting application to punkt:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Noto\'g\'ri topshirish ID',
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Topshirishni punkt ga aylantirishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Convert application to Agent (admin only)
+const convertApplicationToAgent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { viloyat, tuman, mfy } = req.body;
+    const adminId = req.user.userId;
+
+    if (!viloyat) {
+      return res.status(400).json({
+        success: false,
+        message: 'Viloyat kiritilishi shart',
+      });
+    }
+
+    const application = await VacancyApplication.findById(id)
+      .populate('vacancy')
+      .populate('applicant');
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Topshirish topilmadi',
+      });
+    }
+
+    // Check if vacancy target is agent
+    if (application.vacancy.target !== 'agent') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu vakansiya agent uchun emas',
+      });
+    }
+
+    // Check if application is accepted
+    if (application.status !== 'accepted' || application.finalDecision?.result !== 'hired') {
+      return res.status(400).json({
+        success: false,
+        message: 'Faqat qabul qilingan (hired) topshirishlar agent ga aylantirilishi mumkin',
+      });
+    }
+
+    const applicant = application.applicant;
+
+    // Validate viloyat
+    const viloyatRegion = await Region.findById(viloyat);
+    if (!viloyatRegion || viloyatRegion.type !== 'region') {
+      return res.status(400).json({
+        success: false,
+        message: 'Viloyat topilmadi yoki noto\'g\'ri tur',
+      });
+    }
+
+    // Validate tuman if provided
+    if (tuman) {
+      const tumanRegion = await Region.findById(tuman);
+      if (!tumanRegion || tumanRegion.type !== 'district') {
+        return res.status(400).json({
+          success: false,
+          message: 'Tuman topilmadi yoki noto\'g\'ri tur',
+        });
+      }
+      if (tumanRegion.parent?.toString() !== viloyat.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tuman tanlangan viloyatga tegishli emas',
+        });
+      }
+    }
+
+    // Validate mfy if provided
+    if (mfy) {
+      if (!tuman) {
+        return res.status(400).json({
+          success: false,
+          message: 'MFY tanlash uchun tuman ham tanlanishi kerak',
+        });
+      }
+      const mfyRegion = await Region.findById(mfy);
+      if (!mfyRegion || mfyRegion.type !== 'mfy') {
+        return res.status(400).json({
+          success: false,
+          message: 'MFY topilmadi yoki noto\'g\'ri tur',
+        });
+      }
+      if (mfyRegion.parent?.toString() !== tuman.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'MFY tanlangan tumanga tegishli emas',
+        });
+      }
+    }
+
+    // Check if phone already exists
+    const existingPhone = await Agent.findOne({
+      phone: applicant.phone,
+      isDeleted: { $ne: true },
+    });
+    if (existingPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu telefon raqami allaqachon agent sifatida mavjud',
+      });
+    }
+
+    // Check if there's already an active agent in this position
+    const positionFilter = {
+      viloyat: viloyat,
+      isDeleted: { $ne: true },
+      status: 'active',
+    };
+
+    if (tuman) {
+      positionFilter.tuman = tuman;
+    } else {
+      positionFilter.tuman = null;
+    }
+
+    if (mfy) {
+      positionFilter.mfy = mfy;
+    } else {
+      positionFilter.mfy = null;
+    }
+
+    const existingAgentInPosition = await Agent.findOne(positionFilter);
+    if (existingAgentInPosition) {
+      let positionName = 'Bu viloyat';
+      if (tuman) {
+        positionName += ' va tuman';
+      }
+      if (mfy) {
+        positionName += ' va MFY';
+      }
+      return res.status(400).json({
+        success: false,
+        message: `${positionName} uchun allaqachon faol agent mavjud`,
+      });
+    }
+
+    // Create Agent without password (passwordSetupAllowed = true)
+    const agentName = `${applicant.firstName} ${applicant.lastName}`;
+    const agent = await Agent.create({
+      name: agentName,
+      viloyat: viloyat,
+      tuman: tuman || null,
+      mfy: mfy || null,
+      phone: applicant.phone,
+      status: 'active',
+      passwordSetupAllowed: true, // Set to true for password setup flow
+    });
+
+    // Populate regions
+    await agent.populate('viloyat', 'name type code');
+    if (agent.tuman) {
+      await agent.populate('tuman', 'name type code');
+    }
+    if (agent.mfy) {
+      await agent.populate('mfy', 'name type code');
+    }
+
+    // Determine agent type
+    const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
+
+    res.status(201).json({
+      success: true,
+      message: 'Topshirish muvaffaqiyatli agent ga aylantirildi. Parol o\'rnatish uchun telefon raqam orqali kirish kerak.',
+      data: {
+        agent: {
+          _id: agent._id,
+          name: agent.name,
+          phone: agent.phone,
+          viloyat: agent.viloyat,
+          tuman: agent.tuman,
+          mfy: agent.mfy,
+          agentType,
+          passwordSetupAllowed: agent.passwordSetupAllowed,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error converting application to agent:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Noto\'g\'ri topshirish ID',
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Topshirishni agent ga aylantirishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getApplicationsByVacancy,
   getApplicationById,
@@ -930,5 +1269,7 @@ module.exports = {
   getInterviewStage,
   submitInterviewResult,
   makeFinalDecision,
+  convertApplicationToPunkt,
+  convertApplicationToAgent,
 };
 

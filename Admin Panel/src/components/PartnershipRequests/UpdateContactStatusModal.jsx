@@ -7,7 +7,7 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 const UpdateContactStatusModal = ({ open, onClose, onSuccess, request }) => {
   const { showSuccess, showError } = useSnackbar();
   const [formData, setFormData] = useState({
-    contactStatus: 'not_contacted',
+    adminNotes: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,7 +15,7 @@ const UpdateContactStatusModal = ({ open, onClose, onSuccess, request }) => {
   useEffect(() => {
     if (request && open) {
       setFormData({
-        contactStatus: request.contactStatus || 'not_contacted',
+        adminNotes: request.adminNotes || '',
       });
       setError('');
     }
@@ -32,14 +32,17 @@ const UpdateContactStatusModal = ({ open, onClose, onSuccess, request }) => {
     setLoading(true);
 
     try {
-      const response = await partnershipRequestAPI.updateContactStatus(request._id, formData.contactStatus);
+      const response = await partnershipRequestAPI.updateStatusToContacted(
+        request._id,
+        formData.adminNotes
+      );
       if (response.success) {
-        showSuccess(response.message || 'Aloqa holati muvaffaqiyatli yangilandi');
+        showSuccess(response.message || 'So\'rov gaplashilgan deb belgilandi');
         onSuccess();
         onClose();
       }
     } catch (err) {
-      const errorMsg = err.message || 'Aloqa holatini yangilashda xatolik yuz berdi';
+      const errorMsg = err.message || 'So\'rov holatini yangilashda xatolik yuz berdi';
       setError(errorMsg);
       showError(errorMsg);
     } finally {
@@ -50,7 +53,7 @@ const UpdateContactStatusModal = ({ open, onClose, onSuccess, request }) => {
   const handleClose = () => {
     setError('');
     setFormData({
-      contactStatus: 'not_contacted',
+      adminNotes: '',
     });
     onClose();
   };
@@ -80,7 +83,7 @@ const UpdateContactStatusModal = ({ open, onClose, onSuccess, request }) => {
             >
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800">Aloqa holatini yangilash</h2>
+                <h2 className="text-2xl font-bold text-gray-800">Aloqa qilingan deb belgilash</h2>
                 <button
                   onClick={handleClose}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -109,36 +112,41 @@ const UpdateContactStatusModal = ({ open, onClose, onSuccess, request }) => {
                   </div>
                 )}
 
-                {/* Contact Status */}
+                {/* Info */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    Bu so'rovni "Aloqa qilingan" (contacted) holatiga o'tkazadi. Kompaniya bilan gaplashganingiz haqida qo'shimcha ma'lumot yozishingiz mumkin.
+                  </p>
+                </div>
+
+                {/* Admin Notes */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Aloqa holati <span className="text-red-500">*</span>
+                    Admin izohi (ixtiyoriy)
                   </label>
-                  <select
-                    name="contactStatus"
-                    value={formData.contactStatus}
+                  <textarea
+                    name="adminNotes"
+                    value={formData.adminNotes}
                     onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="not_contacted">Aloqa qilinmagan</option>
-                    <option value="contacted">Aloqa qilingan</option>
-                    <option value="in_progress">Jarayonda</option>
-                    <option value="completed">Tugallangan</option>
-                  </select>
+                    rows={4}
+                    maxLength={1000}
+                    placeholder="Kompaniya bilan gaplashish haqida qo'shimcha ma'lumot yozing (maksimum 1000 belgi)..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  />
                   <p className="text-xs text-gray-500 mt-1">
-                    Aloqa holatini tanlang
+                    {formData.adminNotes.length}/1000 belgi
                   </p>
                 </div>
 
                 {/* Current Status Display */}
-                {request.contactStatus && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-xs text-blue-600 mb-1">Joriy holat:</p>
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                      {request.contactStatus === 'completed' ? 'Tugallangan' :
-                       request.contactStatus === 'in_progress' ? 'Jarayonda' :
-                       request.contactStatus === 'contacted' ? 'Aloqa qilingan' : 'Aloqa qilinmagan'}
+                {request.status && (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                    <p className="text-xs text-gray-600 mb-1">Joriy holat:</p>
+                    <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                      {request.status === 'approved' ? 'Tasdiqlangan' :
+                       request.status === 'rejected' ? 'Rad etilgan' :
+                       request.status === 'reviewing' ? 'Ko\'rib chiqilmoqda' :
+                       request.status === 'contacted' ? 'Aloqa qilingan' : 'Kutilmoqda'}
                     </span>
                   </div>
                 )}

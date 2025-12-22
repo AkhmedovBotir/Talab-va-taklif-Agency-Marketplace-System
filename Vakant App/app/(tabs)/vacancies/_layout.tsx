@@ -24,13 +24,14 @@ export default function VacanciesLayout() {
       <Stack.Screen
         name="[id]"
         options={{
-          headerShown: true,
+          headerShown: false,
           title: 'Vakansiya',
         }}
       />
       <Stack.Screen
         name="[id]/apply"
         options={{
+          headerShown: false,
           title: 'Topshirish',
         }}
       />

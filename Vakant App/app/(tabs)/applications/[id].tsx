@@ -11,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
 } from 'react-native';
 
 type TabType = 'vacancy' | 'application' | 'result';
@@ -19,6 +20,7 @@ export default function ApplicationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [application, setApplication] = useState<Application | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('vacancy');
 
   useEffect(() => {
@@ -27,19 +29,30 @@ export default function ApplicationDetailScreen() {
     }
   }, [id]);
 
-  const loadApplication = async () => {
+  const loadApplication = async (isRefresh: boolean = false) => {
     if (!id) return;
     
-    setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const data = await vacancyApi.getApplicationById(id);
       setApplication(data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Arizani yuklashda xatolik');
-      router.back();
+      if (!isRefresh) {
+        router.back();
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    loadApplication(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -120,6 +133,13 @@ export default function ApplicationDetailScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color="#111827" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Ariza batafsil</Text>
+        <View style={{ width: 32 }} />
+      </View>
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
@@ -168,6 +188,9 @@ export default function ApplicationDetailScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
       >
         {activeTab === 'vacancy' ? (
           <VacancyTabContent vacancy={vacancy} application={application} getStatusColor={getStatusColor} getStatusText={getStatusText} />
@@ -788,6 +811,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingTop: 30,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
   },
   loadingContainer: {
     flex: 1,

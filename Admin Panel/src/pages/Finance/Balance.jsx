@@ -14,7 +14,8 @@ import {
   Home, 
   SwapHoriz,
   CalendarToday,
-  Refresh
+  Refresh,
+  LocalShipping
 } from '@mui/icons-material';
 import { formatDateRange } from '../../utils/dateFormatter';
 
@@ -24,6 +25,7 @@ const Balance = ({ hideHeader = false }) => {
   const [totalReceived, setTotalReceived] = useState(null);
   const [totalDistributed, setTotalDistributed] = useState(null);
   const [financeKpi, setFinanceKpi] = useState(null);
+  const [deliveryServiceKpi, setDeliveryServiceKpi] = useState(null);
   const [totalBalance, setTotalBalance] = useState(null);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState('');
@@ -37,11 +39,12 @@ const Balance = ({ hideHeader = false }) => {
       if (endDate) params.endDate = endDate;
 
       // Barcha ma'lumotlarni parallel yuklash
-      const [balanceRes, receivedRes, distributedRes, financeKpiRes, totalBalanceRes] = await Promise.all([
+      const [balanceRes, receivedRes, distributedRes, financeKpiRes, deliveryServiceKpiRes, totalBalanceRes] = await Promise.all([
         financeAPI.getBalance(params),
         financeAPI.getTotalReceived(params),
         financeAPI.getTotalDistributed(params),
         financeAPI.getFinanceKpi(params),
+        financeAPI.getDeliveryServiceKpi(params),
         financeAPI.getTotalBalance(params),
       ]);
 
@@ -49,6 +52,7 @@ const Balance = ({ hideHeader = false }) => {
       if (receivedRes.success) setTotalReceived(receivedRes.data);
       if (distributedRes.success) setTotalDistributed(distributedRes.data);
       if (financeKpiRes.success) setFinanceKpi(financeKpiRes.data);
+      if (deliveryServiceKpiRes.success) setDeliveryServiceKpi(deliveryServiceKpiRes.data);
       if (totalBalanceRes.success) setTotalBalance(totalBalanceRes.data);
     } catch (err) {
       showError(err.message || 'Balans ma\'lumotlarini yuklashda xatolik yuz berdi');
@@ -160,6 +164,13 @@ const Balance = ({ hideHeader = false }) => {
               subtitle={financeKpi ? `${financeKpi.transactionsCount || 0} ta transaksiya` : ''}
             />
             <FinanceReportCard
+              title="Yetkazib Berish Xizmati KPI"
+              value={formatAmount(deliveryServiceKpi?.totalDeliveryServiceKpi || 0)}
+              icon={LocalShipping}
+              color="bg-cyan-500"
+              subtitle={deliveryServiceKpi ? `${deliveryServiceKpi.transactionsCount || 0} ta transaksiya` : ''}
+            />
+            <FinanceReportCard
               title="Umumiy Balans"
               value={formatAmount(balance.totalBalance)}
               icon={AccountBalance}
@@ -230,6 +241,15 @@ const Balance = ({ hideHeader = false }) => {
                     {formatAmount(balance.details.finance)}
                   </p>
                 </div>
+                <div className="bg-cyan-50 rounded-lg p-4 border border-cyan-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <LocalShipping className="text-cyan-600" />
+                    <span className="text-sm font-medium text-gray-700">Yetkazib Berish Xizmati</span>
+                  </div>
+                  <p className="text-2xl font-bold text-cyan-900">
+                    {formatAmount(deliveryServiceKpi?.totalDeliveryServiceKpi || 0)}
+                  </p>
+                </div>
                 {balance.details.punktTransfer > 0 && (
                   <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
                     <div className="flex items-center gap-2 mb-2">
@@ -265,6 +285,10 @@ const Balance = ({ hideHeader = false }) => {
               <div className="flex items-start gap-2">
                 <span className="font-semibold min-w-[200px]">Moliya Bo'limiga Ajratilgan:</span>
                 <span>KPI bonuslardan moliya bo'limiga ajratilgan qism</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-semibold min-w-[200px]">Yetkazib Berish Xizmati KPI:</span>
+                <span>KPI bonuslardan yetkazib berish xizmatiga ajratilgan qism (faqat moliya bo'limida saqlanadi)</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="font-semibold min-w-[200px]">Umumiy Balans:</span>

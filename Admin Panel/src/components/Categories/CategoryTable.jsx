@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Visibility, ExpandMore, ChevronRight } from '@mui/icons-material';
+import { Visibility, ExpandMore, ChevronRight, Edit, Delete } from '@mui/icons-material';
 
-const CategoryTable = ({ categories, loading, onView, pagination, onPageChange }) => {
+const CategoryTable = ({ categories, loading, onView, onEdit, onDelete, onCreateSubcategory, pagination, onPageChange }) => {
   const [expandedCategories, setExpandedCategories] = useState({});
 
   const formatDate = (dateString) => {
@@ -29,6 +29,13 @@ const CategoryTable = ({ categories, loading, onView, pagination, onPageChange }
     return status === 'active'
       ? `${baseClasses} bg-green-100 text-green-800`
       : `${baseClasses} bg-gray-100 text-gray-800`;
+  };
+
+  const getCensoredBadge = (censored) => {
+    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
+    return censored
+      ? `${baseClasses} bg-red-100 text-red-800`
+      : `${baseClasses} bg-blue-100 text-blue-800`;
   };
 
   if (loading) {
@@ -84,16 +91,31 @@ const CategoryTable = ({ categories, loading, onView, pagination, onPageChange }
                         )}
                       </button>
                       <div className="flex-1">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <h3 className="text-sm font-medium text-gray-900">{category.name}</h3>
                           <span className="text-xs text-gray-500">({category.slug})</span>
                           <span className={getStatusBadge(category.status)}>
                             {category.status === 'active' ? 'Faol' : 'Nofaol'}
                           </span>
+                          <span className={getCensoredBadge(category.censored)}>
+                            {category.censored ? 'Censored' : 'Not Censored'}
+                          </span>
                           {subcategories.length > 0 && (
                             <span className="text-xs text-gray-500">
                               ({subcategories.length} ta subkategoriya)
                             </span>
+                          )}
+                          {onCreateSubcategory && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCreateSubcategory(category);
+                              }}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 px-2 py-1 border border-indigo-200 rounded-md hover:bg-indigo-50 transition-colors"
+                              title="Subkategoriya qo'shish"
+                            >
+                              + Subkategoriya
+                            </button>
                           )}
                         </div>
                         {category.createdBy && (
@@ -104,17 +126,37 @@ const CategoryTable = ({ categories, loading, onView, pagination, onPageChange }
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                       <div className="text-xs text-gray-500">
                         {formatDate(category.createdAt)}
                       </div>
-                      <button
-                        onClick={() => onView(category)}
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                        title="Batafsil ko'rish"
-                      >
-                        <Visibility className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => onView(category)}
+                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                          title="Batafsil ko'rish"
+                        >
+                          <Visibility className="w-4 h-4" />
+                        </button>
+                        {onEdit && (
+                          <button
+                            onClick={() => onEdit(category)}
+                            className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50 transition-colors"
+                            title="Tahrirlash"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button
+                            onClick={() => onDelete(category)}
+                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                            title="O'chirish"
+                          >
+                            <Delete className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -138,7 +180,7 @@ const CategoryTable = ({ categories, loading, onView, pagination, onPageChange }
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-3 flex-wrap">
                                     <h4 className="text-sm font-medium text-gray-900">
                                       {subcategory.name}
                                     </h4>
@@ -147,6 +189,9 @@ const CategoryTable = ({ categories, loading, onView, pagination, onPageChange }
                                     </span>
                                     <span className={getStatusBadge(subcategory.status)}>
                                       {subcategory.status === 'active' ? 'Faol' : 'Nofaol'}
+                                    </span>
+                                    <span className={getCensoredBadge(subcategory.censored)}>
+                                      {subcategory.censored ? 'Censored' : 'Not Censored'}
                                     </span>
                                   </div>
                                   {subcategory.createdBy && (
@@ -157,17 +202,37 @@ const CategoryTable = ({ categories, loading, onView, pagination, onPageChange }
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
                                 <div className="text-xs text-gray-500">
                                   {formatDate(subcategory.createdAt)}
                                 </div>
-                                <button
-                                  onClick={() => onView(subcategory)}
-                                  className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                                  title="Batafsil ko'rish"
-                                >
-                                  <Visibility className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => onView(subcategory)}
+                                    className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                                    title="Batafsil ko'rish"
+                                  >
+                                    <Visibility className="w-4 h-4" />
+                                  </button>
+                                  {onEdit && (
+                                    <button
+                                      onClick={() => onEdit(subcategory, true)}
+                                      className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50 transition-colors"
+                                      title="Tahrirlash"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {onDelete && (
+                                    <button
+                                      onClick={() => onDelete(subcategory, true)}
+                                      className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                                      title="O'chirish"
+                                    >
+                                      <Delete className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>

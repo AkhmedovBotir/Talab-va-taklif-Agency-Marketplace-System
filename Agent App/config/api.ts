@@ -1,9 +1,13 @@
 // API Configuration
 
-export const API_BASE_URL = 'https://api.ttsa.uz/api';
+export const API_BASE_URL = 'http://192.168.1.6:5000/api';
 
 export const API_ENDPOINTS = {
   AGENT_LOGIN: '/agents/login',
+  // Password Setup
+  PASSWORD_SETUP_STEP1: '/agents/password-setup/step1',
+  PASSWORD_SETUP_STEP2: '/agents/password-setup/step2',
+  PASSWORD_SETUP_STEP3: '/agents/password-setup/step3',
   // Agent Orders
   AGENT_ORDERS: '/agent/orders',
   AGENT_ORDERS_TODAY: '/agent/orders/today',

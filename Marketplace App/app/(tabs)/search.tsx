@@ -18,8 +18,33 @@ import FilterModal from '../../components/ui/FilterModal';
 import ProductCard from '../../components/ui/ProductCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
+import { useLocation } from '../../contexts/LocationContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import apiService, { Product } from '../../services/api';
+
+// Helper function to calculate age from birthDate
+const calculateAge = (birthDate: string | null | undefined): number | null => {
+    if (!birthDate) return null;
+    
+    try {
+        const birth = new Date(birthDate);
+        const today = new Date();
+        
+        if (isNaN(birth.getTime())) return null;
+        
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+        
+        return age;
+    } catch (error) {
+        console.error('Error calculating age:', error);
+        return null;
+    }
+};
 
 export default function SearchScreen() {
     const router = useRouter();
@@ -29,6 +54,8 @@ export default function SearchScreen() {
     }>();
     const insets = useSafeAreaInsets();
     const { unreadCount } = useNotification();
+    const { user } = useAuth();
+    const { selectedTuman } = useLocation();
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [products, setProducts] = useState<Product[]>([]);
@@ -73,7 +100,31 @@ export default function SearchScreen() {
                         limit: 20,
                     });
 
-                    const searchProducts = response.results.products.data || [];
+                    let searchProducts = response.results.products.data || [];
+
+                    // Filter products by selected tuman
+                    if (selectedTuman) {
+                        searchProducts = searchProducts.filter((product) => {
+                            if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
+                                return false; // Hide products without delivery regions
+                            }
+                            return product.deliveryRegions.some((region) => {
+                                return region.tuman?._id === selectedTuman._id;
+                            });
+                        });
+                    }
+
+                    // Filter censored products for users under 18
+                    const userAge = calculateAge(user?.birthDate);
+                    if (userAge !== null && userAge < 18) {
+                        searchProducts = searchProducts.filter((product) => {
+                            if (product.censored === true) {
+                                console.log('SearchScreen: Censored product filtered out for user under 18:', product.name);
+                                return false;
+                            }
+                            return true;
+                        });
+                    }
 
                     if (append) {
                         setProducts((prev) => [...prev, ...searchProducts]);
@@ -93,10 +144,36 @@ export default function SearchScreen() {
                         limit: 20,
                     });
 
+                    let filteredProducts = response.results.data || [];
+
+                    // Filter products by selected tuman
+                    if (selectedTuman) {
+                        filteredProducts = filteredProducts.filter((product) => {
+                            if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
+                                return false; // Hide products without delivery regions
+                            }
+                            return product.deliveryRegions.some((region) => {
+                                return region.tuman?._id === selectedTuman._id;
+                            });
+                        });
+                    }
+
+                    // Filter censored products for users under 18
+                    const userAge = calculateAge(user?.birthDate);
+                    if (userAge !== null && userAge < 18) {
+                        filteredProducts = filteredProducts.filter((product) => {
+                            if (product.censored === true) {
+                                console.log('SearchScreen: Censored product filtered out for user under 18:', product.name);
+                                return false;
+                            }
+                            return true;
+                        });
+                    }
+
                     if (append) {
-                        setProducts((prev) => [...prev, ...response.results.data]);
+                        setProducts((prev) => [...prev, ...filteredProducts]);
                     } else {
-                        setProducts(response.results.data);
+                        setProducts(filteredProducts);
                     }
 
                     console.log(response.results);
@@ -110,10 +187,36 @@ export default function SearchScreen() {
                         status: 'active',
                     });
 
+                    let allProducts = response.data || [];
+
+                    // Filter products by selected tuman
+                    if (selectedTuman) {
+                        allProducts = allProducts.filter((product) => {
+                            if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
+                                return false; // Hide products without delivery regions
+                            }
+                            return product.deliveryRegions.some((region) => {
+                                return region.tuman?._id === selectedTuman._id;
+                            });
+                        });
+                    }
+
+                    // Filter censored products for users under 18
+                    const userAge = calculateAge(user?.birthDate);
+                    if (userAge !== null && userAge < 18) {
+                        allProducts = allProducts.filter((product) => {
+                            if (product.censored === true) {
+                                console.log('SearchScreen: Censored product filtered out for user under 18:', product.name);
+                                return false;
+                            }
+                            return true;
+                        });
+                    }
+
                     if (append) {
-                        setProducts((prev) => [...prev, ...response.data]);
+                        setProducts((prev) => [...prev, ...allProducts]);
                     } else {
-                        setProducts(response.data);
+                        setProducts(allProducts);
                     }
 
                     setPage(response.page);
@@ -128,7 +231,7 @@ export default function SearchScreen() {
                 setLoadingMore(false);
             }
         },
-        [debouncedSearchQuery, contragentFilter, activeFilters]
+        [debouncedSearchQuery, contragentFilter, activeFilters, selectedTuman, user?.birthDate]
     );
 
     // Load products when debounced search query changes

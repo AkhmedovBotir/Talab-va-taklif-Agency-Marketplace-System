@@ -41,6 +41,8 @@ const {
   updatePassword,
   updateAvatar,
   updateLocation,
+  getViloyatTuman,
+  updateViloyatTuman,
 } = require('../controllers/marketplaceProfileController');
 const {
   getMarketplaceNotifications,
@@ -55,7 +57,7 @@ const {
   createPartnershipRequest,
   getMyPartnershipRequests,
 } = require('../controllers/partnershipRequestController');
-const { validate, marketplaceValidationSchemas, cartValidationSchemas, orderValidationSchemas, marketplaceProfileValidationSchemas, partnershipRequestValidationSchemas } = require('../middleware/validation');
+const { validate, marketplaceValidationSchemas, cartValidationSchemas, orderValidationSchemas, marketplaceProfileValidationSchemas, partnershipRequestValidationSchemas, marketplacePartnershipRequestValidationSchemas } = require('../middleware/validation');
 const { marketplaceUserAuth, optionalMarketplaceUserAuth } = require('../middleware/auth');
 
 // Check phone exists (must be before other routes to avoid conflicts)
@@ -114,6 +116,8 @@ router.put('/me', marketplaceUserAuth, validate(marketplaceProfileValidationSche
 router.patch('/me/password', marketplaceUserAuth, validate(marketplaceProfileValidationSchemas.updatePassword), updatePassword);
 router.patch('/me/avatar', marketplaceUserAuth, validate(marketplaceProfileValidationSchemas.updateAvatar), updateAvatar);
 router.patch('/me/location', marketplaceUserAuth, validate(marketplaceProfileValidationSchemas.updateLocation), updateLocation);
+router.get('/me/viloyat-tuman', marketplaceUserAuth, getViloyatTuman);
+router.patch('/me/viloyat-tuman', marketplaceUserAuth, validate(marketplaceProfileValidationSchemas.updateViloyatTuman), updateViloyatTuman);
 
 // Notification routes for Marketplace Users
 router.get('/notifications/list', marketplaceUserAuth, getMarketplaceNotifications);
@@ -127,6 +131,17 @@ router.get('/featured-contragents', getFeaturedContragentsForMarketplace);
 // Partnership request routes (optional authentication - tokensiz ham, token bilan ham ishlaydi)
 router.post('/partnership-requests', optionalMarketplaceUserAuth, validate(partnershipRequestValidationSchemas.create), createPartnershipRequest);
 router.get('/partnership-requests', marketplaceUserAuth, getMyPartnershipRequests);
+
+// Marketplace partnership request routes (new system - requires authentication)
+const {
+  createMarketplacePartnershipRequest,
+  getMyMarketplacePartnershipRequests,
+  getMyMarketplacePartnershipRequestById,
+} = require('../controllers/marketplacePartnershipRequestController');
+
+router.post('/marketplace-partnership-requests', marketplaceUserAuth, validate(marketplacePartnershipRequestValidationSchemas.create), createMarketplacePartnershipRequest);
+router.get('/marketplace-partnership-requests', marketplaceUserAuth, getMyMarketplacePartnershipRequests);
+router.get('/marketplace-partnership-requests/:id', marketplaceUserAuth, getMyMarketplacePartnershipRequestById);
 
 module.exports = router;
 

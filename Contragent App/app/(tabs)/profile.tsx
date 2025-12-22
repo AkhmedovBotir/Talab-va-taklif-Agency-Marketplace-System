@@ -76,8 +76,8 @@ export default function ProfileScreen() {
         async (response: ImagePickerResponse) => {
           if (response.didCancel) {
             setUploadingLogo(false);
-            return;
-          }
+        return;
+      }
 
           if (response.errorMessage) {
             Alert.alert('Xatolik', response.errorMessage);
@@ -88,17 +88,17 @@ export default function ProfileScreen() {
           if (response.assets && response.assets[0]?.base64) {
             const asset = response.assets[0];
             const mimeType = asset.type || 'image/jpeg';
-            const base64 = `data:${mimeType};base64,${asset.base64}`;
+        const base64 = `data:${mimeType};base64,${asset.base64}`;
 
-            if (isValidImage(base64)) {
-              setLogoPreview(base64);
-              await apiService.updateLogo({ logo: base64 });
-              await refreshContragent();
-              Alert.alert('Muvaffaqiyatli', 'Logo yangilandi');
-            } else {
-              Alert.alert('Xatolik', 'Rasm formati noto‘g‘ri');
-            }
-          }
+        if (isValidImage(base64)) {
+          setLogoPreview(base64);
+          await apiService.updateLogo({ logo: base64 });
+          await refreshContragent();
+          Alert.alert('Muvaffaqiyatli', 'Logo yangilandi');
+        } else {
+          Alert.alert('Xatolik', 'Rasm formati noto‘g‘ri');
+        }
+      }
           setUploadingLogo(false);
         }
       );

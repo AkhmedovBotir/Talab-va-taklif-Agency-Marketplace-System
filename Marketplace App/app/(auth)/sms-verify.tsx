@@ -52,6 +52,25 @@ export default function SmsVerifyScreen() {
 
         if (response.data) {
           await login(response.data.token, response.data.user);
+          
+          // Check if user has location set
+          try {
+            const locationResponse = await apiService.getViloyatTuman(response.data.token);
+            if (locationResponse.success && locationResponse.data) {
+              const hasLocation = locationResponse.data.viloyat && locationResponse.data.tuman;
+              if (!hasLocation) {
+                // Navigate to tabs with autoOpen location modal
+                router.replace({
+                  pathname: '/(tabs)',
+                  params: { autoOpenLocation: 'true' },
+                } as any);
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Error checking location:', error);
+          }
+          
           router.replace('/(tabs)');
         }
       } else if (type === 'forgot_password') {

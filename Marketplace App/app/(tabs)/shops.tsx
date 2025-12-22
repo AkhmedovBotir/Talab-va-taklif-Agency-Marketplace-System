@@ -64,7 +64,7 @@ export default function ShopsScreen() {
             if (response.next) {
                 setHasMore(true);
             } else {
-                setHasMore(response.page < response.totalPages);
+            setHasMore(response.page < response.totalPages);
             }
         } catch (error: any) {
             console.error('Error loading contragents:', error);
@@ -131,37 +131,37 @@ export default function ShopsScreen() {
             : null;
 
         return (
-            <TouchableOpacity
-                style={styles.shopCard}
-                onPress={() => handleShopPress(item)}
-                activeOpacity={0.8}
-            >
-                <View style={styles.shopIconContainer}>
+        <TouchableOpacity
+            style={styles.shopCard}
+            onPress={() => handleShopPress(item)}
+            activeOpacity={0.8}
+        >
+            <View style={styles.shopIconContainer}>
                     {logoUrl ? (
-                        <Image 
+                    <Image 
                             source={{ uri: logoUrl }} 
-                            style={styles.shopLogo}
-                            resizeMode="cover"
-                        />
-                    ) : (
-                        <Ionicons name="storefront" size={24} color="#007AFF" />
-                    )}
-                </View>
-                <View style={styles.shopInfo}>
-                    <Text style={styles.shopName} numberOfLines={1}>
-                        {item.name}
+                        style={styles.shopLogo}
+                        resizeMode="cover"
+                    />
+                ) : (
+                    <Ionicons name="storefront" size={24} color="#007AFF" />
+                )}
+            </View>
+            <View style={styles.shopInfo}>
+                <Text style={styles.shopName} numberOfLines={1}>
+                    {item.name}
+                </Text>
+                <View style={styles.shopLocation}>
+                    <Text style={styles.locationText} >
+                        {item.viloyat?.name || ''}
+                        {item.tuman?.name ? `, ${item.tuman.name}` : ''}
+                        {item.mfy?.name ? `, ${item.mfy.name}` : ''}
                     </Text>
-                    <View style={styles.shopLocation}>
-                        <Text style={styles.locationText} >
-                            {item.viloyat?.name || ''}
-                            {item.tuman?.name ? `, ${item.tuman.name}` : ''}
-                            {item.mfy?.name ? `, ${item.mfy.name}` : ''}
-                        </Text>
-                    </View>
                 </View>
-                <Ionicons name="chevron-forward" size={24} color="#ccc" />
-            </TouchableOpacity>
-        );
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#ccc" />
+        </TouchableOpacity>
+    );
     };
 
     const renderFooter = () => {

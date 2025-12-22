@@ -10,6 +10,8 @@
   - [Update Password](#3-update-password)
   - [Update Avatar](#4-update-avatar)
   - [Update Location](#5-update-location)
+  - [Get Viloyat and Tuman](#6-get-viloyat-and-tuman)
+  - [Update Viloyat and Tuman](#7-update-viloyat-and-tuman)
 - [Data Models](#data-models)
 - [Error Handling](#error-handling)
 - [Examples](#examples)
@@ -417,6 +419,222 @@ Update user's location (viloyat, tuman, mfy). All fields are optional, but hiera
 
 ---
 
+### 6. Get Viloyat and Tuman
+
+Get user's current viloyat (region) and tuman (district) selection. This endpoint returns the user's region selection which is stored separately from the profile address. This selection does not affect the user's profile location (viloyat, tuman, mfy in profile).
+
+**Endpoint:** `GET /api/marketplace/me/viloyat-tuman`
+
+**Headers:**
+- `Authorization: Bearer <token>` (required)
+
+**Success Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439021",
+    "viloyat": {
+      "_id": "507f1f77bcf86cd799439015",
+      "name": "Toshkent",
+      "type": "region",
+      "code": "01"
+    },
+    "tuman": {
+      "_id": "507f1f77bcf86cd799439016",
+      "name": "Yunusobod",
+      "type": "district",
+      "code": "0101"
+    },
+    "mfy": {
+      "_id": "507f1f77bcf86cd799439017",
+      "name": "MFY 1",
+      "type": "mfy",
+      "code": "010101"
+    }
+  }
+}
+```
+
+**Response Fields:**
+- `_id` - Region selection ID
+- `user` - User ID
+- `viloyat` - Region object (populated, can be null)
+- `tuman` - District object (populated, can be null)
+
+**Note:** 
+- This endpoint returns the user's region selection which is stored in a separate model
+- This selection is independent from the user's profile address (profile viloyat, tuman, mfy)
+- All region objects are populated with full details (name, type, code)
+- If a region is not set, it will be `null` in the response
+- If the user doesn't have a selection yet, an empty selection will be created automatically
+
+**Error Responses:**
+
+- **401 Unauthorized** - Token missing or invalid
+- **403 Forbidden** - Token not for marketplace user or account inactive
+- **404 Not Found** - User not found
+- **500 Internal Server Error** - Server error
+
+**Example Response (No Tuman Set):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439022",
+    "user": "507f1f77bcf86cd799439021",
+    "viloyat": {
+      "_id": "507f1f77bcf86cd799439015",
+      "name": "Toshkent",
+      "type": "region",
+      "code": "01"
+    },
+    "tuman": null
+  }
+}
+```
+
+---
+
+### 7. Update Viloyat and Tuman
+
+Update user's viloyat (region) and tuman (district) selection. This endpoint updates the user's region selection which is stored separately from the profile address. This selection does not affect the user's profile location (viloyat, tuman, mfy in profile).
+
+**Endpoint:** `PATCH /api/marketplace/me/viloyat-tuman`
+
+**Headers:**
+- `Authorization: Bearer <token>` (required)
+- `Content-Type: application/json`
+
+**Request Body:**
+
+```json
+{
+  "viloyat": "507f1f77bcf86cd799439015",
+  "tuman": "507f1f77bcf86cd799439016"
+}
+```
+
+**Request Fields:**
+- `viloyat` (optional) - Region ID (must be type: 'region')
+- `tuman` (optional) - District ID (must be type: 'district', must be child of viloyat) or `null` to clear
+
+**Note:** 
+- `viloyat` is optional - if provided, it will update the region selection (can be `null` or empty string to clear)
+- `tuman` is optional - can be:
+  - A valid district ID (must be child of viloyat, current or new)
+  - `null` or empty string to clear the tuman
+- If viloyat is changed and tuman is not provided, the system will automatically clear tuman if it doesn't belong to the new viloyat
+- If tuman is provided, viloyat must be set (either in request or already in user's region selection)
+- This selection is stored in a separate model and does not affect the user's profile address
+- If the user doesn't have a selection yet, it will be created automatically
+
+**Success Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Viloyat va tuman yangilandi",
+  "data": {
+    "_id": "507f1f77bcf86cd799439022",
+    "user": "507f1f77bcf86cd799439021",
+    "viloyat": {
+      "_id": "507f1f77bcf86cd799439015",
+      "name": "Toshkent",
+      "type": "region",
+      "code": "01"
+    },
+    "tuman": {
+      "_id": "507f1f77bcf86cd799439016",
+      "name": "Yunusobod",
+      "type": "district",
+      "code": "0101"
+    }
+  }
+}
+```
+
+**Error Responses:**
+
+- **400 Bad Request** - Invalid input:
+  - Invalid region ID format
+  - Region not found
+  - Wrong region type (e.g., tuman provided as viloyat)
+  - Hierarchy violation (e.g., tuman not child of viloyat)
+  - Tuman provided but viloyat not set
+- **401 Unauthorized** - Token missing or invalid
+- **403 Forbidden** - Token not for marketplace user or account inactive
+- **404 Not Found** - User not found
+- **500 Internal Server Error** - Server error
+
+**Example Error Response (Hierarchy Violation):**
+
+```json
+{
+  "success": false,
+  "message": "Tuman tanlangan viloyatga tegishli emas"
+}
+```
+
+**Example Error Response (Viloyat Not Set):**
+
+```json
+{
+  "success": false,
+  "message": "Avval viloyat tanlashingiz kerak"
+}
+```
+
+**Example Request (Clear Tuman):**
+
+```json
+{
+  "tuman": null
+}
+```
+
+or
+
+```json
+{
+  "tuman": ""
+}
+```
+
+**Example Request (Update Both):**
+
+```json
+{
+  "viloyat": "507f1f77bcf86cd799439015",
+  "tuman": "507f1f77bcf86cd799439016"
+}
+```
+
+**Example Request (Update Only Viloyat):**
+
+```json
+{
+  "viloyat": "507f1f77bcf86cd799439015"
+}
+```
+
+**Example Request (Clear Viloyat):**
+
+```json
+{
+  "viloyat": null
+}
+```
+
+**Note:** 
+- If the current tuman doesn't belong to the new viloyat, it will be automatically cleared
+- If viloyat is cleared, tuman will also be automatically cleared
+- This selection is independent from the user's profile address
+
+---
+
 ## Data Models
 
 ### Marketplace User Object
@@ -451,7 +669,23 @@ Update user's location (viloyat, tuman, mfy). All fields are optional, but hiera
 }
 ```
 
-**Note:** The `password` field is never returned in API responses for security reasons.
+### Marketplace User Region Selection Object
+
+```json
+{
+  "_id": "string (MongoDB ObjectId)",
+  "user": "string (reference to MarketplaceUser, unique)",
+  "viloyat": "object (reference to Region, type: 'region', nullable)",
+  "tuman": "object (reference to Region, type: 'district', nullable)",
+  "createdAt": "string (ISO 8601 date)",
+  "updatedAt": "string (ISO 8601 date)"
+}
+```
+
+**Note:** 
+- The `password` field is never returned in API responses for security reasons.
+- The `MarketplaceUserRegionSelection` model stores user's region selection separately from profile address.
+- This selection does not affect the user's profile location fields (viloyat, tuman, mfy in MarketplaceUser model).
 
 ---
 
@@ -678,6 +912,90 @@ curl -X PATCH "http://localhost:5000/api/marketplace/me/location" \
 }
 ```
 
+### Example 6: Get Viloyat and Tuman
+
+**Request:**
+
+```bash
+curl -X GET "http://localhost:5000/api/marketplace/me/viloyat-tuman" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "507f1f77bcf86cd799439022",
+    "user": "507f1f77bcf86cd799439021",
+    "viloyat": {
+      "_id": "507f1f77bcf86cd799439015",
+      "name": "Toshkent",
+      "type": "region",
+      "code": "01"
+    },
+    "tuman": {
+      "_id": "507f1f77bcf86cd799439016",
+      "name": "Yunusobod",
+      "type": "district",
+      "code": "0101"
+    }
+  }
+}
+```
+
+### Example 7: Update Viloyat and Tuman
+
+**Request (Update Both):**
+
+```bash
+curl -X PATCH "http://localhost:5000/api/marketplace/me/viloyat-tuman" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "viloyat": "507f1f77bcf86cd799439015",
+    "tuman": "507f1f77bcf86cd799439016"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Viloyat va tuman yangilandi",
+  "data": {
+    "_id": "507f1f77bcf86cd799439022",
+    "user": "507f1f77bcf86cd799439021",
+    "viloyat": {...},
+    "tuman": {...}
+  }
+}
+```
+
+**Request (Update Only Viloyat):**
+
+```bash
+curl -X PATCH "http://localhost:5000/api/marketplace/me/viloyat-tuman" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "viloyat": "507f1f77bcf86cd799439015"
+  }'
+```
+
+**Request (Clear Tuman):**
+
+```bash
+curl -X PATCH "http://localhost:5000/api/marketplace/me/viloyat-tuman" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tuman": null
+  }'
+```
+
 ---
 
 ## Notes
@@ -705,15 +1023,25 @@ curl -X PATCH "http://localhost:5000/api/marketplace/me/location" \
    - Tuman must be a child of viloyat
    - MFY must be a child of tuman
 
-6. **Region Validation:**
+6. **Viloyat and Tuman Selection:**
+   - Separate model (`MarketplaceUserRegionSelection`) for storing user's region selection
+   - This selection is independent from the user's profile address (viloyat, tuman, mfy in profile)
+   - Separate GET and PATCH endpoints for managing this selection
+   - If viloyat is changed, tuman will be automatically cleared if it doesn't belong to the new viloyat
+   - If viloyat is cleared, tuman will also be automatically cleared
+   - Tuman can be cleared by setting it to `null` or empty string
+   - If tuman is provided, viloyat must be set (either in request or already in user's region selection)
+   - If the user doesn't have a selection yet, it will be created automatically on first GET or PATCH request
+
+7. **Region Validation:**
    - All region IDs are validated for existence and correct type
    - Hierarchy relationships are checked automatically
 
-7. **Phone Number:**
+8. **Phone Number:**
    - Phone number cannot be changed through profile API
    - Phone number is set during registration
 
-8. **Response Data:**
+9. **Response Data:**
    - Password is never included in responses
    - All region objects are populated with full details
 

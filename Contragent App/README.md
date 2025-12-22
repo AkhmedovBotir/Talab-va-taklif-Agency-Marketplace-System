@@ -81,9 +81,9 @@ cd contragent
 
 ### 2. Dependencies o'rnatish
 
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
 yoki
 
@@ -109,9 +109,9 @@ npm start
 
 yoki
 
-```bash
-npx expo start
-```
+   ```bash
+   npx expo start
+   ```
 
 #### Android uchun
 

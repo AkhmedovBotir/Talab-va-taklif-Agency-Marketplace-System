@@ -265,22 +265,22 @@ export default function FilterModal({
               <View style={styles.headerDragIndicator} />
             </View>
             <View style={styles.headerContent}>
-              <View style={styles.headerLeft}>
-                <View style={styles.headerIconContainer}>
+            <View style={styles.headerLeft}>
+              <View style={styles.headerIconContainer}>
                   <Ionicons name="filter" size={22} color="#007AFF" />
-                </View>
-                <View>
-                  <Text style={styles.headerTitle}>Filterlar</Text>
-                  {activeFiltersCount > 0 && (
-                    <Text style={styles.headerSubtitle}>
-                      {activeFiltersCount} ta filter tanlangan
-                    </Text>
-                  )}
-                </View>
               </View>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <View>
+                <Text style={styles.headerTitle}>Filterlar</Text>
+                  {activeFiltersCount > 0 && (
+                <Text style={styles.headerSubtitle}>
+                      {activeFiltersCount} ta filter tanlangan
+                </Text>
+                  )}
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                 <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
+            </TouchableOpacity>
             </View>
           </View>
 
@@ -300,7 +300,7 @@ export default function FilterModal({
               <View style={styles.priceCard}>
                 <View style={styles.priceRow}>
                   <View style={styles.priceInputGroup}>
-                    <Text style={styles.priceLabel}>Min narx</Text>
+                      <Text style={styles.priceLabel}>Min narx</Text>
                     <View style={styles.priceInputWrapper}>
                       <TextInput
                         style={styles.priceInput}
@@ -315,7 +315,7 @@ export default function FilterModal({
                   </View>
                   <View style={styles.priceDivider} />
                   <View style={styles.priceInputGroup}>
-                    <Text style={styles.priceLabel}>Max narx</Text>
+                      <Text style={styles.priceLabel}>Max narx</Text>
                     <View style={styles.priceInputWrapper}>
                       <TextInput
                         style={styles.priceInput}
@@ -327,17 +327,17 @@ export default function FilterModal({
                       />
                       <Text style={styles.priceSuffix}>so'm</Text>
                     </View>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
 
-            {/* Contragents */}
+              {/* Contragents */}
             {!hideContragentFilter && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionIconContainer}>
-                    <Ionicons name="storefront-outline" size={20} color="#007AFF" />
+                  <Ionicons name="storefront-outline" size={20} color="#007AFF" />
                   </View>
                   <Text style={styles.sectionTitle}>Do'konlar</Text>
                 </View>
@@ -372,32 +372,32 @@ export default function FilterModal({
                       ).length > 0 ? (
                       <View style={styles.filterList}>
                         {availableFilters.contragents
-                          .filter((contragent) =>
-                            contragent.name.toLowerCase().includes(contragentSearch.toLowerCase())
-                          )
-                          .map((contragent) => (
-                            <TouchableOpacity
-                              key={contragent._id}
-                              activeOpacity={0.7}
-                              style={[
+                        .filter((contragent) =>
+                          contragent.name.toLowerCase().includes(contragentSearch.toLowerCase())
+                        )
+                        .map((contragent) => (
+                        <TouchableOpacity
+                          key={contragent._id}
+                          activeOpacity={0.7}
+                          style={[
                                 styles.filterCard,
                                 filters.contragent === contragent._id && styles.filterCardActive,
-                              ]}
-                              onPress={() => {
-                                const newContragent =
-                                  filters.contragent === contragent._id
-                                    ? undefined
-                                    : contragent._id;
-                                const newFilters = {
-                                  ...filters,
-                                  contragent: newContragent,
-                                  category: undefined,
-                                  subcategory: undefined,
-                                };
-                                setFilters(newFilters);
-                                loadFilters(newFilters);
-                              }}
-                            >
+                          ]}
+                          onPress={() => {
+                            const newContragent =
+                              filters.contragent === contragent._id
+                                ? undefined
+                                : contragent._id;
+                            const newFilters = {
+                              ...filters,
+                              contragent: newContragent,
+                              category: undefined,
+                              subcategory: undefined,
+                            };
+                            setFilters(newFilters);
+                            loadFilters(newFilters);
+                          }}
+                        >
                               <View style={styles.filterCardContent}>
                                 <View style={[
                                   styles.filterCheckbox,
@@ -406,15 +406,15 @@ export default function FilterModal({
                                   {filters.contragent === contragent._id && (
                                     <Ionicons name="checkmark" size={16} color="#fff" />
                                   )}
-                                </View>
+                            </View>
                                 <Text style={[
                                   styles.filterCardText,
                                   filters.contragent === contragent._id && styles.filterCardTextActive,
                                 ]}>
-                                  {contragent.name}
-                                </Text>
-                              </View>
-                            </TouchableOpacity>
+                              {contragent.name}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
                           ))}
                       </View>
                     ) : (
@@ -436,19 +436,19 @@ export default function FilterModal({
             )}
 
             {/* Categories - Select Dropdown */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
                 <View style={styles.sectionIconContainer}>
                   <Ionicons name="folder-outline" size={20} color="#007AFF" />
                 </View>
-                <Text style={styles.sectionTitle}>Kategoriyalar</Text>
-              </View>
-              {loading && (!availableFilters.categories || availableFilters.categories.length === 0) ? (
-                <View style={styles.emptyFilterContainer}>
-                  <ActivityIndicator size="small" color="#007AFF" />
-                  <Text style={styles.emptyFilterText}>Yuklanmoqda...</Text>
+                  <Text style={styles.sectionTitle}>Kategoriyalar</Text>
                 </View>
-              ) : availableFilters.categories && availableFilters.categories.length > 0 ? (
+                {loading && (!availableFilters.categories || availableFilters.categories.length === 0) ? (
+                  <View style={styles.emptyFilterContainer}>
+                    <ActivityIndicator size="small" color="#007AFF" />
+                  <Text style={styles.emptyFilterText}>Yuklanmoqda...</Text>
+                  </View>
+                ) : availableFilters.categories && availableFilters.categories.length > 0 ? (
                 <TouchableOpacity
                   style={styles.selectButton}
                   onPress={() => setCategoryDropdownVisible(true)}
@@ -485,11 +485,11 @@ export default function FilterModal({
                   </View>
                   <Text style={styles.sectionTitle}>Kichik kategoriyalar</Text>
                 </View>
-                <TouchableOpacity
+                        <TouchableOpacity 
                   style={styles.selectButton}
                   onPress={() => setSubcategoryDropdownVisible(true)}
-                  activeOpacity={0.7}
-                >
+                          activeOpacity={0.7}
+                        >
                   <Text style={[
                     styles.selectButtonText,
                     filters.subcategory && styles.selectButtonTextSelected
@@ -503,9 +503,9 @@ export default function FilterModal({
                     size={20} 
                     color={filters.subcategory ? '#007AFF' : '#9CA3AF'} 
                   />
-                </TouchableOpacity>
+                        </TouchableOpacity>
               </View>
-            )}
+                      )}
           </ScrollView>
 
           {/* Category Dropdown Modal */}
@@ -526,7 +526,7 @@ export default function FilterModal({
                   <TouchableOpacity onPress={() => setCategoryDropdownVisible(false)}>
                     <Ionicons name="close" size={24} color="#666" />
                   </TouchableOpacity>
-                </View>
+                    </View>
                 <ScrollView style={styles.dropdownScrollView}>
                   <TouchableOpacity
                     style={[
@@ -550,37 +550,37 @@ export default function FilterModal({
                     )}
                   </TouchableOpacity>
                   {availableFilters.categories.map((category) => (
-                    <TouchableOpacity
-                      key={category._id}
-                      style={[
+                        <TouchableOpacity
+                          key={category._id}
+                          style={[
                         styles.dropdownItem,
                         filters.category === category._id && styles.dropdownItemActive,
-                      ]}
-                      onPress={() => {
+                          ]}
+                          onPress={() => {
                         const newCategory = filters.category === category._id ? undefined : category._id;
-                        const newFilters = {
-                          ...filters,
-                          category: newCategory,
-                          subcategory: undefined,
-                        };
-                        setFilters(newFilters);
+                            const newFilters = {
+                              ...filters,
+                              category: newCategory,
+                              subcategory: undefined,
+                            };
+                            setFilters(newFilters);
                         setCategoryDropdownVisible(false);
-                        loadFilters(newFilters);
-                      }}
-                    >
+                            loadFilters(newFilters);
+                          }}
+                        >
                       <Text style={[
                         styles.dropdownItemText,
                         filters.category === category._id && styles.dropdownItemTextActive,
                       ]}>
-                        {category.name}
-                      </Text>
-                      {filters.category === category._id && (
+                              {category.name}
+                            </Text>
+                          {filters.category === category._id && (
                         <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
-                      )}
-                    </TouchableOpacity>
+                          )}
+                        </TouchableOpacity>
                   ))}
                 </ScrollView>
-              </View>
+                      </View>
             </TouchableOpacity>
           </Modal>
 
@@ -602,14 +602,14 @@ export default function FilterModal({
                   <TouchableOpacity onPress={() => setSubcategoryDropdownVisible(false)}>
                     <Ionicons name="close" size={24} color="#666" />
                   </TouchableOpacity>
-                </View>
+                  </View>
                 <ScrollView style={styles.dropdownScrollView}>
-                  <TouchableOpacity
-                    style={[
+                    <TouchableOpacity
+                      style={[
                       styles.dropdownItem,
                       !filters.subcategory && styles.dropdownItemActive,
-                    ]}
-                    onPress={() => {
+                      ]}
+                      onPress={() => {
                       setFilters(prev => ({ ...prev, subcategory: undefined }));
                       setSubcategoryDropdownVisible(false);
                     }}
@@ -627,10 +627,10 @@ export default function FilterModal({
                   {availableFilters.subcategories.map((subcategory) => (
                     <TouchableOpacity
                       key={subcategory._id}
-                      style={[
+                          style={[
                         styles.dropdownItem,
                         filters.subcategory === subcategory._id && styles.dropdownItemActive,
-                      ]}
+                          ]}
                       onPress={() => {
                         const newSubcategory = filters.subcategory === subcategory._id ? undefined : subcategory._id;
                         setFilters(prev => ({ ...prev, subcategory: newSubcategory }));
@@ -641,14 +641,14 @@ export default function FilterModal({
                         styles.dropdownItemText,
                         filters.subcategory === subcategory._id && styles.dropdownItemTextActive,
                       ]}>
-                        {subcategory.name}
-                      </Text>
+                          {subcategory.name}
+                        </Text>
                       {filters.subcategory === subcategory._id && (
                         <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
                       )}
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
+            </ScrollView>
               </View>
             </TouchableOpacity>
           </Modal>

@@ -26,7 +26,7 @@ const createProduct = async (req, res) => {
 
     const { userId } = req.user; // Contragent ID from auth middleware
 
-    // Validate category exists
+    // Validate category exists, is active, and created by Admin
     const categoryDoc = await Category.findById(category);
     if (!categoryDoc) {
       return res.status(400).json({
@@ -34,6 +34,33 @@ const createProduct = async (req, res) => {
         message: 'Kategoriya topilmadi',
       });
     }
+
+    // Check if category is active
+    if (categoryDoc.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Kategoriya faol emas',
+      });
+    }
+
+    // Check if category is created by Admin (not by Contragent)
+    if (categoryDoc.createdByModel !== 'Admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu kategoriya foydalanish uchun ruxsat berilmagan',
+      });
+    }
+
+    // Check if category is top-level (has no parent)
+    if (categoryDoc.parent) {
+      return res.status(400).json({
+        success: false,
+        message: 'Kategoriya top-level bo\'lishi kerak (sub kategoriya tanlash mumkin emas)',
+      });
+    }
+
+    // Determine censored status from category
+    let productCensored = categoryDoc.censored || false;
 
     // Validate subcategory if provided
     if (subcategory) {
@@ -44,6 +71,23 @@ const createProduct = async (req, res) => {
           message: 'Sub kategoriya topilmadi',
         });
       }
+
+      // Check if subcategory is active
+      if (subcategoryDoc.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Sub kategoriya faol emas',
+        });
+      }
+
+      // Check if subcategory is created by Admin
+      if (subcategoryDoc.createdByModel !== 'Admin') {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu sub kategoriya foydalanish uchun ruxsat berilmagan',
+        });
+      }
+
       // Check if subcategory belongs to the category
       if (subcategoryDoc.parent?.toString() !== category.toString()) {
         return res.status(400).json({
@@ -51,6 +95,11 @@ const createProduct = async (req, res) => {
           message: 'Sub kategoriya tanlangan kategoriyaga tegishli emas',
         });
       }
+
+      // Subcategory inherits censored from parent, but if subcategory's parent has censored, use that
+      // Since subcategory censored is inherited from parent category, we already have it
+      // But let's use subcategory's censored value (which should match parent)
+      productCensored = subcategoryDoc.censored || categoryDoc.censored || false;
     }
 
     // Validate delivery regions
@@ -111,7 +160,7 @@ const createProduct = async (req, res) => {
     // Generate product code
     const productCode = await Product.generateProductCode(userId);
 
-    // Create product
+    // Create product with pending moderation status
     const product = await Product.create({
       name,
       description: description || null,
@@ -131,6 +180,8 @@ const createProduct = async (req, res) => {
       deliveryRegions: deliveryRegions || [],
       kpiBonusPercent,
       productCode,
+      moderationStatus: 'pending', // New products require moderation
+      censored: productCensored, // Inherit censored from category/subcategory
     });
 
     // Populate references
@@ -146,7 +197,7 @@ const createProduct = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Maxsulot muvaffaqiyatli yaratildi',
+      message: 'Maxsulot muvaffaqiyatli yaratildi va moderatsiya uchun yuborildi. Admin tomonidan tasdiqlangandan keyin marketplace ga chiqadi',
       data: product,
     });
   } catch (error) {
@@ -385,6 +436,9 @@ const updateProduct = async (req, res) => {
       });
     }
 
+    // Determine censored status - start with existing product's censored value
+    let productCensored = existingProduct.censored;
+
     // Validate category if provided
     if (category) {
       const categoryDoc = await Category.findById(category);
@@ -394,12 +448,37 @@ const updateProduct = async (req, res) => {
           message: 'Kategoriya topilmadi',
         });
       }
+
+      // Check if category is active and created by Admin
+      if (categoryDoc.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Kategoriya faol emas',
+        });
+      }
+
+      if (categoryDoc.createdByModel !== 'Admin') {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu kategoriya foydalanish uchun ruxsat berilmagan',
+        });
+      }
+
+      // Update censored from category
+      productCensored = categoryDoc.censored || false;
     }
 
     // Validate subcategory if provided
     if (subcategory !== undefined) {
       if (subcategory === null || subcategory === '') {
-        // Removing subcategory is allowed
+        // Removing subcategory - use category's censored
+        if (category) {
+          const categoryDoc = await Category.findById(category);
+          productCensored = categoryDoc.censored || false;
+        } else {
+          const currentCategoryDoc = await Category.findById(existingProduct.category);
+          productCensored = currentCategoryDoc.censored || false;
+        }
       } else {
         const subcategoryDoc = await Category.findById(subcategory);
         if (!subcategoryDoc) {
@@ -408,6 +487,22 @@ const updateProduct = async (req, res) => {
             message: 'Sub kategoriya topilmadi',
           });
         }
+
+        // Check if subcategory is active and created by Admin
+        if (subcategoryDoc.status !== 'active') {
+          return res.status(400).json({
+            success: false,
+            message: 'Sub kategoriya faol emas',
+          });
+        }
+
+        if (subcategoryDoc.createdByModel !== 'Admin') {
+          return res.status(400).json({
+            success: false,
+            message: 'Bu sub kategoriya foydalanish uchun ruxsat berilmagan',
+          });
+        }
+
         // Check if subcategory belongs to the category
         const catId = category || existingProduct.category;
         if (subcategoryDoc.parent?.toString() !== catId.toString()) {
@@ -416,6 +511,9 @@ const updateProduct = async (req, res) => {
             message: 'Sub kategoriya tanlangan kategoriyaga tegishli emas',
           });
         }
+
+        // Update censored from subcategory (which inherits from parent)
+        productCensored = subcategoryDoc.censored || false;
       }
     }
 
@@ -493,6 +591,14 @@ const updateProduct = async (req, res) => {
     if (status !== undefined) updateData.status = status;
     if (deliveryRegions !== undefined) updateData.deliveryRegions = deliveryRegions;
     if (kpiBonusPercent !== undefined) updateData.kpiBonusPercent = kpiBonusPercent;
+    
+    // Always update censored based on category/subcategory
+    updateData.censored = productCensored;
+    
+    // If category or subcategory changed, reset moderation status to pending
+    if (category !== undefined || subcategory !== undefined) {
+      updateData.moderationStatus = 'pending';
+    }
 
     const product = await Product.findByIdAndUpdate(id, updateData, {
       new: true,

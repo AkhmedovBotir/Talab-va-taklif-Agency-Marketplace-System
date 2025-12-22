@@ -18,7 +18,10 @@ const getAllProducts = async (req, res) => {
       limit = 20,
     } = req.query;
 
-    const filter = { status: 'active' }; // Only active products
+    const filter = { 
+      status: 'active',
+      moderationStatus: 'approved' // Only approved products for marketplace
+    };
 
     if (category) {
       filter.category = category;
@@ -113,7 +116,11 @@ const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const product = await Product.findById(id)
+    const product = await Product.findOne({
+      _id: id,
+      status: 'active',
+      moderationStatus: 'approved', // Only approved products for marketplace
+    })
       .populate('category', 'name slug status')
       .populate('subcategory', 'name slug status')
       .populate({
@@ -140,7 +147,7 @@ const getProductById = async (req, res) => {
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Maxsulot topilmadi',
+        message: 'Maxsulot topilmadi yoki hali tasdiqlanmagan',
       });
     }
 
@@ -274,6 +281,7 @@ const getProductsByCategory = async (req, res) => {
     const filter = {
       category: id,
       status: 'active',
+      moderationStatus: 'approved', // Only approved products for marketplace
     };
 
     if (subcategory) {
@@ -441,7 +449,11 @@ const getContragentById = async (req, res) => {
 
     // Get categories used by this contragent
     if (includeCategories === 'true') {
-      const products = await Product.find({ contragent: id, status: 'active' })
+      const products = await Product.find({ 
+        contragent: id, 
+        status: 'active',
+        moderationStatus: 'approved' // Only approved products
+      })
         .select('category subcategory')
         .populate('category', 'name slug status')
         .populate('subcategory', 'name slug status');
@@ -464,7 +476,11 @@ const getContragentById = async (req, res) => {
 
     // Get products for this contragent
     if (includeProducts === 'true') {
-      const products = await Product.find({ contragent: id, status: 'active' })
+      const products = await Product.find({ 
+        contragent: id, 
+        status: 'active',
+        moderationStatus: 'approved' // Only approved products
+      })
         .populate('category', 'name slug status')
         .populate('subcategory', 'name slug status')
         .populate('deliveryRegions.viloyat', 'name type code')
@@ -523,6 +539,7 @@ const search = async (req, res) => {
     // Search products
     const productFilter = {
       status: 'active',
+      moderationStatus: 'approved', // Only approved products for marketplace
       $or: [
         { name: { $regex: searchQuery, $options: 'i' } },
         { productCode: { $regex: searchQuery, $options: 'i' } },
@@ -631,7 +648,10 @@ const filterProducts = async (req, res) => {
       limit = 20,
     } = req.query;
 
-    const filter = { status: 'active' };
+    const filter = { 
+      status: 'active',
+      moderationStatus: 'approved' // Only approved products for marketplace
+    };
 
     // Price range filter
     if (minPrice || maxPrice) {
@@ -664,6 +684,7 @@ const filterProducts = async (req, res) => {
       const contragentProducts = await Product.find({
         contragent: contragent,
         status: 'active',
+        moderationStatus: 'approved', // Only approved products
       })
         .select('category subcategory')
         .populate('category', 'name slug status')

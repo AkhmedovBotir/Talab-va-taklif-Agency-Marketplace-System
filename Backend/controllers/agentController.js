@@ -418,18 +418,10 @@ const updateAgent = async (req, res) => {
       }
     }
 
-    const agent = await Agent.findOneAndUpdate(
-      { _id: id, isDeleted: { $ne: true } },
-      updateData,
-      {
-        new: true,
-        runValidators: true,
-      }
-    )
-      .populate('viloyat', 'name type code')
-      .populate('tuman', 'name type code')
-      .populate('mfy', 'name type code')
-      .select('-password');
+    // Find agent first to handle password hashing properly
+    // If password is being updated, we need to use save() to trigger pre('save') hook
+    const agent = await Agent.findOne({ _id: id, isDeleted: { $ne: true } })
+      .select('+password'); // Include password to update it
 
     if (!agent) {
       return res.status(404).json({
@@ -438,8 +430,24 @@ const updateAgent = async (req, res) => {
       });
     }
 
-    // Add agentType
+    // Update fields
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key] !== undefined) {
+        agent[key] = updateData[key];
+      }
+    });
+
+    // Save agent (this will trigger pre-save hook to hash password if password was modified)
+    await agent.save();
+
+    // Populate for response
+    await agent.populate('viloyat', 'name type code');
+    await agent.populate('tuman', 'name type code');
+    await agent.populate('mfy', 'name type code');
+    
+    // Remove password from response and add agentType
     const agentObj = agent.toObject();
+    delete agentObj.password;
     agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
 
     // Invalidate cache
@@ -539,6 +547,14 @@ const loginAgent = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Hisobingiz faol emas',
+      });
+    }
+
+    // Check if password is set
+    if (!agent.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parol o\'rnatilmagan. Iltimos, avval parol o\'rnating',
       });
     }
 
