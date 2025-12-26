@@ -152,8 +152,8 @@ const Categories = ({ hideHeader = false }) => {
           className="mb-6"
         >
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Kategoriyalar</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Kategoriyalar</h1>
               <p className="text-gray-600">Kategoriyalar va subkategoriyalarni boshqarish</p>
             </div>
             <button
@@ -186,14 +186,14 @@ const Categories = ({ hideHeader = false }) => {
                 Yangi Kategoriya
               </button>
             )}
-            <button
-              onClick={handleClearFilters}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <Clear className="w-4 h-4" />
-              <span>Tozalash</span>
-            </button>
-          </div>
+          <button
+            onClick={handleClearFilters}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <Clear className="w-4 h-4" />
+            <span>Tozalash</span>
+          </button>
+        </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}

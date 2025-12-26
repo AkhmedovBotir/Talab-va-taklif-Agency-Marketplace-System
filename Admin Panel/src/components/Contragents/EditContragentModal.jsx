@@ -4,6 +4,7 @@ import { Close, Visibility, VisibilityOff } from '@mui/icons-material';
 import { contragentAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import RegionSelect from '../Regions/RegionSelect';
+import ContragentTypeSelect from './ContragentTypeSelect';
 
 const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
   const { showSuccess, showError } = useSnackbar();
@@ -17,6 +18,7 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
     phone: '',
     password: '',
     logo: '',
+    activityType: '',
     status: 'active',
   });
   const [loading, setLoading] = useState(false);
@@ -33,6 +35,7 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
         phone: contragent.phone || '',
         password: '', // Password is optional in update
         logo: contragent.logo || '', // Logo from existing data
+        activityType: contragent.activityType?._id || contragent.activityType || '',
         status: contragent.status || 'active',
       });
       setShowPassword(false);
@@ -265,6 +268,17 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
                         </button>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">Agar parolni o'zgartirmasangiz, bo'sh qoldiring</p>
+                    </div>
+
+                    {/* Activity Type */}
+                    <div>
+                      <ContragentTypeSelect
+                        name="activityType"
+                        value={formData.activityType}
+                        onChange={handleChange}
+                        label="Faoliyat turi"
+                        status="active"
+                      />
                     </div>
 
                     {/* Status */}

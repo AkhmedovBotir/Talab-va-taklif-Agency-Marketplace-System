@@ -628,6 +628,14 @@ export const productModerationAPI = {
       body: JSON.stringify({ rejectionReason }),
     });
   },
+
+  // Update product
+  updateProduct: async (id, data) => {
+    return apiRequest(`/admins/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 // Admin Data API functions (GET only - for viewing categories, subcategories, and products)
@@ -1224,6 +1232,46 @@ export const contragentAPI = {
   // Delete contragent
   deleteContragent: async (id) => {
     return apiRequest(`/contragents/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Contragent Type API functions
+export const contragentTypeAPI = {
+  // Get all contragent types
+  getAllContragentTypes: async (params = {}) => {
+    const { status } = params;
+    const queryParams = new URLSearchParams();
+    if (status) queryParams.append('status', status);
+    const queryString = queryParams.toString();
+    return apiRequest(`/contragent-types${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get contragent type by ID
+  getContragentTypeById: async (id) => {
+    return apiRequest(`/contragent-types/${id}`);
+  },
+
+  // Create new contragent type
+  createContragentType: async (contragentTypeData) => {
+    return apiRequest('/contragent-types', {
+      method: 'POST',
+      body: JSON.stringify(contragentTypeData),
+    });
+  },
+
+  // Update contragent type
+  updateContragentType: async (id, contragentTypeData) => {
+    return apiRequest(`/contragent-types/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(contragentTypeData),
+    });
+  },
+
+  // Delete contragent type
+  deleteContragentType: async (id) => {
+    return apiRequest(`/contragent-types/${id}`, {
       method: 'DELETE',
     });
   },
@@ -2298,6 +2346,29 @@ export const contragentPaymentAPI = {
     
     const queryString = queryParams.toString();
     return apiRequest(`/admin-contragent-payments/unpaid/grouped${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Pay single payment
+  paySinglePayment: async (paymentId, notes) => {
+    return apiRequest(`/admin-contragent-payments/${paymentId}/pay`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  },
+
+  // Pay payments by date range
+  payByDateRange: async (params) => {
+    const { startDate, endDate, contragentId, isOverdue, notes } = params;
+    return apiRequest('/admin-contragent-payments/pay-by-date-range', {
+      method: 'POST',
+      body: JSON.stringify({
+        startDate,
+        endDate,
+        contragentId,
+        isOverdue,
+        notes,
+      }),
+    });
   },
 
   // Mark payments as paid

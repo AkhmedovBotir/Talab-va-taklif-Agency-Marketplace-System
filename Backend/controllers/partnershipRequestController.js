@@ -1,6 +1,7 @@
 const PartnershipRequest = require('../models/PartnershipRequest');
 const Region = require('../models/Region');
 const Contragent = require('../models/Contragent');
+const ContragentType = require('../models/ContragentType');
 
 // Marketplace: Create partnership request
 const createPartnershipRequest = async (req, res) => {
@@ -13,11 +14,27 @@ const createPartnershipRequest = async (req, res) => {
       viloyat,
       tuman,
       mfy,
-      activity,
+      activityType,
       managerFirstName,
       managerLastName,
       managerPhone,
     } = req.body;
+
+    // Validate activityType exists and is active
+    const activityTypeDoc = await ContragentType.findById(activityType);
+    if (!activityTypeDoc) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faoliyat turi topilmadi',
+      });
+    }
+
+    if (activityTypeDoc.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Faoliyat turi faol emas',
+      });
+    }
 
     // Validate that regions exist and have correct types
     const viloyatRegion = await Region.findById(viloyat);
@@ -71,7 +88,7 @@ const createPartnershipRequest = async (req, res) => {
       viloyat,
       tuman,
       mfy,
-      activity,
+      activityType,
       managerFirstName,
       managerLastName,
       managerPhone,
@@ -81,7 +98,8 @@ const createPartnershipRequest = async (req, res) => {
       .populate('marketplaceUser', 'firstName lastName phone')
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
-      .populate('mfy', 'name type code');
+      .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon');
 
     res.status(201).json({
       success: true,
@@ -107,6 +125,7 @@ const getMyPartnershipRequests = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -150,6 +169,7 @@ const getAllPartnershipRequests = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -182,7 +202,8 @@ const getPartnershipRequestById = async (req, res) => {
       .populate('marketplaceUser', 'firstName lastName phone viloyat tuman mfy')
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
-      .populate('mfy', 'name type code');
+      .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon');
 
     if (!request) {
       return res.status(404).json({
@@ -325,7 +346,8 @@ const convertPartnershipRequestToContragent = async (req, res) => {
     const request = await PartnershipRequest.findById(id)
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
-      .populate('mfy', 'name type code');
+      .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon');
 
     if (!request) {
       return res.status(404).json({
@@ -372,6 +394,7 @@ const convertPartnershipRequestToContragent = async (req, res) => {
       mfy: request.mfy,
       phone: request.managerPhone,
       password: defaultPassword,
+      activityType: request.activityType,
       // By default: isFeaturedForMarketplace = false, status = 'active'
     });
 

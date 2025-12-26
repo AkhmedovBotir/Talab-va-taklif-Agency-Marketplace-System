@@ -59,6 +59,11 @@ const contragentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    activityType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ContragentType',
+      required: [true, 'Faoliyat turi kiritilishi shart'],
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],
@@ -108,6 +113,7 @@ contragentSchema.index({ phone: 1 }, { unique: true });
 contragentSchema.index({ viloyat: 1 });
 contragentSchema.index({ tuman: 1 });
 contragentSchema.index({ mfy: 1 });
+contragentSchema.index({ activityType: 1 });
 contragentSchema.index({ status: 1 });
 contragentSchema.index({ isFeaturedForMarketplace: 1 });
 

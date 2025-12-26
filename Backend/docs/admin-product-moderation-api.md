@@ -11,6 +11,7 @@
   - [Get All Products with Moderation Filter](#3-get-all-products-with-moderation-filter)
   - [Approve Product](#4-approve-product)
   - [Reject Product](#5-reject-product)
+  - [Update Product](#6-update-product)
 - [Error Handling](#error-handling)
 - [Validation Rules](#validation-rules)
 - [Examples](#examples)
@@ -446,6 +447,171 @@ Reject a pending product. Rejected products do not appear in the marketplace.
 
 ---
 
+### 6. Update Product
+
+Update any product in the system. Admin can update any product regardless of which Contragent owns it.
+
+**Endpoint:** `PUT /api/admins/products/:id`
+
+**Headers:**
+- `Authorization: Bearer <token>` (required)
+- `Content-Type: application/json`
+
+**URL Parameters:**
+- `id` (required) - MongoDB ObjectId of the product
+
+**Request Body:**
+
+All fields are optional. Only include fields you want to update.
+
+```json
+{
+  "name": "string (optional, 2-500 characters)",
+  "description": "object | string | null (optional, Delta format for rich text)",
+  "price": "number (optional, min: 0)",
+  "originalPrice": "number (optional, min: 0)",
+  "images": "array of strings (optional, max 5, base64 format)",
+  "category": "string (optional, Category ObjectId)",
+  "subcategory": "string | null (optional, Category ObjectId)",
+  "quantity": "number (optional, min: 0)",
+  "unit": "string (optional, enum: 'dona' | 'litr' | 'kg')",
+  "unitSize": "number | null (optional, min: 0)",
+  "length": "number | null (optional, min: 0)",
+  "width": "number | null (optional, min: 0)",
+  "weight": "number | null (optional, min: 0)",
+  "status": "string (optional, enum: 'active' | 'inactive' | 'archived')",
+  "deliveryRegions": "array of objects (optional, viloyat, tuman)",
+  "kpiBonusPercent": "number (optional, 0-100)",
+  "moderationStatus": "string (optional, enum: 'pending' | 'approved' | 'rejected')"
+}
+```
+
+**Field Descriptions:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | No | Maxsulot nomi (2-500 belgi) |
+| `description` | object/string/null | No | Maxsulot tavsifi (Delta format yoki null) |
+| `price` | number | No | Narx (min: 0) |
+| `originalPrice` | number | No | Asl narx (min: 0) |
+| `images` | array | No | Rasmlar (maksimal 5 ta, base64 format) |
+| `category` | string (ObjectId) | No | Kategoriya ID (faqat Admin tomonidan yaratilgan va active) |
+| `subcategory` | string/null (ObjectId) | No | Sub kategoriya ID yoki null (faqat Admin tomonidan yaratilgan va active) |
+| `quantity` | number | No | Miqdor (min: 0) |
+| `unit` | string | No | Birlik ('dona', 'litr', 'kg') |
+| `unitSize` | number/null | No | Birlik o'lchami (min: 0) |
+| `length` | number/null | No | Bo'yi (cm yoki m, min: 0) |
+| `width` | number/null | No | Eni (cm yoki m, min: 0) |
+| `weight` | number/null | No | Og'irligi (kg yoki g, min: 0) |
+| `status` | string | No | Status ('active', 'inactive', 'archived') |
+| `deliveryRegions` | array | No | Yetkazib berish xududlari (kamida 1 ta) |
+| `kpiBonusPercent` | number | No | KPI bonus foizi (0-100) |
+| `moderationStatus` | string | No | Moderation status ('pending', 'approved', 'rejected') |
+
+**Important Notes:**
+- **Category/Subcategory Validation:** Only categories/subcategories created by Admin and with `status: 'active'` can be used
+- **Censored Inheritance:** `censored` field is automatically inherited from category or subcategory
+- **Moderation Status Reset:** If `category` or `subcategory` is changed and `moderationStatus` is not explicitly set, it will be reset to `'pending'`
+- **Delivery Regions:** Each region must have `viloyat` (required) and `tuman` (optional, can be null). Tuman must belong to the selected viloyat
+
+**Success Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "Maxsulot muvaffaqiyatli yangilandi",
+  "data": {
+    "_id": "507f1f77bcf86cd799439011",
+    "name": "Coca Cola 1.5L (Updated)",
+    "description": null,
+    "price": 16000,
+    "originalPrice": 18000,
+    "images": ["base64image1", "base64image2"],
+    "category": {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "Ichimliklar",
+      "slug": "ichimliklar",
+      "status": "active",
+      "image": "category-image-url",
+      "censored": false
+    },
+    "subcategory": {
+      "_id": "507f1f77bcf86cd799439013",
+      "name": "Gazlangan ichimliklar",
+      "slug": "gazlangan-ichimliklar",
+      "status": "active",
+      "image": null,
+      "censored": false
+    },
+    "quantity": 100,
+    "unit": "dona",
+    "unitSize": 1.5,
+    "length": null,
+    "width": null,
+    "weight": null,
+    "status": "active",
+    "contragent": {
+      "_id": "507f1f77bcf86cd799439014",
+      "name": "O'zbekiston Tijorat MChJ",
+      "inn": "123456789",
+      "phone": "+998901234567",
+      "viloyat": "507f1f77bcf86cd799439015",
+      "tuman": "507f1f77bcf86cd799439016",
+      "mfy": "507f1f77bcf86cd799439017"
+    },
+    "deliveryRegions": [
+      {
+        "viloyat": {
+          "_id": "507f1f77bcf86cd799439018",
+          "name": "Toshkent viloyati",
+          "type": "region",
+          "code": "10"
+        },
+        "tuman": {
+          "_id": "507f1f77bcf86cd799439019",
+          "name": "Chirchiq tumani",
+          "type": "district",
+          "code": "1001"
+        }
+      }
+    ],
+    "kpiBonusPercent": 5,
+    "productCode": "001",
+    "moderationStatus": "approved",
+    "moderatedBy": null,
+    "moderatedAt": null,
+    "rejectionReason": null,
+    "censored": false,
+    "createdAt": "2024-01-15T10:00:00.000Z",
+    "updatedAt": "2024-01-15T12:00:00.000Z"
+  }
+}
+```
+
+**Error Responses:**
+- **400 Bad Request** - Validation error (invalid category/subcategory, invalid delivery regions, etc.)
+- **404 Not Found** - Product not found
+- **401 Unauthorized** - Token missing or invalid
+- **500 Internal Server Error** - Server error
+
+**Example Request:**
+
+```bash
+curl -X PUT "http://localhost:5000/api/admins/products/507f1f77bcf86cd799439011" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Coca Cola 1.5L (Updated)",
+    "price": 16000,
+    "originalPrice": 18000,
+    "quantity": 100,
+    "status": "active",
+    "moderationStatus": "approved"
+  }'
+```
+
+---
+
 ## Error Handling
 
 All endpoints follow a consistent error response format:
@@ -477,6 +643,31 @@ All endpoints follow a consistent error response format:
   - Minimum 1 character
   - Maximum 1000 characters
   - Automatically trimmed
+
+### Update Product
+
+All fields are optional. Only include fields you want to update.
+
+- `name`: String, 2-500 characters, trimmed
+- `description`: String, object (Delta format), or null
+- `price`: Number, minimum 0
+- `originalPrice`: Number, minimum 0
+- `images`: Array of strings, maximum 5 items
+- `category`: String (ObjectId), must be Admin-created and active
+- `subcategory`: String (ObjectId) or null, must be Admin-created, active, and belong to category
+- `quantity`: Number, minimum 0
+- `unit`: String, must be one of: 'dona', 'litr', 'kg'
+- `unitSize`: Number (min: 0) or null
+- `length`: Number (min: 0) or null
+- `width`: Number (min: 0) or null
+- `weight`: Number (min: 0) or null
+- `status`: String, must be one of: 'active', 'inactive', 'archived'
+- `deliveryRegions`: Array of objects, minimum 1 item
+  - Each region must have `viloyat` (required, ObjectId)
+  - Each region can have `tuman` (optional, ObjectId or null)
+  - Tuman must belong to the selected viloyat
+- `kpiBonusPercent`: Number, 0-100
+- `moderationStatus`: String, must be one of: 'pending', 'approved', 'rejected'
 
 ---
 
@@ -514,7 +705,79 @@ curl -X POST "http://localhost:5000/api/admins/products/moderation/507f1f77bcf86
   }'
 ```
 
-### Example 5: Get All Approved Products
+### Example 5: Update Product
+
+```bash
+curl -X PUT "http://localhost:5000/api/admins/products/507f1f77bcf86cd799439011" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Coca Cola 1.5L (Updated)",
+    "price": 16000,
+    "originalPrice": 18000,
+    "quantity": 100,
+    "status": "active",
+    "moderationStatus": "approved"
+  }'
+```
+
+### Example 6: Update Product with Category Change
+
+```bash
+curl -X PUT "http://localhost:5000/api/admins/products/507f1f77bcf86cd799439011" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "category": "507f1f77bcf86cd799439012",
+    "subcategory": "507f1f77bcf86cd799439013",
+    "deliveryRegions": [
+      {
+        "viloyat": "507f1f77bcf86cd799439018",
+        "tuman": "507f1f77bcf86cd799439019"
+      }
+    ]
+  }'
+```
+
+**Note:** When category or subcategory is changed, `moderationStatus` will be automatically reset to `'pending'` unless explicitly set in the request.
+
+### Example 5: Update Product
+
+```bash
+curl -X PUT "http://localhost:5000/api/admins/products/507f1f77bcf86cd799439011" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Coca Cola 1.5L (Updated)",
+    "price": 16000,
+    "originalPrice": 18000,
+    "quantity": 100,
+    "status": "active",
+    "moderationStatus": "approved"
+  }'
+```
+
+### Example 6: Update Product with Category Change
+
+```bash
+curl -X PUT "http://localhost:5000/api/admins/products/507f1f77bcf86cd799439011" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "category": "507f1f77bcf86cd799439012",
+    "subcategory": "507f1f77bcf86cd799439013",
+    "deliveryRegions": [
+      {
+        "viloyat": "507f1f77bcf86cd799439018",
+        "tuman": "507f1f77bcf86cd799439019"
+      }
+    ]
+  }'
+```
+
+**Note:** When category or subcategory is changed, `moderationStatus` will be automatically reset to `'pending'` unless explicitly set in the request.
+
+### Example 7: Get All Approved Products
 
 ```bash
 curl -X GET "http://localhost:5000/api/admins/products/moderation?moderationStatus=approved&page=1&limit=50" \

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Close, Visibility, VisibilityOff } from '@mui/icons-material';
 import { contragentAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import RegionSelect from '../Regions/RegionSelect';
+import ContragentTypeSelect from './ContragentTypeSelect';
 
 const CreateContragentModal = ({ open, onClose, onSuccess }) => {
   const { showSuccess, showError } = useSnackbar();
@@ -17,6 +18,7 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
     phone: '',
     password: '',
     logo: '',
+    activityType: '',
     status: 'active',
   });
   const [loading, setLoading] = useState(false);
@@ -72,6 +74,7 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
           phone: '',
           password: '',
           logo: '',
+          activityType: '',
           status: 'active',
         });
         onSuccess();
@@ -96,6 +99,7 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
       phone: '',
       password: '',
       logo: '',
+      activityType: '',
       status: 'active',
     });
     onClose();
@@ -268,6 +272,18 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
                           {showPassword ? <VisibilityOff className="w-5 h-5" /> : <Visibility className="w-5 h-5" />}
                         </button>
                       </div>
+                    </div>
+
+                    {/* Activity Type */}
+                    <div>
+                      <ContragentTypeSelect
+                        name="activityType"
+                        value={formData.activityType}
+                        onChange={handleChange}
+                        label="Faoliyat turi"
+                        required
+                        status="active"
+                      />
                     </div>
 
                     {/* Status */}

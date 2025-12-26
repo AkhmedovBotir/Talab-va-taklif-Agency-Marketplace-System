@@ -44,23 +44,23 @@ const KPIDistributionModal = ({
                   <div className="bg-white/20 backdrop-blur-sm rounded-lg p-1.5">
                     <Settings className="w-4 h-4" />
                   </div>
-                  <div>
+              <div>
                     <h2 className="text-lg font-bold">
                       {editingDistribution ? 'KPI Taqsimlashni Tahrirlash' : 'Yangi KPI Taqsimlash'}
-                    </h2>
+                </h2>
                     <p className="text-xs text-indigo-100 mt-0.5">
-                      {editingDistribution
-                        ? 'Mavjud taqsimlash qiymatlarini yangilang'
-                        : 'Default qiymatlardan foydalanib tezda konfiguratsiya yarating'}
-                    </p>
+                  {editingDistribution
+                    ? 'Mavjud taqsimlash qiymatlarini yangilang'
+                    : 'Default qiymatlardan foydalanib tezda konfiguratsiya yarating'}
+                </p>
                   </div>
-                </div>
-                <button
-                  onClick={onClose}
+              </div>
+              <button
+                onClick={onClose}
                   className="text-white/80 hover:text-white hover:bg-white/20 rounded-lg p-1.5 transition-all"
-                >
+              >
                   <Close className="w-4 h-4" />
-                </button>
+              </button>
               </div>
             </div>
 

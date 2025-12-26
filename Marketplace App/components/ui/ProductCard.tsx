@@ -60,12 +60,12 @@ export default function ProductCard({ product, onPress, onAddToCart, isInCart = 
         <View style={styles.quantityContainer}>
           <Ionicons name="cube-outline" size={14} color="#666" />
           <Text style={styles.quantity}>
-            {product.quantity} {product.unit}
-          </Text>
+              {product.quantity} {product.unit}
+            </Text>
         </View>
 
         {/* Add to Cart Button */}
-        <TouchableOpacity
+          <TouchableOpacity
           style={[styles.cartButton, isInCart && styles.cartButtonActive]}
           onPress={(e) => {
             e.stopPropagation();
@@ -74,7 +74,7 @@ export default function ProductCard({ product, onPress, onAddToCart, isInCart = 
             }
           }}
           activeOpacity={0.8}
-        >
+          >
           {isInCart ? (
             <>
               <Ionicons name="checkmark-circle" size={20} color="#fff" />
@@ -86,7 +86,7 @@ export default function ProductCard({ product, onPress, onAddToCart, isInCart = 
               <Text style={styles.cartButtonText}>Korzinkaga</Text>
             </>
           )}
-        </TouchableOpacity>
+          </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );

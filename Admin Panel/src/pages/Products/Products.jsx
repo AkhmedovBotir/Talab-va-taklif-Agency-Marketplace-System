@@ -5,6 +5,7 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 import ProductTable from '../../components/Products/ProductTable';
 import ViewProductModal from '../../components/Products/ViewProductModal';
 import RejectProductModal from '../../components/Products/RejectProductModal';
+import EditProductModal from '../../components/Products/EditProductModal';
 import { Search, Clear } from '@mui/icons-material';
 import RegionSelect from '../../components/Regions/RegionSelect';
 
@@ -32,8 +33,10 @@ const Products = ({ hideHeader = false }) => {
   // Modals
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [rejectingProduct, setRejectingProduct] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   // Fetch products
   const fetchProducts = async () => {
@@ -116,6 +119,15 @@ const Products = ({ hideHeader = false }) => {
   };
 
   const handleRejectSuccess = () => {
+    fetchProducts();
+  };
+
+  const handleEdit = (product) => {
+    setEditingProduct(product);
+    setEditModalOpen(true);
+  };
+
+  const handleEditSuccess = () => {
     fetchProducts();
   };
 
@@ -252,6 +264,7 @@ const Products = ({ hideHeader = false }) => {
         onView={handleView}
         onApprove={handleApprove}
         onReject={handleReject}
+        onEdit={handleEdit}
         pagination={pagination}
         onPageChange={handlePageChange}
       />
@@ -277,6 +290,18 @@ const Products = ({ hideHeader = false }) => {
           }}
           onSuccess={handleRejectSuccess}
           product={rejectingProduct}
+        />
+      )}
+
+      {editingProduct && (
+        <EditProductModal
+          open={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setEditingProduct(null);
+          }}
+          onSuccess={handleEditSuccess}
+          product={editingProduct}
         />
       )}
     </div>

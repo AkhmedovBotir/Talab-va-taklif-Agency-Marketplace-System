@@ -182,9 +182,9 @@ export default function HomeScreen() {
   // Reload products when location changes
   useEffect(() => {
     if (selectedTuman) {
-      setPage(1);
-      setHasMore(true);
-      loadProducts(1, false);
+    setPage(1);
+    setHasMore(true);
+    loadProducts(1, false);
     }
   }, [selectedTuman?._id, loadProducts]);
 

@@ -6,6 +6,7 @@ const Order = require('../models/Order');
 const Agent = require('../models/Agent');
 const Region = require('../models/Region');
 const KpiBonusTransaction = require('../models/KpiBonusTransaction');
+const ContragentPaymentDistribution = require('../models/ContragentPaymentDistribution');
 
 // ==================== KUNLIK HISOBOT ====================
 
@@ -930,24 +931,51 @@ const getAgentPerformance = async (req, res) => {
 
 // ==================== MOLIYA BALANSLARI ====================
 
-// Umumiy balans (Umumiy tushgan summa, Tarqatilgan summa, Moliya bo'limiga ajratilgan summa)
+// Umumiy balans (Umumiy tushgan summa, Tarqatilgan summa, Moliya bo'limiga ajratilgan summa, Contragent to'lovlari)
 const getFinanceBalance = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
-    // Sana filtri
-    const dateFilter = {};
+    // Sana filtri (KPI va Contragent to'lovlar uchun)
+    const kpiDateFilter = {};
+    const contragentDateFilter = {};
+    
     if (startDate || endDate) {
-      dateFilter.createdAt = {};
       if (startDate) {
         const start = new Date(startDate);
         start.setHours(0, 0, 0, 0);
-        dateFilter.createdAt.$gte = start;
+        kpiDateFilter.createdAt = { $gte: start };
+        contragentDateFilter.paidAt = { $gte: start };
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        dateFilter.createdAt.$lte = end;
+        if (kpiDateFilter.createdAt) {
+          kpiDateFilter.createdAt.$lte = end;
+        } else {
+          kpiDateFilter.createdAt = { $lte: end };
+        }
+        if (contragentDateFilter.paidAt) {
+          contragentDateFilter.paidAt.$lte = end;
+        } else {
+          contragentDateFilter.paidAt = { $lte: end };
+        }
+      }
+    }
+
+    // Sana filtri (FinanceSubmission uchun - confirmedAt)
+    const submissionDateFilter = {};
+    if (startDate || endDate) {
+      submissionDateFilter.confirmedAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        submissionDateFilter.confirmedAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        submissionDateFilter.confirmedAt.$lte = end;
       }
     }
 
@@ -955,17 +983,15 @@ const getFinanceBalance = async (req, res) => {
     const confirmedSubmissions = await FinanceSubmission.find({
       toAgentType: 'finance',
       status: 'confirmed',
-      ...(dateFilter.createdAt && {
-        confirmedAt: dateFilter.createdAt,
-      }),
+      ...(Object.keys(submissionDateFilter).length > 0 ? submissionDateFilter : {}),
     });
 
     const totalReceived = confirmedSubmissions.reduce((sum, s) => sum + s.amount, 0);
 
-    // 2. Tarqatilgan summa (KPI bonuslar - punkt, agentlar)
+    // 2. Tarqatilgan summa (KPI bonuslar - punkt, agentlar, deliveryService)
     const kpiTransactions = await KpiBonusTransaction.find({
       orderStatus: 'confirmed_by_customer',
-      ...dateFilter,
+      ...(Object.keys(kpiDateFilter).length > 0 ? kpiDateFilter : {}),
     });
 
     const totalDistributed = kpiTransactions.reduce((sum, t) => {
@@ -975,42 +1001,82 @@ const getFinanceBalance = async (req, res) => {
         (t.amounts.viloyatAgent || 0) +
         (t.amounts.tumanAgent || 0) +
         (t.amounts.mfyAgent || 0) +
-        (t.amounts.punktTransfer || 0)
+        (t.amounts.punktTransfer || 0) +
+        (t.amounts.deliveryService || 0)
       );
     }, 0);
 
     // 3. Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
     const totalFinanceKpi = kpiTransactions.reduce((sum, t) => sum + (t.amounts.finance || 0), 0);
 
-    // 4. Umumiy balans (Tushgan - Tarqatilgan)
-    const totalBalance = totalReceived - totalDistributed;
+    // 4. Yetkazib berish xizmati summasi (KPI bonuslardan)
+    const totalDeliveryServiceKpi = kpiTransactions.reduce(
+      (sum, t) => sum + (t.amounts.deliveryService || 0),
+      0
+    );
 
-    // 5. Moliya bo'limi umumiy balansi (Tushgan + KPI bonus)
-    const financeTotalBalance = totalReceived + totalFinanceKpi;
+    // 5. Contragent to'lovlari (to'langan)
+    const contragentPaymentsFilter = {
+      status: 'paid',
+      ...(Object.keys(contragentDateFilter).length > 0 ? contragentDateFilter : {}),
+    };
 
-    // 6. Tafsilotlar
+    const paidContragentPayments = await ContragentPaymentDistribution.find(contragentPaymentsFilter);
+    const totalContragentPayments = paidContragentPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    // 6. Umumiy xarajatlar (Tarqatilgan + Contragent to'lovlari)
+    const totalExpenses = totalDistributed + totalContragentPayments;
+
+    // 7. Umumiy balans (Tushgan - Xarajatlar)
+    const totalBalance = totalReceived - totalExpenses;
+
+    // 8. Moliya bo'limi sof daromadi (Tushgan - Xarajatlar + KPI bonus)
+    const financeNetIncome = totalReceived - totalExpenses + totalFinanceKpi;
+
+    // 9. Moliya bo'limi umumiy balansi (Tushgan + KPI bonus - Contragent to'lovlari)
+    const financeTotalBalance = totalReceived + totalFinanceKpi - totalContragentPayments;
+
+    // 10. Tafsilotlar
     const details = {
-      punkt: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punkt || 0), 0),
-      viloyatAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.viloyatAgent || 0), 0),
-      tumanAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.tumanAgent || 0), 0),
-      mfyAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.mfyAgent || 0), 0),
-      punktTransfer: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punktTransfer || 0), 0),
-      finance: totalFinanceKpi,
+      kpiDistribution: {
+        punkt: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punkt || 0), 0),
+        viloyatAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.viloyatAgent || 0), 0),
+        tumanAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.tumanAgent || 0), 0),
+        mfyAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.mfyAgent || 0), 0),
+        punktTransfer: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punktTransfer || 0), 0),
+        deliveryService: totalDeliveryServiceKpi,
+        finance: totalFinanceKpi,
+      },
+      contragentPayments: {
+        total: totalContragentPayments,
+        count: paidContragentPayments.length,
+      },
     };
 
     res.status(200).json({
       success: true,
       balance: {
         period: {
-          startDate: dateFilter.createdAt?.$gte || null,
-          endDate: dateFilter.createdAt?.$lte || null,
+          startDate: startDate ? new Date(startDate) : null,
+          endDate: endDate ? new Date(endDate) : null,
         },
-        totalReceived, // Umumiy tushgan summa
-        totalDistributed, // Tarqatilgan summa
-        totalFinanceKpi, // Moliya bo'limiga ajratilgan summa (KPI)
-        totalBalance, // Umumiy balans (Tushgan - Tarqatilgan)
-        financeTotalBalance, // Moliya bo'limi umumiy balansi (Tushgan + KPI bonus)
-        details, // Tafsilotlar
+        // Daromadlar
+        totalReceived, // Umumiy tushgan summa (mijozlardan)
+        totalFinanceKpi, // Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
+        totalIncome: totalReceived + totalFinanceKpi, // Umumiy daromad
+        
+        // Xarajatlar
+        totalDistributed, // Tarqatilgan summa (KPI bonuslar - punkt, agentlar, deliveryService)
+        totalContragentPayments, // Contragent to'lovlari (to'langan)
+        totalExpenses, // Umumiy xarajatlar (Tarqatilgan + Contragent to'lovlari)
+        
+        // Balanslar
+        totalBalance, // Umumiy balans (Tushgan - Xarajatlar)
+        financeTotalBalance, // Moliya bo'limi umumiy balansi (Tushgan + KPI - Contragent to'lovlari)
+        financeNetIncome, // Moliya bo'limi sof daromadi (Tushgan - Xarajatlar + KPI bonus)
+        
+        // Tafsilotlar
+        details,
       },
     });
   } catch (error) {
@@ -1106,7 +1172,8 @@ const getTotalDistributed = async (req, res) => {
         (t.amounts.viloyatAgent || 0) +
         (t.amounts.tumanAgent || 0) +
         (t.amounts.mfyAgent || 0) +
-        (t.amounts.punktTransfer || 0)
+        (t.amounts.punktTransfer || 0) +
+        (t.amounts.deliveryService || 0)
       );
     }, 0);
 
@@ -1116,6 +1183,7 @@ const getTotalDistributed = async (req, res) => {
       tumanAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.tumanAgent || 0), 0),
       mfyAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.mfyAgent || 0), 0),
       punktTransfer: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punktTransfer || 0), 0),
+      deliveryService: kpiTransactions.reduce((sum, t) => sum + (t.amounts.deliveryService || 0), 0),
     };
 
     res.status(200).json({
@@ -1239,7 +1307,7 @@ const getDeliveryServiceKpiAmount = async (req, res) => {
   }
 };
 
-// Umumiy balans (Tushgan - Tarqatilgan)
+// Umumiy balans (Tushgan - Xarajatlar)
 const getTotalBalance = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -1268,7 +1336,7 @@ const getTotalBalance = async (req, res) => {
 
     const totalReceived = confirmedSubmissions.reduce((sum, s) => sum + s.amount, 0);
 
-    // Tarqatilgan summa
+    // Tarqatilgan summa (KPI bonuslar)
     const distributedDateFilter = {};
     if (startDate || endDate) {
       distributedDateFilter.createdAt = {};
@@ -1296,12 +1364,39 @@ const getTotalBalance = async (req, res) => {
         (t.amounts.viloyatAgent || 0) +
         (t.amounts.tumanAgent || 0) +
         (t.amounts.mfyAgent || 0) +
-        (t.amounts.punktTransfer || 0)
+        (t.amounts.punktTransfer || 0) +
+        (t.amounts.deliveryService || 0)
       );
     }, 0);
 
-    // Umumiy balans
-    const totalBalance = totalReceived - totalDistributed;
+    // Contragent to'lovlari (to'langan)
+    const contragentDateFilter = {};
+    if (startDate || endDate) {
+      contragentDateFilter.paidAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        contragentDateFilter.paidAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        contragentDateFilter.paidAt.$lte = end;
+      }
+    }
+
+    const paidContragentPayments = await ContragentPaymentDistribution.find({
+      status: 'paid',
+      ...contragentDateFilter,
+    });
+
+    const totalContragentPayments = paidContragentPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    // Umumiy xarajatlar
+    const totalExpenses = totalDistributed + totalContragentPayments;
+
+    // Umumiy balans (Tushgan - Xarajatlar)
+    const totalBalance = totalReceived - totalExpenses;
 
     res.status(200).json({
       success: true,
@@ -1310,9 +1405,11 @@ const getTotalBalance = async (req, res) => {
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
         },
-        totalReceived,
-        totalDistributed,
-        totalBalance,
+        totalReceived, // Tushgan summa
+        totalDistributed, // Tarqatilgan summa (KPI bonuslar)
+        totalContragentPayments, // Contragent to'lovlari
+        totalExpenses, // Umumiy xarajatlar
+        totalBalance, // Umumiy balans (Tushgan - Xarajatlar)
       },
     });
   } catch (error) {

@@ -4,6 +4,8 @@ const { adminAuth } = require('../middleware/auth');
 const {
   getUnpaidPayments,
   getUnpaidPaymentsGrouped,
+  payContragentPayment,
+  payContragentPaymentsByDateRange,
   markPaymentsAsPaid,
   getPaymentStatistics,
   getPaidPayments,
@@ -13,11 +15,17 @@ const {
 // All routes require admin authentication
 router.use(adminAuth);
 
+// To'lovni to'lash (bitta to'lov) - MUST be before /unpaid to avoid route conflict
+router.post('/:id/pay', payContragentPayment);
+
+// Belgilangan muddat orasida filterlangan to'lanmagan to'lovlarni to'lash
+router.post('/pay-by-date-range', payContragentPaymentsByDateRange);
+
 // To'lanmagan to'lovlar
 router.get('/unpaid', getUnpaidPayments);
 router.get('/unpaid/grouped', getUnpaidPaymentsGrouped);
 
-// To'lovni tasdiqlash
+// To'lovni tasdiqlash (bir nechta to'lovlarni)
 router.post('/mark-as-paid', markPaymentsAsPaid);
 
 // To'lovlar statistikasi

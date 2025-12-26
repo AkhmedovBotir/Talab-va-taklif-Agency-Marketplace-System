@@ -86,7 +86,11 @@ http://localhost:5000/api/marketplace
     "type": "mfy",
     "code": "string"
   },
-  "activity": "string",
+  "activityType": {
+    "_id": "string (ObjectId)",
+    "name": "string",
+    "icon": "string"
+  },
   "managerFirstName": "string",
   "managerLastName": "string",
   "managerPhone": "string",
@@ -115,7 +119,51 @@ http://localhost:5000/api/marketplace
 
 ## Endpoints
 
-### 1. Create Partnership Request
+### 1. Get All Contragent Types
+
+Get all available contragent activity types for partnership request form.
+
+**Endpoint:** `GET /api/contragent-types`
+
+**Authentication:** Not required (public endpoint)
+
+**Query Parameters:**
+- `status` (optional) - Filter by status: 'active' or 'inactive'. Default: returns all
+
+**Success Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "count": 3,
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "Savdo",
+      "icon": "shop-icon",
+      "status": "active",
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T10:30:00.000Z"
+    },
+    {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "Xizmat ko'rsatish",
+      "icon": "service-icon",
+      "status": "active",
+      "createdAt": "2024-01-15T11:00:00.000Z",
+      "updatedAt": "2024-01-15T11:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Note:** Use this endpoint to get the list of available activity types before creating a partnership request. Only active activity types should be used in partnership requests.
+
+**For more details, see:** [Contragent Type API Documentation](./contragent-type-api.md)
+
+---
+
+### 2. Create Partnership Request
 
 Submit a new partnership request.
 
@@ -134,7 +182,7 @@ Submit a new partnership request.
   "viloyat": "string (required, Region ObjectId)",
   "tuman": "string (required, Region ObjectId)",
   "mfy": "string (required, Region ObjectId)",
-  "activity": "string (required, max 500 characters)",
+  "activityType": "string (required, ContragentType ObjectId)",
   "managerFirstName": "string (required, 2-50 characters)",
   "managerLastName": "string (required, 2-50 characters)",
   "managerPhone": "string (required, valid phone format)"
@@ -152,7 +200,7 @@ Submit a new partnership request.
 | `viloyat` | string | Yes | Viloyat ID (Region modelidan, type='region') |
 | `tuman` | string | Yes | Tuman ID (Region modelidan, type='district') |
 | `mfy` | string | Yes | MFY ID (Region modelidan, type='mfy') |
-| `activity` | string | Yes | Faoliyat turi (maksimal 500 belgi) |
+| `activityType` | string (ObjectId) | Yes | Faoliyat turi ID (ContragentType - faqat active status bilan) |
 | `managerFirstName` | string | Yes | Rahbar ismi (2-50 belgi) |
 | `managerLastName` | string | Yes | Rahbar familiyasi (2-50 belgi) |
 | `managerPhone` | string | Yes | Rahbar telefon raqami |
@@ -193,7 +241,7 @@ Submit a new partnership request.
       "type": "mfy",
       "code": "1001001"
     },
-    "activity": "Qishloq xo'jalik mahsulotlari yetkazib berish",
+    "activityType": "507f1f77bcf86cd799439011",
     "managerFirstName": "Akmal",
     "managerLastName": "Karimov",
     "managerPhone": "+998901234568",
@@ -259,7 +307,7 @@ Submit a new partnership request.
 
 ---
 
-### 2. Get My Partnership Requests
+### 3. Get My Partnership Requests
 
 Get all partnership requests submitted by the authenticated user.
 
@@ -300,7 +348,11 @@ Get all partnership requests submitted by the authenticated user.
         "type": "mfy",
         "code": "1001001"
       },
-      "activity": "Qishloq xo'jalik mahsulotlari yetkazib berish",
+      "activityType": {
+        "_id": "507f1f77bcf86cd799439011",
+        "name": "Savdo",
+        "icon": "shop-icon"
+      },
       "managerFirstName": "Akmal",
       "managerLastName": "Karimov",
       "managerPhone": "+998901234568",
@@ -334,7 +386,11 @@ Get all partnership requests submitted by the authenticated user.
         "type": "mfy",
         "code": "2001001"
       },
-      "activity": "Elektronika va maishiy texnika",
+      "activityType": {
+        "_id": "507f1f77bcf86cd799439012",
+        "name": "Xizmat ko'rsatish",
+        "icon": "service-icon"
+      },
       "managerFirstName": "Bobur",
       "managerLastName": "Toshmatov",
       "managerPhone": "+998901234569",
@@ -478,7 +534,7 @@ curl -X POST http://localhost:5000/api/marketplace/partnership-requests \
     "viloyat": "65a1b2c3d4e5f6g7h8i9j0k3",
     "tuman": "65a1b2c3d4e5f6g7h8i9j0k4",
     "mfy": "65a1b2c3d4e5f6g7h8i9j0k5",
-    "activity": "Qishloq xo'jalik mahsulotlari yetkazib berish",
+    "activityType": "507f1f77bcf86cd799439011",
     "managerFirstName": "Akmal",
     "managerLastName": "Karimov",
     "managerPhone": "+998901234568"
@@ -500,7 +556,7 @@ curl -X POST http://localhost:5000/api/marketplace/partnership-requests \
     "viloyat": "65a1b2c3d4e5f6g7h8i9j0k3",
     "tuman": "65a1b2c3d4e5f6g7h8i9j0k4",
     "mfy": "65a1b2c3d4e5f6g7h8i9j0k5",
-    "activity": "Qishloq xo'jalik mahsulotlari yetkazib berish",
+    "activityType": "507f1f77bcf86cd799439011",
     "managerFirstName": "Akmal",
     "managerLastName": "Karimov",
     "managerPhone": "+998901234568"
@@ -538,7 +594,7 @@ curl -X POST http://localhost:5000/api/marketplace/partnership-requests \
       "type": "mfy",
       "code": "1001001"
     },
-    "activity": "Qishloq xo'jalik mahsulotlari yetkazib berish",
+    "activityType": "507f1f77bcf86cd799439011",
     "managerFirstName": "Akmal",
     "managerLastName": "Karimov",
     "managerPhone": "+998901234568",

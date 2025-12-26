@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,107 +13,82 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import apiService from '../../services/api';
-import { Region } from '../../services/api';
+import { ContragentType } from '../../services/api';
 
-interface RegionPickerProps {
+interface ActivityTypePickerProps {
   label: string;
   value: string;
-  onSelect: (region: Region) => void;
-  type?: 'region' | 'district' | 'mfy';
-  parentId?: string;
+  onSelect: (activityType: ContragentType) => void;
   error?: string;
   disabled?: boolean;
   displayValue?: string;
 }
 
-export default function RegionPicker({
+export default function ActivityTypePicker({
   label,
   value,
   onSelect,
-  type = 'region',
-  parentId,
   error,
   disabled = false,
   displayValue,
-}: RegionPickerProps) {
+}: ActivityTypePickerProps) {
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
-  const [allRegions, setAllRegions] = useState<Region[]>([]);
-  const [filteredRegions, setFilteredRegions] = useState<Region[]>([]);
+  const [allActivityTypes, setAllActivityTypes] = useState<ContragentType[]>([]);
+  const [filteredActivityTypes, setFilteredActivityTypes] = useState<ContragentType[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [selectedActivityType, setSelectedActivityType] = useState<ContragentType | null>(null);
   const [displayText, setDisplayText] = useState<string>('');
 
-  // Sort regions alphabetically by name (Uzbek alphabet)
-  const sortRegionsAlphabetically = useCallback((regions: Region[]): Region[] => {
-    return [...regions].sort((a, b) => {
+  // Sort activity types alphabetically by name (Uzbek alphabet)
+  const sortActivityTypesAlphabetically = useCallback((types: ContragentType[]): ContragentType[] => {
+    return [...types].sort((a, b) => {
       const nameA = (a.name || '').toLowerCase();
       const nameB = (b.name || '').toLowerCase();
       return nameA.localeCompare(nameB, 'uz');
     });
   }, []);
 
-  // Load all regions at once
-  const loadAllRegions = useCallback(async () => {
+  // Load all activity types
+  const loadAllActivityTypes = useCallback(async () => {
     if (disabled) return;
 
     setLoading(true);
     try {
-      const params: any = {
-        type,
-        page: 1,
-        limit: 1000,
-      };
-
-      if (parentId) {
-        params.parent = parentId;
-      }
-
-      const response = await apiService.getRegions(params);
-
-      // If there are more pages, load them all
-      let allData = [...response.data];
-      let currentPage = response.page;
+      const response = await apiService.getContragentTypes({ status: 'active' });
       
-      while (currentPage < response.totalPages) {
-        currentPage++;
-        const nextParams = { ...params, page: currentPage };
-        const nextResponse = await apiService.getRegions(nextParams);
-        allData = [...allData, ...nextResponse.data];
-      }
-
       // Sort alphabetically
-      const sortedRegions = sortRegionsAlphabetically(allData);
-      setAllRegions(sortedRegions);
-      setFilteredRegions(sortedRegions);
+      const sortedTypes = sortActivityTypesAlphabetically(response.data);
+      setAllActivityTypes(sortedTypes);
+      setFilteredActivityTypes(sortedTypes);
     } catch (error) {
-      console.error('Error loading regions:', error);
+      console.error('Error loading activity types:', error);
     } finally {
       setLoading(false);
     }
-  }, [disabled, type, parentId, sortRegionsAlphabetically]);
+  }, [disabled, sortActivityTypesAlphabetically]);
 
   useEffect(() => {
     if (visible) {
       setSearchText('');
-      setSelectedRegion(null);
-      loadAllRegions();
+      setSelectedActivityType(null);
+      loadAllActivityTypes();
     }
-  }, [visible, type, parentId, loadAllRegions]);
+  }, [visible, loadAllActivityTypes]);
 
   useEffect(() => {
-    if (value && allRegions.length > 0) {
-      const region = allRegions.find((r) => r._id === value);
-      if (region) {
-        setSelectedRegion(region);
-        setDisplayText(region.name);
+    if (value && allActivityTypes.length > 0) {
+      const activityType = allActivityTypes.find((t) => t._id === value);
+      if (activityType) {
+        setSelectedActivityType(activityType);
+        setDisplayText(activityType.name);
       }
     } else if (!value) {
-      setSelectedRegion(null);
+      setSelectedActivityType(null);
       setDisplayText('');
     }
-  }, [value, allRegions]);
+  }, [value, allActivityTypes]);
 
   useEffect(() => {
     if (displayValue && value) {
@@ -123,42 +98,29 @@ export default function RegionPicker({
     }
   }, [displayValue, value]);
 
-  // Filter regions locally based on search text
+  // Filter activity types locally based on search text
   useEffect(() => {
     if (!searchText.trim()) {
-      setFilteredRegions(allRegions);
+      setFilteredActivityTypes(allActivityTypes);
     } else {
       const searchLower = searchText.toLowerCase();
-      const filtered = allRegions.filter((region) =>
-        region.name?.toLowerCase().includes(searchLower)
+      const filtered = allActivityTypes.filter((type) =>
+        type.name?.toLowerCase().includes(searchLower)
       );
-      setFilteredRegions(filtered);
+      setFilteredActivityTypes(filtered);
     }
-  }, [searchText, allRegions]);
+  }, [searchText, allActivityTypes]);
 
   const handleSearch = useCallback((text: string) => {
     setSearchText(text);
   }, []);
 
-  const handleSelect = (region: Region) => {
-    setSelectedRegion(region);
-    setDisplayText(region.name);
-    onSelect(region);
+  const handleSelect = (activityType: ContragentType) => {
+    setSelectedActivityType(activityType);
+    setDisplayText(activityType.name);
+    onSelect(activityType);
     setVisible(false);
     setSearchText('');
-  };
-
-  const getPlaceholder = () => {
-    switch (type) {
-      case 'region':
-        return 'Viloyatni tanlang';
-      case 'district':
-        return 'Tumanni tanlang';
-      case 'mfy':
-        return 'MFY ni tanlang';
-      default:
-        return 'Tanlang';
-    }
   };
 
   return (
@@ -176,14 +138,14 @@ export default function RegionPicker({
       >
         <View style={styles.inputContent}>
           <Ionicons 
-            name={type === 'region' ? 'location' : type === 'district' ? 'map' : 'home'} 
+            name="business" 
             size={20} 
             color={displayText ? '#007AFF' : '#999'} 
             style={styles.inputIcon}
           />
-        <Text style={[styles.inputText, !displayText && styles.placeholder]}>
-          {displayText || getPlaceholder()}
-        </Text>
+          <Text style={[styles.inputText, !displayText && styles.placeholder]}>
+            {displayText || 'Faoliyat turini tanlang'}
+          </Text>
         </View>
         <Ionicons name="chevron-down" size={20} color="#666" />
       </TouchableOpacity>
@@ -205,15 +167,15 @@ export default function RegionPicker({
               <View style={styles.modalHeaderLeft}>
                 <View style={styles.modalIconContainer}>
                   <Ionicons 
-                    name={type === 'region' ? 'location' : type === 'district' ? 'map' : 'home'} 
+                    name="business" 
                     size={24} 
                     color="#007AFF" 
                   />
                 </View>
                 <View>
-              <Text style={styles.modalTitle}>{label}</Text>
+                  <Text style={styles.modalTitle}>{label}</Text>
                   <Text style={styles.modalSubtitle}>
-                    {filteredRegions.length} ta {type === 'region' ? 'viloyat' : type === 'district' ? 'tuman' : 'MFY'}
+                    {filteredActivityTypes.length} ta faoliyat turi
                   </Text>
                 </View>
               </View>
@@ -249,15 +211,15 @@ export default function RegionPicker({
               )}
             </View>
 
-            {/* Regions List */}
+            {/* Activity Types List */}
             <FlatList
-              data={filteredRegions}
-              keyExtractor={(item, index) => item._id || `region-${index}`}
+              data={filteredActivityTypes}
+              keyExtractor={(item, index) => item._id || `activity-type-${index}`}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
                     styles.item,
-                    selectedRegion?._id === item._id && styles.itemSelected,
+                    selectedActivityType?._id === item._id && styles.itemSelected,
                   ]}
                   onPress={() => handleSelect(item)}
                   activeOpacity={0.7}
@@ -265,24 +227,24 @@ export default function RegionPicker({
                   <View style={styles.itemContent}>
                     <View style={[
                       styles.itemIconContainer,
-                      selectedRegion?._id === item._id && styles.itemIconContainerActive
+                      selectedActivityType?._id === item._id && styles.itemIconContainerActive
                     ]}>
                       <Ionicons 
-                        name={type === 'region' ? 'location' : type === 'district' ? 'map' : 'home'} 
+                        name="business" 
                         size={18} 
-                        color={selectedRegion?._id === item._id ? '#007AFF' : '#999'} 
+                        color={selectedActivityType?._id === item._id ? '#007AFF' : '#999'} 
                       />
                     </View>
-                  <Text
-                    style={[
-                      styles.itemText,
-                      selectedRegion?._id === item._id && styles.itemTextSelected,
-                    ]}
-                  >
-                    {item.name}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.itemText,
+                        selectedActivityType?._id === item._id && styles.itemTextSelected,
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
                   </View>
-                  {selectedRegion?._id === item._id && (
+                  {selectedActivityType?._id === item._id && (
                     <View style={styles.checkmarkContainer}>
                       <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
                     </View>
@@ -528,3 +490,5 @@ const styles = StyleSheet.create({
     color: '#ccc',
   },
 });
+
+

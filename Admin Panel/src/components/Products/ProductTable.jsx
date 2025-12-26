@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
-import { Visibility, CheckCircle, Cancel } from '@mui/icons-material';
+import { Visibility, CheckCircle, Cancel, Edit } from '@mui/icons-material';
 
-const ProductTable = ({ products, loading, onView, onApprove, onReject, pagination, onPageChange }) => {
+const ProductTable = ({ products, loading, onView, onApprove, onReject, onEdit, pagination, onPageChange }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -217,6 +217,15 @@ const ProductTable = ({ products, loading, onView, onApprove, onReject, paginati
                         title="Rad etish"
                       >
                         <Cancel className="w-4 h-4" />
+                      </button>
+                    )}
+                    {onEdit && (
+                      <button
+                        onClick={() => onEdit(product)}
+                        className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50 transition-colors"
+                        title="Tahrirlash"
+                      >
+                        <Edit className="w-4 h-4" />
                       </button>
                     )}
                     <button

@@ -27,6 +27,7 @@ const agentFinanceRoutes = require('./routes/agentFinanceRoutes');
 const adminFinanceRoutes = require('./routes/adminFinanceRoutes');
 const adminKpiPaymentRoutes = require('./routes/adminKpiPaymentRoutes');
 const adminContragentPaymentRoutes = require('./routes/adminContragentPaymentRoutes');
+const contragentTypeRoutes = require('./routes/contragentTypeRoutes');
 
 // Initialize Express app
 const app = express();
@@ -66,6 +67,7 @@ app.use('/api/agent-finance', agentFinanceRoutes);
 app.use('/api/admin-finance', adminFinanceRoutes);
 app.use('/api/admin-kpi-payments', adminKpiPaymentRoutes);
 app.use('/api/admin-contragent-payments', adminContragentPaymentRoutes);
+app.use('/api/contragent-types', contragentTypeRoutes);
 // Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({

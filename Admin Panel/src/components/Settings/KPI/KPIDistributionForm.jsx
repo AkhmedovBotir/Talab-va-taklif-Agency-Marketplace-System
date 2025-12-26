@@ -215,54 +215,54 @@ const KPIDistributionForm = ({
     <form onSubmit={handleSubmit} className="space-y-3">
       {/* Basic Information Card */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
+      <div className="flex items-center justify-between">
+        <div>
             <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
               <AutoAwesome className="w-4 h-4 text-indigo-600" />
               Asosiy Ma'lumotlar
-            </h3>
+          </h3>
             <p className="text-xs text-gray-500 mt-0.5">
               Taqsimlash nomi va tavsifini kiriting
-            </p>
-          </div>
-          {!editingDistribution && (
-            <button
-              type="button"
-              onClick={handlePrefillDefaults}
-              disabled={!defaults || defaultsLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 rounded-md hover:from-indigo-100 hover:to-purple-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium border border-indigo-200"
-            >
-              <RestartAlt className="w-3 h-3" />
-              Tavsiya etilgan qiymatlar
-            </button>
-          )}
+          </p>
         </div>
+        {!editingDistribution && (
+          <button
+            type="button"
+            onClick={handlePrefillDefaults}
+            disabled={!defaults || defaultsLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 rounded-md hover:from-indigo-100 hover:to-purple-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium border border-indigo-200"
+          >
+              <RestartAlt className="w-3 h-3" />
+            Tavsiya etilgan qiymatlar
+          </button>
+        )}
+      </div>
 
         <div className="grid grid-cols-1 gap-3">
-          <div>
+        <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
               Nomi <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              required
-              value={formState.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              placeholder="Masalan: Standard Distribution"
+          <input
+            type="text"
+            required
+            value={formState.name}
+            onChange={(e) => handleInputChange('name', e.target.value)}
+            placeholder="Masalan: Standard Distribution"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white"
-            />
-          </div>
-          <div>
+          />
+        </div>
+        <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
               Tavsif
             </label>
-            <textarea
-              value={formState.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
+          <textarea
+            value={formState.description}
+            onChange={(e) => handleInputChange('description', e.target.value)}
               rows={2}
               placeholder="Bu taqsimlash qachon va qanday holatlarda ishlatilishini yozib qo'ying"
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none bg-white"
-            />
+          />
           </div>
         </div>
       </div>
@@ -333,22 +333,22 @@ const KPIDistributionForm = ({
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
                     <Icon className={`w-3.5 h-3.5 ${config.textColor}`} />
                     <span>{config.label}</span>
-                  </label>
+                </label>
                   <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={formState.distribution[field] || 0}
-                      onChange={(e) => handleDistributionChange(field, e.target.value)}
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formState.distribution[field] || 0}
+                  onChange={(e) => handleDistributionChange(field, e.target.value)}
                       className={`w-full px-2 py-1.5 text-sm ${config.borderColor} border rounded-md focus:outline-none focus:ring-1 ${config.focusRing} focus:border-transparent transition-all font-semibold ${config.textColor} bg-white`}
-                    />
+                />
                     <span className={`absolute right-2 top-1/2 -translate-y-1/2 ${config.textColor} font-semibold text-xs pointer-events-none`}>
                       %
                     </span>
                   </div>
-                </div>
+              </div>
               );
             })}
           </div>
@@ -367,8 +367,8 @@ const KPIDistributionForm = ({
           </div>
           <div className="max-w-md">
             <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Punkt Transfer (%)
-            </label>
+                Punkt Transfer (%)
+              </label>
             <div className="relative">
               <input
                 type="number"
@@ -415,20 +415,20 @@ const KPIDistributionForm = ({
                 <p className={`text-base font-bold ${sumOfBasePercents === 100 ? 'text-green-600' : 'text-amber-600'}`}>
                   {sumOfBasePercents}%
                 </p>
-              </div>
             </div>
-          </div>
+            </div>
+        </div>
           <label className="flex items-center gap-2 p-2 bg-white rounded-md border border-gray-200 cursor-pointer hover:border-indigo-300 transition-colors shadow-sm">
-            <input
-              type="checkbox"
-              checked={formState.isActive}
-              onChange={(e) => handleInputChange('isActive', e.target.checked)}
+          <input
+            type="checkbox"
+            checked={formState.isActive}
+            onChange={(e) => handleInputChange('isActive', e.target.checked)}
               className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
-            />
+          />
             <span className="text-xs font-semibold text-gray-700">
-              Faol taqsimlash sifatida saqlash
+          Faol taqsimlash sifatida saqlash
             </span>
-          </label>
+        </label>
         </div>
       </div>
 

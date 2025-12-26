@@ -11,7 +11,9 @@ import {
   CheckCircle, 
   AccountBalance,
   TrendingUp,
-  Warning
+  Warning,
+  CalendarToday,
+  Payment
 } from '@mui/icons-material';
 
 const formatNumber = (num) => {
@@ -45,9 +47,18 @@ const ContragentPayments = ({ hideHeader = false }) => {
   const [statistics, setStatistics] = useState(null);
   const [selectedPayments, setSelectedPayments] = useState([]);
   const [markAsPaidModalOpen, setMarkAsPaidModalOpen] = useState(false);
+  const [paySingleModalOpen, setPaySingleModalOpen] = useState(false);
+  const [payByDateRangeModalOpen, setPayByDateRangeModalOpen] = useState(false);
+  const [selectedPaymentId, setSelectedPaymentId] = useState(null);
   const [notes, setNotes] = useState('');
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [dueDateDays, setDueDateDays] = useState(7);
+  const [dateRange, setDateRange] = useState({
+    startDate: '',
+    endDate: '',
+    contragentId: '',
+    isOverdue: false,
+  });
 
   // Fetch unpaid payments
   const fetchUnpaidPayments = useCallback(async () => {
@@ -67,7 +78,7 @@ const ContragentPayments = ({ hideHeader = false }) => {
       const response = await contragentPaymentAPI.getUnpaidPayments(params);
 
       if (response.success) {
-        setPayments(response.data || []);
+        setPayments(response.data);
         setPagination({
           page: response.page || pagination.page,
           limit: response.limit || pagination.limit,
@@ -188,6 +199,66 @@ const ContragentPayments = ({ hideHeader = false }) => {
     }
   };
 
+  const handlePaySingle = async () => {
+    if (!selectedPaymentId) {
+      showError('To\'lov tanlanmagan');
+      return;
+    }
+
+    try {
+      const response = await contragentPaymentAPI.paySinglePayment(selectedPaymentId, notes);
+      if (response.success) {
+        showSuccess(response.message || 'To\'lov muvaffaqiyatli to\'landi');
+        setPaySingleModalOpen(false);
+        setSelectedPaymentId(null);
+        setNotes('');
+        if (activeView === 'unpaid') {
+          fetchUnpaidPayments();
+        }
+      }
+    } catch (err) {
+      showError(err.message || 'To\'lovni to\'lashda xatolik yuz berdi');
+    }
+  };
+
+  const handlePayByDateRange = async () => {
+    if (!dateRange.startDate || !dateRange.endDate) {
+      showError('Boshlanish va tugash sanalarini kiriting');
+      return;
+    }
+
+    if (new Date(dateRange.startDate) > new Date(dateRange.endDate)) {
+      showError('Boshlanish sanasi tugash sanasidan kichik bo\'lishi kerak');
+      return;
+    }
+
+    try {
+      const response = await contragentPaymentAPI.payByDateRange({
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        contragentId: dateRange.contragentId || undefined,
+        isOverdue: dateRange.isOverdue,
+        notes: notes,
+      });
+      if (response.success) {
+        showSuccess(response.message || `${response.count || 0} ta to'lov muvaffaqiyatli to'landi`);
+        setPayByDateRangeModalOpen(false);
+        setDateRange({
+          startDate: '',
+          endDate: '',
+          contragentId: '',
+          isOverdue: false,
+        });
+        setNotes('');
+        if (activeView === 'unpaid') {
+          fetchUnpaidPayments();
+        }
+      }
+    } catch (err) {
+      showError(err.message || 'To\'lovlarni to\'lashda xatolik yuz berdi');
+    }
+  };
+
   const handleSync = async () => {
     try {
       const response = await contragentPaymentAPI.syncPayments(dueDateDays);
@@ -250,14 +321,25 @@ const ContragentPayments = ({ hideHeader = false }) => {
               <Sync />
               <span>Sinxronlashtirish</span>
             </button>
-            {activeView === 'unpaid' && selectedPayments.length > 0 && (
-              <button
-                onClick={() => setMarkAsPaidModalOpen(true)}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-              >
-                <CheckCircle />
-                <span>To'landi deb belgilash ({selectedPayments.length})</span>
-              </button>
+            {activeView === 'unpaid' && (
+              <>
+                <button
+                  onClick={() => setPayByDateRangeModalOpen(true)}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <CalendarToday />
+                  <span>Sana bo'yicha to'lash</span>
+                </button>
+                {selectedPayments.length > 0 && (
+                  <button
+                    onClick={() => setMarkAsPaidModalOpen(true)}
+                    className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                  >
+                    <CheckCircle />
+                    <span>To'landi deb belgilash ({selectedPayments.length})</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </motion.div>
@@ -507,6 +589,10 @@ const ContragentPayments = ({ hideHeader = false }) => {
                   setSelectedPayments([]);
                 }
               }}
+              onPaySingle={(paymentId) => {
+                setSelectedPaymentId(paymentId);
+                setPaySingleModalOpen(true);
+              }}
             />
           )}
         </div>
@@ -551,6 +637,140 @@ const ContragentPayments = ({ hideHeader = false }) => {
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
                 Tasdiqlash
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Pay Single Payment Modal */}
+      {paySingleModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+          >
+            <h2 className="text-xl font-bold text-gray-900 mb-4">To'lovni to'lash</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Bitta to'lov to'lanmoqda
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Qo'shimcha ma'lumotlar (ixtiyoriy)
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                rows={3}
+                placeholder="Masalan: Naqd pul orqali to'landi"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setPaySingleModalOpen(false);
+                  setSelectedPaymentId(null);
+                  setNotes('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Bekor qilish
+              </button>
+              <button
+                onClick={handlePaySingle}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                To'lash
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Pay By Date Range Modal */}
+      {payByDateRangeModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+          >
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Sana bo'yicha to'lovlarni to'lash</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Sana oralig'idagi barcha to'lanmagan to'lovlarni to'lash
+            </p>
+            <div className="space-y-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Boshlanish sanasi <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.startDate}
+                  onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tugash sanasi <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.endDate}
+                  onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={dateRange.isOverdue}
+                    onChange={(e) => setDateRange({ ...dateRange, isOverdue: e.target.checked })}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-700">Faqat muddat o'tgan to'lovlar</span>
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Qo'shimcha ma'lumotlar (ixtiyoriy)
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  rows={3}
+                  placeholder="Masalan: Oylik to'lovlar"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setPayByDateRangeModalOpen(false);
+                  setDateRange({
+                    startDate: '',
+                    endDate: '',
+                    contragentId: '',
+                    isOverdue: false,
+                  });
+                  setNotes('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Bekor qilish
+              </button>
+              <button
+                onClick={handlePayByDateRange}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                To'lash
               </button>
             </div>
           </motion.div>
@@ -610,6 +830,8 @@ const ContragentPayments = ({ hideHeader = false }) => {
 };
 
 export default ContragentPayments;
+
+
 
 
 

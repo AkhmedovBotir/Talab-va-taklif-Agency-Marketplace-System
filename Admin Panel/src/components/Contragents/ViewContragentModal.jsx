@@ -171,6 +171,19 @@ const ViewContragentModal = ({ open, onClose, contragent }) => {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
+                            Faoliyat turi
+                          </label>
+                          <p className="text-gray-900">
+                            {contragentData.activityType?.name || '-'}
+                            {contragentData.activityType?.icon && (
+                              <span className="text-xs text-gray-500 ml-2 font-mono">
+                                ({contragentData.activityType.icon})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500 mb-1">
                             Status
                           </label>
                           <span className={getStatusBadge(contragentData.status)}>

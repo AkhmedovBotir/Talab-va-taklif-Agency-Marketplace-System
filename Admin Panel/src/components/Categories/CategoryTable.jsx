@@ -131,13 +131,13 @@ const CategoryTable = ({ categories, loading, onView, onEdit, onDelete, onCreate
                         {formatDate(category.createdAt)}
                       </div>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => onView(category)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                          title="Batafsil ko'rish"
-                        >
-                          <Visibility className="w-4 h-4" />
-                        </button>
+                      <button
+                        onClick={() => onView(category)}
+                        className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                        title="Batafsil ko'rish"
+                      >
+                        <Visibility className="w-4 h-4" />
+                      </button>
                         {onEdit && (
                           <button
                             onClick={() => onEdit(category)}
@@ -207,13 +207,13 @@ const CategoryTable = ({ categories, loading, onView, onEdit, onDelete, onCreate
                                   {formatDate(subcategory.createdAt)}
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => onView(subcategory)}
-                                    className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                                    title="Batafsil ko'rish"
-                                  >
-                                    <Visibility className="w-4 h-4" />
-                                  </button>
+                                <button
+                                  onClick={() => onView(subcategory)}
+                                  className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                                  title="Batafsil ko'rish"
+                                >
+                                  <Visibility className="w-4 h-4" />
+                                </button>
                                   {onEdit && (
                                     <button
                                       onClick={() => onEdit(subcategory, true)}

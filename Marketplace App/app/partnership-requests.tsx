@@ -517,7 +517,11 @@ export default function PartnershipRequestsScreen() {
                 <View style={styles.infoSection}>
                   <Text style={styles.sectionTitle}>Faoliyat</Text>
                   <View style={styles.infoCard}>
-                    <Text style={styles.activityText}>{selectedRequest.activity}</Text>
+                    <Text style={styles.activityText}>
+                      {typeof selectedRequest.activityType === 'object' && selectedRequest.activityType !== null
+                        ? selectedRequest.activityType.name
+                        : selectedRequest.activityType || '-'}
+                    </Text>
                   </View>
                 </View>
 

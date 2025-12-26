@@ -78,6 +78,7 @@ const {
   approveProduct,
   rejectProduct,
   getAllProductsForModeration,
+  updateProduct,
 } = require('../controllers/adminProductModerationController');
 const {
   getAllPartnershipRequests,
@@ -149,20 +150,25 @@ router.get('/data/categories/:id', adminAuth, getCategoryByIdForAdmin);
 // Category CRUD
 router.post('/categories', adminAuth, validate(adminCategoryValidationSchemas.create), createCategory);
 router.get('/categories', adminAuth, getAllCategories);
-router.get('/categories/:id', adminAuth, getCategoryById);
-router.put('/categories/:id', adminAuth, validate(adminCategoryValidationSchemas.update), updateCategory);
-router.put('/categories/:id/status', adminAuth, validate(adminCategoryValidationSchemas.updateStatus), updateCategoryStatus);
-router.delete('/categories/:id', adminAuth, deleteCategory);
 
-// Subcategory CRUD
+// Subcategory CRUD (MUST be before /categories/:id to avoid route conflict)
 router.post('/categories/subcategories', adminAuth, validate(adminCategoryValidationSchemas.createSubcategory), createSubcategory);
 router.get('/categories/subcategories', adminAuth, getAllSubcategories);
 router.put('/categories/subcategories/:id', adminAuth, validate(adminCategoryValidationSchemas.updateSubcategory), updateSubcategory);
 router.put('/categories/subcategories/:id/status', adminAuth, validate(adminCategoryValidationSchemas.updateStatus), updateCategoryStatus);
 router.delete('/categories/subcategories/:id', adminAuth, deleteSubcategory);
 
+// Category by ID (MUST be after /categories/subcategories to avoid route conflict)
+router.get('/categories/:id', adminAuth, getCategoryById);
+router.put('/categories/:id', adminAuth, validate(adminCategoryValidationSchemas.update), updateCategory);
+router.put('/categories/:id/status', adminAuth, validate(adminCategoryValidationSchemas.updateStatus), updateCategoryStatus);
+router.delete('/categories/:id', adminAuth, deleteCategory);
+
 // Get all products (for admin with advanced filters)
 router.get('/data/products', adminAuth, getAllProductsForAdmin);
+
+// Update product
+router.put('/products/:id', adminAuth, validate(adminProductModerationValidationSchemas.update), updateProduct);
 
 // Get product by ID (for admin)
 router.get('/data/products/:id', adminAuth, getProductByIdForAdmin);

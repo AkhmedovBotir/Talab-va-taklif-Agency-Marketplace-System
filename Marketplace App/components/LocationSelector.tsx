@@ -321,25 +321,25 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
           />
         )}
         
-        <TouchableOpacity
+      <TouchableOpacity
           style={[
             styles.locationSelector,
             showHighlight && styles.locationSelectorHighlighted,
           ]}
-          onPress={handleLocationPress}
-          activeOpacity={0.7}
-        >
-          <View style={styles.locationIconContainer}>
-            <Ionicons name="location" size={20} color="#007AFF" />
-          </View>
-          <View style={styles.locationTextContainer}>
-            <Text style={styles.locationLabel}>Yetkazib berish hududi</Text>
-            <Text style={styles.locationText} numberOfLines={1}>
-              {getLocationText()}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#999" />
-        </TouchableOpacity>
+        onPress={handleLocationPress}
+        activeOpacity={0.7}
+      >
+        <View style={styles.locationIconContainer}>
+          <Ionicons name="location" size={20} color="#007AFF" />
+        </View>
+        <View style={styles.locationTextContainer}>
+          <Text style={styles.locationLabel}>Yetkazib berish hududi</Text>
+          <Text style={styles.locationText} numberOfLines={1}>
+            {getLocationText()}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#999" />
+      </TouchableOpacity>
       </View>
 
       {/* Alert-style explanation for new users */}
@@ -394,7 +394,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
             <View style={styles.dragIndicator} />
             
             {/* Header */}
-            <View style={styles.modalHeader}>
+          <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
                 <View style={styles.modalIconContainer}>
                   <Ionicons name="location" size={20} color="#007AFF" />
@@ -406,14 +406,14 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity 
+            <TouchableOpacity
                 onPress={() => setLocationModalVisible(false)}
                 style={styles.closeButton}
                 activeOpacity={0.7}
               >
                 <Ionicons name="close-circle" size={24} color="#999" />
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
+          </View>
 
             <ScrollView 
               style={styles.modalContent}
@@ -424,16 +424,16 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
               {/* Info Card */}
               <View style={styles.infoCard}>
                 <View style={styles.infoIconContainer}>
-                  <Ionicons name="information-circle" size={20} color="#007AFF" />
+              <Ionicons name="information-circle" size={20} color="#007AFF" />
                 </View>
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoTitle}>Qanday tanlash kerak?</Text>
                   <Text style={styles.infoDescription}>
                     Avval viloyatni, keyin tumanni tanlang. Tanlangan hududga qarab faqat sizning hududingizga yetkazib beriladigan mahsulotlar ko'rsatiladi.
-                  </Text>
+              </Text>
                 </View>
-              </View>
-
+            </View>
+            
               {/* Viloyat Selector Card */}
               <View style={styles.selectorCard}>
                 <View style={styles.selectorCardHeader}>
@@ -443,11 +443,11 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
                   <Text style={styles.selectorCardTitle}>Viloyat</Text>
                 </View>
                 <View style={styles.regionPickerWrapper}>
-                  <RegionPicker
+            <RegionPicker
                     label=""
                     value={tempViloyat?._id || ''}
-                    type="region"
-                    onSelect={handleViloyatSelect}
+              type="region"
+              onSelect={handleViloyatSelect}
                     displayValue={tempViloyat?.name}
                   />
                 </View>
@@ -469,15 +469,15 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
                   )}
                 </View>
                 <View style={styles.regionPickerWrapper}>
-                  <RegionPicker
+            <RegionPicker
                     label=""
                     value={tempTuman?._id || ''}
-                    type="district"
+              type="district"
                     parentId={tempViloyat?._id}
-                    onSelect={handleTumanSelect}
+              onSelect={handleTumanSelect}
                     displayValue={tempTuman?.name}
                     disabled={!tempViloyat}
-                  />
+            />
                 </View>
               </View>
 
@@ -486,7 +486,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
                 <View style={styles.selectedLocationCard}>
                   <View style={styles.selectedLocationHeader}>
                     <View style={styles.selectedLocationIconContainer}>
-                      <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
                     </View>
                     <Text style={styles.selectedLocationTitle}>Tanlangan hudud</Text>
                   </View>
@@ -507,10 +507,10 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
               {/* Action Buttons */}
               <View style={styles.actionButtons}>
                 {tempViloyat && tempTuman && (
-                  <TouchableOpacity
+                <TouchableOpacity
                     style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-                    onPress={handleSave}
-                    activeOpacity={0.8}
+                  onPress={handleSave}
+                  activeOpacity={0.8}
                     disabled={saving}
                   >
                     {saving ? (
@@ -518,9 +518,9 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
                     ) : (
                       <>
                         <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                        <Text style={styles.saveButtonText}>Saqlash</Text>
-                      </>
-                    )}
+                  <Text style={styles.saveButtonText}>Saqlash</Text>
+              </>
+            )}
                   </TouchableOpacity>
                 )}
                 {(tempViloyat || tempTuman) && (

@@ -363,29 +363,29 @@ export default function SearchScreen() {
             {/* Search Bar with Filter Button */}
             <View style={styles.searchContainer}>
                 <View style={styles.searchInputGroup}>
-                    <View style={styles.searchBar}>
-                        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Mahsulot qidirish..."
-                            placeholderTextColor="#999"
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            onSubmitEditing={handleSearch}
-                            returnKeyType="search"
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setSearchQuery('');
-                                    setDebouncedSearchQuery('');
-                                    setPage(1);
-                                    setHasMore(true);
-                                    loadProducts(1, false, '');
-                                }}
-                                style={styles.clearButton}
-                            >
-                                <Ionicons name="close-circle" size={20} color="#999" />
+                <View style={styles.searchBar}>
+                    <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Mahsulot qidirish..."
+                        placeholderTextColor="#999"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        onSubmitEditing={handleSearch}
+                        returnKeyType="search"
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity
+                            onPress={() => {
+                                setSearchQuery('');
+                                setDebouncedSearchQuery('');
+                                setPage(1);
+                                setHasMore(true);
+                                loadProducts(1, false, '');
+                            }}
+                            style={styles.clearButton}
+                        >
+                            <Ionicons name="close-circle" size={20} color="#999" />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -413,22 +413,22 @@ export default function SearchScreen() {
             {(contragentFilterName || activeFilters.category || activeFilters.subcategory) && (
                 <View style={styles.filterContainer}>
                     {contragentFilterName && (
-                        <View style={styles.filterBadgeItem}>
-                            <Ionicons name="storefront" size={16} color="#007AFF" />
-                            <Text style={styles.filterBadgeItemText}>{contragentFilterName}</Text>
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    setContragentFilter(undefined);
-                                    setContragentFilterName(undefined);
+                    <View style={styles.filterBadgeItem}>
+                        <Ionicons name="storefront" size={16} color="#007AFF" />
+                        <Text style={styles.filterBadgeItemText}>{contragentFilterName}</Text>
+                        <TouchableOpacity 
+                            onPress={() => {
+                                setContragentFilter(undefined);
+                                setContragentFilterName(undefined);
                                     setActiveFilters({});
-                                    setPage(1);
-                                    setHasMore(true);
-                                    loadProducts(1, false);
-                                }}
-                            >
-                                <Ionicons name="close-circle" size={18} color="#007AFF" />
-                            </TouchableOpacity>
-                        </View>
+                                setPage(1);
+                                setHasMore(true);
+                                loadProducts(1, false);
+                            }}
+                        >
+                            <Ionicons name="close-circle" size={18} color="#007AFF" />
+                        </TouchableOpacity>
+                    </View>
                     )}
                     {activeFilters.category && (
                         <View style={styles.filterBadgeItem}>

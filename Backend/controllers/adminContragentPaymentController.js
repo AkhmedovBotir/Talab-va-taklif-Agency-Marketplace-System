@@ -235,6 +235,329 @@ const getUnpaidPaymentsGrouped = async (req, res) => {
 
 // ==================== TO'LOVNI TASDIQLASH ====================
 
+// Bitta to'lovni to'lash (Contragentga to'lovni amalga oshirish)
+const payContragentPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const admin = req.user.admin;
+
+    // Check if payment exists and is pending
+    const payment = await ContragentPaymentDistribution.findById(id);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'To\'lov topilmadi',
+      });
+    }
+
+    if (payment.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `To'lov allaqachon ${payment.status === 'paid' ? 'to\'langan' : 'bekor qilingan'}`,
+      });
+    }
+
+    // Update payment
+    const now = new Date();
+    payment.status = 'paid';
+    payment.paidAt = now;
+    payment.paidBy = admin._id;
+    payment.notes = notes || null;
+    payment.isOverdue = false;
+
+    await payment.save();
+
+    // Get updated payment with full details
+    const updatedPayment = await ContragentPaymentDistribution.findById(id)
+      .populate({
+        path: 'contragent',
+        select: 'name inn phone viloyat tuman mfy',
+        populate: [
+          {
+            path: 'viloyat',
+            select: 'name type code',
+          },
+          {
+            path: 'tuman',
+            select: 'name type code',
+          },
+          {
+            path: 'mfy',
+            select: 'name type code',
+          },
+        ],
+      })
+      .populate('paidBy', 'name phone')
+      .populate('orders', 'orderNumber totalPrice totalKpiPrice createdAt');
+
+    // Send notification to contragent
+    let io = null;
+    try {
+      io = getIO();
+    } catch (error) {
+      console.warn('Socket.io not initialized, notifications will be saved but not sent via socket');
+    }
+
+    let notification = null;
+    if (updatedPayment.contragent) {
+      // Format amount
+      const formattedAmount = updatedPayment.amount.toLocaleString('uz-UZ', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+
+      // Get contragent name
+      const contragentName = updatedPayment.contragent.name || 'Noma\'lum';
+
+      // Format date
+      const formattedDate = now.toLocaleDateString('uz-UZ', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+
+      // Create notification
+      try {
+        notification = new Notification({
+          targetType: 'contragents',
+          targetId: updatedPayment.contragent._id,
+          type: 'payment_received',
+          title: 'To\'lov qabul qilindi',
+          message: `Sizga ${formattedAmount} so'm to'lov ${formattedDate} sanasida to'landi.`,
+          data: {
+            paymentId: updatedPayment._id,
+            amount: updatedPayment.amount,
+            paidAt: now,
+          },
+        });
+
+        await notification.save();
+
+        // Send via socket if available
+        if (io) {
+          io.to(`contragent_${updatedPayment.contragent._id}`).emit('notification', notification);
+        }
+      } catch (error) {
+        console.error('Error creating notification for payment:', error);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'To\'lov muvaffaqiyatli to\'landi',
+      data: updatedPayment,
+      notification: notification ? {
+        id: notification._id,
+        title: notification.title,
+        message: notification.message,
+      } : null,
+    });
+  } catch (error) {
+    console.error('Error in payContragentPayment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'To\'lovni to\'lashda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Belgilangan muddat orasida filterlangan to'lanmagan to'lovlarni to'lash
+const payContragentPaymentsByDateRange = async (req, res) => {
+  try {
+    const { startDate, endDate, contragentId, isOverdue, notes } = req.body;
+    const admin = req.user.admin;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Boshlanish va tugash sanalari kiritilishi shart',
+      });
+    }
+
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    if (start > end) {
+      return res.status(400).json({
+        success: false,
+        message: 'Boshlanish sanasi tugash sanasidan kichik bo\'lishi kerak',
+      });
+    }
+
+    // Build filter
+    const filter = {
+      status: 'pending',
+      dueDate: {
+        $gte: start,
+        $lte: end,
+      },
+    };
+
+    if (contragentId) {
+      filter.contragent = contragentId;
+    }
+
+    if (isOverdue === true || isOverdue === 'true') {
+      filter.isOverdue = true;
+    }
+
+    // Find all matching payments
+    const payments = await ContragentPaymentDistribution.find(filter);
+
+    if (payments.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Belgilangan muddat orasida to\'lanmagan to\'lovlar topilmadi',
+      });
+    }
+
+    // Update all payments
+    const now = new Date();
+    const paymentIds = payments.map((p) => p._id);
+
+    await ContragentPaymentDistribution.updateMany(
+      { _id: { $in: paymentIds } },
+      {
+        $set: {
+          status: 'paid',
+          paidAt: now,
+          paidBy: admin._id,
+          notes: notes || null,
+          isOverdue: false,
+        },
+      }
+    );
+
+    // Get updated payments with full details
+    const updatedPayments = await ContragentPaymentDistribution.find({
+      _id: { $in: paymentIds },
+    })
+      .populate({
+        path: 'contragent',
+        select: 'name inn phone viloyat tuman mfy',
+        populate: [
+          {
+            path: 'viloyat',
+            select: 'name type code',
+          },
+          {
+            path: 'tuman',
+            select: 'name type code',
+          },
+          {
+            path: 'mfy',
+            select: 'name type code',
+          },
+        ],
+      })
+      .populate('paidBy', 'name phone')
+      .populate('orders', 'orderNumber totalPrice totalKpiPrice createdAt');
+
+    // Calculate total amount
+    const totalAmount = updatedPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    // Send notifications to contragents
+    let io = null;
+    try {
+      io = getIO();
+    } catch (error) {
+      console.warn('Socket.io not initialized, notifications will be saved but not sent via socket');
+    }
+
+    const notifications = [];
+    const contragentIds = new Set();
+
+    for (const payment of updatedPayments) {
+      if (!payment.contragent || contragentIds.has(payment.contragent._id.toString())) {
+        continue;
+      }
+
+      contragentIds.add(payment.contragent._id.toString());
+
+      // Calculate total amount for this contragent
+      const contragentPayments = updatedPayments.filter(
+        (p) => p.contragent && p.contragent._id.toString() === payment.contragent._id.toString()
+      );
+      const contragentTotalAmount = contragentPayments.reduce((sum, p) => sum + p.amount, 0);
+
+      // Format amount
+      const formattedAmount = contragentTotalAmount.toLocaleString('uz-UZ', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+
+      // Get contragent name
+      const contragentName = payment.contragent.name || 'Noma\'lum';
+
+      // Format date
+      const formattedDate = now.toLocaleDateString('uz-UZ', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+
+      // Create notification
+      try {
+        const notification = new Notification({
+          targetType: 'contragents',
+          targetId: payment.contragent._id,
+          type: 'payment_received',
+          title: 'To\'lovlar qabul qilindi',
+          message: `Sizga ${formattedAmount} so'm to'lov (${contragentPayments.length} ta) ${formattedDate} sanasida to'landi.`,
+          data: {
+            paymentIds: contragentPayments.map((p) => p._id),
+            totalAmount: contragentTotalAmount,
+            count: contragentPayments.length,
+            paidAt: now,
+          },
+        });
+
+        await notification.save();
+        notifications.push(notification);
+
+        // Send via socket if available
+        if (io) {
+          io.to(`contragent_${payment.contragent._id}`).emit('notification', notification);
+        }
+      } catch (error) {
+        console.error('Error creating notification for payment:', error);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${payments.length} ta to'lov muvaffaqiyatli to'landi`,
+      count: updatedPayments.length,
+      totalAmount,
+      dateRange: {
+        startDate: start,
+        endDate: end,
+      },
+      filter: {
+        contragentId: contragentId || null,
+        isOverdue: isOverdue || false,
+      },
+      data: updatedPayments,
+      notifications: {
+        sent: notifications.length,
+        contragents: contragentIds.size,
+      },
+    });
+  } catch (error) {
+    console.error('Error in payContragentPaymentsByDateRange:', error);
+    res.status(500).json({
+      success: false,
+      message: 'To\'lovlarni to\'lashda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 // Bir yoki bir nechta to'lovlarni "to'landi" deb belgilash
 const markPaymentsAsPaid = async (req, res) => {
   try {
@@ -778,6 +1101,8 @@ const syncContragentPayments = async (req, res) => {
 module.exports = {
   getUnpaidPayments,
   getUnpaidPaymentsGrouped,
+  payContragentPayment,
+  payContragentPaymentsByDateRange,
   markPaymentsAsPaid,
   getPaymentStatistics,
   getPaidPayments,

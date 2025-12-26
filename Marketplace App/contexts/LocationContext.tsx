@@ -46,7 +46,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
           } else {
             setSelectedViloyatState(null);
             console.log('LocationContext: Cleared viloyat (API returned null)');
-          }
+        }
           
           if (response.data.tuman && typeof response.data.tuman === 'object') {
             setSelectedTumanState(response.data.tuman);

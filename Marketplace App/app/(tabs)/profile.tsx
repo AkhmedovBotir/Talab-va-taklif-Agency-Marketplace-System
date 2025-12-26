@@ -284,7 +284,7 @@ export default function ProfileScreen() {
   const handlePickImage = () => {
     const options = {
       mediaType: 'photo' as MediaType,
-      quality: 0.8,
+        quality: 0.8,
       includeBase64: true,
     };
 

@@ -43,7 +43,9 @@ The API uses JWT (JSON Web Token) for authentication. After successful login, yo
 
 **Token Expiration:** 24 hours
 
-**Note:** Currently, most endpoints do not require authentication. However, it is recommended to implement authentication middleware for production use.
+**Note:** 
+- GET endpoints (`GET /api/contragents` and `GET /api/contragents/:id`) are **public** and do not require authentication.
+- Other endpoints may require authentication depending on the implementation.
 
 ---
 
@@ -61,6 +63,7 @@ The API uses JWT (JSON Web Token) for authentication. After successful login, yo
   "mfy": "object (reference to Region, type: 'mfy')",
   "phone": "string (valid phone number, unique)",
   "logo": "string (base64 image, optional)",
+  "activityType": "object (reference to ContragentType)",
   "status": "string (enum: 'active' | 'inactive', default: 'active')",
   "createdAt": "string (ISO 8601 date)",
   "updatedAt": "string (ISO 8601 date)"
@@ -74,6 +77,15 @@ The API uses JWT (JSON Web Token) for authentication. After successful login, yo
   "name": "string",
   "type": "string",
   "code": "string"
+}
+```
+
+**ContragentType Object (when populated):**
+```json
+{
+  "_id": "string",
+  "name": "string",
+  "icon": "string"
 }
 ```
 
@@ -222,6 +234,7 @@ Create a new contragent.
   "mfy": "string (required, MongoDB ObjectId of Region with type: 'mfy')",
   "phone": "string (required, valid phone format, unique)",
   "password": "string (required, min 6 chars)",
+  "activityType": "string (required, MongoDB ObjectId of ContragentType)",
   "logo": "string (optional, base64 image format: data:image/png;base64,...)",
   "status": "string (optional, 'active' | 'inactive', default: 'active')"
 }
@@ -235,6 +248,7 @@ Create a new contragent.
 - `mfy`: Required, must be a valid Region ID with type 'mfy', and must be a child of the selected tuman
 - `phone`: Required, must be a valid phone number format, unique
 - `password`: Required, minimum 6 characters
+- `activityType`: Required, must be a valid ContragentType ID with status 'active'
 - `logo`: Optional, must be base64 image format (data:image/png;base64,... or data:image/jpeg;base64,...)
 - `status`: Optional, defaults to 'active'
 
@@ -433,6 +447,7 @@ All fields are optional. Only include fields you want to update.
   "mfy": "string (optional, MongoDB ObjectId of Region with type: 'mfy')",
   "phone": "string (optional, valid phone format, unique)",
   "password": "string (optional, min 6 chars)",
+  "activityType": "string (optional, MongoDB ObjectId of ContragentType with status 'active')",
   "logo": "string (optional, base64 image format: data:image/png;base64,...)",
   "status": "string (optional, 'active' | 'inactive')"
 }
@@ -442,6 +457,7 @@ All fields are optional. Only include fields you want to update.
 - Same as create, but all fields are optional
 - INN and phone must be unique (cannot duplicate existing values)
 - If updating viloyat, tuman, or mfy, hierarchy validation applies (tuman must be child of viloyat, mfy must be child of tuman)
+- If updating activityType, it must be a valid ContragentType ID with status 'active'
 
 **Success Response (200 OK):**
 
@@ -669,6 +685,12 @@ All error responses follow a consistent format:
   - Invalid: `data:image/png;base64` (missing comma and base64 data)
 - **Note:** Logo is stored as base64 string in the database
 
+### Activity Type
+- **Type:** MongoDB ObjectId (reference to ContragentType)
+- **Required:** Yes (for create)
+- **Description:** Must be a valid ContragentType ID with status 'active' from the contragent-types collection
+- **Note:** When creating or updating a contragent, the activityType must exist and be active
+
 ### Status
 - **Type:** String (enum)
 - **Required:** No (defaults to 'active')
@@ -721,6 +743,11 @@ curl -X POST http://localhost:5000/api/contragents/login \
         "name": "Yunusobod MFY",
         "type": "mfy",
         "code": "YUN-MFY"
+      },
+      "activityType": {
+        "_id": "507f1f77bcf86cd799439015",
+        "name": "Savdo",
+        "icon": "shop-icon"
       },
       "phone": "+998901234567",
       "status": "active",
@@ -790,6 +817,7 @@ curl -X POST http://localhost:5000/api/contragents \
     "mfy": "507f1f77bcf86cd799439014",
     "phone": "+998901234567",
     "password": "securepass123",
+    "activityType": "507f1f77bcf86cd799439015",
     "logo": "data:image/png;base64,iVBORw0KGgoAAAANS...",
     "status": "active"
   }'
@@ -1032,6 +1060,10 @@ curl -X POST http://localhost:5000/api/contragents \
 7. **Pagination:** The `getAllContragents` endpoint supports pagination with `page` and `limit` query parameters.
 
 8. **Timestamps:** All contragent records include `createdAt` and `updatedAt` timestamps that are automatically managed by MongoDB.
+
+9. **Activity Type:** Each contragent must have an activity type (ContragentType) which defines the type of business activity. The activity type must be active when creating or updating a contragent.
+
+10. **Public GET Endpoints:** The `GET /api/contragents` and `GET /api/contragents/:id` endpoints are public and do not require authentication. Use these endpoints to fetch contragent information without authentication.
 
 ---
 

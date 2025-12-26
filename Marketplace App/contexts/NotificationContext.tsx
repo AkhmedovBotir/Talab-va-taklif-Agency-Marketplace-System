@@ -29,7 +29,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       // Don't log 401 errors - they're handled by API service
       if (error?.status !== 401) {
-        console.error('Error fetching unread count:', error);
+      console.error('Error fetching unread count:', error);
       }
       // Set unread count to 0 on any error
       setUnreadCount(0);

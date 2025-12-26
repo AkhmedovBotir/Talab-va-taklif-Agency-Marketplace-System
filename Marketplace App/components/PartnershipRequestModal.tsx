@@ -14,8 +14,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import api, { CreatePartnershipRequest, Region } from '../services/api';
+import api, { CreatePartnershipRequest, Region, ContragentType } from '../services/api';
 import RegionPicker from './ui/RegionPicker';
+import ActivityTypePicker from './ui/ActivityTypePicker';
 
 interface PartnershipRequestModalProps {
   visible: boolean;
@@ -40,7 +41,7 @@ export default function PartnershipRequestModal({
     viloyat: '',
     tuman: '',
     mfy: '',
-    activity: '',
+    activityType: '',
     managerFirstName: '',
     managerLastName: '',
     managerPhone: '',
@@ -71,8 +72,8 @@ export default function PartnershipRequestModal({
     if (!formData.mfy) {
       newErrors.mfy = 'MFY tanlanishi shart';
     }
-    if (!formData.activity.trim() || formData.activity.trim().length > 500) {
-      newErrors.activity = 'Faoliyat turi kiritilishi shart (maksimal 500 belgi)';
+    if (!formData.activityType) {
+      newErrors.activityType = 'Faoliyat turi tanlanishi shart';
     }
     if (!formData.managerFirstName.trim() || formData.managerFirstName.trim().length < 2) {
       newErrors.managerFirstName = 'Rahbar ismi kamida 2 ta belgi bo\'lishi kerak';
@@ -109,7 +110,7 @@ export default function PartnershipRequestModal({
           viloyat: '',
           tuman: '',
           mfy: '',
-          activity: '',
+          activityType: '',
           managerFirstName: '',
           managerLastName: '',
           managerPhone: '',
@@ -136,13 +137,13 @@ export default function PartnershipRequestModal({
           style={styles.keyboardAvoidingView}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-          <View style={[styles.modalContent, { paddingBottom: insets.bottom }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Hamkorlik so'rovi</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
+        <View style={[styles.modalContent, { paddingBottom: insets.bottom }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Hamkorlik so'rovi</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
 
             <ScrollView
               style={styles.modalBody}
@@ -268,23 +269,15 @@ export default function PartnershipRequestModal({
             <Text style={styles.sectionTitle}>Faoliyat</Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Faoliyat turi *</Text>
-              <TextInput
-                style={[styles.textArea, errors.activity && styles.inputError]}
-                placeholder="Faoliyat turini kiriting (maksimal 500 belgi)"
-                value={formData.activity}
-                onChangeText={(text) => {
-                  if (text.length <= 500) {
-                    setFormData({ ...formData, activity: text });
-                    if (errors.activity) setErrors({ ...errors, activity: '' });
-                  }
+              <ActivityTypePicker
+                label="Faoliyat turi *"
+                value={formData.activityType}
+                onSelect={(activityType: ContragentType) => {
+                  setFormData({ ...formData, activityType: activityType._id });
+                  if (errors.activityType) setErrors({ ...errors, activityType: '' });
                 }}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
+                error={errors.activityType}
               />
-              <Text style={styles.charCount}>{formData.activity.length}/500</Text>
-              {errors.activity && <Text style={styles.errorText}>{errors.activity}</Text>}
             </View>
 
             <Text style={styles.sectionTitle}>Rahbar ma'lumotlari</Text>
@@ -335,22 +328,22 @@ export default function PartnershipRequestModal({
               />
               {errors.managerPhone && <Text style={styles.errorText}>{errors.managerPhone}</Text>}
             </View>
-            </ScrollView>
+          </ScrollView>
 
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                onPress={handleSubmit}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Yuborish</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitButtonText}>Yuborish</Text>
+              )}
+            </TouchableOpacity>
           </View>
+        </View>
         </KeyboardAvoidingView>
       </View>
     </Modal>

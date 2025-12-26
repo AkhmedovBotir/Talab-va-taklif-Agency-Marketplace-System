@@ -217,9 +217,16 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
 
-              {/* New User Button */}
+              {/* Divider */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>yoki</Text>
+                <View style={styles.divider} />
+              </View>
+
+              {/* Password Setup Button */}
               <TouchableOpacity
-                style={styles.newUserButton}
+                style={styles.secondaryButton}
                 onPress={() => {
                   setSetupPhone('');
                   setSmsCode(['', '', '', '', '']);
@@ -231,8 +238,8 @@ export default function LoginScreen() {
                 disabled={loading}
                 activeOpacity={0.8}
               >
-                <Ionicons name="person-add-outline" size={18} color="#007AFF" style={styles.newUserIcon} />
-                <Text style={styles.newUserText}>Yangi Foydalanuvchi</Text>
+                <Ionicons name="lock-open-outline" size={20} color="#007AFF" style={styles.secondaryButtonIcon} />
+                <Text style={styles.secondaryButtonText}>Yangi Foydalanuvchi uchun</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -546,7 +553,9 @@ function PasswordSetupModal({
               {smsCode.map((digit, index) => (
                 <TextInput
                   key={index}
-                  ref={(ref) => (codeInputRefs.current[index] = ref)}
+                  ref={(ref) => {
+                    codeInputRefs.current[index] = ref;
+                  }}
                   style={[
                     styles.codeInput,
                     digit && styles.codeInputFilled,
@@ -826,20 +835,39 @@ const styles = StyleSheet.create({
   buttonIcon: {
     marginLeft: 8,
   },
-  newUserButton: {
+  dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    paddingVertical: 12,
+    marginVertical: 24,
   },
-  newUserIcon: {
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: '#999',
+  },
+  secondaryButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    borderWidth: 1.5,
+    borderColor: '#007AFF',
+  },
+  secondaryButtonIcon: {
     marginRight: 8,
   },
-  newUserText: {
+  secondaryButtonText: {
     color: '#007AFF',
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   // Modal styles
   modalContainer: {

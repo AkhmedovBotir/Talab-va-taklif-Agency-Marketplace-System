@@ -82,6 +82,7 @@ export default function ProductViewScreen() {
     try {
       const response = await apiService.getProductById(productId);
       setProduct(response.data);
+      console.log('Product response:', response.data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Maxsulotni yuklashda xatolik');
       router.back();
@@ -272,50 +273,55 @@ export default function ProductViewScreen() {
             </View>
           </View>
 
-          {product.moderationStatus && (
+          {(product.censored || product.moderationStatus) && (
             <View style={styles.moderationContainer}>
               <View style={styles.moderationHeader}>
-                <Text style={styles.moderationLabel}>Moderatsiya holati:</Text>
-                <View style={[
-                  styles.moderationBadge,
-                  product.moderationStatus === 'approved' && styles.moderationBadgeApproved,
-                  product.moderationStatus === 'rejected' && styles.moderationBadgeRejected,
-                  product.moderationStatus === 'pending' && styles.moderationBadgePending,
-                ]}>
-                  <Text style={[
-                    styles.moderationBadgeText,
-                    product.moderationStatus === 'approved' && styles.moderationBadgeTextApproved,
-                    product.moderationStatus === 'rejected' && styles.moderationBadgeTextRejected,
-                    product.moderationStatus === 'pending' && styles.moderationBadgeTextPending,
-                  ]}>
-                    {product.moderationStatus === 'approved' ? 'Tasdiqlangan' : 
-                     product.moderationStatus === 'rejected' ? 'Rad etilgan' : 
-                     'Kutilmoqda'}
-                  </Text>
+                <Text style={styles.moderationLabel}>Holat:</Text>
+                <View style={styles.badgesContainer}>
+                  {product.censored && (
+                    <View style={styles.censoredBadge}>
+                      <Ionicons name="warning" size={14} color="#FF6B6B" />
+                      <Text style={styles.censoredBadgeText}>18+</Text>
+                    </View>
+                  )}
+                  {product.moderationStatus && (
+                    <View style={[
+                      styles.moderationBadge,
+                      product.moderationStatus === 'approved' && styles.moderationBadgeApproved,
+                      product.moderationStatus === 'rejected' && styles.moderationBadgeRejected,
+                      product.moderationStatus === 'pending' && styles.moderationBadgePending,
+                    ]}>
+                      <Text style={[
+                        styles.moderationBadgeText,
+                        product.moderationStatus === 'approved' && styles.moderationBadgeTextApproved,
+                        product.moderationStatus === 'rejected' && styles.moderationBadgeTextRejected,
+                        product.moderationStatus === 'pending' && styles.moderationBadgeTextPending,
+                      ]}>
+                        {product.moderationStatus === 'approved' ? 'Tasdiqlangan' :
+                          product.moderationStatus === 'rejected' ? 'Rad etilgan' :
+                            'Kutilmoqda'}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
-              {product.moderatedBy && (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Tekshiruvchi</Text>
-                  <Text style={styles.infoValue}>
-                    {product.moderatedBy.name}
-                    {product.moderatedBy.username && ` (@${product.moderatedBy.username})`}
-                  </Text>
-                </View>
-              )}
-              {product.moderatedAt && (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Tekshirilgan vaqti</Text>
-                  <Text style={styles.infoValue}>
-                    {new Date(product.moderatedAt).toLocaleString('uz-UZ')}
-                  </Text>
-                </View>
-              )}
-              {product.rejectionReason && (
-                <View style={styles.rejectionReasonContainer}>
-                  <Text style={styles.rejectionReasonLabel}>Rad etish sababi:</Text>
-                  <Text style={styles.rejectionReasonText}>{product.rejectionReason}</Text>
-                </View>
+              {product.moderationStatus && (
+                <>
+                  {product.moderatedAt && (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.infoLabel}>Tekshirilgan vaqti</Text>
+                      <Text style={styles.infoValue}>
+                        {new Date(product.moderatedAt).toLocaleString('uz-UZ')}
+                      </Text>
+                    </View>
+                  )}
+                  {product.rejectionReason && (
+                    <View style={styles.rejectionReasonContainer}>
+                      <Text style={styles.rejectionReasonLabel}>Rad etish sababi:</Text>
+                      <Text style={styles.rejectionReasonText}>{product.rejectionReason}</Text>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           )}
@@ -497,27 +503,6 @@ export default function ProductViewScreen() {
           </View>
         )}
 
-        {/* Contragent Card */}
-        {product.contragent && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Kontragent</Text>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Nomi</Text>
-              <Text style={styles.infoValue}>{product.contragent.name}</Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>INN</Text>
-              <Text style={styles.infoValue}>{product.contragent.inn}</Text>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Telefon</Text>
-              <Text style={styles.infoValue}>{product.contragent.phone}</Text>
-            </View>
-          </View>
-        )}
       </ScrollView>
     </View>
   );
@@ -735,6 +720,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  censoredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  censoredBadgeText: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
   moderationLabel: {
     fontSize: 14,

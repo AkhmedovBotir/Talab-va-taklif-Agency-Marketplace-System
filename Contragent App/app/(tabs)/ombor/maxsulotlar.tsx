@@ -245,25 +245,33 @@ export default function MaxsulotlarScreen() {
                     <Text style={styles.productName} numberOfLines={1}>
                       {item.name}
                     </Text>
-                    {item.moderationStatus && (
-                      <View style={[
-                        styles.moderationBadge,
-                        item.moderationStatus === 'approved' && styles.moderationBadgeApproved,
-                        item.moderationStatus === 'rejected' && styles.moderationBadgeRejected,
-                        item.moderationStatus === 'pending' && styles.moderationBadgePending,
-                      ]}>
-                        <Text style={[
-                          styles.moderationBadgeText,
-                          item.moderationStatus === 'approved' && styles.moderationBadgeTextApproved,
-                          item.moderationStatus === 'rejected' && styles.moderationBadgeTextRejected,
-                          item.moderationStatus === 'pending' && styles.moderationBadgeTextPending,
+                    <View style={styles.badgesContainer}>
+                      {item.censored && (
+                        <View style={styles.censoredBadge}>
+                          <Ionicons name="warning" size={12} color="#FF6B6B" />
+                          <Text style={styles.censoredBadgeText}>18+</Text>
+                        </View>
+                      )}
+                      {item.moderationStatus && (
+                        <View style={[
+                          styles.moderationBadge,
+                          item.moderationStatus === 'approved' && styles.moderationBadgeApproved,
+                          item.moderationStatus === 'rejected' && styles.moderationBadgeRejected,
+                          item.moderationStatus === 'pending' && styles.moderationBadgePending,
                         ]}>
-                          {item.moderationStatus === 'approved' ? 'Tasdiqlangan' : 
-                           item.moderationStatus === 'rejected' ? 'Rad etilgan' : 
-                           'Kutilmoqda'}
-                        </Text>
-                      </View>
-                    )}
+                          <Text style={[
+                            styles.moderationBadgeText,
+                            item.moderationStatus === 'approved' && styles.moderationBadgeTextApproved,
+                            item.moderationStatus === 'rejected' && styles.moderationBadgeTextRejected,
+                            item.moderationStatus === 'pending' && styles.moderationBadgeTextPending,
+                          ]}>
+                            {item.moderationStatus === 'approved' ? 'Tasdiqlangan' : 
+                             item.moderationStatus === 'rejected' ? 'Rad etilgan' : 
+                             'Kutilmoqda'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                   <Text style={styles.productCode}>Kod: {item.productCode}</Text>
                 </View>
@@ -630,6 +638,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginBottom: 4,
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  censoredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  censoredBadgeText: {
+    fontSize: 10,
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
   productName: {
     fontSize: 16,

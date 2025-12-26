@@ -1,10 +1,11 @@
 const Contragent = require('../models/Contragent');
+const ContragentType = require('../models/ContragentType');
 const jwt = require('jsonwebtoken');
 
 // Create new contragent
 const createContragent = async (req, res) => {
   try {
-    const { name, inn, viloyat, tuman, mfy, phone, password, status, logo } = req.body;
+    const { name, inn, viloyat, tuman, mfy, phone, password, status, logo, activityType } = req.body;
 
     // Validate logo if provided
     if (logo) {
@@ -77,6 +78,22 @@ const createContragent = async (req, res) => {
       });
     }
 
+    // Validate activityType exists and is active
+    const activityTypeDoc = await ContragentType.findById(activityType);
+    if (!activityTypeDoc) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faoliyat turi topilmadi',
+      });
+    }
+
+    if (activityTypeDoc.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Faoliyat turi faol emas',
+      });
+    }
+
     const contragent = await Contragent.create({
       name,
       inn,
@@ -86,13 +103,15 @@ const createContragent = async (req, res) => {
       phone,
       password,
       logo: logo || null,
+      activityType,
       status: status || 'active',
     });
 
-    // Populate regions
+    // Populate regions and activityType
     await contragent.populate('viloyat', 'name type code');
     await contragent.populate('tuman', 'name type code');
     await contragent.populate('mfy', 'name type code');
+    await contragent.populate('activityType', 'name icon');
 
     // Invalidate cache
 
@@ -146,6 +165,7 @@ const getAllContragents = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon')
       .select('-password')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -179,6 +199,7 @@ const getContragentById = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon')
       .select('-password');
 
     if (!contragent) {
@@ -308,6 +329,24 @@ const updateContragent = async (req, res) => {
       }
     }
 
+    // Validate activityType if being updated
+    if (updateData.activityType) {
+      const activityTypeDoc = await ContragentType.findById(updateData.activityType);
+      if (!activityTypeDoc) {
+        return res.status(400).json({
+          success: false,
+          message: 'Faoliyat turi topilmadi',
+        });
+      }
+
+      if (activityTypeDoc.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Faoliyat turi faol emas',
+        });
+      }
+    }
+
     // If password is being updated, we need to hash it first
     // We'll use save() method instead of findByIdAndUpdate to trigger pre('save') hook
     if (updateData.password) {
@@ -333,10 +372,11 @@ const updateContragent = async (req, res) => {
       // Save to trigger pre('save') hook for password hashing
       await contragent.save();
 
-      // Populate regions
+      // Populate regions and activityType
       await contragent.populate('viloyat', 'name type code');
       await contragent.populate('tuman', 'name type code');
       await contragent.populate('mfy', 'name type code');
+      await contragent.populate('activityType', 'name icon');
 
       // Invalidate cache
 
@@ -371,6 +411,7 @@ const updateContragent = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon')
       .select('-password');
 
     if (!contragent) {
@@ -450,6 +491,7 @@ const getMe = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon')
       .select('-password');
 
     if (!contragent) {
@@ -518,6 +560,25 @@ const updateMyProfile = async (req, res) => {
       }
     }
 
+    // Validate activityType if being updated
+    if (updateData.activityType) {
+      const ContragentType = require('../models/ContragentType');
+      const activityTypeDoc = await ContragentType.findById(updateData.activityType);
+      if (!activityTypeDoc) {
+        return res.status(400).json({
+          success: false,
+          message: 'Faoliyat turi topilmadi',
+        });
+      }
+
+      if (activityTypeDoc.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          message: 'Faoliyat turi faol emas',
+        });
+      }
+    }
+
     // Validate regions if being updated
     if (updateData.viloyat || updateData.tuman || updateData.mfy) {
       const Region = require('../models/Region');
@@ -574,6 +635,7 @@ const updateMyProfile = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon')
       .select('-password');
 
     // Invalidate cache
@@ -605,6 +667,7 @@ const updateMyLogo = async (req, res) => {
       { new: true, runValidators: true }
     )
       .populate('viloyat', 'name type code')
+      .populate('activityType', 'name icon')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
       .select('-password');

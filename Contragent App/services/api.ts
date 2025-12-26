@@ -207,6 +207,7 @@ export interface Product {
   width?: number | null;
   weight?: number | null;
   status: 'active' | 'inactive' | 'archived';
+  censored?: boolean;
   moderationStatus?: 'pending' | 'approved' | 'rejected';
   moderatedBy?: {
     _id: string;

@@ -265,10 +265,10 @@ export default function LoginScreen() {
             {/* Header Section */}
             <View style={styles.header}>
               <View style={styles.iconContainer}>
-                <Ionicons name="compass-outline" size={64} color="#007AFF" />
+                <Ionicons name="person-circle" size={64} color="#007AFF" />
               </View>
               <Text style={styles.title}>Agent Tizimi</Text>
-              <Text style={styles.subtitle}>Hisobingizga kiring</Text>
+              <Text style={styles.subtitle}>Tizimga kirish</Text>
             </View>
 
             {/* Card Form */}
@@ -352,15 +352,22 @@ export default function LoginScreen() {
                   )}
                 </TouchableOpacity>
 
-                {/* New User Button */}
+                {/* Divider */}
+                <View style={styles.dividerContainer}>
+                  <View style={styles.divider} />
+                  <Text style={styles.dividerText}>yoki</Text>
+                  <View style={styles.divider} />
+                </View>
+
+                {/* Password Setup Button */}
                 <TouchableOpacity
-                  style={styles.newUserButton}
+                  style={styles.secondaryButton}
                   onPress={() => setShowPasswordSetup(true)}
                   disabled={loading}
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                 >
-                  <Ionicons name="person-add-outline" size={18} color="#007AFF" style={styles.newUserIcon} />
-                  <Text style={styles.newUserText}>Yangi foydalanuvchi</Text>
+                  <Ionicons name="lock-open-outline" size={20} color="#007AFF" style={styles.secondaryButtonIcon} />
+                  <Text style={styles.secondaryButtonText}>Yangi foydalanuvchi uchun</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -460,7 +467,9 @@ export default function LoginScreen() {
                     {smsCode.map((digit, index) => (
                       <TextInput
                         key={index}
-                        ref={(ref) => (smsInputRefs.current[index] = ref)}
+                        ref={(ref) => {
+                          smsInputRefs.current[index] = ref;
+                        }}
                         style={[
                           styles.smsCodeInput,
                           digit && styles.smsCodeInputFilled,
@@ -737,20 +746,39 @@ const styles = StyleSheet.create({
   buttonIcon: {
     marginLeft: 8,
   },
-  newUserButton: {
+  dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    paddingVertical: 12,
+    marginVertical: 24,
   },
-  newUserIcon: {
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: '#999',
+  },
+  secondaryButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    borderWidth: 1.5,
+    borderColor: '#007AFF',
+  },
+  secondaryButtonIcon: {
     marginRight: 8,
   },
-  newUserText: {
+  secondaryButtonText: {
     color: '#007AFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
+    letterSpacing: 0.5,
   },
   // Modal Styles
   modalContainer: {

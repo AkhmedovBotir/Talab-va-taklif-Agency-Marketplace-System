@@ -30,12 +30,12 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
           : 'Yakuniy qaror: Rad etildi';
         
         showSuccess(message);
-        onSuccess();
-        onClose();
-        // Reset form
-        setResult('hired');
-        setReason('');
-        setDecidedBy('');
+          onSuccess();
+          onClose();
+          // Reset form
+          setResult('hired');
+          setReason('');
+          setDecidedBy('');
       }
     } catch (err) {
       showError(err.message || 'Yakuniy qaror qilishda xatolik yuz berdi');
@@ -85,7 +85,7 @@ const FinalDecisionModal = ({ open, onClose, onSuccess, application }) => {
 
               {/* Content */}
               <div className="p-6">
-                <form onSubmit={handleSubmit} className="space-y-6">
+                  <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Info */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-blue-800">

@@ -295,6 +295,10 @@ const contragentValidationSchemas = {
       .messages({
         'string.pattern.base': 'Logo base64 formatida bo\'lishi kerak (data:image/png;base64,... yoki data:image/jpeg;base64,...)',
       }),
+    activityType: Joi.string()
+      .messages({
+        'string.base': 'Faoliyat turi ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
     status: Joi.string()
       .valid('active', 'inactive')
       .messages({
@@ -1590,14 +1594,11 @@ const partnershipRequestValidationSchemas = {
         'string.empty': 'MFY kiritilishi shart',
         'any.required': 'MFY kiritilishi shart',
       }),
-    activity: Joi.string()
+    activityType: Joi.string()
       .required()
-      .trim()
-      .max(500)
       .messages({
-        'string.empty': 'Faoliyat kiritilishi shart',
-        'string.max': 'Faoliyat 500 ta belgidan oshmasligi kerak',
-        'any.required': 'Faoliyat kiritilishi shart',
+        'string.empty': 'Faoliyat turi kiritilishi shart',
+        'any.required': 'Faoliyat turi kiritilishi shart',
       }),
     managerFirstName: Joi.string()
       .min(2)
@@ -1714,14 +1715,11 @@ const marketplacePartnershipRequestValidationSchemas = {
         'string.empty': 'MFY kiritilishi shart',
         'any.required': 'MFY kiritilishi shart',
       }),
-    activity: Joi.string()
+    activityType: Joi.string()
       .required()
-      .trim()
-      .max(500)
       .messages({
-        'string.empty': 'Faoliyat kiritilishi shart',
-        'string.max': 'Faoliyat 500 ta belgidan oshmasligi kerak',
-        'any.required': 'Faoliyat kiritilishi shart',
+        'string.empty': 'Faoliyat turi kiritilishi shart',
+        'any.required': 'Faoliyat turi kiritilishi shart',
       }),
     managerFirstName: Joi.string()
       .min(2)
@@ -1818,6 +1816,102 @@ const adminProductModerationValidationSchemas = {
         'any.required': 'Rad etish sababi kiritilishi shart',
       }),
   }),
+  update: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(500)
+      .trim()
+      .messages({
+        'string.min': 'Maxsulot nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Maxsulot nomi 500 ta belgidan oshmasligi kerak',
+      }),
+    description: Joi.alternatives().try(
+      Joi.string().allow(''),
+      Joi.object(),
+      Joi.valid(null)
+    ),
+    price: Joi.number()
+      .min(0)
+      .messages({
+        'number.min': 'Narx 0 dan kichik bo\'la olmaydi',
+      }),
+    originalPrice: Joi.number()
+      .min(0)
+      .messages({
+        'number.min': 'Asl narx 0 dan kichik bo\'la olmaydi',
+      }),
+    images: Joi.array()
+      .items(Joi.string())
+      .max(5)
+      .messages({
+        'array.max': 'Maksimal 5 ta rasm yuklash mumkin',
+      }),
+    category: Joi.string()
+      .messages({
+        'string.base': 'Kategoriya ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    subcategory: Joi.alternatives().try(
+      Joi.string(),
+      Joi.valid(null, '')
+    ),
+    quantity: Joi.number()
+      .min(0)
+      .messages({
+        'number.min': 'Miqdor 0 dan kichik bo\'la olmaydi',
+      }),
+    unit: Joi.string()
+      .valid('dona', 'litr', 'kg')
+      .messages({
+        'any.only': 'Birlik "dona", "litr" yoki "kg" bo\'lishi kerak',
+      }),
+    unitSize: Joi.alternatives().try(
+      Joi.number().min(0),
+      Joi.valid(null, '')
+    ),
+    length: Joi.alternatives().try(
+      Joi.number().min(0),
+      Joi.valid(null, '')
+    ),
+    width: Joi.alternatives().try(
+      Joi.number().min(0),
+      Joi.valid(null, '')
+    ),
+    weight: Joi.alternatives().try(
+      Joi.number().min(0),
+      Joi.valid(null, '')
+    ),
+    status: Joi.string()
+      .valid('active', 'inactive', 'archived')
+      .messages({
+        'any.only': 'Status "active", "inactive" yoki "archived" bo\'lishi kerak',
+      }),
+    deliveryRegions: Joi.array()
+      .items(
+        Joi.object({
+          viloyat: Joi.string().required(),
+          tuman: Joi.alternatives().try(
+            Joi.string(),
+            Joi.valid(null, '')
+          ),
+        })
+      )
+      .min(1)
+      .messages({
+        'array.min': 'Kamida bitta yetkazib berish xududi kiritilishi shart',
+      }),
+    kpiBonusPercent: Joi.number()
+      .min(0)
+      .max(100)
+      .messages({
+        'number.min': 'KPI bonus foizi 0 dan kichik bo\'la olmaydi',
+        'number.max': 'KPI bonus foizi 100 dan katta bo\'la olmaydi',
+      }),
+    moderationStatus: Joi.string()
+      .valid('pending', 'approved', 'rejected')
+      .messages({
+        'any.only': 'Moderation status "pending", "approved" yoki "rejected" bo\'lishi kerak',
+      }),
+  }),
 };
 
 // Admin Vacancy Application Validation Schemas
@@ -1856,11 +1950,61 @@ const adminVacancyApplicationValidationSchemas = {
   }),
 };
 
+// Contragent Type Validation Schemas
+const contragentTypeValidationSchemas = {
+  create: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(200)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Nomi kiritilishi shart',
+        'string.min': 'Nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Nomi 200 ta belgidan oshmasligi kerak',
+      }),
+    icon: Joi.string()
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Icon kiritilishi shart',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .default('active')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+
+  update: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(200)
+      .trim()
+      .messages({
+        'string.min': 'Nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Nomi 200 ta belgidan oshmasligi kerak',
+      }),
+    icon: Joi.string()
+      .trim()
+      .messages({
+        'string.base': 'Icon to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+};
+
 module.exports = {
   validate,
   adminValidationSchemas,
   regionValidationSchemas,
   contragentValidationSchemas,
+  contragentTypeValidationSchemas,
   agentValidationSchemas,
   punktValidationSchemas,
   categoryValidationSchemas,

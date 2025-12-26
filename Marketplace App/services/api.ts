@@ -66,8 +66,24 @@ export interface Contragent {
   mfy: Region;
   status: 'active' | 'inactive';
   logo?: string | null;
+  activityType?: ContragentType | string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ContragentType {
+  _id: string;
+  name: string;
+  icon: string;
+  status: 'active' | 'inactive';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ContragentTypesResponse {
+  success: boolean;
+  count: number;
+  data: ContragentType[];
 }
 
 export interface Product {
@@ -419,7 +435,7 @@ export interface PartnershipRequest {
     firstName: string;
     lastName: string;
     phone: string;
-  };
+  } | null;
   companyName: string;
   inn: string;
   mfo: string;
@@ -427,7 +443,7 @@ export interface PartnershipRequest {
   viloyat: Region;
   tuman: Region;
   mfy: Region;
-  activity: string;
+  activityType: ContragentType | string;
   managerFirstName: string;
   managerLastName: string;
   managerPhone: string;
@@ -455,7 +471,7 @@ export interface CreatePartnershipRequest {
   viloyat: string;
   tuman: string;
   mfy: string;
-  activity: string;
+  activityType: string;
   managerFirstName: string;
   managerLastName: string;
   managerPhone: string;
@@ -894,12 +910,14 @@ class ApiService {
     page?: number;
     limit?: number;
     search?: string;
+    activityType?: string;
   }): Promise<ContragentsResponse> {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.search) queryParams.append('search', params.search);
+    if (params?.activityType) queryParams.append('activityType', params.activityType);
 
     const queryString = queryParams.toString();
     const endpoint = `/contragents${queryString ? `?${queryString}` : ''}`;
@@ -1391,6 +1409,32 @@ class ApiService {
     return this.request<PartnershipRequest>(`/marketplace-partnership-requests/${id}`, {
       method: 'GET',
     }, token) as any;
+  }
+
+  // Get All Contragent Types
+  async getContragentTypes(params?: {
+    status?: 'active' | 'inactive';
+  }): Promise<ContragentTypesResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/contragent-types${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${REGIONS_BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Xatolik yuz berdi');
+    }
+
+    return data;
   }
 
   // Payment Methods
