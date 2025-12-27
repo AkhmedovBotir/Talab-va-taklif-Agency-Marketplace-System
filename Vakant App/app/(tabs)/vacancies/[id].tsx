@@ -34,7 +34,7 @@ export default function VacancyDetailScreen() {
     if (isRefresh) {
       setRefreshing(true);
     } else {
-      setLoading(true);
+    setLoading(true);
     }
     try {
       const data = await vacancyApi.getVacancyById(id);
@@ -45,7 +45,7 @@ export default function VacancyDetailScreen() {
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Vakansiyani yuklashda xatolik');
       if (!isRefresh) {
-        router.back();
+      router.back();
       }
     } finally {
       setLoading(false);
@@ -255,7 +255,7 @@ export default function VacancyDetailScreen() {
           />
         )}
       </View>
-      </ScrollView>
+    </ScrollView>
     </View>
   );
 }

@@ -6,7 +6,6 @@ const marketplaceUserRegionSelectionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'MarketplaceUser',
       required: [true, 'Foydalanuvchi kiritilishi shart'],
-      unique: true,
     },
     viloyat: {
       type: mongoose.Schema.Types.ObjectId,

@@ -4,6 +4,7 @@ const cors = require('cors');
 const http = require('http');
 const connectDB = require('./config/database');
 const { initializeSocket } = require('./config/socket');
+const { connectRedis } = require('./config/redis');
 
 // Import routes
 const adminRoutes = require('./routes/adminRoutes');
@@ -28,6 +29,7 @@ const adminFinanceRoutes = require('./routes/adminFinanceRoutes');
 const adminKpiPaymentRoutes = require('./routes/adminKpiPaymentRoutes');
 const adminContragentPaymentRoutes = require('./routes/adminContragentPaymentRoutes');
 const contragentTypeRoutes = require('./routes/contragentTypeRoutes');
+const deviceVerificationRoutes = require('./routes/deviceVerificationRoutes');
 
 // Initialize Express app
 const app = express();
@@ -38,6 +40,9 @@ const io = initializeSocket(server);
 
 // Connect to MongoDB
 connectDB();
+
+// Connect to Redis
+connectRedis();
 
 
 // Middleware
@@ -68,6 +73,7 @@ app.use('/api/admin-finance', adminFinanceRoutes);
 app.use('/api/admin-kpi-payments', adminKpiPaymentRoutes);
 app.use('/api/admin-contragent-payments', adminContragentPaymentRoutes);
 app.use('/api/contragent-types', contragentTypeRoutes);
+app.use('/api/device-verification', deviceVerificationRoutes);
 // Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({

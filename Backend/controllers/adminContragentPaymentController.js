@@ -45,6 +45,8 @@ const getUnpaidPayments = async (req, res) => {
             select: 'name type code',
           },
         ],
+        // Allow null contragents (in case contragent was deleted)
+        strictPopulate: false,
       })
       .populate('orders', 'orderNumber totalPrice totalKpiPrice createdAt')
       .sort({ dueDate: 1, createdAt: -1 })
@@ -55,16 +57,27 @@ const getUnpaidPayments = async (req, res) => {
     if (viloyatId || tumanId || mfyId) {
       payments = payments.filter((payment) => {
         const contragent = payment.contragent;
-        if (!contragent) return false;
+        if (!contragent) {
+          // If region filter is applied, exclude payments with null contragent
+          return false;
+        }
+
+        // Check if contragent is populated (not just ObjectId)
+        if (typeof contragent === 'string' || contragent instanceof require('mongoose').Types.ObjectId) {
+          return false;
+        }
 
         if (mfyId && contragent.mfy) {
-          return contragent.mfy._id.toString() === mfyId.toString();
+          const mfyIdStr = contragent.mfy._id?.toString() || contragent.mfy.toString();
+          return mfyIdStr === mfyId.toString();
         }
         if (tumanId && contragent.tuman) {
-          return contragent.tuman._id.toString() === tumanId.toString();
+          const tumanIdStr = contragent.tuman._id?.toString() || contragent.tuman.toString();
+          return tumanIdStr === tumanId.toString();
         }
         if (viloyatId && contragent.viloyat) {
-          return contragent.viloyat._id.toString() === viloyatId.toString();
+          const viloyatIdStr = contragent.viloyat._id?.toString() || contragent.viloyat.toString();
+          return viloyatIdStr === viloyatId.toString();
         }
         return false;
       });
@@ -84,6 +97,7 @@ const getUnpaidPayments = async (req, res) => {
 
     // Calculate totals
     const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+    
     const totalUnpaidAmount = await ContragentPaymentDistribution.aggregate([
       { $match: { status: 'pending' } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -111,7 +125,10 @@ const getUnpaidPayments = async (req, res) => {
       data: payments,
     });
   } catch (error) {
-    console.error('Error in getUnpaidPayments:', error);
+    console.error('=== XATO: GET UNPAID PAYMENTS ===');
+    console.error('Error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Request query:', req.query);
     res.status(500).json({
       success: false,
       message: 'To\'lanmagan to\'lovlarni olishda xatolik yuz berdi',
@@ -261,6 +278,7 @@ const payContragentPayment = async (req, res) => {
 
     // Update payment
     const now = new Date();
+    
     payment.status = 'paid';
     payment.paidAt = now;
     payment.paidBy = admin._id;
@@ -340,7 +358,7 @@ const payContragentPayment = async (req, res) => {
           io.to(`contragent_${updatedPayment.contragent._id}`).emit('notification', notification);
         }
       } catch (error) {
-        console.error('Error creating notification for payment:', error);
+        console.error('Error creating notification:', error);
       }
     }
 
@@ -355,7 +373,14 @@ const payContragentPayment = async (req, res) => {
       } : null,
     });
   } catch (error) {
-    console.error('Error in payContragentPayment:', error);
+    console.error('=== XATO: TO\'LOVNI TO\'LASHDA XATOLIK ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Request params:', req.params);
+    console.error('Request body:', req.body);
+    console.error('Admin:', req.user?.admin ? { id: req.user.admin._id } : 'Admin topilmadi');
+    
     res.status(500).json({
       success: false,
       message: 'To\'lovni to\'lashda xatolik yuz berdi',

@@ -78,75 +78,73 @@ export default function FinanceScreen() {
           }
         } else if (activeTab === 'collected') {
           // Get collected transactions from daily report
+          // According to API docs, daily report contains transactions array
           const response = await apiService.getMFYDailyReport(dateStr);
           console.log('=== MFY Collected Transactions API Response ===');
           console.log('Full Response:', JSON.stringify(response, null, 2));
-          if (response.success && response.report.transactions) {
-            console.log('All Transactions:', JSON.stringify(response.report.transactions, null, 2));
-            // Filter collected but not yet submitted transactions
-            const collected = response.report.transactions.filter(
-              (t: PaymentTransaction) => t.status === 'collected' && t.currentHolder === 'mfy_agent'
-            );
+          
+          if (response.success && response.report) {
+            // Get transactions from report
+            // According to API docs, transactions can be an array of transaction IDs or full objects
+            const reportTransactions = response.report.transactions || [];
+            console.log('Report Transactions:', JSON.stringify(reportTransactions, null, 2));
+            console.log('Report Transactions Type:', Array.isArray(reportTransactions) ? 'array' : typeof reportTransactions);
+            console.log('Report Transactions Length:', Array.isArray(reportTransactions) ? reportTransactions.length : 0);
+            
+            // Filter collected but not yet submitted to district transactions
+            // According to API docs: status === 'collected' && currentHolder === 'mfy_agent' && not submitted to district
+            const collected = reportTransactions.filter((t: any) => {
+              // Handle both cases: transaction ID string or full transaction object
+              if (typeof t === 'string') {
+                // If it's just an ID, we can't filter it here, skip it
+                console.log(`Transaction is just an ID: ${t}, skipping filter`);
+                return false;
+              }
+              
+              // It's a full transaction object
+              const isCollected = t.status === 'collected';
+              const isMfyHolder = t.currentHolder === 'mfy_agent';
+              const notSubmitted = !t.submittedToDistrict || t.submittedToDistrict === null; // Not yet submitted to district
+              
+              console.log(`Transaction ${t._id}: status=${t.status}, currentHolder=${t.currentHolder}, submittedToDistrict=${t.submittedToDistrict}, isCollected=${isCollected}, isMfyHolder=${isMfyHolder}, notSubmitted=${notSubmitted}`);
+              
+              return isCollected && isMfyHolder && notSubmitted;
+            });
+            
             console.log('Filtered Collected Transactions:', JSON.stringify(collected, null, 2));
             console.log('Collected Count:', collected.length);
             
-            // Extract order and user IDs and fetch their details
-            const orderIds = new Set<string>();
-            const userIds = new Set<string>();
-            
-            collected.forEach((t: PaymentTransaction) => {
-              if (typeof t.order === 'string') {
-                orderIds.add(t.order);
-              }
-              if (typeof t.user === 'string') {
-                userIds.add(t.user);
-              }
-            });
-            
-            console.log('Order IDs to fetch:', Array.from(orderIds));
-            console.log('User IDs to fetch:', Array.from(userIds));
-            
-            // Fetch order details
-            const ordersData: Record<string, any> = {};
-            for (const orderId of orderIds) {
-              try {
-                const orderResponse = await apiService.getOrderById(orderId);
-                if (orderResponse.success) {
-                  ordersData[orderId] = orderResponse.data;
-                  console.log(`Order ${orderId} fetched:`, JSON.stringify(orderResponse.data, null, 2));
-                }
-              } catch (error) {
-                console.log(`Failed to fetch order ${orderId}:`, error);
-              }
-            }
-            setOrdersCache(prev => ({ ...prev, ...ordersData }));
-            
-            // For users, we'll use the order data which contains user info
-            const usersData: Record<string, any> = {};
-            Object.values(ordersData).forEach((order: any) => {
-              if (order.user && order.user._id) {
-                usersData[order.user._id] = order.user;
-              }
-            });
-            setUsersCache(prev => ({ ...prev, ...usersData }));
-            
-            // Enrich transactions with order and user data
+            // Transactions should already have order and user objects from API
+            // But we'll enrich them if they're just IDs
             const enrichedTransactions = collected.map((t: PaymentTransaction) => {
-              const orderId = typeof t.order === 'string' ? t.order : (t.order as any)?._id;
-              const userId = typeof t.user === 'string' ? t.user : (t.user as any)?._id;
+              // If order is just an ID string, try to get from cache or keep as is
+              let enrichedOrder = t.order;
+              if (typeof t.order === 'string') {
+                const cachedOrder = ordersCache[t.order];
+                if (cachedOrder) {
+                  enrichedOrder = cachedOrder;
+                } else {
+                  // Keep as string ID, will be handled in render
+                  enrichedOrder = t.order;
+                }
+              }
               
-              const enrichedOrder = typeof t.order === 'string' 
-                ? (ordersData[orderId] || { _id: orderId, orderNumber: 'Loading...', totalPrice: 0 })
-                : t.order;
-              
-              const enrichedUser = typeof t.user === 'string'
-                ? (usersData[userId] || ordersData[orderId]?.user || { _id: userId, name: 'Loading...', phone: '' })
-                : t.user;
+              // If user is just an ID string, try to get from cache or keep as is
+              let enrichedUser = t.user;
+              if (typeof t.user === 'string') {
+                const cachedUser = usersCache[t.user];
+                if (cachedUser) {
+                  enrichedUser = cachedUser;
+                } else {
+                  // Keep as string ID, will be handled in render
+                  enrichedUser = t.user;
+                }
+              }
               
               return {
                 ...t,
-                order: enrichedOrder as any,
-                user: enrichedUser as any,
+                order: enrichedOrder,
+                user: enrichedUser,
               } as PaymentTransaction;
             });
             
@@ -154,6 +152,7 @@ export default function FinanceScreen() {
             setCollectedTransactions(enrichedTransactions as any);
           } else {
             console.log('No transactions in response or response failed');
+            setCollectedTransactions([]);
           }
         } else if (activeTab === 'statistics') {
           const params: any = {};
@@ -183,10 +182,22 @@ export default function FinanceScreen() {
           if (confirmedResponse.success) {
             console.log('Confirmed Submissions:', JSON.stringify(confirmedResponse.submissions, null, 2));
             console.log('Submissions Count:', confirmedResponse.submissions.length);
+            
+            // Process submissions and extract transactions
+            confirmedResponse.submissions.forEach((submission: FinanceSubmission) => {
+              console.log('Processing Submission:', JSON.stringify(submission, null, 2));
+              if (Array.isArray(submission.transactions)) {
+                submission.transactions.forEach((t: any) => {
+                  console.log('Transaction in submission:', typeof t === 'string' ? t : JSON.stringify(t, null, 2));
+                });
+              }
+            });
+            
             // Store confirmed submissions, transactions will be extracted in render
             setSubmissions(confirmedResponse.submissions);
           } else {
             console.log('Failed to load confirmed submissions');
+            setSubmissions([]);
           }
         } else if (activeTab === 'statistics') {
           const params: any = {};
@@ -216,10 +227,22 @@ export default function FinanceScreen() {
           if (confirmedResponse.success) {
             console.log('Confirmed Submissions:', JSON.stringify(confirmedResponse.submissions, null, 2));
             console.log('Submissions Count:', confirmedResponse.submissions.length);
+            
+            // Process submissions and extract transactions
+            confirmedResponse.submissions.forEach((submission: FinanceSubmission) => {
+              console.log('Processing Submission:', JSON.stringify(submission, null, 2));
+              if (Array.isArray(submission.transactions)) {
+                submission.transactions.forEach((t: any) => {
+                  console.log('Transaction in submission:', typeof t === 'string' ? t : JSON.stringify(t, null, 2));
+                });
+              }
+            });
+            
             // Store confirmed submissions, transactions will be extracted in render
             setSubmissions(confirmedResponse.submissions);
           } else {
             console.log('Failed to load confirmed submissions');
+            setSubmissions([]);
           }
         } else if (activeTab === 'statistics') {
           const params: any = {};
@@ -707,8 +730,28 @@ export default function FinanceScreen() {
     console.log('=== renderCollectedTransactions - Current State ===');
     console.log('Role:', role);
     console.log('Collected Transactions (MFY):', JSON.stringify(collectedTransactions, null, 2));
+    console.log('Collected Transactions Count (MFY):', collectedTransactions.length);
     console.log('Submissions (Tuman/Viloyat):', JSON.stringify(submissions, null, 2));
     console.log('Selected Transactions:', selectedTransactions);
+    console.log('Selected Transactions Count:', selectedTransactions.length);
+    
+    // MFY specific debug
+    if (role === 'mfy') {
+      console.log('=== MFY Agent Debug ===');
+      console.log('collectedTransactions.length:', collectedTransactions.length);
+      console.log('selectedTransactions.length:', selectedTransactions.length);
+      console.log('Should show submit button:', selectedTransactions.length > 0);
+      collectedTransactions.forEach((t, index) => {
+        console.log(`Transaction ${index}:`, {
+          id: t._id,
+          amount: t.amount,
+          order: typeof t.order === 'string' ? t.order : t.order?._id,
+          user: typeof t.user === 'string' ? t.user : t.user?._id,
+          status: t.status,
+          currentHolder: t.currentHolder,
+        });
+      });
+    }
     
     // For Tuman/Viloyat agents, get transaction IDs from confirmed submissions
     // But only include transactions that haven't been submitted to next level yet
@@ -891,37 +934,54 @@ export default function FinanceScreen() {
             </View>
           )}
 
-          {((role === 'mfy' && selectedTransactions.length > 0) || 
-            ((role === 'tuman' || role === 'viloyat') && transactionIds.length > 0)) && (
-            <TouchableOpacity
-              style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-              onPress={() => {
-                if (role === 'mfy') {
-                  handleSubmitToDistrict();
-                } else if (role === 'tuman') {
-                  handleSubmitToProvince(transactionIds);
-                } else if (role === 'viloyat') {
-                  handleSubmitToFinance(transactionIds);
-                }
-              }}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="send" size={20} color="#fff" />
-                  <Text style={styles.submitButtonText}>
-                    {role === 'mfy' 
-                      ? `Tuman agentga topshirish (${selectedTransactions.length} ta)`
-                      : role === 'tuman'
-                      ? `Viloyat agentga topshirish (${transactionIds.length} ta)`
-                      : `Moliya bo'limiga topshirish (${transactionIds.length} ta)`}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
+          {(() => {
+            const shouldShowMFY = role === 'mfy' && selectedTransactions.length > 0;
+            const shouldShowTumanViloyat = (role === 'tuman' || role === 'viloyat') && transactionIds.length > 0;
+            const shouldShow = shouldShowMFY || shouldShowTumanViloyat;
+            
+            console.log('=== Submit Button Visibility Check ===');
+            console.log('Role:', role);
+            console.log('shouldShowMFY:', shouldShowMFY);
+            console.log('shouldShowTumanViloyat:', shouldShowTumanViloyat);
+            console.log('shouldShow:', shouldShow);
+            console.log('selectedTransactions.length:', selectedTransactions.length);
+            console.log('transactionIds.length:', transactionIds.length);
+            
+            return shouldShow ? (
+              <TouchableOpacity
+                style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+                onPress={() => {
+                  console.log('Submit button pressed');
+                  if (role === 'mfy') {
+                    console.log('Calling handleSubmitToDistrict with selectedTransactions:', selectedTransactions);
+                    handleSubmitToDistrict();
+                  } else if (role === 'tuman') {
+                    console.log('Calling handleSubmitToProvince with transactionIds:', transactionIds);
+                    handleSubmitToProvince(transactionIds);
+                  } else if (role === 'viloyat') {
+                    console.log('Calling handleSubmitToFinance with transactionIds:', transactionIds);
+                    handleSubmitToFinance(transactionIds);
+                  }
+                }}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="send" size={20} color="#fff" />
+                    <Text style={styles.submitButtonText}>
+                      {role === 'mfy' 
+                        ? `Tuman agentga topshirish (${selectedTransactions.length} ta)`
+                        : role === 'tuman'
+                        ? `Viloyat agentga topshirish (${transactionIds.length} ta)`
+                        : `Moliya bo'limiga topshirish (${transactionIds.length} ta)`}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : null;
+          })()}
         </View>
 
         {role === 'mfy' ? (

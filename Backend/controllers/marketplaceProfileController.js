@@ -69,18 +69,44 @@ const updateProfile = async (req, res) => {
 
     await user.save();
 
-    // Populate regions
+    // Populate regions and exclude password
     await user.populate('viloyat', 'name type code');
     await user.populate('tuman', 'name type code');
     await user.populate('mfy', 'name type code');
 
+    // Convert to object and remove password if present
+    const userObj = user.toObject();
+    if (userObj.password) {
+      delete userObj.password;
+    }
+
     res.status(200).json({
       success: true,
       message: 'Profil yangilandi',
-      data: user,
+      data: userObj,
     });
   } catch (error) {
     console.error('Error updating profile:', error);
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map((err) => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Ma\'lumotlar noto\'g\'ri',
+        errors,
+      });
+    }
+
+    // Handle cast errors (invalid ObjectId, date, etc.)
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Noto\'g\'ri ma\'lumot formati',
+        error: error.message,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Profilni yangilashda xatolik yuz berdi',
@@ -123,6 +149,17 @@ const updatePassword = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating password:', error);
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map((err) => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Ma\'lumotlar noto\'g\'ri',
+        errors,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Parolni o\'zgartirishda xatolik yuz berdi',
@@ -183,6 +220,17 @@ const updateAvatar = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating avatar:', error);
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map((err) => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Ma\'lumotlar noto\'g\'ri',
+        errors,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Avatarni yangilashda xatolik yuz berdi',
@@ -269,15 +317,21 @@ const updateLocation = async (req, res) => {
 
     await user.save();
 
-    // Populate regions
+    // Populate regions and exclude password
     await user.populate('viloyat', 'name type code');
     await user.populate('tuman', 'name type code');
     await user.populate('mfy', 'name type code');
 
+    // Convert to object and remove password if present
+    const userObj = user.toObject();
+    if (userObj.password) {
+      delete userObj.password;
+    }
+
     res.status(200).json({
       success: true,
       message: 'Manzil yangilandi',
-      data: user,
+      data: userObj,
     });
   } catch (error) {
     console.error('Error updating location:', error);

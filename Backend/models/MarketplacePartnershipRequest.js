@@ -45,11 +45,10 @@ const marketplacePartnershipRequestSchema = new mongoose.Schema(
       ref: 'Region',
       required: [true, 'MFY kiritilishi shart'],
     },
-    activity: {
-      type: String,
-      required: [true, 'Faoliyat kiritilishi shart'],
-      trim: true,
-      maxlength: [500, 'Faoliyat 500 ta belgidan oshmasligi kerak'],
+    activityType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ContragentType',
+      required: [true, 'Faoliyat turi kiritilishi shart'],
     },
     managerFirstName: {
       type: String,
@@ -114,6 +113,7 @@ marketplacePartnershipRequestSchema.index({ marketplaceUser: 1 });
 marketplacePartnershipRequestSchema.index({ status: 1 });
 marketplacePartnershipRequestSchema.index({ createdAt: -1 });
 marketplacePartnershipRequestSchema.index({ reviewedBy: 1 });
+marketplacePartnershipRequestSchema.index({ activityType: 1 });
 
 const MarketplacePartnershipRequest = mongoose.model(
   'MarketplacePartnershipRequest',

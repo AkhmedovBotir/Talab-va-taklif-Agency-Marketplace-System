@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { CheckCircle, Warning, CalendarToday, Payment } from '@mui/icons-material';
+import { CheckCircle, Warning, CalendarToday, Payment, Visibility } from '@mui/icons-material';
 
 const ContragentPaymentTable = ({
   payments,
@@ -11,6 +11,7 @@ const ContragentPaymentTable = ({
   onSelectPayment,
   onSelectAll,
   onPaySingle,
+  onViewDetails,
 }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -95,13 +96,8 @@ const ContragentPaymentTable = ({
               </>
             )}
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Qo'shimcha
+              Amallar
             </th>
-            {activeView === 'unpaid' && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Amallar
-              </th>
-            )}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -193,23 +189,29 @@ const ContragentPaymentTable = ({
                   </>
                 )}
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-500">
-                    {payment.notes || '-'}
-                  </div>
-                </td>
-                {activeView === 'unpaid' && (
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {onPaySingle && (
+                  <div className="flex items-center gap-2">
+                    {onViewDetails && (
+                      <button
+                        onClick={() => onViewDetails(payment)}
+                        className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md hover:bg-indigo-200 transition-colors"
+                        title="Batafsil ko'rish"
+                      >
+                        <Visibility className="w-3 h-3" />
+                        Batafsil
+                      </button>
+                    )}
+                    {activeView === 'unpaid' && onPaySingle && (
                       <button
                         onClick={() => onPaySingle(payment._id)}
                         className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200 transition-colors"
+                        title="To'lash"
                       >
                         <Payment className="w-3 h-3" />
                         To'lash
                       </button>
                     )}
-                  </td>
-                )}
+                  </div>
+                </td>
               </motion.tr>
             );
           })}

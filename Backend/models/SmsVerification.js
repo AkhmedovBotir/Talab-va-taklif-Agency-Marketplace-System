@@ -12,8 +12,26 @@ const smsVerificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['login', 'register', 'forgot_password', 'contragent_password_setup', 'punkt_password_setup', 'agent_password_setup'],
+      enum: [
+        'login',
+        'register',
+        'forgot_password',
+        'contragent_password_setup',
+        'punkt_password_setup',
+        'agent_password_setup',
+        'device_verification',
+      ],
       required: [true, 'Kod turi kiritilishi shart'],
+    },
+    // Device verification specific fields
+    deviceId: {
+      type: String,
+      default: null,
+    },
+    userModel: {
+      type: String,
+      enum: ['Admin', 'Contragent', 'Punkt', 'Agent'],
+      default: null,
     },
     isUsed: {
       type: Boolean,

@@ -189,12 +189,23 @@ export default function ShopsScreen() {
             'LocalGroceryStore': 'shopping-bag',
             'BakeryDining': 'restaurant',
             'PointOfSale': 'point-of-sale',
+            'Receipt': 'receipt',
+            'ReceiptLong': 'receipt-long',
+            'Inventory': 'inventory',
+            'Inventory2': 'inventory-2',
             'Shop': 'store',
             'Shop2': 'store',
             'StoreMallDirectory': 'store',
             'CorporateFare': 'business',
             'Domain': 'domain',
             'AccountBalance': 'account-balance',
+            'TrendingUp': 'trending-up',
+            'BarChart': 'bar-chart',
+            'Assessment': 'assessment',
+            'Analytics': 'analytics',
+            'PieChart': 'pie-chart',
+            'ShowChart': 'show-chart',
+            'Timeline': 'timeline',
             
             // Food & Restaurant
             'Restaurant': 'restaurant',
@@ -239,6 +250,15 @@ export default function ShopsScreen() {
             'Commute': 'commute',
             'DirectionsWalk': 'directions-walk',
             'DirectionsRun': 'directions-run',
+            'FlightTakeoff': 'flight-takeoff',
+            'FlightLand': 'flight-land',
+            'TrainIcon': 'train',
+            'DirectionsTransit': 'directions-transit',
+            'DirectionsSubway': 'directions-subway',
+            'DirectionsRailway': 'directions-railway',
+            'AirlineSeatReclineNormal': 'airline-seat-recline-normal',
+            'AirlineSeatFlat': 'airline-seat-flat',
+            'AirlineSeatIndividualSuite': 'airline-seat-individual-suite',
             
             // Building
             'Home': 'home',
@@ -280,6 +300,12 @@ export default function ShopsScreen() {
             'Payments': 'payments',
             'Money': 'attach-money',
             'MoneyOff': 'money-off',
+            'CreditScore': 'credit-score',
+            'SavingsOutlined': 'savings',
+            'AccountBalanceOutlined': 'account-balance',
+            'Euro': 'euro',
+            'Dollar': 'attach-money',
+            'Yen': 'yen',
             
             // Hospitality
             'Spa': 'spa',
@@ -293,6 +319,17 @@ export default function ShopsScreen() {
             'AcUnit': 'ac-unit',
             'Air': 'air',
             'WaterDrop': 'water-drop',
+            'SportsSoccer': 'sports-soccer',
+            'SportsBasketball': 'sports-basketball',
+            'SportsTennis': 'sports-tennis',
+            'SportsVolleyball': 'sports-volleyball',
+            'SportsHockey': 'sports-hockey',
+            'SportsBaseball': 'sports-baseball',
+            'SportsCricket': 'sports-cricket',
+            'SportsKabaddi': 'sports-kabaddi',
+            'SportsEsports': 'sports-esports',
+            'SportsMotorsports': 'sports-motorsports',
+            'SportsMma': 'sports-mma',
             
             // Education
             'Book': 'menu-book',
@@ -315,6 +352,7 @@ export default function ShopsScreen() {
             'GraduationCap': 'school',
             'LibraryBooks': 'library-books',
             'LocalLibrary': 'local-library',
+            'SchoolOutlined': 'school',
             
             // Communication
             'Email': 'email',

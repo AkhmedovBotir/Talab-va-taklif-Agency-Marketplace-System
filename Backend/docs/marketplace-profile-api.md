@@ -199,11 +199,59 @@ Update user's personal information (firstName, lastName, gender, birthDate).
 
 **Error Responses:**
 
-- **400 Bad Request** - Invalid input (validation errors)
-- **401 Unauthorized** - Token missing or invalid
-- **403 Forbidden** - Token not for marketplace user or account inactive
-- **404 Not Found** - User not found
-- **500 Internal Server Error** - Server error
+**400 Bad Request (Validation Error):**
+```json
+{
+  "success": false,
+  "message": "Ma'lumotlar noto'g'ri",
+  "errors": [
+    "Ism kamida 2 ta belgidan iborat bo'lishi kerak",
+    "Jins \"ayol\" yoki \"erkak\" bo'lishi kerak"
+  ]
+}
+```
+
+**400 Bad Request (Cast Error):**
+```json
+{
+  "success": false,
+  "message": "Noto'g'ri ma'lumot formati",
+  "error": "Cast to date failed for value..."
+}
+```
+
+**401 Unauthorized:**
+```json
+{
+  "success": false,
+  "message": "Token topilmadi"
+}
+```
+
+**403 Forbidden:**
+```json
+{
+  "success": false,
+  "message": "Bu token marketplace user uchun emas"
+}
+```
+
+**404 Not Found:**
+```json
+{
+  "success": false,
+  "message": "Foydalanuvchi topilmadi"
+}
+```
+
+**500 Internal Server Error:**
+```json
+{
+  "success": false,
+  "message": "Profilni yangilashda xatolik yuz berdi",
+  "error": "Error details"
+}
+```
 
 ---
 
@@ -1047,7 +1095,8 @@ curl -X PATCH "http://localhost:5000/api/marketplace/me/viloyat-tuman" \
 
 ---
 
-**Last Updated:** 2024-01-15
+**Last Updated:** 2024-12-25  
+**Versiya:** 1.0.0
 
 
 

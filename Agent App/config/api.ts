@@ -1,6 +1,6 @@
 // API Configuration
 
-export const API_BASE_URL = 'http://192.168.1.6:5000/api';
+export const API_BASE_URL = 'https://api.ttsa.uz/api';
 
 export const API_ENDPOINTS = {
   AGENT_LOGIN: '/agents/login',
@@ -8,6 +8,10 @@ export const API_ENDPOINTS = {
   PASSWORD_SETUP_STEP1: '/agents/password-setup/step1',
   PASSWORD_SETUP_STEP2: '/agents/password-setup/step2',
   PASSWORD_SETUP_STEP3: '/agents/password-setup/step3',
+  // Device Verification - Agent
+  DEVICE_VERIFICATION_AGENT_REQUEST_CODE: '/device-verification/agent/request-code',
+  DEVICE_VERIFICATION_AGENT_VERIFY: '/device-verification/agent/verify',
+  DEVICE_VERIFICATION_AGENT_RESEND_CODE: '/device-verification/agent/resend-code',
   // Agent Orders
   AGENT_ORDERS: '/agent/orders',
   AGENT_ORDERS_TODAY: '/agent/orders/today',

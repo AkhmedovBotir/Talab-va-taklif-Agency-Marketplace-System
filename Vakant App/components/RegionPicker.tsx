@@ -227,7 +227,7 @@ export function RegionPicker({
           />
           <Text style={[styles.inputText, !displayText && styles.placeholder]}>
             {displayText || getPlaceholder()}
-          </Text>
+        </Text>
         </View>
         <Ionicons name="chevron-down" size={20} color="#666" />
       </TouchableOpacity>
@@ -255,7 +255,7 @@ export function RegionPicker({
                   />
                 </View>
                 <View>
-                  <Text style={styles.modalTitle}>{label}</Text>
+              <Text style={styles.modalTitle}>{label}</Text>
                   <Text style={styles.modalSubtitle}>
                     {filteredRegions.length} ta {type === 'region' ? 'viloyat' : type === 'district' ? 'tuman' : 'MFY'}
                   </Text>
@@ -269,7 +269,7 @@ export function RegionPicker({
                 <Ionicons name="close-circle" size={28} color="#999" />
               </TouchableOpacity>
             </View>
-
+            
             {/* Search Bar */}
             <View style={styles.searchContainer}>
               <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -291,21 +291,21 @@ export function RegionPicker({
                   <Ionicons name="close-circle" size={20} color="#999" />
                 </TouchableOpacity>
               )}
-            </View>
+              </View>
 
             {/* Regions List */}
-            <FlatList
+              <FlatList
               data={filteredRegions}
               keyExtractor={(item, index) => item._id || `region-${index}`}
-              renderItem={({ item }) => (
-                <TouchableOpacity
+                renderItem={({ item }) => (
+                  <TouchableOpacity
                   style={[
                     styles.item,
                     selectedRegion?._id === item._id && styles.itemSelected,
                   ]}
-                  onPress={() => handleSelect(item)}
+                    onPress={() => handleSelect(item)}
                   activeOpacity={0.7}
-                >
+                  >
                   <View style={styles.itemContent}>
                     <View style={[
                       styles.itemIconContainer,
@@ -326,19 +326,19 @@ export function RegionPicker({
                       {item.name}
                     </Text>
                   </View>
-                  {selectedRegion?._id === item._id && (
+                    {selectedRegion?._id === item._id && (
                     <View style={styles.checkmarkContainer}>
                       <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
                     </View>
-                  )}
-                </TouchableOpacity>
-              )}
+                    )}
+                  </TouchableOpacity>
+                )}
               removeClippedSubviews={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ 
                 paddingBottom: Math.max(insets.bottom + 20, 40) 
               }}
-              ListEmptyComponent={
+                ListEmptyComponent={
                 loading ? (
                   <View style={styles.emptyContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
@@ -351,8 +351,8 @@ export function RegionPicker({
                     <Text style={styles.emptySubtext}>Boshqa so'z bilan qidiring</Text>
                   </View>
                 )
-              }
-            />
+                }
+              />
           </View>
         </View>
       </Modal>

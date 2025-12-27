@@ -313,6 +313,20 @@ export default function ProductCreateScreen() {
     }
   }, [categoryId, loadSubcategories]);
 
+  // Category modal ochilganda API dan yangilash
+  useEffect(() => {
+    if (showCategoryModal) {
+      loadCategories();
+    }
+  }, [showCategoryModal, loadCategories]);
+
+  // Subcategory modal ochilganda API dan yangilash
+  useEffect(() => {
+    if (showSubcategoryModal && categoryId) {
+      loadSubcategories(categoryId);
+    }
+  }, [showSubcategoryModal, categoryId, loadSubcategories]);
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -899,10 +913,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
+    height: '80%',
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
     paddingBottom: 20,
   },
   modalHeader: {

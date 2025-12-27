@@ -67,12 +67,12 @@ const removeDeletedPunktsFromOrder = async (orderObj) => {
     for (const req of orderObj.punktRequests) {
       if (req.punktId) {
         if (typeof req.punktId === 'object' && req.punktId._id && !req.punktId.isDeleted) {
-          const deleted = await isPunktDeleted(req.punktId);
+        const deleted = await isPunktDeleted(req.punktId);
           if (deleted) {
             req.punktId.isDeleted = true;
-          }
         }
       }
+    }
     }
   }
   

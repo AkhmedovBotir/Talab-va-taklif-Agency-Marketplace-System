@@ -34,3 +34,4 @@ const ContragentType = mongoose.model('ContragentType', contragentTypeSchema);
 module.exports = ContragentType;
 
 
+

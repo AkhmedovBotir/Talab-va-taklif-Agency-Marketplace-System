@@ -24,14 +24,40 @@ Admin Finance Balance API moliya bo'limi uchun to'liq moliya balanslari va stati
 **Base Path:** `/api/admin-finance/balance`
 
 **Asosiy Ma'lumotlar:**
-- **Umumiy tushgan summa:** Moliya bo'limiga tasdiqlangan to'lovlar (mijozlardan)
-- **Tarqatilgan summa:** KPI bonuslar (punkt, agentlar, deliveryService)
-- **Moliya bo'limiga ajratilgan summa:** KPI bonuslardan moliya bo'limiga ajratilgan qism
-- **Contragent to'lovlari:** Contragentlarga to'langan to'lovlar
-- **Umumiy xarajatlar:** Tarqatilgan summa + Contragent to'lovlari
-- **Umumiy balans:** Tushgan summa - Umumiy xarajatlar
-- **Moliya bo'limi umumiy balansi:** Tushgan summa + KPI bonus - Contragent to'lovlari
-- **Moliya bo'limi sof daromadi:** Tushgan summa - Xarajatlar + KPI bonus
+
+### ⚠️ MUHIM: KPI Bonus - Xarajat, Daromad Emas!
+
+**Asosiy qoida:**
+- **KPI bonus** — bu daromad emas, bu **ichki taqsimot (xarajat)**
+- Agar KPI mijozdan alohida tushmagan bo'lsa, u **Tushgan summa ichidan ajratiladi**
+- KPI'ni "daromadga qo'shish" → hisobni sun'iy oshiradi
+
+**To'g'ri moliyaviy struktura:**
+
+1. **Umumiy Tushgan Summa** (`totalReceived`)
+   - Mijozlardan real tushgan pul
+   - Moliya bo'limiga tasdiqlangan to'lovlar
+
+2. **KPI Bonuslar (Ichki taqsimot - Xarajat)** (`totalKpiExpenses`)
+   - Punkt, Agentlar (MFY, Tuman, Viloyat), Moliya bo'limi, Yetkazib berish
+   - **Bularning barchasi xarajat**
+
+3. **Contragent to'lovlari** (`totalContragentPayments`)
+   - Tashqi xarajat (real chiqim)
+
+4. **Umumiy Xarajatlar** (`totalExpenses`)
+   - KPI Bonuslar + Contragent to'lovlari
+
+5. **Umumiy Sof Balans (REAL foyda)** (`totalBalance`)
+   - Tushgan - Xarajatlar
+
+6. **Moliya bo'limi balansi** (`financeTotalBalance`)
+   - Tushgan - Contragent to'lovlari
+   - KPI qo'shilmaydi (chunki bu xarajat)
+
+7. **Moliya bo'limi sof daromadi** (`financeNetIncome`)
+   - Moliya bo'limi uchun KPI bonus (ichki daromad)
+   - Lekin umumiy tizim uchun bu xarajat
 
 ---
 
@@ -56,32 +82,44 @@ Barcha endpoint'lar Admin autentifikatsiyasini talab qiladi.
 ### Balance Object
 ```json
 {
-  "period": {
-    "startDate": "2024-01-01T00:00:00.000Z",
-    "endDate": "2024-01-31T23:59:59.999Z"
-  },
-  "totalReceived": 500000000,
-  "totalFinanceKpi": 100000000,
-  "totalIncome": 600000000,
-  "totalDistributed": 200000000,
-  "totalContragentPayments": 150000000,
-  "totalExpenses": 350000000,
-  "totalBalance": 150000000,
-  "financeTotalBalance": 450000000,
-  "financeNetIncome": 350000000,
-  "details": {
-    "kpiDistribution": {
-      "punkt": 50000000,
-      "viloyatAgent": 50000000,
-      "tumanAgent": 50000000,
-      "mfyAgent": 50000000,
-      "punktTransfer": 0,
-      "deliveryService": 0,
-      "finance": 100000000
+  "success": true,
+  "balance": {
+    "period": {
+      "startDate": "2024-01-01T00:00:00.000Z",
+      "endDate": "2024-01-31T23:59:59.999Z"
     },
-    "contragentPayments": {
-      "total": 150000000,
-      "count": 250
+    "totalReceived": 375000,
+    "totalKpiExpenses": 23800,
+    "kpiDistribution": {
+      "punkt": 4200,
+      "viloyatAgent": 4200,
+      "tumanAgent": 4200,
+      "mfyAgent": 9800,
+      "punktTransfer": 0,
+      "deliveryService": 1400,
+      "finance": 4200,
+      "total": 23800
+    },
+    "totalContragentPayments": 111000,
+    "totalExpenses": 134800,
+    "totalBalance": 240200,
+    "financeTotalBalance": 264000,
+    "financeNetIncome": 4200,
+    "details": {
+      "kpiDistribution": {
+        "punkt": 4200,
+        "viloyatAgent": 4200,
+        "tumanAgent": 4200,
+        "mfyAgent": 9800,
+        "punktTransfer": 0,
+        "deliveryService": 1400,
+        "finance": 4200,
+        "total": 23800
+      },
+      "contragentPayments": {
+        "total": 111000,
+        "count": 25
+      }
     }
   }
 }
@@ -110,28 +148,37 @@ Umumiy tushgan summa, tarqatilgan summa, moliya bo'limiga ajratilgan summa va um
       "startDate": "2024-01-01T00:00:00.000Z",
       "endDate": "2024-01-31T23:59:59.999Z"
     },
-    "totalReceived": 500000000,
-    "totalFinanceKpi": 100000000,
-    "totalIncome": 600000000,
-    "totalDistributed": 200000000,
-    "totalContragentPayments": 150000000,
-    "totalExpenses": 350000000,
-    "totalBalance": 150000000,
-    "financeTotalBalance": 450000000,
-    "financeNetIncome": 350000000,
+    "totalReceived": 375000,
+    "totalKpiExpenses": 23800,
+    "kpiDistribution": {
+      "punkt": 4200,
+      "viloyatAgent": 4200,
+      "tumanAgent": 4200,
+      "mfyAgent": 9800,
+      "punktTransfer": 0,
+      "deliveryService": 1400,
+      "finance": 4200,
+      "total": 23800
+    },
+    "totalContragentPayments": 111000,
+    "totalExpenses": 134800,
+    "totalBalance": 240200,
+    "financeTotalBalance": 264000,
+    "financeNetIncome": 4200,
     "details": {
       "kpiDistribution": {
-        "punkt": 50000000,
-        "viloyatAgent": 50000000,
-        "tumanAgent": 50000000,
-        "mfyAgent": 50000000,
+        "punkt": 4200,
+        "viloyatAgent": 4200,
+        "tumanAgent": 4200,
+        "mfyAgent": 9800,
         "punktTransfer": 0,
-        "deliveryService": 0,
-        "finance": 100000000
+        "deliveryService": 1400,
+        "finance": 4200,
+        "total": 23800
       },
       "contragentPayments": {
-        "total": 150000000,
-        "count": 250
+        "total": 111000,
+        "count": 25
       }
     }
   }
@@ -141,19 +188,33 @@ Umumiy tushgan summa, tarqatilgan summa, moliya bo'limiga ajratilgan summa va um
 **Field Tushuntirishlari:**
 
 **Daromadlar:**
-- `totalReceived` - Umumiy tushgan summa (Moliya bo'limiga tasdiqlangan to'lovlar - mijozlardan)
-- `totalFinanceKpi` - Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
-- `totalIncome` - Umumiy daromad (Tushgan + KPI bonus)
+- `totalReceived` - Umumiy tushgan summa (Mijozlardan real tushgan pul)
+  - Moliya bo'limiga tasdiqlangan to'lovlar
+  - **Eslatma:** KPI bonus daromad emas, xarajat!
 
 **Xarajatlar:**
-- `totalDistributed` - Tarqatilgan summa (KPI bonuslar: punkt + agentlar + deliveryService)
-- `totalContragentPayments` - Contragent to'lovlari (to'langan)
-- `totalExpenses` - Umumiy xarajatlar (Tarqatilgan + Contragent to'lovlari)
+- `totalKpiExpenses` - Barcha KPI bonuslar jami (Xarajat - ichki taqsimot)
+  - Punkt, Agentlar (MFY, Tuman, Viloyat), Moliya bo'limi, Yetkazib berish
+  - **Bularning barchasi xarajat**
+- `kpiDistribution` - KPI bonuslar taqsimoti
+  - `punkt` - Punkt bonuslari
+  - `viloyatAgent` - Viloyat agent bonuslari
+  - `tumanAgent` - Tuman agent bonuslari
+  - `mfyAgent` - MFY agent bonuslari
+  - `punktTransfer` - Punkt transfer bonuslari
+  - `deliveryService` - Yetkazib berish xizmati bonuslari
+  - `finance` - Moliya bo'limi bonuslari (ichki daromad, lekin umumiy tizim uchun xarajat)
+  - `total` - Barcha KPI bonuslar jami
+- `totalContragentPayments` - Contragent to'lovlari (Tashqi xarajat - real chiqim)
+- `totalExpenses` - Umumiy xarajatlar (KPI bonuslar + Contragent to'lovlari)
 
 **Balanslar:**
-- `totalBalance` - Umumiy balans (Tushgan - Xarajatlar)
-- `financeTotalBalance` - Moliya bo'limi umumiy balansi (Tushgan + KPI - Contragent to'lovlari)
-- `financeNetIncome` - Moliya bo'limi sof daromadi (Tushgan - Xarajatlar + KPI bonus)
+- `totalBalance` - Umumiy sof balans (REAL foyda) = Tushgan - Xarajatlar
+- `financeTotalBalance` - Moliya bo'limi balansi = Tushgan - Contragent to'lovlari
+  - KPI qo'shilmaydi (chunki bu xarajat)
+- `financeNetIncome` - Moliya bo'limi sof daromadi = KPI bonus (ichki daromad)
+  - Moliya bo'limi uchun KPI = ichki daromad
+  - Lekin umumiy tizim uchun: KPI = xarajat
 
 **Tafsilotlar:**
 - `details.kpiDistribution` - KPI bonuslar taqsimoti (har bir kategoriya bo'yicha)
@@ -201,9 +262,9 @@ curl -X GET "http://localhost:5000/api/admin-finance/balance/total-received?star
 
 ---
 
-### 3. Tarqatilgan Summa
+### 3. Tarqatilgan Summa (KPI Bonuslar - Xarajat)
 
-KPI bonuslar bo'yicha tarqatilgan summa (punkt, agentlar).
+KPI bonuslar bo'yicha tarqatilgan summa (punkt, agentlar, deliveryService). **Eslatma:** Bu xarajat, daromad emas!
 
 **Endpoint:** `GET /balance/total-distributed`
 
@@ -242,9 +303,9 @@ curl -X GET "http://localhost:5000/api/admin-finance/balance/total-distributed?s
 
 ---
 
-### 4. Moliya Bo'limiga Ajratilgan Summa
+### 4. Moliya Bo'limiga Ajratilgan Summa (KPI Bonus - Xarajat)
 
-KPI bonuslardan moliya bo'limiga ajratilgan summa.
+KPI bonuslardan moliya bo'limiga ajratilgan summa. **Eslatma:** Bu ham xarajat (ichki taqsimot), lekin moliya bo'limi uchun ichki daromad.
 
 **Endpoint:** `GET /balance/finance-kpi`
 
@@ -313,24 +374,22 @@ curl -X GET "http://localhost:5000/api/admin-finance/balance/total-balance?start
 
 ## Balans Tushuntirishlari
 
+### ⚠️ MUHIM: KPI Bonus - Xarajat, Daromad Emas!
+
+**Asosiy qoida:**
+- **KPI bonus** — bu daromad emas, bu **ichki taqsimot (xarajat)**
+- Agar KPI mijozdan alohida tushmagan bo'lsa, u **Tushgan summa ichidan ajratiladi**
+- KPI'ni "daromadga qo'shish" → hisobni sun'iy oshiradi
+
 ### Umumiy Tushgan Summa (`totalReceived`)
+- Mijozlardan real tushgan pul
 - Moliya bo'limiga tasdiqlangan to'lovlar jami summasi
 - `FinanceSubmission` modelida `status: 'confirmed'` va `toAgentType: 'finance'` bo'lganlar
-- Bu summa viloyat agentlardan moliya bo'limiga topshirilgan to'lovlar (mijozlardan olingan)
+- Bu summa viloyat agentlardan moliya bo'limiga topshirilgan to'lovlar
 - **Sana filtri:** `confirmedAt` bo'yicha
 
-### Moliya Bo'limiga Ajratilgan Summa (`totalFinanceKpi`)
-- KPI bonuslardan moliya bo'limiga ajratilgan qism
-- `KpiBonusTransaction` modelida `amounts.finance` field'i
-- Bu summa KPI bonus tizimi orqali moliya bo'limiga ajratiladi
-- **Sana filtri:** `createdAt` bo'yicha
-
-### Umumiy Daromad (`totalIncome`)
-- **Formula:** `totalReceived + totalFinanceKpi`
-- Bu summa moliya bo'limining umumiy daromadi
-
-### Tarqatilgan Summa (`totalDistributed`)
-- KPI bonuslar bo'yicha tarqatilgan summa
+### KPI Bonuslar (Ichki Taqsimot - Xarajat) (`totalKpiExpenses`)
+- **Barcha KPI bonuslar jami (xarajat)**
 - Quyidagilarni o'z ichiga oladi:
   - Punkt bonuslari
   - Viloyat agent bonuslari
@@ -338,30 +397,33 @@ curl -X GET "http://localhost:5000/api/admin-finance/balance/total-balance?start
   - MFY agent bonuslari
   - Punkt transfer bonuslari
   - Yetkazib berish xizmati bonuslari (`deliveryService`)
-- **Eslatma:** Moliya bo'limiga ajratilgan summa (`finance`) bu yig'indiga kirmaydi
+  - Moliya bo'limi bonuslari (`finance`)
+- **Eslatma:** Bularning barchasi xarajat (ichki taqsimot)
 - **Sana filtri:** `createdAt` bo'yicha
 
 ### Contragent To'lovlari (`totalContragentPayments`)
-- Contragentlarga to'langan to'lovlar jami summasi
+- Contragentlarga to'langan to'lovlar jami summasi (Tashqi xarajat - real chiqim)
 - `ContragentPaymentDistribution` modelida `status: 'paid'` bo'lganlar
 - Bu summa contragentlarga to'langan to'lovlar (buyurtmalardan olingan summalar)
 - **Sana filtri:** `paidAt` bo'yicha
 
 ### Umumiy Xarajatlar (`totalExpenses`)
-- **Formula:** `totalDistributed + totalContragentPayments`
-- Bu summa moliya bo'limining umumiy xarajatlari
+- **Formula:** `totalKpiExpenses + totalContragentPayments` = KPI Bonuslar + Contragent to'lovlari
+- Bu summa tizimning umumiy xarajatlari
 
-### Umumiy Balans (`totalBalance`)
-- **Formula:** `totalReceived - totalExpenses`
-- Bu summa moliya bo'limida qolgan pul (tushgan - xarajatlar)
+### Umumiy Sof Balans (REAL foyda) (`totalBalance`)
+- **Formula:** `totalReceived - totalExpenses` = Tushgan - Xarajatlar
+- Bu tizimning haqiqiy sof balansi
 
-### Moliya Bo'limi Umumiy Balansi (`financeTotalBalance`)
-- **Formula:** `totalReceived + totalFinanceKpi - totalContragentPayments`
-- Bu summa moliya bo'limining umumiy balansi (tushgan to'lovlar + KPI bonus - Contragent to'lovlari)
+### Moliya Bo'limi Balansi (`financeTotalBalance`)
+- **Formula:** `totalReceived - totalContragentPayments` = Tushgan - Contragent to'lovlari
+- KPI qo'shilmaydi (chunki bu xarajat)
+- Bu moliya bo'limida qolgan pul (Contragent to'lovlaridan keyin)
 
 ### Moliya Bo'limi Sof Daromadi (`financeNetIncome`)
-- **Formula:** `totalReceived - totalExpenses + totalFinanceKpi`
-- Bu summa moliya bo'limining sof daromadi (tushgan - xarajatlar + KPI bonus)
+- **Formula:** `totalFinanceKpi` = Moliya bo'limi uchun KPI bonus
+- Moliya bo'limi uchun: KPI bonus = ichki daromad
+- Lekin umumiy tizim uchun: KPI = xarajat
 
 ---
 
@@ -535,17 +597,19 @@ function FinanceBalanceComponent({ token, startDate, endDate }) {
         </div>
 
         <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
-          <h3>Umumiy Daromad</h3>
+          <h3>Umumiy Tushgan Summa</h3>
           <p style={{ fontSize: '24px', fontWeight: 'bold', color: 'darkgreen' }}>
-            {balance.totalIncome.toLocaleString()} so'm
+            {balance.totalReceived.toLocaleString()} so'm
           </p>
+          <p style={{ fontSize: '12px', color: 'gray' }}>Mijozlardan real tushgan pul</p>
         </div>
 
         <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
-          <h3>Tarqatilgan Summa (KPI)</h3>
+          <h3>KPI Bonuslar (Xarajat)</h3>
           <p style={{ fontSize: '24px', fontWeight: 'bold', color: 'orange' }}>
-            {balance.totalDistributed.toLocaleString()} so'm
+            {balance.totalKpiExpenses.toLocaleString()} so'm
           </p>
+          <p style={{ fontSize: '12px', color: 'gray' }}>Ichki taqsimot - xarajat</p>
         </div>
 
         <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
@@ -553,6 +617,7 @@ function FinanceBalanceComponent({ token, startDate, endDate }) {
           <p style={{ fontSize: '24px', fontWeight: 'bold', color: 'red' }}>
             {balance.totalContragentPayments.toLocaleString()} so'm
           </p>
+          <p style={{ fontSize: '12px', color: 'gray' }}>Tashqi xarajat - real chiqim</p>
         </div>
 
         <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
@@ -560,20 +625,23 @@ function FinanceBalanceComponent({ token, startDate, endDate }) {
           <p style={{ fontSize: '24px', fontWeight: 'bold', color: 'darkred' }}>
             {balance.totalExpenses.toLocaleString()} so'm
           </p>
+          <p style={{ fontSize: '12px', color: 'gray' }}>KPI Bonuslar + Contragent to'lovlari</p>
         </div>
 
         <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
-          <h3>Umumiy Balans</h3>
+          <h3>Umumiy Sof Balans (REAL foyda)</h3>
           <p style={{ fontSize: '24px', fontWeight: 'bold', color: 'purple' }}>
             {balance.totalBalance.toLocaleString()} so'm
           </p>
+          <p style={{ fontSize: '12px', color: 'gray' }}>Tushgan - Xarajatlar</p>
         </div>
 
         <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
-          <h3>Moliya Bo'limi Umumiy Balansi</h3>
+          <h3>Moliya Bo'limi Balansi</h3>
           <p style={{ fontSize: '24px', fontWeight: 'bold', color: 'darkgreen' }}>
             {balance.financeTotalBalance.toLocaleString()} so'm
           </p>
+          <p style={{ fontSize: '12px', color: 'gray' }}>Tushgan - Contragent to'lovlari</p>
         </div>
 
         <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
@@ -581,6 +649,7 @@ function FinanceBalanceComponent({ token, startDate, endDate }) {
           <p style={{ fontSize: '24px', fontWeight: 'bold', color: 'green' }}>
             {balance.financeNetIncome.toLocaleString()} so'm
           </p>
+          <p style={{ fontSize: '12px', color: 'gray' }}>KPI bonus (ichki daromad)</p>
         </div>
       </div>
 
@@ -615,64 +684,72 @@ export default FinanceBalanceComponent;
 
 ### Balans Hisoblash Formulalari
 
-1. **Umumiy Tushgan Summa:**
+#### ⚠️ MUHIM: KPI Bonus - Xarajat, Daromad Emas!
+
+**Asosiy qoida:**
+- KPI bonus — bu daromad emas, bu **ichki taqsimot (xarajat)**
+- Umumiy daromad = Tushgan summa (KPI qo'shilmaydi)
+- Sof foyda = Tushgan - (KPI + Contragent to'lovlari)
+
+1. **Umumiy Tushgan Summa (Daromad):**
    ```
    totalReceived = SUM(FinanceSubmission.amount) 
    WHERE status = 'confirmed' AND toAgentType = 'finance'
    ```
+   - Mijozlardan real tushgan pul
+   - **Eslatma:** KPI bonus daromad emas!
 
-2. **Moliya Bo'limiga Ajratilgan Summa:**
+2. **KPI Bonuslar (Xarajat - Ichki Taqsimot):**
    ```
-   totalFinanceKpi = SUM(amounts.finance)
-   FROM KpiBonusTransaction
-   WHERE orderStatus = 'confirmed_by_customer'
-   ```
-
-3. **Umumiy Daromad:**
-   ```
-   totalIncome = totalReceived + totalFinanceKpi
-   ```
-
-4. **Tarqatilgan Summa:**
-   ```
-   totalDistributed = SUM(
+   totalKpiExpenses = SUM(
      amounts.punkt + 
      amounts.viloyatAgent + 
      amounts.tumanAgent + 
      amounts.mfyAgent + 
      amounts.punktTransfer +
-     amounts.deliveryService
+     amounts.deliveryService +
+     amounts.finance
    )
    FROM KpiBonusTransaction
    WHERE orderStatus = 'confirmed_by_customer'
    ```
+   - Barcha KPI bonuslar jami (xarajat)
+   - Punkt, Agentlar, Moliya bo'limi, Yetkazib berish
 
-5. **Contragent To'lovlari:**
+3. **Contragent To'lovlari (Tashqi Xarajat):**
    ```
    totalContragentPayments = SUM(amount)
    FROM ContragentPaymentDistribution
    WHERE status = 'paid'
    ```
+   - Contragentlarga to'langan to'lovlar (real chiqim)
 
-6. **Umumiy Xarajatlar:**
+4. **Umumiy Xarajatlar:**
    ```
-   totalExpenses = totalDistributed + totalContragentPayments
+   totalExpenses = totalKpiExpenses + totalContragentPayments
    ```
+   - KPI Bonuslar + Contragent to'lovlari
 
-7. **Umumiy Balans:**
+5. **Umumiy Sof Balans (REAL foyda):**
    ```
    totalBalance = totalReceived - totalExpenses
    ```
+   - Tushgan - Xarajatlar
+   - Bu tizimning haqiqiy sof balansi
 
-8. **Moliya Bo'limi Umumiy Balansi:**
+6. **Moliya Bo'limi Balansi:**
    ```
-   financeTotalBalance = totalReceived + totalFinanceKpi - totalContragentPayments
+   financeTotalBalance = totalReceived - totalContragentPayments
    ```
+   - Tushgan - Contragent to'lovlari
+   - KPI qo'shilmaydi (chunki bu xarajat)
 
-9. **Moliya Bo'limi Sof Daromadi:**
+7. **Moliya Bo'limi Sof Daromadi:**
    ```
-   financeNetIncome = totalReceived - totalExpenses + totalFinanceKpi
+   financeNetIncome = totalFinanceKpi
    ```
+   - Moliya bo'limi uchun KPI bonus (ichki daromad)
+   - Lekin umumiy tizim uchun: KPI = xarajat
 
 ### Xavfsizlik
 

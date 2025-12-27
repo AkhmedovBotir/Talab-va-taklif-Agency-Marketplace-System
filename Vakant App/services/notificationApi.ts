@@ -49,6 +49,11 @@ class NotificationApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('Token topilmadi');
+    }
+
     const headers = await this.getHeaders();
 
     try {
@@ -73,7 +78,10 @@ class NotificationApiService {
 
       return data;
     } catch (error: any) {
-      console.error('Notifications API error:', error);
+      // Token xatosi bo'lsa, console.error qilmaslik
+      if (!error.message?.includes('Token topilmadi')) {
+        console.error('Notifications API error:', error);
+      }
 
       if (isUnauthorizedError(error)) {
         await handleUnauthorized();
@@ -114,14 +122,28 @@ class NotificationApiService {
   }
 
   async getUnreadCount(): Promise<number> {
-    const response = await this.request<{
-      success: boolean;
-      data: { unreadCount: number };
-    }>('/notifications/unread-count', {
-      method: 'GET',
-    });
+    // Token mavjudligini tekshirish
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      return 0;
+    }
 
-    return response.data?.unreadCount ?? 0;
+    try {
+      const response = await this.request<{
+        success: boolean;
+        data: { unreadCount: number };
+      }>('/notifications/unread-count', {
+        method: 'GET',
+      });
+
+      return response.data?.unreadCount ?? 0;
+    } catch (error: any) {
+      // Token xatosi bo'lsa, 0 qaytarish
+      if (error.message?.includes('Token') || error.message?.includes('Avtorizatsiya')) {
+        return 0;
+      }
+      throw error;
+    }
   }
 
   async markAsRead(notificationId: string): Promise<void> {

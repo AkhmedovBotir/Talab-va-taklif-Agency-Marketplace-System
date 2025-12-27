@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { agentAuth } = require('../middleware/auth');
+const { redisCache, invalidateCache } = require('../middleware/redisCache');
 const {
   getMyOrders,
   getOrderById,
@@ -20,28 +21,28 @@ const {
 router.use(agentAuth);
 
 // Get orders for agent (agent type'ga qarab buyurtmalarni ko'rish)
-router.get('/orders', getMyOrders);
+router.get('/orders', redisCache(30), getMyOrders); // 30 sekund cache
 
 // Get today's orders (bugungi buyurtmalar)
-router.get('/orders/today', getTodayOrders);
+router.get('/orders/today', redisCache(30), getTodayOrders); // 30 sekund cache
 
 // Get order history (tarix - o'tgan kunlar)
-router.get('/orders/history', getOrderHistory);
+router.get('/orders/history', redisCache(60), getOrderHistory); // 1 daqiqa cache
 
 // Get order by ID
-router.get('/orders/:id', getOrderById);
+router.get('/orders/:id', redisCache(30), getOrderById); // 30 sekund cache
 
 // Confirm order by agent (MFY agentlari mijozga borib tasdiqlash)
-router.post('/orders/:id/confirm', confirmOrderByAgent);
+router.post('/orders/:id/confirm', invalidateCache(['cache:/api/agent/orders*', 'cache:/api/punkt/orders*']), confirmOrderByAgent);
 
 // Mark order as delivered (MFY agentlari mijozga yetkazib berganini belgilash)
-router.post('/orders/:id/delivered', markOrderAsDelivered);
+router.post('/orders/:id/delivered', invalidateCache(['cache:/api/agent/orders*', 'cache:/api/punkt/orders*']), markOrderAsDelivered);
 
 // KPI Bonus endpoints
-router.get('/kpi/summary', getMyKpiSummary);
-router.get('/kpi/transactions', getMyKpiTransactions);
-router.get('/kpi/balance', getMyKpiDailyBalance);
-router.get('/kpi/reports/daily', getMyKpiDailyReport);
+router.get('/kpi/summary', redisCache(120), getMyKpiSummary); // 2 daqiqa cache
+router.get('/kpi/transactions', redisCache(120), getMyKpiTransactions); // 2 daqiqa cache
+router.get('/kpi/balance', redisCache(60), getMyKpiDailyBalance); // 1 daqiqa cache
+router.get('/kpi/reports/daily', redisCache(60), getMyKpiDailyReport); // 1 daqiqa cache
 
 module.exports = router;
 

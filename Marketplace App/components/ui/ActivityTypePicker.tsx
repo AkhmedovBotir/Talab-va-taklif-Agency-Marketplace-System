@@ -10,7 +10,7 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import apiService from '../../services/api';
 import { ContragentType } from '../../services/api';
@@ -123,6 +123,521 @@ export default function ActivityTypePicker({
     setSearchText('');
   };
 
+  // Material-UI icon names mapping to React Native Material icon names
+  const getMaterialIconName = (iconName: string): string => {
+    if (!iconName) return 'business';
+
+    // All Material-UI icons list (complete mapping)
+    const materialUIIcons: { [key: string]: string } = {
+      // Business & Shopping
+      'Store': 'store',
+      'ShoppingBag': 'shopping-bag',
+      'ShoppingCart': 'shopping-cart',
+      'ShoppingBasket': 'shopping-basket',
+      'Category': 'category',
+      'Business': 'business',
+      'Work': 'work',
+      'BusinessCenter': 'business-center',
+      'Storefront': 'store',
+      'ShoppingMall': 'shopping-bag',
+      'LocalMall': 'shopping-bag',
+      'LocalGroceryStore': 'shopping-bag',
+      'BakeryDining': 'restaurant',
+      'PointOfSale': 'point-of-sale',
+      'Receipt': 'receipt',
+      'ReceiptLong': 'receipt-long',
+      'Inventory': 'inventory',
+      'Inventory2': 'inventory-2',
+      'Shop': 'store',
+      'Shop2': 'store',
+      'StoreMallDirectory': 'store',
+      'CorporateFare': 'business',
+      'Domain': 'domain',
+      'AccountBalance': 'account-balance',
+      'TrendingUp': 'trending-up',
+      'BarChart': 'bar-chart',
+      'Assessment': 'assessment',
+      'Analytics': 'analytics',
+      'PieChart': 'pie-chart',
+      'ShowChart': 'show-chart',
+      'Timeline': 'timeline',
+      
+      // Food & Restaurant
+      'Restaurant': 'restaurant',
+      'RestaurantMenu': 'restaurant-menu',
+      'Fastfood': 'fastfood',
+      'LocalCafe': 'local-cafe',
+      'LocalBar': 'local-bar',
+      'SportsBar': 'sports-bar',
+      'Dining': 'dining',
+      'RoomService': 'room-service',
+      'SetMeal': 'restaurant',
+      'BreakfastDining': 'restaurant',
+      'LunchDining': 'restaurant',
+      'DinnerDining': 'restaurant',
+      'Icecream': 'icecream',
+      'Cake': 'cake',
+      'LocalPizza': 'local-pizza',
+      'LocalDrink': 'local-drink',
+      'WineBar': 'wine-bar',
+      'FoodBank': 'food-bank',
+      'Kitchen': 'kitchen',
+      'Coffee': 'local-cafe',
+      'LocalDining': 'restaurant',
+      'RamenDining': 'restaurant',
+      'BrunchDining': 'restaurant',
+      'TakeoutDining': 'restaurant',
+      
+      // Transportation
+      'LocalShipping': 'local-shipping',
+      'DirectionsCar': 'directions-car',
+      'TwoWheeler': 'two-wheeler',
+      'Flight': 'flight',
+      'Train': 'train',
+      'DirectionsBus': 'directions-bus',
+      'Subway': 'subway',
+      'Tram': 'tram',
+      'DirectionsBike': 'directions-bike',
+      'ElectricBike': 'electric-bike',
+      'ElectricScooter': 'electric-scooter',
+      'AirportShuttle': 'airport-shuttle',
+      'LocalTaxi': 'local-taxi',
+      'Commute': 'commute',
+      'DirectionsWalk': 'directions-walk',
+      'DirectionsRun': 'directions-run',
+      'FlightTakeoff': 'flight-takeoff',
+      'FlightLand': 'flight-land',
+      'TrainIcon': 'train',
+      'DirectionsTransit': 'directions-transit',
+      'DirectionsSubway': 'directions-subway',
+      'DirectionsRailway': 'directions-railway',
+      'AirlineSeatReclineNormal': 'airline-seat-recline-normal',
+      'AirlineSeatFlat': 'airline-seat-flat',
+      'AirlineSeatIndividualSuite': 'airline-seat-individual-suite',
+      
+      // Building
+      'Home': 'home',
+      'Apartment': 'apartment',
+      'Factory': 'factory',
+      'Construction': 'construction',
+      'Build': 'build',
+      'Engineering': 'engineering',
+      'LocationCity': 'location-city',
+      'Place': 'place',
+      'Warehouse': 'warehouse',
+      'Museum': 'museum',
+      'TheaterComedy': 'theater-comedy',
+      'Stadium': 'stadium',
+      'Castle': 'castle',
+      'Church': 'church',
+      'Mosque': 'mosque',
+      'TempleBuddhist': 'temple-buddhist',
+      'TempleHindu': 'temple-hindu',
+      'School': 'school',
+      'Library': 'library',
+      'Hospital': 'local-hospital',
+      'Hotel': 'hotel',
+      'OfficeBuilding': 'business',
+      
+      // Finance
+      'Payment': 'payment',
+      'CreditCard': 'credit-card',
+      'AttachMoney': 'attach-money',
+      'MonetizationOn': 'monetization-on',
+      'Savings': 'savings',
+      'AccountBalanceWallet': 'account-balance-wallet',
+      'AccountTree': 'account-tree',
+      'CurrencyExchange': 'currency-exchange',
+      'Paid': 'paid',
+      'RequestQuote': 'request-quote',
+      'PriceCheck': 'price-check',
+      'Calculate': 'calculate',
+      'Payments': 'payments',
+      'Money': 'attach-money',
+      'MoneyOff': 'money-off',
+      'CreditScore': 'credit-score',
+      'SavingsOutlined': 'savings',
+      'AccountBalanceOutlined': 'account-balance',
+      'Euro': 'euro',
+      'Dollar': 'attach-money',
+      'Yen': 'yen',
+      
+      // Hospitality
+      'Spa': 'spa',
+      'BeachAccess': 'beach-access',
+      'Pool': 'pool',
+      'Casino': 'casino',
+      'GolfCourse': 'golf-course',
+      'FitnessCenter': 'fitness-center',
+      'Sports': 'sports',
+      'HotTub': 'hot-tub',
+      'AcUnit': 'ac-unit',
+      'Air': 'air',
+      'WaterDrop': 'water-drop',
+      'SportsSoccer': 'sports-soccer',
+      'SportsBasketball': 'sports-basketball',
+      'SportsTennis': 'sports-tennis',
+      'SportsVolleyball': 'sports-volleyball',
+      'SportsHockey': 'sports-hockey',
+      'SportsBaseball': 'sports-baseball',
+      'SportsCricket': 'sports-cricket',
+      'SportsKabaddi': 'sports-kabaddi',
+      'SportsEsports': 'sports-esports',
+      'SportsMotorsports': 'sports-motorsports',
+      'SportsMma': 'sports-mma',
+      
+      // Education
+      'Book': 'menu-book',
+      'MenuBook': 'menu-book',
+      'Computer': 'computer',
+      'Laptop': 'laptop',
+      'Tablet': 'tablet',
+      'Phone': 'phone',
+      'PhoneAndroid': 'phone-android',
+      'PhoneIphone': 'phone-iphone',
+      'Devices': 'devices',
+      'CastForEducation': 'cast-for-education',
+      'Science': 'science',
+      'Psychology': 'psychology',
+      'HistoryEdu': 'history-edu',
+      'AutoStories': 'auto-stories',
+      'BookOnline': 'menu-book',
+      'Class': 'class',
+      'WorkspacePremium': 'workspace-premium',
+      'GraduationCap': 'school',
+      'LibraryBooks': 'library-books',
+      'LocalLibrary': 'local-library',
+      'SchoolOutlined': 'school',
+      
+      // Communication
+      'Email': 'email',
+      'Message': 'message',
+      'Chat': 'chat',
+      'Forum': 'forum',
+      'Comment': 'comment',
+      'Comments': 'comments',
+      'Sms': 'sms',
+      'Call': 'call',
+      'CallEnd': 'call-end',
+      'CallMade': 'call-made',
+      'CallReceived': 'call-received',
+      'CallSplit': 'call-split',
+      'VideoCall': 'video-call',
+      'Videocam': 'videocam',
+      'VideocamOff': 'videocam-off',
+      'Mic': 'mic',
+      'MicOff': 'mic-off',
+      'PhoneInTalk': 'phone-in-talk',
+      'PhoneEnabled': 'phone-enabled',
+      'PhoneDisabled': 'phone-disabled',
+      'PhoneCallback': 'phone-callback',
+      'PhonePaused': 'phone-paused',
+      'ChatBubble': 'chat-bubble',
+      'ChatBubbleOutline': 'chat-bubble-outline',
+      'QuestionAnswer': 'question-answer',
+      'ContactMail': 'contact-mail',
+      
+      // Location
+      'LocationOn': 'location-on',
+      'Map': 'map',
+      'Navigation': 'navigation',
+      'MyLocation': 'my-location',
+      'NearMe': 'near-me',
+      'Directions': 'directions',
+      'Route': 'route',
+      'Explore': 'explore',
+      'ExploreOff': 'explore-off',
+      'LocalActivity': 'local-activity',
+      'LocalAtm': 'local-atm',
+      'LocalParking': 'local-parking',
+      'LocalGasStation': 'local-gas-station',
+      'LocalPharmacy': 'local-pharmacy',
+      'LocationSearching': 'location-searching',
+      'LocationDisabled': 'location-disabled',
+      'PinDrop': 'pin-drop',
+      'AddLocation': 'add-location',
+      'EditLocation': 'edit-location',
+      'LocationOff': 'location-off',
+      'WhereToVote': 'where-to-vote',
+      'Room': 'room',
+      
+      // Medical
+      'MedicalServices': 'medical-services',
+      'LocalHospital': 'local-hospital',
+      'Healing': 'healing',
+      'HealthAndSafety': 'health-and-safety',
+      'Vaccines': 'vaccines',
+      'Emergency': 'emergency',
+      'MedicalInformation': 'medical-information',
+      'Medication': 'medication',
+      'MonitorHeart': 'monitor-heart',
+      'Favorite': 'favorite',
+      'FavoriteBorder': 'favorite-border',
+      'Coronavirus': 'coronavirus',
+      'Sick': 'sick',
+      'MedicationLiquid': 'medication-liquid',
+      'PregnantWoman': 'pregnant-woman',
+      'ChildCare': 'child-care',
+      
+      // Services
+      'AutoRepair': 'build',
+      'CarRepair': 'build',
+      'BuildCircle': 'build',
+      'Handyman': 'build',
+      'Plumbing': 'plumbing',
+      'ElectricalServices': 'electrical-services',
+      'CleaningServices': 'cleaning-services',
+      'DryCleaning': 'dry-cleaning',
+      'LocalLaundryService': 'local-laundry-service',
+      'Carpenter': 'carpenter',
+      'PrecisionManufacturing': 'precision-manufacturing',
+      'HomeRepairService': 'build',
+      'MiscellaneousServices': 'miscellaneous-services',
+      
+      // Media
+      'Camera': 'camera-alt',
+      'PhotoCamera': 'camera-alt',
+      'MusicNote': 'music-note',
+      'Movie': 'movie',
+      'MovieFilter': 'movie-filter',
+      'VideoLibrary': 'video-library',
+      'PhotoLibrary': 'photo-library',
+      'Image': 'image',
+      'Images': 'images',
+      'VideoFile': 'video-file',
+      'AudioFile': 'audio-file',
+      'MovieCreation': 'movie-creation',
+      'LiveTv': 'live-tv',
+      'Radio': 'radio',
+      'CameraAlt': 'camera-alt',
+      'CameraRoll': 'camera-roll',
+      'CameraEnhance': 'camera-enhance',
+      'Photo': 'photo',
+      'PhotoAlbum': 'photo-album',
+      
+      // Technology
+      'Smartphone': 'smartphone',
+      'Watch': 'watch',
+      'Headphones': 'headphones',
+      'Speaker': 'speaker',
+      'Tv': 'tv',
+      'Monitor': 'monitor',
+      'Print': 'print',
+      'Scanner': 'scanner',
+      'Fax': 'fax',
+      'Router': 'router',
+      'Memory': 'memory',
+      'Storage': 'storage',
+      'LaptopMac': 'laptop-mac',
+      'LaptopWindows': 'laptop-windows',
+      'TabletAndroid': 'tablet-android',
+      'TabletMac': 'tablet-mac',
+      'WatchLater': 'watch-later',
+      
+      // Shopping
+      'AddShoppingCart': 'add-shopping-cart',
+      'RemoveShoppingCart': 'remove-shopping-cart',
+      'LocalOffer': 'local-offer',
+      'LocalOfferOutlined': 'local-offer',
+      'Discount': 'local-offer',
+      'Loyalty': 'loyalty',
+      'CardGiftcard': 'card-giftcard',
+      'Redeem': 'redeem',
+      'CardMembership': 'card-membership',
+      
+      // General
+      'Settings': 'settings',
+      'MoreVert': 'more-vert',
+      'MoreHoriz': 'more-horiz',
+      'Menu': 'menu',
+      'Apps': 'apps',
+      'Dashboard': 'dashboard',
+      'Notifications': 'notifications',
+      'NotificationsActive': 'notifications-active',
+      'NotificationsOff': 'notifications-off',
+      'Star': 'star',
+      'StarBorder': 'star-border',
+      'StarHalf': 'star-half',
+      'ThumbUp': 'thumb-up',
+      'ThumbDown': 'thumb-down',
+      'Share': 'share',
+      'Download': 'file-download',
+      'Upload': 'file-upload',
+      'Save': 'save',
+      'Edit': 'edit',
+      'Delete': 'delete',
+      'Add': 'add',
+      'Remove': 'remove',
+      'Close': 'close',
+      'Check': 'check',
+      'Cancel': 'cancel',
+      'Search': 'search',
+      'FilterList': 'filter-list',
+      'Sort': 'sort',
+      'ArrowUpward': 'arrow-upward',
+      'ArrowDownward': 'arrow-downward',
+      'ArrowForward': 'arrow-forward',
+      'ArrowBack': 'arrow-back',
+      'Refresh': 'refresh',
+      'Sync': 'sync',
+      'Autorenew': 'autorenew',
+      
+      // Security
+      'Lock': 'lock',
+      'LockOpen': 'lock-open',
+      'Visibility': 'visibility',
+      'VisibilityOff': 'visibility-off',
+      'Security': 'security',
+      'Verified': 'verified',
+      'VerifiedUser': 'verified-user',
+      'AdminPanelSettings': 'admin-panel-settings',
+      'Shield': 'security',
+      'ShieldCheck': 'security',
+      'LockClock': 'lock-clock',
+      'LockReset': 'lock-reset',
+      'Password': 'lock',
+      'Policy': 'policy',
+      
+      // People
+      'Person': 'person',
+      'People': 'people',
+      'Group': 'group',
+      'PersonAdd': 'person-add',
+      'PersonRemove': 'person-remove',
+      'AccountCircle': 'account-circle',
+      'AccountBox': 'account-box',
+      'PersonOutline': 'person-outline',
+      'PeopleOutline': 'people-outline',
+      'GroupAdd': 'group-add',
+      'GroupRemove': 'group-remove',
+      'SupervisorAccount': 'supervisor-account',
+      'PersonPin': 'person-pin',
+      'PersonPinCircle': 'person-pin-circle',
+      'HowToReg': 'how-to-reg',
+      'PersonAddAlt': 'person-add',
+      'PersonRemoveAlt': 'person-remove',
+      
+      // Documents
+      'Assignment': 'assignment',
+      'AssignmentInd': 'assignment-ind',
+      'AssignmentTurnedIn': 'assignment-turned-in',
+      'Description': 'description',
+      'Article': 'article',
+      'Note': 'note',
+      'Notes': 'notes',
+      'StickyNote2': 'note',
+      'TextSnippet': 'text-snippet',
+      'Folder': 'folder',
+      'FolderOpen': 'folder-open',
+      'InsertDriveFile': 'insert-drive-file',
+      'AttachFile': 'attach-file',
+      'Link': 'link',
+      
+      // Time
+      'CalendarToday': 'calendar-today',
+      'Event': 'event',
+      'Schedule': 'schedule',
+      'AccessTime': 'access-time',
+      'DateRange': 'date-range',
+      'Alarm': 'alarm',
+      'Timer': 'timer',
+      'Stopwatch': 'timer',
+      'HourglassEmpty': 'hourglass-empty',
+      'HourglassFull': 'hourglass-full',
+      'CalendarMonth': 'calendar-month',
+      'CalendarViewDay': 'calendar-view-day',
+      'CalendarViewWeek': 'calendar-view-week',
+      'CalendarViewMonth': 'calendar-view-month',
+      'Today': 'today',
+      'EventAvailable': 'event-available',
+      'EventBusy': 'event-busy',
+      'EventNote': 'event-note',
+      
+      // Weather
+      'Cloud': 'cloud',
+      'CloudQueue': 'cloud-queue',
+      'CloudDone': 'cloud-done',
+      'CloudOff': 'cloud-off',
+      'CloudUpload': 'cloud-upload',
+      'CloudDownload': 'cloud-download',
+      'Brightness': 'brightness-high',
+      'BrightnessHigh': 'brightness-high',
+      'BrightnessLow': 'brightness-low',
+      'WbSunny': 'wb-sunny',
+      'WbTwilight': 'wb-twilight',
+      'WbCloudy': 'wb-cloudy',
+      'Grain': 'grain',
+      'FilterDrama': 'filter-drama',
+      
+      // Arts
+      'Palette': 'palette',
+      'Brush': 'brush',
+      'ColorLens': 'color-lens',
+      'FormatPaint': 'format-paint',
+      'Draw': 'brush',
+      
+      // Tools
+      'Tune': 'tune',
+      'ViewList': 'view-list',
+      'ViewModule': 'view-module',
+      'GridOn': 'grid-on',
+      'GridOff': 'grid-off',
+      'ViewComfy': 'view-comfy',
+      'ViewCompact': 'view-compact',
+      'ViewHeadline': 'view-headline',
+    };
+
+    // Try exact match first
+    if (materialUIIcons[iconName]) {
+      return materialUIIcons[iconName];
+    }
+
+    // Try case-insensitive match
+    const lowerName = iconName.toLowerCase();
+    for (const [muiName, rnName] of Object.entries(materialUIIcons)) {
+      if (muiName.toLowerCase() === lowerName) {
+        return rnName;
+      }
+    }
+
+    // Convert PascalCase to kebab-case as fallback
+    const kebabCase = iconName
+      .replace(/([A-Z])/g, '-$1')
+      .toLowerCase()
+      .replace(/^-/, '');
+
+    return kebabCase;
+  };
+
+  // Helper function to render Material icon
+  const renderMaterialIcon = (iconName: string, size: number = 18, color: string = '#999') => {
+    if (!iconName) {
+      return <MaterialIcons name="business" size={size} color={color} />;
+    }
+
+    const materialIconName = getMaterialIconName(iconName);
+
+    // For WaterDrop, use MaterialCommunityIcons as it's not in MaterialIcons
+    if (iconName.toLowerCase() === 'waterdrop' || materialIconName === 'water-drop') {
+      return (
+        <MaterialCommunityIcons 
+          name="water" 
+          size={size} 
+          color={color} 
+        />
+      );
+    }
+
+    // Try MaterialIcons first
+    return (
+      <MaterialIcons 
+        name={materialIconName as any} 
+        size={size} 
+        color={color} 
+      />
+    );
+  };
+
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
@@ -137,12 +652,16 @@ export default function ActivityTypePicker({
         activeOpacity={0.7}
       >
         <View style={styles.inputContent}>
-          <Ionicons 
-            name="business" 
-            size={20} 
-            color={displayText ? '#007AFF' : '#999'} 
-            style={styles.inputIcon}
-          />
+          {selectedActivityType ? (
+            renderMaterialIcon(selectedActivityType.icon, 20, displayText ? '#007AFF' : '#999')
+          ) : (
+            <MaterialIcons 
+              name="business" 
+              size={20} 
+              color={displayText ? '#007AFF' : '#999'} 
+              style={styles.inputIcon}
+            />
+          )}
           <Text style={[styles.inputText, !displayText && styles.placeholder]}>
             {displayText || 'Faoliyat turini tanlang'}
           </Text>
@@ -166,7 +685,7 @@ export default function ActivityTypePicker({
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
                 <View style={styles.modalIconContainer}>
-                  <Ionicons 
+                  <MaterialIcons 
                     name="business" 
                     size={24} 
                     color="#007AFF" 
@@ -229,11 +748,11 @@ export default function ActivityTypePicker({
                       styles.itemIconContainer,
                       selectedActivityType?._id === item._id && styles.itemIconContainerActive
                     ]}>
-                      <Ionicons 
-                        name="business" 
-                        size={18} 
-                        color={selectedActivityType?._id === item._id ? '#007AFF' : '#999'} 
-                      />
+                      {renderMaterialIcon(
+                        item.icon, 
+                        18, 
+                        selectedActivityType?._id === item._id ? '#007AFF' : '#999'
+                      )}
                     </View>
                     <Text
                       style={[

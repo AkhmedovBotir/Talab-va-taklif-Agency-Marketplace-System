@@ -219,13 +219,13 @@ export default function RegisterFormScreen() {
               />
 
               <View style={styles.passwordSection}>
-                <Input
-                  label="Parol"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  showPasswordToggle
-                  error={errors.password}
+              <Input
+                label="Parol"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                showPasswordToggle
+                error={errors.password}
                   placeholder="Parolni kiriting"
                 />
                 

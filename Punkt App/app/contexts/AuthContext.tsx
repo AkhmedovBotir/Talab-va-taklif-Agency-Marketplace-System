@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { apiService, Punkt } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -6,7 +6,7 @@ interface AuthContextType {
   token: string | null;
   punkt: Punkt | null;
   isLoading: boolean;
-  login: (phone: string, password: string) => Promise<void>;
+  login: (phone: string, password: string, deviceId?: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -21,9 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [punkt, setPunkt] = useState<Punkt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadStoredAuth();
-  }, []);
 
   const loadStoredAuth = async () => {
     try {
@@ -44,38 +41,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (phone: string, password: string) => {
+  const login = async (phone: string, password: string, deviceId?: string) => {
     try {
-      const response = await apiService.login({ phone, password });
-      const { token: newToken, punkt: newPunkt } = response.data;
+      const response = await apiService.login({ phone, password }, deviceId);
+      
+      // Check if device verification is required
+      if ('requiresDeviceVerification' in response && response.requiresDeviceVerification) {
+        const error: any = new Error(response.message || 'Qurilma tasdiqlash kerak');
+        error.status = 403;
+        error.requiresDeviceVerification = true;
+        throw error;
+      }
 
-      setToken(newToken);
-      setPunkt(newPunkt);
-      apiService.setToken(newToken);
+      // Check if response has data with token and punkt
+      if (response.data && 'token' in response.data && 'punkt' in response.data) {
+        const { token: newToken, punkt: newPunkt } = response.data;
 
-      await Promise.all([
-        AsyncStorage.setItem(TOKEN_KEY, newToken),
-        AsyncStorage.setItem(PUNKT_KEY, JSON.stringify(newPunkt)),
-      ]);
+        if (newToken && newPunkt) {
+          setToken(newToken);
+          setPunkt(newPunkt);
+          apiService.setToken(newToken);
+
+          await Promise.all([
+            AsyncStorage.setItem(TOKEN_KEY, newToken),
+            AsyncStorage.setItem(PUNKT_KEY, JSON.stringify(newPunkt)),
+          ]);
+        } else {
+          throw new Error('Invalid login response: missing token or punkt');
+        }
+      } else {
+        throw new Error('Invalid login response');
+      }
     } catch (error) {
       throw error;
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
+      console.log('🔴 Logging out...');
+      // Clear state immediately so navigation can happen
       setToken(null);
       setPunkt(null);
       apiService.setToken(null);
 
-      await Promise.all([
+      // Clear storage in background
+      Promise.all([
         AsyncStorage.removeItem(TOKEN_KEY),
         AsyncStorage.removeItem(PUNKT_KEY),
-      ]);
+      ]).catch((error) => {
+        console.error('Error clearing storage:', error);
+      });
+      
+      console.log('✅ Logout completed, user will be redirected to login');
     } catch (error) {
       console.error('Error logging out:', error);
+      // Even if there's an error, clear the state
+      setToken(null);
+      setPunkt(null);
+      apiService.setToken(null);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadStoredAuth();
+    
+    // Set device error callback to logout user
+    apiService.setOnDeviceError(() => {
+      logout();
+    });
+  }, [logout]);
 
   return (
     <AuthContext.Provider

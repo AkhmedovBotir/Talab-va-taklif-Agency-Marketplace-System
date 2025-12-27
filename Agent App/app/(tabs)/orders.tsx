@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiService } from '../../services/api';
-import type { GetOrdersParams, KPIDailyBalance, Order, OrderStatus, PaymentStatus, PaymentMethod } from '../../types/api';
+import type { GetOrdersParams, KPISummaryResponse, Order, OrderStatus, PaymentStatus, PaymentMethod } from '../../types/api';
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -29,7 +29,7 @@ export default function OrdersScreen() {
   });
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [kpiBalance, setKpiBalance] = useState<KPIDailyBalance | null>(null);
+  const [kpiBalance, setKpiBalance] = useState<KPISummaryResponse['data'] | null>(null);
   const [loadingKPI, setLoadingKPI] = useState(true);
   const router = useRouter();
   const { role } = useAuth();
@@ -66,9 +66,10 @@ export default function OrdersScreen() {
   const loadKPIBalance = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const response = await apiService.getKPIDailyBalance(today);
+      const response = await apiService.getKPISummary({ date: today });
       if (response.success) {
         setKpiBalance(response.data);
+        console.log('KPI balance:', response);
       }
     } catch (error: any) {
       // Silently fail - KPI is optional
@@ -80,6 +81,7 @@ export default function OrdersScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
+    setLoadingKPI(true);
     loadOrders({ page: 1 });
     loadKPIBalance();
   };
@@ -272,21 +274,21 @@ export default function OrdersScreen() {
             <View style={styles.kpiBalanceItem}>
               <Text style={styles.kpiBalanceLabel}>Jami</Text>
               <Text style={styles.kpiBalanceValue}>
-                {kpiBalance.totals.totalAmount.toLocaleString()} so'm
+                {kpiBalance.summary.totalAmount.toLocaleString()} so'm
               </Text>
             </View>
             <View style={styles.kpiBalanceDivider} />
             <View style={styles.kpiBalanceItem}>
               <Text style={styles.kpiBalanceLabel}>To'langan</Text>
               <Text style={[styles.kpiBalanceValue, styles.kpiBalancePaid]}>
-                {kpiBalance.totals.paidAmount.toLocaleString()} so'm
+                {kpiBalance.summary.paidAmount.toLocaleString()} so'm
               </Text>
             </View>
             <View style={styles.kpiBalanceDivider} />
             <View style={styles.kpiBalanceItem}>
               <Text style={styles.kpiBalanceLabel}>To'lanmagan</Text>
               <Text style={[styles.kpiBalanceValue, styles.kpiBalanceUnpaid]}>
-                {kpiBalance.totals.unpaidAmount.toLocaleString()} so'm
+                {kpiBalance.summary.unpaidAmount.toLocaleString()} so'm
               </Text>
             </View>
           </View>

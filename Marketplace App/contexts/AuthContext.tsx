@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import { User } from '../services/api';
 
 interface AuthContextType {
@@ -21,6 +22,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const loadAuthData = useCallback(async () => {
+    try {
+      const [storedToken, storedUser] = await Promise.all([
+        AsyncStorage.getItem(TOKEN_KEY),
+        AsyncStorage.getItem(USER_KEY),
+      ]);
+
+      if (storedToken && storedUser) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      } else {
+        setToken(null);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Error loading auth data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      // Get all keys from AsyncStorage
+      const allKeys = await AsyncStorage.getAllKeys();
+      
+      // Filter keys that start with @marketplace:
+      const marketplaceKeys = allKeys.filter(key => key.startsWith('@marketplace:'));
+      
+      // Remove all marketplace-related keys
+      if (marketplaceKeys.length > 0) {
+        await AsyncStorage.multiRemove(marketplaceKeys);
+        console.log('Cleared all marketplace data from storage:', marketplaceKeys);
+      }
+      
+      setToken(null);
+      setUser(null);
+    } catch (error) {
+      console.error('Error removing auth data:', error);
+    }
+  }, []);
 
   useEffect(() => {
     loadAuthData();
@@ -48,29 +91,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check periodically (API service clears storage on 401)
     const interval = setInterval(checkAuth, 500);
     
-    return () => clearInterval(interval);
-  }, [token, user]);
-
-  const loadAuthData = async () => {
-    try {
-      const [storedToken, storedUser] = await Promise.all([
-        AsyncStorage.getItem(TOKEN_KEY),
-        AsyncStorage.getItem(USER_KEY),
-      ]);
-
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } else {
-        setToken(null);
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Error loading auth data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    // Listen for 401 unauthorized event from API service
+    const handle401Error = async () => {
+      console.log('Received 401 unauthorized event, logging out user');
+      // Clear state immediately
+      setToken(null);
+      setUser(null);
+      // Also call logout to ensure all cleanup is done
+      await logout();
+    };
+    
+    // Add event listener for 401 errors
+    const subscription = DeviceEventEmitter.addListener('marketplace:401-unauthorized', handle401Error);
+    
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [token, user, logout, loadAuthData]);
 
   const login = async (newToken: string, newUser: User) => {
     try {
@@ -83,27 +121,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error saving auth data:', error);
       throw error;
-    }
-  };
-
-  const logout = async () => {
-    try {
-      // Get all keys from AsyncStorage
-      const allKeys = await AsyncStorage.getAllKeys();
-      
-      // Filter keys that start with @marketplace:
-      const marketplaceKeys = allKeys.filter(key => key.startsWith('@marketplace:'));
-      
-      // Remove all marketplace-related keys
-      if (marketplaceKeys.length > 0) {
-        await AsyncStorage.multiRemove(marketplaceKeys);
-        console.log('Cleared all marketplace data from storage:', marketplaceKeys);
-      }
-      
-      setToken(null);
-      setUser(null);
-    } catch (error) {
-      console.error('Error removing auth data:', error);
     }
   };
 

@@ -80,10 +80,35 @@ class ApiService {
   }
 
   // Login
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
+  async login(
+    credentials: LoginRequest,
+    deviceInfo?: {
+      deviceId: string;
+      deviceName?: string;
+      deviceType?: string;
+      platform?: string;
+      os?: string;
+      browser?: string;
+      userAgent?: string;
+    }
+  ): Promise<LoginResponse> {
+    // Prepare headers with device information
+    const headers: Record<string, string> = {};
+    
+    if (deviceInfo) {
+      headers['X-Device-Id'] = deviceInfo.deviceId;
+      if (deviceInfo.deviceName) headers['X-Device-Name'] = deviceInfo.deviceName;
+      if (deviceInfo.deviceType) headers['X-Device-Type'] = deviceInfo.deviceType;
+      if (deviceInfo.platform) headers['X-Platform'] = deviceInfo.platform;
+      if (deviceInfo.os) headers['X-OS'] = deviceInfo.os;
+      if (deviceInfo.browser) headers['X-Browser'] = deviceInfo.browser;
+      if (deviceInfo.userAgent) headers['X-User-Agent'] = deviceInfo.userAgent;
+    }
+
     const response = await this.api.post<LoginResponse>(
       API_ENDPOINTS.AGENT_LOGIN,
-      credentials
+      credentials,
+      { headers }
     );
     
     if (response.data.success && response.data.data.token) {
@@ -126,6 +151,66 @@ class ApiService {
     const response = await this.api.post<{ success: boolean; message: string }>(
       API_ENDPOINTS.PASSWORD_SETUP_STEP3,
       { phone, newPassword }
+    );
+    return response.data;
+  }
+
+  // Device Verification - Request Code
+  async requestDeviceVerificationCode(data: {
+    phone: string;
+    deviceId: string;
+    deviceName?: string;
+    deviceType?: string;
+    platform?: string;
+    os?: string;
+    browser?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    location?: {
+      country?: string;
+      city?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+  }): Promise<{ success: boolean; message: string; data?: any }> {
+    const response = await this.api.post<{ success: boolean; message: string; data?: any }>(
+      API_ENDPOINTS.DEVICE_VERIFICATION_AGENT_REQUEST_CODE,
+      data
+    );
+    return response.data;
+  }
+
+  // Device Verification - Verify
+  async verifyDevice(data: {
+    phone: string;
+    deviceId: string;
+    code: string;
+    deviceName?: string;
+    deviceType?: string;
+    platform?: string;
+    os?: string;
+    browser?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    location?: {
+      country?: string;
+      city?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+  }): Promise<{ success: boolean; message: string; data?: any }> {
+    const response = await this.api.post<{ success: boolean; message: string; data?: any }>(
+      API_ENDPOINTS.DEVICE_VERIFICATION_AGENT_VERIFY,
+      data
+    );
+    return response.data;
+  }
+
+  // Device Verification - Resend Code
+  async resendDeviceVerificationCode(phone: string, deviceId: string): Promise<{ success: boolean; message: string; data?: any }> {
+    const response = await this.api.post<{ success: boolean; message: string; data?: any }>(
+      API_ENDPOINTS.DEVICE_VERIFICATION_AGENT_RESEND_CODE,
+      { phone, deviceId }
     );
     return response.data;
   }

@@ -1024,17 +1024,27 @@ const getFinanceBalance = async (req, res) => {
     const paidContragentPayments = await ContragentPaymentDistribution.find(contragentPaymentsFilter);
     const totalContragentPayments = paidContragentPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    // 6. Umumiy xarajatlar (Tarqatilgan + Contragent to'lovlari)
-    const totalExpenses = totalDistributed + totalContragentPayments;
+    // 6. Umumiy xarajatlar (KPI bonuslar + Contragent to'lovlari)
+    // KPI bonuslar - bu xarajat (ichki taqsimot)
+    // totalDistributed - bu KPI bonuslar (punkt, agentlar, deliveryService)
+    // totalFinanceKpi - bu ham KPI bonus (moliya bo'limi uchun)
+    // Lekin moliya bo'limi uchun KPI = ichki daromad (lekin umumiy tizim uchun xarajat)
+    const totalKpiExpenses = totalDistributed + totalFinanceKpi; // Barcha KPI bonuslar (xarajat)
+    const totalExpenses = totalKpiExpenses + totalContragentPayments; // Umumiy xarajatlar
 
-    // 7. Umumiy balans (Tushgan - Xarajatlar)
+    // 7. Umumiy balans (Sof foyda) = Tushgan - Xarajatlar
     const totalBalance = totalReceived - totalExpenses;
 
-    // 8. Moliya bo'limi sof daromadi (Tushgan - Xarajatlar + KPI bonus)
-    const financeNetIncome = totalReceived - totalExpenses + totalFinanceKpi;
+    // 8. Moliya bo'limi sof daromadi
+    // Moliya bo'limi uchun: KPI bonus = ichki daromad
+    // Lekin umumiy tizim uchun: KPI = xarajat
+    // Moliya bo'limi sof daromadi = KPI bonus (chunki bu ichki daromad)
+    const financeNetIncome = totalFinanceKpi;
 
-    // 9. Moliya bo'limi umumiy balansi (Tushgan + KPI bonus - Contragent to'lovlari)
-    const financeTotalBalance = totalReceived + totalFinanceKpi - totalContragentPayments;
+    // 9. Moliya bo'limi umumiy balansi
+    // Moliya bo'limi: Tushgan summa - Contragent to'lovlari
+    // KPI bonus qo'shilmaydi, chunki bu ichki taqsimot (xarajat)
+    const financeTotalBalance = totalReceived - totalContragentPayments;
 
     // 10. Tafsilotlar
     const details = {
@@ -1046,6 +1056,7 @@ const getFinanceBalance = async (req, res) => {
         punktTransfer: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punktTransfer || 0), 0),
         deliveryService: totalDeliveryServiceKpi,
         finance: totalFinanceKpi,
+        total: totalKpiExpenses, // Barcha KPI bonuslar jami (xarajat)
       },
       contragentPayments: {
         total: totalContragentPayments,
@@ -1060,22 +1071,36 @@ const getFinanceBalance = async (req, res) => {
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
         },
-        // Daromadlar
-        totalReceived, // Umumiy tushgan summa (mijozlardan)
-        totalFinanceKpi, // Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
-        totalIncome: totalReceived + totalFinanceKpi, // Umumiy daromad
+        // ========== DAROMADLAR ==========
+        totalReceived, // Umumiy tushgan summa (mijozlardan real tushgan pul)
+        // Eslatma: KPI bonus daromad emas, xarajat!
         
-        // Xarajatlar
-        totalDistributed, // Tarqatilgan summa (KPI bonuslar - punkt, agentlar, deliveryService)
+        // ========== XARAJATLAR ==========
+        // KPI Bonuslar (ichki taqsimot - xarajat)
+        totalKpiExpenses, // Barcha KPI bonuslar jami (xarajat)
+        kpiDistribution: {
+          punkt: details.kpiDistribution.punkt,
+          viloyatAgent: details.kpiDistribution.viloyatAgent,
+          tumanAgent: details.kpiDistribution.tumanAgent,
+          mfyAgent: details.kpiDistribution.mfyAgent,
+          punktTransfer: details.kpiDistribution.punktTransfer,
+          deliveryService: details.kpiDistribution.deliveryService,
+          finance: details.kpiDistribution.finance, // Moliya bo'limi uchun KPI (ichki daromad, lekin umumiy tizim uchun xarajat)
+        },
+        // Contragent to'lovlari (tashqi xarajat)
         totalContragentPayments, // Contragent to'lovlari (to'langan)
-        totalExpenses, // Umumiy xarajatlar (Tarqatilgan + Contragent to'lovlari)
+        // Umumiy xarajatlar
+        totalExpenses, // Umumiy xarajatlar (KPI bonuslar + Contragent to'lovlari)
         
-        // Balanslar
-        totalBalance, // Umumiy balans (Tushgan - Xarajatlar)
-        financeTotalBalance, // Moliya bo'limi umumiy balansi (Tushgan + KPI - Contragent to'lovlari)
-        financeNetIncome, // Moliya bo'limi sof daromadi (Tushgan - Xarajatlar + KPI bonus)
+        // ========== BALANSLAR ==========
+        // Umumiy sof balans (REAL foyda)
+        totalBalance, // Sof foyda = Tushgan - Xarajatlar
         
-        // Tafsilotlar
+        // Moliya bo'limi balanslari
+        financeTotalBalance, // Moliya bo'limi balansi = Tushgan - Contragent to'lovlari
+        financeNetIncome, // Moliya bo'limi sof daromadi = KPI bonus (ichki daromad)
+        
+        // ========== TAFSILOTLAR ==========
         details,
       },
     });
@@ -1357,6 +1382,7 @@ const getTotalBalance = async (req, res) => {
       ...distributedDateFilter,
     });
 
+    // KPI bonuslar (xarajat)
     const totalDistributed = kpiTransactions.reduce((sum, t) => {
       return (
         sum +
@@ -1368,6 +1394,12 @@ const getTotalBalance = async (req, res) => {
         (t.amounts.deliveryService || 0)
       );
     }, 0);
+
+    // Moliya bo'limiga ajratilgan KPI bonus (ham xarajat)
+    const totalFinanceKpi = kpiTransactions.reduce((sum, t) => sum + (t.amounts.finance || 0), 0);
+
+    // Barcha KPI bonuslar (xarajat)
+    const totalKpiExpenses = totalDistributed + totalFinanceKpi;
 
     // Contragent to'lovlari (to'langan)
     const contragentDateFilter = {};
@@ -1392,10 +1424,10 @@ const getTotalBalance = async (req, res) => {
 
     const totalContragentPayments = paidContragentPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    // Umumiy xarajatlar
-    const totalExpenses = totalDistributed + totalContragentPayments;
+    // Umumiy xarajatlar (KPI bonuslar + Contragent to'lovlari)
+    const totalExpenses = totalKpiExpenses + totalContragentPayments;
 
-    // Umumiy balans (Tushgan - Xarajatlar)
+    // Umumiy balans (Sof foyda) = Tushgan - Xarajatlar
     const totalBalance = totalReceived - totalExpenses;
 
     res.status(200).json({
@@ -1405,11 +1437,16 @@ const getTotalBalance = async (req, res) => {
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
         },
-        totalReceived, // Tushgan summa
-        totalDistributed, // Tarqatilgan summa (KPI bonuslar)
-        totalContragentPayments, // Contragent to'lovlari
-        totalExpenses, // Umumiy xarajatlar
-        totalBalance, // Umumiy balans (Tushgan - Xarajatlar)
+        // Daromadlar
+        totalReceived, // Umumiy tushgan summa (mijozlardan real tushgan pul)
+        
+        // Xarajatlar
+        totalKpiExpenses, // Barcha KPI bonuslar (xarajat)
+        totalContragentPayments, // Contragent to'lovlari (tashqi xarajat)
+        totalExpenses, // Umumiy xarajatlar (KPI bonuslar + Contragent to'lovlari)
+        
+        // Balans
+        totalBalance, // Sof foyda = Tushgan - Xarajatlar
       },
     });
   } catch (error) {

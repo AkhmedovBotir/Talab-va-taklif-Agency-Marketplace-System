@@ -95,6 +95,18 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="statistika/payments"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="statistika/payment-detail"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profil',

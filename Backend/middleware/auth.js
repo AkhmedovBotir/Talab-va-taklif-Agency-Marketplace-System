@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
+const Device = require('../models/Device');
 
 // Authentication middleware for admin
 const adminAuth = async (req, res, next) => {
@@ -45,6 +46,41 @@ const adminAuth = async (req, res, next) => {
         success: false,
         message: 'Hisobingiz faol emas',
       });
+    }
+
+    // Check device if deviceId is in token
+    if (decoded.deviceId) {
+      const device = await Device.findOne({
+        user: admin._id,
+        userModel: 'Admin',
+        deviceId: decoded.deviceId,
+        isActive: true,
+      });
+
+      if (!device) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma topilmadi yoki nofaol. Iltimos, qurilmani tasdiqlang yoki faol qurilma bilan kirish',
+        });
+      }
+
+      // Update device last activity
+      device.lastActivityAt = new Date();
+      await device.save();
+    } else {
+      // If no deviceId in token, check if user has any active devices
+      const activeDevices = await Device.find({
+        user: admin._id,
+        userModel: 'Admin',
+        isActive: true,
+      });
+
+      if (activeDevices.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma ID topilmadi. Iltimos, qayta login qiling',
+        });
+      }
     }
 
     // Attach admin info to request
@@ -102,6 +138,59 @@ const contragentAuth = async (req, res, next) => {
         success: false,
         message: 'Bu token contragent uchun emas',
       });
+    }
+
+    // Check device if deviceId is in token
+    if (decoded.deviceId) {
+      const device = await Device.findOne({
+        user: decoded.id,
+        userModel: 'Contragent',
+        deviceId: decoded.deviceId,
+        isActive: true,
+      });
+
+      if (!device) {
+        // Check if device exists but is inactive
+        const inactiveDevice = await Device.findOne({
+          user: decoded.id,
+          userModel: 'Contragent',
+          deviceId: decoded.deviceId,
+          isActive: false,
+        });
+
+        if (inactiveDevice) {
+          return res.status(403).json({
+            success: false,
+            message: 'Bu qurilma nofaol. Faqat faol qurilma bilan login qilish mumkin. Iltimos, faol qurilma bilan kirish yoki yangi qurilmani tasdiqlash uchun SMS kod so\'rang',
+            requiresDeviceVerification: true,
+          });
+        }
+
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma topilmadi yoki nofaol. Iltimos, qurilmani tasdiqlang yoki faol qurilma bilan kirish',
+          requiresDeviceVerification: true,
+        });
+      }
+
+      // Update device last activity
+      device.lastActivityAt = new Date();
+      await device.save();
+    } else {
+      // If no deviceId in token, check if user has any active devices
+      const activeDevices = await Device.find({
+        user: decoded.id,
+        userModel: 'Contragent',
+        isActive: true,
+      });
+
+      if (activeDevices.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma ID topilmadi. Iltimos, qayta login qiling',
+          requiresDeviceVerification: true,
+        });
+      }
     }
 
     // Attach user info to request
@@ -362,6 +451,41 @@ const punktAuth = async (req, res, next) => {
       });
     }
 
+    // Check device if deviceId is in token
+    if (decoded.deviceId) {
+      const device = await Device.findOne({
+        user: punkt._id,
+        userModel: 'Punkt',
+        deviceId: decoded.deviceId,
+        isActive: true,
+      });
+
+      if (!device) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma topilmadi yoki nofaol. Iltimos, qurilmani tasdiqlang yoki faol qurilma bilan kirish',
+        });
+      }
+
+      // Update device last activity
+      device.lastActivityAt = new Date();
+      await device.save();
+    } else {
+      // If no deviceId in token, check if user has any active devices
+      const activeDevices = await Device.find({
+        user: punkt._id,
+        userModel: 'Punkt',
+        isActive: true,
+      });
+
+      if (activeDevices.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma ID topilmadi. Iltimos, qayta login qiling',
+        });
+      }
+    }
+
     // Attach punkt info to request
     req.user = {
       userId: punkt._id,
@@ -439,6 +563,41 @@ const agentAuth = async (req, res, next) => {
         success: false,
         message: 'Hisobingiz faol emas',
       });
+    }
+
+    // Check device if deviceId is in token
+    if (decoded.deviceId) {
+      const device = await Device.findOne({
+        user: agent._id,
+        userModel: 'Agent',
+        deviceId: decoded.deviceId,
+        isActive: true,
+      });
+
+      if (!device) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma topilmadi yoki nofaol. Iltimos, qurilmani tasdiqlang yoki faol qurilma bilan kirish',
+        });
+      }
+
+      // Update device last activity
+      device.lastActivityAt = new Date();
+      await device.save();
+    } else {
+      // If no deviceId in token, check if user has any active devices
+      const activeDevices = await Device.find({
+        user: agent._id,
+        userModel: 'Agent',
+        isActive: true,
+      });
+
+      if (activeDevices.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma ID topilmadi. Iltimos, qayta login qiling',
+        });
+      }
     }
 
     // Determine agent type

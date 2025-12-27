@@ -35,7 +35,7 @@ export default function ApplicationDetailScreen() {
     if (isRefresh) {
       setRefreshing(true);
     } else {
-      setLoading(true);
+    setLoading(true);
     }
     try {
       const data = await vacancyApi.getApplicationById(id);
@@ -43,7 +43,7 @@ export default function ApplicationDetailScreen() {
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Arizani yuklashda xatolik');
       if (!isRefresh) {
-        router.back();
+      router.back();
       }
     } finally {
       setLoading(false);

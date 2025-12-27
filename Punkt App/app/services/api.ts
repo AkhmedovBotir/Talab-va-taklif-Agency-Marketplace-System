@@ -1,4 +1,4 @@
-const BASE_URL = 'http://192.168.1.6:5000/api';
+const BASE_URL = 'https://api.ttsa.uz/api';
 
 export interface LoginRequest {
   phone: string;
@@ -41,6 +41,64 @@ export interface PasswordSetupStep3Request {
 export interface PasswordSetupStep3Response {
   success: boolean;
   message: string;
+}
+
+export interface DeviceVerificationRequest {
+  phone: string;
+  deviceId: string;
+  deviceName?: string;
+  deviceType?: 'mobile' | 'tablet' | 'desktop' | 'web' | 'unknown';
+  platform?: string;
+  os?: string;
+  browser?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  location?: {
+    country?: string;
+    city?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+}
+
+export interface DeviceVerificationCodeResponse {
+  success: boolean;
+  message: string;
+  data: {
+    phone: string;
+    expiresAt: string;
+  };
+}
+
+export interface DeviceVerificationVerifyRequest extends DeviceVerificationRequest {
+  code: string;
+}
+
+export interface DeviceVerificationVerifyResponse {
+  success: boolean;
+  message: string;
+  data: {
+    device: {
+      _id: string;
+      deviceId: string;
+      deviceName?: string;
+      isPrimary: boolean;
+      lastLoginAt: string;
+    };
+    isNew: boolean;
+  };
+}
+
+export interface LoginResponseWithDeviceVerification {
+  success: boolean;
+  message: string;
+  requiresDeviceVerification?: boolean;
+  data?: {
+    token?: string;
+    punkt?: Punkt;
+    phone?: string;
+    deviceId?: string;
+  };
 }
 
 export interface Punkt {
@@ -544,6 +602,12 @@ export interface MarkReadResponse {
 
 class ApiService {
   private token: string | null = null;
+  private onDeviceErrorCallback: (() => void) | null = null;
+  private isLoggingOut: boolean = false;
+
+  setOnDeviceError(callback: () => void) {
+    this.onDeviceErrorCallback = callback;
+  }
 
   private getToken(): string | null {
     return this.token;
@@ -553,6 +617,13 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    // If already logging out, don't make new requests
+    if (this.isLoggingOut) {
+      const error: any = new Error('Logging out...');
+      error.status = 401;
+      throw error;
+    }
+
     const token = this.getToken();
     const url = `${BASE_URL}${endpoint}`;
 
@@ -571,7 +642,6 @@ class ApiService {
         headers,
       });
 
-
       const data = await response.json();
 
       if (!response.ok) {
@@ -580,25 +650,110 @@ class ApiService {
           statusText: response.statusText,
           data,
         });
-        throw new Error(data.message || 'An error occurred');
+        
+        const errorMessage = data.message || data.data?.message || '';
+        
+        // Check if it's a device-related error (403 with device message)
+        if (response.status === 403 && errorMessage && 
+            (errorMessage.toLowerCase().includes('qurilma') || 
+             errorMessage.toLowerCase().includes('device') ||
+             errorMessage.toLowerCase().includes('nofaol'))) {
+          // Don't trigger logout for login endpoint or device verification endpoints
+          const isLoginEndpoint = endpoint.includes('/login') || 
+                                  endpoint.includes('/password-setup') ||
+                                  endpoint.includes('/device-verification');
+          if (!isLoginEndpoint && this.onDeviceErrorCallback && !this.isLoggingOut) {
+            console.log('🔴 Device error detected, triggering logout...');
+            this.isLoggingOut = true;
+            // Trigger logout callback immediately (synchronously if possible)
+            try {
+              this.onDeviceErrorCallback();
+            } catch (error) {
+              console.error('Error in logout callback:', error);
+            }
+            // Don't throw error after logout is triggered
+            const error: any = new Error('Logging out...');
+            error.status = 403;
+            throw error;
+          }
+        }
+        
+        // Check if it's an authentication error (401) - like "Punkt topilmadi" or "Token topilmadi"
+        if (response.status === 401) {
+          // Don't trigger logout for login endpoint or password setup endpoints
+          const isAuthEndpoint = endpoint.includes('/login') || 
+                                 endpoint.includes('/password-setup') ||
+                                 endpoint.includes('/device-verification');
+          if (!isAuthEndpoint && this.onDeviceErrorCallback && !this.isLoggingOut) {
+            console.log('🔴 Authentication error (401) detected, triggering logout...');
+            this.isLoggingOut = true;
+            // Trigger logout callback immediately (synchronously if possible)
+            try {
+              this.onDeviceErrorCallback();
+            } catch (error) {
+              console.error('Error in logout callback:', error);
+            }
+            // Don't throw error after logout is triggered
+            const error: any = new Error('Logging out...');
+            error.status = 401;
+            throw error;
+          }
+        }
+        
+        const error: any = new Error(errorMessage || 'An error occurred');
+        error.status = response.status;
+        error.data = data;
+        throw error;
       }
 
       return data as T;
     } catch (error) {
-      console.error('❌ Request Error:', error);
-      if (error instanceof Error) {
-        console.error('Error Message:', error.message);
-        console.error('Error Stack:', error.stack);
-        throw error;
+      // Don't log errors if we're logging out
+      if (!this.isLoggingOut) {
+        console.error('❌ Request Error:', error);
+        if (error instanceof Error) {
+          console.error('Error Message:', error.message);
+          console.error('Error Stack:', error.stack);
+        }
       }
-      throw new Error('Network error occurred');
+      throw error;
     }
   }
 
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/punkts/login', {
+  async login(credentials: LoginRequest, deviceId?: string): Promise<LoginResponse | LoginResponseWithDeviceVerification> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (deviceId) {
+      headers['X-Device-Id'] = deviceId;
+    }
+
+    return this.request<LoginResponse | LoginResponseWithDeviceVerification>('/punkts/login', {
       method: 'POST',
+      headers,
       body: JSON.stringify(credentials),
+    });
+  }
+
+  async requestDeviceVerificationCode(data: DeviceVerificationRequest): Promise<DeviceVerificationCodeResponse> {
+    return this.request<DeviceVerificationCodeResponse>('/device-verification/punkt/request-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyDevice(data: DeviceVerificationVerifyRequest): Promise<DeviceVerificationVerifyResponse> {
+    return this.request<DeviceVerificationVerifyResponse>('/device-verification/punkt/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async resendDeviceVerificationCode(phone: string, deviceId: string): Promise<DeviceVerificationCodeResponse> {
+    return this.request<DeviceVerificationCodeResponse>('/device-verification/punkt/resend-code', {
+      method: 'POST',
+      body: JSON.stringify({ phone, deviceId }),
     });
   }
 
@@ -1036,6 +1191,10 @@ class ApiService {
 
   setToken(token: string | null) {
     this.token = token;
+    // Reset logging out flag when setting a new token (login)
+    if (token) {
+      this.isLoggingOut = false;
+    }
   }
 }
 

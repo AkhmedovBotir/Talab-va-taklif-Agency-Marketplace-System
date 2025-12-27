@@ -162,6 +162,12 @@ class EskizService {
     const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
     return await this.sendSMS(phone, message);
   }
+
+  // Send verification code for device verification
+  async sendDeviceVerificationCode(phone, code) {
+    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    return await this.sendSMS(phone, message);
+  }
 }
 
 module.exports = new EskizService();

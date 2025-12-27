@@ -7,7 +7,19 @@ interface AuthContextType {
   isLoading: boolean;
   token: string | null;
   contragent: Contragent | null;
-  login: (phone: string, password: string) => Promise<void>;
+  login: (
+    phone: string,
+    password: string,
+    deviceInfo?: {
+      deviceId: string;
+      deviceName?: string;
+      deviceType?: string;
+      platform?: string;
+      os?: string;
+      browser?: string;
+      userAgent?: string;
+    }
+  ) => Promise<void>;
   logout: () => Promise<void>;
   refreshContragent: () => Promise<void>;
 }
@@ -84,9 +96,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (phone: string, password: string) => {
+  const login = async (
+    phone: string,
+    password: string,
+    deviceInfo?: {
+      deviceId: string;
+      deviceName?: string;
+      deviceType?: string;
+      platform?: string;
+      os?: string;
+      browser?: string;
+      userAgent?: string;
+    }
+  ) => {
     try {
-      const response = await apiService.login({ phone, password });
+      const deviceId = deviceInfo?.deviceId;
+      const response = await apiService.login({ phone, password }, deviceId);
+      
+      // Check if device verification is required
+      if (response.requiresDeviceVerification) {
+        const enhancedError: any = {
+          status: 403,
+          message: response.message || 'Yangi qurilma aniqlandi. Qurilmani tasdiqlash kerak',
+          requiresDeviceVerification: true,
+          phone: response.data.phone,
+          deviceId: response.data.deviceId,
+          response: { data: response },
+        };
+        throw enhancedError;
+      }
+      
+      if (!response.data.token || !response.data.contragent) {
+        throw {
+          status: 500,
+          message: 'Login response is invalid',
+        };
+      }
       
       await AsyncStorage.setItem(TOKEN_KEY, response.data.token);
       await AsyncStorage.setItem(CONTRAGENT_KEY, JSON.stringify(response.data.contragent));
@@ -95,7 +140,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setContragent(response.data.contragent);
       setIsAuthenticated(true);
     } catch (error: any) {
-      throw error;
+      // Preserve full error object for device verification check
+      const responseData = error.response?.data || error.response || {};
+      const statusCode = error.response?.status || error.status || 0;
+      const errorMessage = responseData.message || error.message || 'Login failed';
+      
+      // Check if device verification is required
+      const requiresVerification = 
+        responseData.requiresDeviceVerification === true || 
+        responseData.requiresDeviceVerification === 'true' ||
+        error.requiresDeviceVerification === true ||
+        (statusCode === 403 && (
+          errorMessage.toLowerCase().includes('qurilma') ||
+          errorMessage.toLowerCase().includes('device') ||
+          errorMessage.toLowerCase().includes('tasdiqlash') ||
+          errorMessage.toLowerCase().includes('verification')
+        ));
+      
+      // Enhanced error object with all necessary information
+      const enhancedError: any = {
+        ...error,
+        response: error.response || { data: responseData, status: statusCode },
+        status: statusCode,
+        message: errorMessage,
+        data: responseData,
+        requiresDeviceVerification: requiresVerification,
+        phone: responseData.data?.phone || responseData.phone || error.phone,
+        deviceId: responseData.data?.deviceId || responseData.deviceId || error.deviceId,
+      };
+      
+      throw enhancedError;
     }
   };
 

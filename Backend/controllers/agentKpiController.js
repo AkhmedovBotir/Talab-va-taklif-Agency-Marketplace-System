@@ -1,4 +1,5 @@
 const KpiBonusTransaction = require('../models/KpiBonusTransaction');
+const mongoose = require('mongoose');
 
 const CUSTOMER_CONFIRMED_STATUS = 'confirmed_by_customer';
 
@@ -13,14 +14,19 @@ const getAgentAmountExpression = (role) => ({
 });
 
 const buildAgentBaseFilter = (agentId, role) => {
+  // Ensure agentId is ObjectId
+  const agentObjectId = mongoose.Types.ObjectId.isValid(agentId) 
+    ? (agentId instanceof mongoose.Types.ObjectId ? agentId : new mongoose.Types.ObjectId(agentId))
+    : agentId;
+
   const filter = { orderStatus: CUSTOMER_CONFIRMED_STATUS };
 
   if (role === 'mfy') {
-    filter['recipients.mfyAgent'] = agentId;
+    filter['recipients.mfyAgent'] = agentObjectId;
   } else if (role === 'tuman') {
-    filter['recipients.tumanAgent'] = agentId;
+    filter['recipients.tumanAgent'] = agentObjectId;
   } else {
-    filter['recipients.viloyatAgent'] = agentId;
+    filter['recipients.viloyatAgent'] = agentObjectId;
   }
 
   return filter;

@@ -25,10 +25,40 @@
 Admin Contragent Payment API provides endpoints for Admins to manage payments to Contragents. This includes viewing unpaid payments, paying individual or multiple payments, filtering payments by date range, and syncing payments from orders.
 
 **Workflow:**
-1. Orders are confirmed by customers → Contragents deliver items
-2. Admin syncs payments from orders → Creates `ContragentPaymentDistribution` records
-3. Admin views unpaid payments → Filters by date, contragent, region, etc.
-4. Admin pays contragents → Updates payment status to 'paid' and sends notifications
+
+### To'lov Jarayoni (Payment Flow):
+
+1. **Buyurtma Tasdiqlanishi:**
+   - Mijoz buyurtmani qabul qiladi → Order status: `confirmed_by_customer`
+   - Mijoz to'lovni amalga oshiradi → `PaymentTransaction` yaratiladi
+
+2. **Contragent Yetkazib Berish:**
+   - Contragent mahsulotlarni Punkt'ga yetkazadi
+   - Contragent request status: `delivered_to_punkt`
+
+3. **To'lov Yaratish (Sync):**
+   - Admin `/sync` endpoint'ini chaqiradi
+   - Sistema `confirmed_by_customer` va `delivered_to_punkt` bo'lgan buyurtmalarni topadi
+   - Har bir Contragent uchun `ContragentPaymentDistribution` yaratiladi
+   - **To'lov summasi:** `totalPrice - totalKpiPrice`
+     - `totalPrice` = Mijozdan olingan umumiy summa
+     - `totalKpiPrice` = KPI bonus (foyda * quantity * kpiBonusPercent / 100)
+   - `dueDate` = Hozirgi sana + `dueDateDays` (default: 7 kun)
+
+4. **To'lovlarni Ko'rish:**
+   - Admin `/unpaid` endpoint'i orqali to'lanmagan to'lovlarni ko'radi
+   - Filter qilish mumkin: contragent, viloyat, tuman, mfy, overdue
+
+5. **To'lovni Amalga Oshirish:**
+   - Admin bitta to'lovni to'lash: `POST /:id/pay`
+   - Yoki bir nechta to'lovni to'lash: `POST /pay-by-date-range` yoki `POST /mark-as-paid`
+   - To'lov status: `pending` → `paid`
+   - `paidAt`, `paidBy` yangilanadi
+   - Contragent'ga bildirishnoma yuboriladi (Socket.io orqali)
+
+6. **To'lov Statistikasi:**
+   - Admin `/statistics` endpoint'i orqali statistikani ko'radi
+   - To'lanmagan, to'langan, overdue to'lovlar
 
 **Base Path:** `/api/admin-contragent-payments`
 
@@ -545,9 +575,15 @@ Create or update contragent payments from confirmed orders.
 
 ```json
 {
-  "dueDateDays": "number (required, default: 7, minimum: 1)"
+  "dueDateDays": 7
 }
 ```
+
+**Request Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `dueDateDays` | number | Yes | To'lov muddati (kunlar). Minimum: 1, Default: 7 |
 
 **Success Response (200 OK):**
 
@@ -627,7 +663,7 @@ All endpoints follow a consistent error response format:
 
 ### Sync Contragent Payments
 
-- `dueDateDays`: Required, number, minimum 1
+- `dueDateDays`: Required, number, minimum 1, default: 7
 
 ---
 
@@ -717,8 +753,39 @@ curl -X POST "http://localhost:5000/api/admin-contragent-payments/sync" \
 
 ## Notes
 
-- All payment operations send notifications to contragents via Socket.io (if available)
-- Payments are automatically marked as overdue if `dueDate` passes and status is still `pending`
-- When paying by date range, notifications are grouped by contragent (one notification per contragent with total amount)
-- Payment amount is calculated as: `totalPrice - totalKpiPrice` from orders
-- Only orders with status `confirmed_by_customer` and contragent requests with status `delivered_to_punkt` are included in sync
+### To'lov Jarayoni Haqida:
+
+1. **To'lov Summasi Hisoblash:**
+   - **Formula:** `paymentAmount = totalPrice - totalKpiPrice`
+   - `totalPrice` = Mijozdan olingan umumiy summa (item.price * item.quantity)
+   - `totalKpiPrice` = KPI bonus summa
+     - Har bir item uchun: `(profitPerUnit * quantity * kpiBonusPercent) / 100`
+     - `profitPerUnit = item.price - item.originalPrice`
+
+2. **To'lov Yaratish (Sync):**
+   - Faqat `confirmed_by_customer` status'li buyurtmalar qayta ishlanadi
+   - Faqat `delivered_to_punkt` status'li contragent request'lardagi item'lar qo'shiladi
+   - Agar bir xil Contragent va `dueDate` uchun to'lov mavjud bo'lsa, yangi to'lov yaratilmaydi, mavjud to'lov yangilanadi (summa qo'shiladi, order qo'shiladi)
+
+3. **To'lov Holati:**
+   - `pending` - To'lanmagan (default)
+   - `paid` - To'langan
+   - `cancelled` - Bekor qilingan
+
+4. **Overdue (Muddati O'tgan):**
+   - Agar `dueDate` o'tgan va status hali `pending` bo'lsa, `isOverdue = true` bo'ladi
+   - Bu avtomatik ravishda `pre('save')` middleware orqali yangilanadi
+
+5. **Bildirishnomalar:**
+   - Barcha to'lov operatsiyalari Contragent'ga bildirishnoma yuboradi (Socket.io orqali, agar mavjud bo'lsa)
+   - Date range bo'yicha to'lovda, bildirishnomalar Contragent bo'yicha guruhlanadi (har bir Contragent uchun bitta bildirishnoma, umumiy summa bilan)
+
+6. **To'lov Muddati (dueDate):**
+   - Sync paytida: `dueDate = hozirgi sana + dueDateDays`
+   - Default: 7 kun
+   - Admin to'lovni to'lganda, `isOverdue = false` bo'ladi
+
+7. **Filterlash:**
+   - To'lanmagan to'lovlarni filterlash: contragentId, viloyatId, tumanId, mfyId, isOverdue
+   - To'langan to'lovlarni filterlash: contragentId, startDate (paidAt), endDate (paidAt)
+   - Date range to'lovda: `dueDate` bo'yicha filter qilinadi (paidAt emas)

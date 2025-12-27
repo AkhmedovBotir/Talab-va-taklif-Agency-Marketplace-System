@@ -4,6 +4,7 @@ import { contragentPaymentAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import RegionSelect from '../../components/Regions/RegionSelect';
 import ContragentPaymentTable from '../../components/Finance/ContragentPaymentTable';
+import ViewPaymentModal from '../../components/Finance/ViewPaymentModal';
 import { 
   Search, 
   Clear, 
@@ -59,6 +60,17 @@ const ContragentPayments = ({ hideHeader = false }) => {
     contragentId: '',
     isOverdue: false,
   });
+  const [unpaidSummary, setUnpaidSummary] = useState({
+    totalAmount: 0,
+    totalUnpaidAmount: 0,
+    overdue: { totalAmount: 0, count: 0 },
+  });
+  const [paidSummary, setPaidSummary] = useState({
+    totalAmount: 0,
+    totalPaidAmount: 0,
+  });
+  const [viewPaymentModalOpen, setViewPaymentModalOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
 
   // Fetch unpaid payments
   const fetchUnpaidPayments = useCallback(async () => {
@@ -73,7 +85,7 @@ const ContragentPayments = ({ hideHeader = false }) => {
       if (filters.viloyatId) params.viloyatId = filters.viloyatId;
       if (filters.tumanId) params.tumanId = filters.tumanId;
       if (filters.mfyId) params.mfyId = filters.mfyId;
-      if (filters.isOverdue !== '') params.isOverdue = filters.isOverdue === 'true';
+      if (filters.isOverdue !== '') params.isOverdue = filters.isOverdue;
 
       const response = await contragentPaymentAPI.getUnpaidPayments(params);
 
@@ -84,6 +96,12 @@ const ContragentPayments = ({ hideHeader = false }) => {
           limit: response.limit || pagination.limit,
           total: response.total || 0,
           totalPages: response.totalPages || 0,
+        });
+        // Store summary data from response
+        setUnpaidSummary({
+          totalAmount: response.totalAmount || 0,
+          totalUnpaidAmount: response.totalUnpaidAmount || 0,
+          overdue: response.overdue || { totalAmount: 0, count: 0 },
         });
       }
     } catch (err) {
@@ -125,6 +143,11 @@ const ContragentPayments = ({ hideHeader = false }) => {
           limit: response.limit || pagination.limit,
           total: response.total || 0,
           totalPages: response.totalPages || 0,
+        });
+        // Store summary data from response
+        setPaidSummary({
+          totalAmount: response.totalAmount || 0,
+          totalPaidAmount: response.totalPaidAmount || 0,
         });
       }
     } catch (err) {
@@ -399,6 +422,86 @@ const ContragentPayments = ({ hideHeader = false }) => {
         </div>
 
         <div className="p-6">
+          {/* Summary Cards for Unpaid */}
+          {activeView === 'unpaid' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Jami summa</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      {formatNumber(unpaidSummary.totalAmount)} so'm
+                    </p>
+                  </div>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <AccountBalance className="text-blue-600" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">To'lanmagan summa</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      {formatNumber(unpaidSummary.totalUnpaidAmount)} so'm
+                    </p>
+                  </div>
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <Warning className="text-yellow-600" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Muddat o'tgan</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      {formatNumber(unpaidSummary.overdue.totalAmount)} so'm
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatNumber(unpaidSummary.overdue.count)} ta to'lov
+                    </p>
+                  </div>
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <Warning className="text-red-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Summary Cards for Paid */}
+          {activeView === 'paid' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Jami summa</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      {formatNumber(paidSummary.totalAmount)} so'm
+                    </p>
+                  </div>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <AccountBalance className="text-blue-600" />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">To'langan summa</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">
+                      {formatNumber(paidSummary.totalPaidAmount)} so'm
+                    </p>
+                  </div>
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CheckCircle className="text-green-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Filters */}
           {(activeView === 'unpaid' || activeView === 'paid') && (
             <motion.div
@@ -592,6 +695,10 @@ const ContragentPayments = ({ hideHeader = false }) => {
               onPaySingle={(paymentId) => {
                 setSelectedPaymentId(paymentId);
                 setPaySingleModalOpen(true);
+              }}
+              onViewDetails={(payment) => {
+                setSelectedPayment(payment);
+                setViewPaymentModalOpen(true);
               }}
             />
           )}
@@ -825,6 +932,16 @@ const ContragentPayments = ({ hideHeader = false }) => {
           </motion.div>
         </div>
       )}
+
+      {/* View Payment Modal */}
+      <ViewPaymentModal
+        payment={selectedPayment}
+        isOpen={viewPaymentModalOpen}
+        onClose={() => {
+          setViewPaymentModalOpen(false);
+          setSelectedPayment(null);
+        }}
+      />
     </div>
   );
 };

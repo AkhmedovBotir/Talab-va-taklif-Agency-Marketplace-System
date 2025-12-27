@@ -1,4 +1,6 @@
 const Agent = require('../models/Agent');
+const Device = require('../models/Device');
+const { extractDeviceInfo } = require('../utils/deviceHelper');
 const jwt = require('jsonwebtoken');
 
 // Create new agent
@@ -529,24 +531,17 @@ const loginAgent = async (req, res) => {
   try {
     const { phone, password } = req.body;
 
-    // Find agent with password field included (only non-deleted)
+    // Find agent with password field included (only non-deleted and active)
     const agent = await Agent.findOne({
       phone,
       isDeleted: { $ne: true },
+      status: 'active', // Only find active agents
     }).select('+password');
 
     if (!agent) {
       return res.status(401).json({
         success: false,
         message: 'Telefon raqami yoki parol noto\'g\'ri',
-      });
-    }
-
-    // Check if agent is active
-    if (agent.status !== 'active') {
-      return res.status(403).json({
-        success: false,
-        message: 'Hisobingiz faol emas',
       });
     }
 
@@ -568,6 +563,82 @@ const loginAgent = async (req, res) => {
       });
     }
 
+    // Extract device information
+    const deviceInfo = extractDeviceInfo(req);
+
+    // Check if deviceId is provided
+    if (!deviceInfo.deviceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Qurilma ID kiritilishi shart',
+      });
+    }
+
+    // Check if device exists (active or inactive)
+    const existingDevice = await Device.findOne({
+      user: agent._id,
+      userModel: 'Agent',
+      deviceId: deviceInfo.deviceId,
+    });
+
+    // If device exists but is inactive, reject login immediately
+    if (existingDevice && !existingDevice.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu qurilma nofaol. Faqat faol qurilma bilan login qilish mumkin. Iltimos, faol qurilma bilan kirish yoki yangi qurilmani tasdiqlash uchun SMS kod so\'rang',
+      });
+    }
+
+    // Check if user has any active devices
+    const activeDevices = await Device.find({
+      user: agent._id,
+      userModel: 'Agent',
+      isActive: true,
+    });
+
+    // If device exists and is active, update and proceed
+    if (existingDevice && existingDevice.isActive) {
+      existingDevice.lastLoginAt = new Date();
+      existingDevice.lastActivityAt = new Date();
+      if (deviceInfo.ipAddress) existingDevice.ipAddress = deviceInfo.ipAddress;
+      if (deviceInfo.userAgent) existingDevice.userAgent = deviceInfo.userAgent;
+      await existingDevice.save();
+    } else if (!existingDevice) {
+      // Device doesn't exist - check if this is first device or not
+      // If no active devices, this is the first device - auto-create and activate
+      if (activeDevices.length === 0) {
+        const { device, isNew } = await Device.findOrCreateDevice(agent, 'Agent', deviceInfo);
+        // Device is already active from findOrCreateDevice
+      } else {
+        // There are active devices, require device verification
+        return res.status(403).json({
+          success: false,
+          message: 'Yangi qurilma aniqlandi. Qurilmani tasdiqlash kerak',
+          requiresDeviceVerification: true,
+          data: {
+            phone: agent.phone,
+            deviceId: deviceInfo.deviceId,
+          },
+        });
+      }
+    }
+
+    // Get the device (either existing or newly created) - MUST be active
+    const device = await Device.findOne({
+      user: agent._id,
+      userModel: 'Agent',
+      deviceId: deviceInfo.deviceId,
+      isActive: true,
+    });
+
+    // Final check: if device is not found or not active, reject login
+    if (!device || !device.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Qurilma topilmadi yoki nofaol. Iltimos, qurilmani tasdiqlang',
+      });
+    }
+
     // Determine agent type
     const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
 
@@ -578,6 +649,7 @@ const loginAgent = async (req, res) => {
         phone: agent.phone,
         agentType,
         type: 'agent',
+        deviceId: device.deviceId,
       },
       process.env.JWT_SECRET || 'your-secret-key-change-in-production',
       {
@@ -605,6 +677,11 @@ const loginAgent = async (req, res) => {
         token,
         role: agentType, // role field qo'shildi
         agent: agentObj,
+        device: {
+          deviceId: device.deviceId,
+          deviceName: device.deviceName,
+          isPrimary: device.isPrimary,
+        },
       },
     });
   } catch (error) {

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings as SettingsIcon, Analytics, Comment, Star } from '@mui/icons-material';
+import { Settings as SettingsIcon, Analytics, Comment, Star, Devices } from '@mui/icons-material';
 import KPISettings from '../../components/Settings/KPISettings';
 import CommentTemplatesContent from '../../components/Settings/CommentTemplatesContent';
 import FeaturedContragentsSettings from '../../components/Settings/FeaturedContragentsSettings';
+import DeviceManagement from '../../components/Settings/DeviceManagement';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('kpi');
@@ -12,6 +13,7 @@ const Settings = () => {
     { id: 'kpi', label: 'KPI sozlamalari', icon: Analytics },
     { id: 'comment-templates', label: 'Kommentariya Shablonlari', icon: Comment },
     { id: 'featured-contragents', label: 'Tanlangan Kontragentlar', icon: Star },
+    { id: 'devices', label: 'Qurilma Boshqaruvi', icon: Devices },
   ];
 
   return (
@@ -67,6 +69,7 @@ const Settings = () => {
         {activeTab === 'kpi' && <div className="p-6"><KPISettings /></div>}
         {activeTab === 'comment-templates' && <div className="p-6"><CommentTemplatesContent /></div>}
         {activeTab === 'featured-contragents' && <div className="p-6"><FeaturedContragentsSettings /></div>}
+        {activeTab === 'devices' && <div className="p-6"><DeviceManagement /></div>}
       </motion.div>
     </div>
   );

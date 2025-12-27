@@ -577,3 +577,4 @@ curl -X GET "http://localhost:5000/api/contragent-types?status=active"
 **Last Updated:** 2024-01-15
 
 
+

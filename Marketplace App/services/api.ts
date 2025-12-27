@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 
-const BASE_URL = 'http://192.168.1.6:5000/api/marketplace';
-const REGIONS_BASE_URL = 'http://192.168.1.6:5000/api';
-const REVIEWS_BASE_URL = 'http://192.168.1.6:5000/api/reviews';
-const PAYMENT_BASE_URL = 'http://192.168.1.6:5000/api/payment';
+const BASE_URL = 'https://api.ttsa.uz/api/marketplace';
+const REGIONS_BASE_URL = 'https://api.ttsa.uz/api';
+const REVIEWS_BASE_URL = 'https://api.ttsa.uz/api/reviews';
+const PAYMENT_BASE_URL = 'https://api.ttsa.uz/api/payment';
 // Auth storage keys MUST match those used in AuthContext
 const TOKEN_KEY = '@marketplace:token';
 const USER_KEY = '@marketplace:user';
@@ -567,6 +568,10 @@ class ApiService {
             await AsyncStorage.multiRemove(marketplaceKeys);
             console.log('User logged out due to 401 error. Cleared all marketplace data:', marketplaceKeys);
           }
+          
+          // Emit event to notify AuthContext about 401 error
+          // This will trigger logout and navigation to login screen
+          DeviceEventEmitter.emit('marketplace:401-unauthorized');
         } catch (storageError) {
           console.error('Error clearing auth data:', storageError);
         }
@@ -600,9 +605,13 @@ class ApiService {
         }
       }
       
-      // Add status code to error message for 401 handling
+      // Add status code and response data to error for better error handling
       const error = new Error(errorMessage);
       (error as any).status = response.status;
+      (error as any).response = {
+        status: response.status,
+        data: data,
+      };
       throw error;
     }
 
@@ -638,7 +647,12 @@ class ApiService {
         }
       }
       
-      throw new Error(errorMessage);
+      const error = new Error(errorMessage);
+      (error as any).response = {
+        status: 400,
+        data: data,
+      };
+      throw error;
     }
 
     return data;

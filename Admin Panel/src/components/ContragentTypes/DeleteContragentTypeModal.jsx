@@ -131,3 +131,4 @@ const DeleteContragentTypeModal = ({ open, onClose, onSuccess, contragentType })
 export default DeleteContragentTypeModal;
 
 
+

@@ -37,8 +37,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       const count = await notificationApi.getUnreadCount();
       setUnreadCount(count);
-    } catch (error) {
+    } catch (error: any) {
+      // Token xatosi yoki avtorizatsiya xatosi bo'lsa, faqat 0 qo'yish, console.error qilmaslik
+      if (error.message?.includes('Token') || error.message?.includes('Avtorizatsiya')) {
+        setUnreadCount(0);
+        return;
+      }
+      // Boshqa xatolar uchun console.error
       console.error('Unread count load error:', error);
+      setUnreadCount(0);
     } finally {
       setLoading(false);
     }

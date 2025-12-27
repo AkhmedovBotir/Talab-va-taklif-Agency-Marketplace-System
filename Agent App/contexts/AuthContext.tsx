@@ -9,7 +9,18 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
+  login: (
+    credentials: LoginRequest,
+    deviceInfo?: {
+      deviceId: string;
+      deviceName?: string;
+      deviceType?: string;
+      platform?: string;
+      os?: string;
+      browser?: string;
+      userAgent?: string;
+    }
+  ) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -49,9 +60,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (credentials: LoginRequest) => {
+  const login = async (
+    credentials: LoginRequest,
+    deviceInfo?: {
+      deviceId: string;
+      deviceName?: string;
+      deviceType?: string;
+      platform?: string;
+      os?: string;
+      browser?: string;
+      userAgent?: string;
+    }
+  ) => {
     try {
-      const response: LoginResponse = await apiService.login(credentials);
+      const response: LoginResponse = await apiService.login(credentials, deviceInfo);
       if (response.success && response.data) {
         setAgent(response.data.agent);
         setRole(response.data.role);
@@ -60,8 +82,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(response.message || 'Login failed');
       }
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
-      throw new Error(errorMessage);
+      // Preserve full error object for device verification check
+      const responseData = error.response?.data || {};
+      const statusCode = error.response?.status || error.status;
+      const errorMessage = responseData.message || error.message || 'Login failed';
+      
+      // Check if device not found error
+      const isDeviceNotFound = errorMessage.toLowerCase().includes('qurilma topilmadi') ||
+                               errorMessage.toLowerCase().includes('device not found') ||
+                               (errorMessage.toLowerCase().includes('qurilma') && errorMessage.toLowerCase().includes('topilmadi')) ||
+                               statusCode === 404;
+      
+      // Enhanced error object with all necessary information
+      const enhancedError: any = {
+        ...error,
+        response: error.response,
+        status: statusCode,
+        message: errorMessage,
+        data: responseData,
+        requiresDeviceVerification: responseData.requiresDeviceVerification === true || 
+                                   responseData.requiresDeviceVerification === 'true' ||
+                                   (statusCode === 403 && (
+                                     errorMessage.toLowerCase().includes('qurilma') ||
+                                     errorMessage.toLowerCase().includes('device') ||
+                                     errorMessage.toLowerCase().includes('tasdiqlash') ||
+                                     errorMessage.toLowerCase().includes('verification')
+                                   )),
+        isDeviceNotFound,
+      };
+      
+      throw enhancedError;
     }
   };
 

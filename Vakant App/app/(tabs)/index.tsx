@@ -44,7 +44,7 @@ export default function ProfileScreen() {
       if (isRefresh) {
         setRefreshing(true);
       } else {
-        setLoading(true);
+      setLoading(true);
       }
       const data = await profileApi.getProfile();
       if (data) {
@@ -311,16 +311,16 @@ export default function ProfileScreen() {
           }
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Ruxsat kerak', 'Rasm tanlash uchun ruxsat berilishi kerak');
-        return;
-      }
+          Alert.alert('Ruxsat kerak', 'Rasm tanlash uchun ruxsat berilishi kerak');
+          return;
+        }
       }
 
       launchImageLibrary(
         {
           mediaType: 'photo' as MediaType,
           includeBase64: true,
-        quality: 0.8,
+          quality: 0.8,
           maxWidth: 1024,
           maxHeight: 1024,
         },
@@ -331,38 +331,38 @@ export default function ProfileScreen() {
 
           if (response.errorMessage) {
             Alert.alert('Xatolik', response.errorMessage);
-        return;
-      }
+            return;
+          }
 
           if (response.assets && response.assets[0]) {
             const asset = response.assets[0];
-        
-        if (!asset.uri) {
-          Alert.alert('Xatolik', 'Rasm tanlanmadi');
-          return;
-        }
+            
+            if (!asset.uri) {
+              Alert.alert('Xatolik', 'Rasm tanlanmadi');
+              return;
+            }
 
-        let base64Image: string;
-        
-        if (asset.base64) {
+            let base64Image: string;
+            
+            if (asset.base64) {
               const imageType = asset.type || `image/${asset.uri.split('.').pop()?.toLowerCase() || 'jpeg'}`;
-          base64Image = `data:${imageType};base64,${asset.base64}`;
-        } else {
-          // Fallback: use URI if base64 is not available
-          base64Image = asset.uri;
-        }
-        
+              base64Image = `data:${imageType};base64,${asset.base64}`;
+            } else {
+              // Fallback: use URI if base64 is not available
+              base64Image = asset.uri;
+            }
+            
             (async () => {
-        try {
-          const updated = await profileApi.updateAvatar({ avatar: base64Image });
-          setProfile(updated);
-          updateUser(updated as any);
-          Alert.alert('Muvaffaqiyat', 'Avatar yangilandi');
-        } catch (error: any) {
-          Alert.alert('Xatolik', error.message || 'Avatarni yangilashda xatolik');
-        }
+              try {
+                const updated = await profileApi.updateAvatar({ avatar: base64Image });
+                setProfile(updated);
+                updateUser(updated as any);
+                Alert.alert('Muvaffaqiyat', 'Avatar yangilandi');
+              } catch (error: any) {
+                Alert.alert('Xatolik', error.message || 'Avatarni yangilashda xatolik');
+              }
             })();
-      }
+          }
         }
       );
     } catch (error: any) {

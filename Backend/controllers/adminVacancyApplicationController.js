@@ -461,233 +461,6 @@ const makeFinalDecision = async (req, res) => {
     // Update application status
     application.status = result === 'hired' ? 'accepted' : 'rejected';
 
-    // If hired, create Punkt or Agent based on vacancy target
-    let createdUser = null;
-    if (result === 'hired') {
-      // Populate vacancy and applicant
-      await application.populate('vacancy');
-      await application.populate('applicant');
-
-      const vacancy = application.vacancy;
-      const applicant = application.applicant;
-
-      if (vacancy.target === 'punkt') {
-        // Create Punkt
-        const punktName = `${applicant.firstName} ${applicant.lastName}`;
-        
-        // Check if phone already exists
-        const existingPhone = await Punkt.findOne({
-          phone: applicant.phone,
-          isDeleted: { $ne: true },
-        });
-        if (existingPhone) {
-          return res.status(400).json({
-            success: false,
-            message: 'Bu telefon raqami allaqachon punkt sifatida mavjud',
-          });
-        }
-
-        // Validate viloyat
-        const viloyatRegion = await Region.findById(applicant.viloyat);
-        if (!viloyatRegion || viloyatRegion.type !== 'region') {
-          return res.status(400).json({
-            success: false,
-            message: 'Viloyat topilmadi yoki noto\'g\'ri tur',
-          });
-        }
-
-        // Validate tuman if provided
-        if (applicant.tuman) {
-          const tumanRegion = await Region.findById(applicant.tuman).populate('parent');
-          if (!tumanRegion || tumanRegion.type !== 'district') {
-            return res.status(400).json({
-              success: false,
-              message: 'Tuman topilmadi yoki noto\'g\'ri tur',
-            });
-          }
-          if (tumanRegion.parent && tumanRegion.parent._id.toString() !== applicant.viloyat.toString()) {
-            return res.status(400).json({
-              success: false,
-              message: 'Tuman viloyatga tegishli emas',
-            });
-          }
-        }
-
-        // Check if there's already an active punkt in this position
-        const positionFilter = {
-          viloyat: applicant.viloyat,
-          tuman: applicant.tuman || null,
-          isDeleted: { $ne: true },
-          status: 'active',
-        };
-
-        const existingPunktInPosition = await Punkt.findOne(positionFilter);
-        if (existingPunktInPosition) {
-          const tumanName = applicant.tuman ? ' va tuman' : '';
-          return res.status(400).json({
-            success: false,
-            message: `Bu viloyat${tumanName} uchun allaqachon faol punkt mavjud`,
-          });
-        }
-
-        // Create Punkt - use phone as default password (user will change it)
-        // Password will be hashed automatically by Punkt model's pre('save') hook
-        const punkt = await Punkt.create({
-          name: punktName,
-          phone: applicant.phone,
-          password: applicant.phone, // Default password is phone number (user should change it)
-          viloyat: applicant.viloyat,
-          tuman: applicant.tuman || null,
-          status: 'active',
-        });
-
-        // Populate regions
-        await punkt.populate([
-          { path: 'viloyat', select: 'name type code' },
-          { path: 'tuman', select: 'name type code' },
-        ]);
-
-        // Invalidate cache
-
-        createdUser = {
-          type: 'punkt',
-          data: punkt,
-        };
-      } else if (vacancy.target === 'agent') {
-        // Create Agent
-        const agentName = `${applicant.firstName} ${applicant.lastName}`;
-        
-        // Check if phone already exists
-        const existingPhone = await Agent.findOne({
-          phone: applicant.phone,
-          isDeleted: { $ne: true },
-        });
-        if (existingPhone) {
-          return res.status(400).json({
-            success: false,
-            message: 'Bu telefon raqami allaqachon agent sifatida mavjud',
-          });
-        }
-
-        // Validate regions
-        const viloyatRegion = await Region.findById(applicant.viloyat);
-        if (!viloyatRegion || viloyatRegion.type !== 'region') {
-          return res.status(400).json({
-            success: false,
-            message: 'Viloyat topilmadi yoki noto\'g\'ri tur',
-          });
-        }
-
-        // Validate tuman if provided
-        if (applicant.tuman) {
-          const tumanRegion = await Region.findById(applicant.tuman);
-          if (!tumanRegion || tumanRegion.type !== 'district') {
-            return res.status(400).json({
-              success: false,
-              message: 'Tuman topilmadi yoki noto\'g\'ri tur',
-            });
-          }
-          if (tumanRegion.parent?.toString() !== applicant.viloyat.toString()) {
-            return res.status(400).json({
-              success: false,
-              message: 'Tuman tanlangan viloyatga tegishli emas',
-            });
-          }
-        }
-
-        // Validate mfy if provided
-        if (applicant.mfy) {
-          if (!applicant.tuman) {
-            return res.status(400).json({
-              success: false,
-              message: 'MFY tanlash uchun tuman ham tanlanishi kerak',
-            });
-          }
-          const mfyRegion = await Region.findById(applicant.mfy);
-          if (!mfyRegion || mfyRegion.type !== 'mfy') {
-            return res.status(400).json({
-              success: false,
-              message: 'MFY topilmadi yoki noto\'g\'ri tur',
-            });
-          }
-          if (mfyRegion.parent?.toString() !== applicant.tuman.toString()) {
-            return res.status(400).json({
-              success: false,
-              message: 'MFY tanlangan tumanga tegishli emas',
-            });
-          }
-        }
-
-        // Check if there's already an active agent in this position
-        const positionFilter = {
-          viloyat: applicant.viloyat,
-          isDeleted: { $ne: true },
-          status: 'active',
-        };
-
-        if (applicant.tuman) {
-          positionFilter.tuman = applicant.tuman;
-        } else {
-          positionFilter.tuman = null;
-        }
-
-        if (applicant.mfy) {
-          positionFilter.mfy = applicant.mfy;
-        } else {
-          positionFilter.mfy = null;
-        }
-
-        const existingAgentInPosition = await Agent.findOne(positionFilter);
-        if (existingAgentInPosition) {
-          let positionName = 'Bu viloyat';
-          if (applicant.tuman) {
-            positionName += ' va tuman';
-          }
-          if (applicant.mfy) {
-            positionName += ' va MFY';
-          }
-          return res.status(400).json({
-            success: false,
-            message: `${positionName} uchun allaqachon faol agent mavjud`,
-          });
-        }
-
-        // Create Agent - use phone as default password (user will change it)
-        // Password will be hashed automatically by Agent model's pre('save') hook
-        const agent = await Agent.create({
-          name: agentName,
-          viloyat: applicant.viloyat,
-          tuman: applicant.tuman || null,
-          mfy: applicant.mfy || null,
-          phone: applicant.phone,
-          password: applicant.phone, // Default password is phone number (user should change it)
-          status: 'active',
-        });
-
-        // Populate regions
-        await agent.populate('viloyat', 'name type code');
-        if (agent.tuman) {
-          await agent.populate('tuman', 'name type code');
-        }
-        if (agent.mfy) {
-          await agent.populate('mfy', 'name type code');
-        }
-
-        // Determine agent type
-        const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-
-        // Invalidate cache
-
-        createdUser = {
-          type: 'agent',
-          data: {
-            ...agent.toObject(),
-            agentType,
-          },
-        };
-      }
-    }
-
     await application.save();
 
     // Populate for response
@@ -695,12 +468,29 @@ const makeFinalDecision = async (req, res) => {
     await application.populate('adminDecidedBy', 'username');
     await application.populate('vacancy', 'name target');
 
+    // If hired, inform that conversion should be done via separate endpoint
+    let conversionInfo = null;
+    if (result === 'hired') {
+      const vacancy = application.vacancy;
+      if (vacancy.target === 'punkt') {
+        conversionInfo = {
+          message: 'Topshirish qabul qilindi. Punkt ga aylantirish uchun alohida endpoint dan foydalaning: POST /api/admins/applications/:id/convert-to-punkt',
+          target: 'punkt',
+        };
+      } else if (vacancy.target === 'agent') {
+        conversionInfo = {
+          message: 'Topshirish qabul qilindi. Agent ga aylantirish uchun alohida endpoint dan foydalaning: POST /api/admins/applications/:id/convert-to-agent',
+          target: 'agent',
+        };
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: `Yakuniy qaror: ${result === 'hired' ? 'Ishga qabul qilindi' : 'Rad etildi'}`,
       data: {
         application,
-        createdUser, // null if rejected or if target is not agent/punkt
+        conversionInfo, // Information about how to convert to punkt/agent
       },
     });
   } catch (error) {

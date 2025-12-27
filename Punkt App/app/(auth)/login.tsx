@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { getDeviceId, getDeviceInfo } from '../utils/device';
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState('');
@@ -24,6 +25,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   const { login } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -38,6 +40,18 @@ export default function LoginScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const codeInputRefs = useRef<(TextInput | null)[]>([]);
+
+  // Device verification states
+  const [showDeviceVerification, setShowDeviceVerification] = useState(false);
+  const [deviceVerificationCode, setDeviceVerificationCode] = useState(['', '', '', '', '']);
+  const [deviceVerificationLoading, setDeviceVerificationLoading] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState('');
+  const deviceVerificationCodeRefs = useRef<(TextInput | null)[]>([]);
+
+  useEffect(() => {
+    // Get device ID on mount
+    getDeviceId().then(setDeviceId);
+  }, []);
 
   const formatPhoneNumber = (text: string): string => {
     // Faqat raqamlarni olish
@@ -93,24 +107,49 @@ export default function LoginScreen() {
       return;
     }
 
+    if (!deviceId) {
+      Alert.alert('Xatolik', 'Qurilma ma\'lumotlari yuklanmoqda. Iltimos, biroz kutib turing.');
+      return;
+    }
+
     setLoading(true);
     try {
-      await login(getFullPhoneNumber(), password);
+      const fullPhone = getFullPhoneNumber();
+      await login(fullPhone, password, deviceId || undefined);
       router.replace('/(tabs)/orders');
     } catch (error: any) {
-      let errorMessage = 'Kirishda xatolik yuz berdi';
-      
-      if (error.status === 401) {
-        errorMessage = 'Telefon raqami yoki parol noto\'g\'ri';
-      } else if (error.status === 403) {
-        errorMessage = 'Hisob faol emas';
-      } else if (error.status === 400) {
-        errorMessage = error.message || 'Ma\'lumotlar noto\'g\'ri';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
+      // Check if device verification is required
+      if (error.requiresDeviceVerification || (error.status === 403 && error.message && error.message.includes('qurilma'))) {
+        const fullPhone = getFullPhoneNumber();
+        setPendingPhone(fullPhone);
+        try {
+          const deviceInfo = getDeviceInfo();
+          await apiService.requestDeviceVerificationCode({
+            phone: fullPhone,
+            deviceId: deviceId!,
+            ...deviceInfo,
+          });
+          setShowDeviceVerification(true);
+          setLoading(false);
+          return;
+        } catch (verifyError: any) {
+          Alert.alert('Xatolik', verifyError.message || 'Qurilma tasdiqlashda xatolik');
+        }
+      } else {
+        let errorMessage = 'Kirishda xatolik yuz berdi';
+        
+        if (error.status === 401) {
+          errorMessage = 'Telefon raqami yoki parol noto\'g\'ri';
+        } else if (error.status === 403) {
+          errorMessage = 'Hisob faol emas';
+        } else if (error.status === 400) {
+          errorMessage = error.message || 'Ma\'lumotlar noto\'g\'ri';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
 
-      Alert.alert('Xatolik', errorMessage);
+        Alert.alert('Xatolik', errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -246,6 +285,35 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
 
+      {/* Device Verification Modal */}
+      <Modal
+        visible={showDeviceVerification}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowDeviceVerification(false)}
+      >
+        <DeviceVerificationModal
+          phone={pendingPhone}
+          deviceId={deviceId || ''}
+          smsCode={deviceVerificationCode}
+          setSmsCode={setDeviceVerificationCode}
+          loading={deviceVerificationLoading}
+          setLoading={setDeviceVerificationLoading}
+          onClose={() => setShowDeviceVerification(false)}
+          codeInputRefs={deviceVerificationCodeRefs}
+          onSuccess={async () => {
+            setShowDeviceVerification(false);
+            // Try login again after device verification
+            try {
+              await login(pendingPhone, password, deviceId || undefined);
+              router.replace('/(tabs)/orders');
+            } catch (error: any) {
+              Alert.alert('Xatolik', 'Kirishda xatolik yuz berdi');
+            }
+          }}
+        />
+      </Modal>
+
       {/* Password Setup Modal */}
       <Modal
         visible={showPasswordSetup}
@@ -278,6 +346,187 @@ export default function LoginScreen() {
           }}
         />
       </Modal>
+    </KeyboardAvoidingView>
+  );
+}
+
+// Device Verification Modal Component
+interface DeviceVerificationModalProps {
+  phone: string;
+  deviceId: string;
+  smsCode: string[];
+  setSmsCode: (code: string[]) => void;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
+  onClose: () => void;
+  codeInputRefs: React.MutableRefObject<(TextInput | null)[]>;
+  onSuccess: () => void;
+}
+
+function DeviceVerificationModal({
+  phone,
+  deviceId,
+  smsCode,
+  setSmsCode,
+  loading,
+  setLoading,
+  onClose,
+  codeInputRefs,
+  onSuccess,
+}: DeviceVerificationModalProps) {
+  const insets = useSafeAreaInsets();
+
+  const handleCodeChange = (value: string, index: number) => {
+    if (value.length > 1) {
+      const digits = value.replace(/\D/g, '').slice(0, 5);
+      const newCode = [...smsCode];
+      digits.split('').forEach((digit, i) => {
+        if (index + i < 5) {
+          newCode[index + i] = digit;
+        }
+      });
+      setSmsCode(newCode);
+      
+      const nextIndex = Math.min(index + digits.length, 4);
+      if (nextIndex < 5 && newCode[nextIndex] === '') {
+        codeInputRefs.current[nextIndex]?.focus();
+      } else if (nextIndex === 4 && newCode[4] !== '') {
+        codeInputRefs.current[4]?.blur();
+      }
+      return;
+    }
+
+    const newCode = [...smsCode];
+    newCode[index] = value.replace(/\D/g, '').slice(-1);
+    setSmsCode(newCode);
+
+    if (value && index < 4) {
+      codeInputRefs.current[index + 1]?.focus();
+    } else if (index === 4 && newCode[4] !== '') {
+      codeInputRefs.current[4]?.blur();
+    }
+  };
+
+  const handleCodeKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !smsCode[index] && index > 0) {
+      codeInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerify = async () => {
+    const code = smsCode.join('');
+    if (code.length !== 5) {
+      Alert.alert('Xatolik', 'Iltimos, 5 ta raqamli kodni kiriting');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const deviceInfo = getDeviceInfo();
+      await apiService.verifyDevice({
+        phone,
+        deviceId,
+        code,
+        ...deviceInfo,
+      });
+      Alert.alert('Muvaffaqiyat', 'Qurilma muvaffaqiyatli tasdiqlandi');
+      onSuccess();
+    } catch (error: any) {
+      Alert.alert('Xatolik', error.message || 'Kod noto\'g\'ri yoki muddati o\'tgan');
+      setSmsCode(['', '', '', '', '']);
+      codeInputRefs.current[0]?.focus();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setLoading(true);
+    try {
+      await apiService.resendDeviceVerificationCode(phone, deviceId);
+      Alert.alert('Muvaffaqiyat', 'Kod qayta yuborildi');
+      setSmsCode(['', '', '', '', '']);
+      codeInputRefs.current[0]?.focus();
+    } catch (error: any) {
+      Alert.alert('Xatolik', error.message || 'Xatolik yuz berdi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={[styles.modalContainer, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.modalHeader}>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Ionicons name="close" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.modalTitle}>Qurilma tasdiqlash</Text>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.modalContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.stepContainer}>
+          <View style={styles.stepIconContainer}>
+            <Ionicons name="phone-portrait" size={48} color="#007AFF" />
+          </View>
+          <Text style={styles.stepTitle}>Yangi qurilma aniqlandi</Text>
+          <Text style={styles.stepDescription}>
+            Bu qurilma bilan kirish uchun telefon raqamingizga yuborilgan 5 ta raqamli kodni kiriting
+          </Text>
+
+          <View style={styles.codeContainer}>
+            {smsCode.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={(ref) => {
+                  codeInputRefs.current[index] = ref;
+                }}
+                style={[
+                  styles.codeInput,
+                  digit && styles.codeInputFilled,
+                ]}
+                value={digit}
+                onChangeText={(value) => handleCodeChange(value, index)}
+                onKeyPress={(e) => handleCodeKeyPress(e, index)}
+                keyboardType="number-pad"
+                maxLength={1}
+                selectTextOnFocus
+                editable={!loading}
+              />
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={styles.resendButton}
+            onPress={handleResend}
+            disabled={loading}
+          >
+            <Text style={styles.resendText}>Kodni qayta yuborish</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleVerify}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.buttonText}>Tasdiqlash</Text>
+                <Ionicons name="checkmark" size={20} color="#fff" style={styles.buttonIcon} />
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

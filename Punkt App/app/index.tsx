@@ -11,12 +11,20 @@ export default function Index() {
   useEffect(() => {
     if (isLoading) return;
 
+    const currentRoute = segments[0];
+    
     if (!isAuthenticated) {
-      router.replace("/(auth)/login");
+      // Only navigate if not already on login page
+      if (currentRoute !== 'auth') {
+        router.replace("/(auth)/login");
+      }
     } else {
-      router.replace("/(tabs)/orders");
+      // Only navigate if not already on tabs
+      if (currentRoute !== 'tabs') {
+        router.replace("/(tabs)/orders");
+      }
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, segments, router]);
 
   return <LoadingSpinner />;
 }

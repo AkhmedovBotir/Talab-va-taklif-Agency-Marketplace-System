@@ -16,8 +16,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { apiService, StatisticsData } from '../../services/api';
 import { formatNumberDisplay } from '../../utils/formatNumber';
+import PaymentsScreen from './statistika/payments';
+
+type TabType = 'statistics' | 'payments';
 
 export default function StatistikaScreen() {
+  const [activeTab, setActiveTab] = useState<TabType>('statistics');
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -118,8 +122,32 @@ export default function StatistikaScreen() {
         <Text style={styles.headerTitle}>Statistika</Text>
       </View>
 
-      {/* Date Filter */}
-      <View style={styles.filterContainer}>
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'statistics' && styles.tabActive]}
+          onPress={() => setActiveTab('statistics')}
+        >
+          <Text style={[styles.tabText, activeTab === 'statistics' && styles.tabTextActive]}>
+            Statistika
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'payments' && styles.tabActive]}
+          onPress={() => setActiveTab('payments')}
+        >
+          <Text style={[styles.tabText, activeTab === 'payments' && styles.tabTextActive]}>
+            To'lovlarim
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === 'payments' ? (
+        <PaymentsScreen />
+      ) : (
+        <>
+          {/* Date Filter */}
+          <View style={styles.filterContainer}>
         <View style={styles.filterRow}>
           <TouchableOpacity
             style={styles.dateButton}
@@ -299,6 +327,8 @@ export default function StatistikaScreen() {
           </View>
         )}
       </ScrollView>
+        </>
+      )}
     </View>
   );
 }
@@ -552,5 +582,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#007AFF',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
 });

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://api.ttsa.uz/api';
 
 // Helper function to get token from localStorage
 const getToken = () => {
@@ -16,14 +16,14 @@ const handleUnauthorized = () => {
 };
 
 // Helper function to make API requests
-const apiRequest = async (endpoint, options = {}) => {
+const apiRequest = async (endpoint, options = {}, requiresAuth = true) => {
   const token = getToken();
   
   const config = {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(requiresAuth && token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },
   };
@@ -60,6 +60,60 @@ const apiRequest = async (endpoint, options = {}) => {
         throw new Error(data.message || 'Sizning sessiyangiz tugadi. Iltimos, qayta kiring.');
       }
       
+      // Handle 403 Forbidden - Device verification required or inactive device
+      if (response.status === 403) {
+        const errorMessage = data.message || '';
+        
+        // Check if error is about inactive device or device not found
+        // These errors should redirect to login page
+        const isDeviceError = errorMessage.toLowerCase().includes('nofaol') || 
+            errorMessage.toLowerCase().includes('inactive') ||
+            errorMessage.toLowerCase().includes('faqat faol') ||
+            errorMessage.toLowerCase().includes('deactivated') ||
+            errorMessage.toLowerCase().includes('not active') ||
+            errorMessage.toLowerCase().includes('device is not active') ||
+            errorMessage.toLowerCase().includes('qurilma topilmadi') ||
+            errorMessage.toLowerCase().includes('device not found') ||
+            errorMessage.toLowerCase().includes('qurilmani tasdiqlang') ||
+            errorMessage.toLowerCase().includes('faol qurilma bilan');
+        
+        // If it's a device-related error and not on login endpoint, redirect to login
+        if (isDeviceError && !endpoint.includes('/login') && !endpoint.includes('/device-verification')) {
+          // Clear authentication data
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminData');
+          // Redirect to login page
+          window.location.href = '/login';
+          throw new Error(errorMessage || 'Qurilma nofaol. Iltimos, qayta kiring.');
+        }
+        
+        // For login endpoint, handle device verification
+        if (endpoint.includes('/login')) {
+          if (isDeviceError) {
+            // Inactive device on login - reject login, don't show device verification
+            throw new Error(errorMessage || 'Bu qurilma nofaol. Faqat faol qurilma bilan login qilish mumkin');
+          }
+          
+          // Only allow device verification for new devices (when requiresDeviceVerification is true)
+          if (data.requiresDeviceVerification) {
+            const error = new Error(errorMessage || 'Qurilma tasdiqlash kerak');
+            error.requiresDeviceVerification = true;
+            error.response = response;
+            error.data = data;
+            throw error;
+          }
+        }
+        
+        // Other 403 errors - redirect to login if authenticated request
+        if (requiresAuth && !endpoint.includes('/device-verification')) {
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminData');
+          window.location.href = '/login';
+        }
+        
+        throw new Error(errorMessage || 'Kirish rad etildi');
+      }
+      
       // Handle validation errors (400) with detailed error messages
       if (response.status === 400 && data.errors && Array.isArray(data.errors)) {
         const errorMessages = data.errors.map(err => err.message || `${err.field}: ${err.message}`).join(', ');
@@ -79,11 +133,92 @@ const apiRequest = async (endpoint, options = {}) => {
 // Admin API functions
 export const adminAPI = {
   // Note: Login endpoint not in API docs - may need separate endpoint
-  login: async (username, password) => {
-    return apiRequest('/admins/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, parol: password }),
-    });
+  login: async (username, password, deviceInfo = null) => {
+    const headers = {};
+    
+    // Add device headers if device info is provided
+    if (deviceInfo) {
+      if (deviceInfo.deviceId) headers['X-Device-Id'] = deviceInfo.deviceId;
+      if (deviceInfo.deviceName) headers['X-Device-Name'] = deviceInfo.deviceName;
+      if (deviceInfo.deviceType) headers['X-Device-Type'] = deviceInfo.deviceType;
+      if (deviceInfo.platform) headers['X-Platform'] = deviceInfo.platform;
+      if (deviceInfo.os) headers['X-OS'] = deviceInfo.os;
+      if (deviceInfo.browser) headers['X-Browser'] = deviceInfo.browser;
+    }
+    
+    try {
+      const response = await apiRequest('/admins/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, parol: password }),
+        headers,
+      }, false); // No auth required for login
+      
+      return response;
+    } catch (error) {
+      // Check if error indicates device verification is required
+      // This can happen for NEW devices OR inactive devices
+      // For inactive devices, we also allow device verification via SMS
+      if (error.requiresDeviceVerification) {
+        const errorMessage = error.message || '';
+        
+        // Check if error is about inactive device
+        // For inactive devices, we still allow device verification via SMS
+        const isInactiveDevice = errorMessage.toLowerCase().includes('nofaol') || 
+            errorMessage.toLowerCase().includes('inactive') ||
+            errorMessage.toLowerCase().includes('faqat faol') ||
+            errorMessage.toLowerCase().includes('qurilma topilmadi') ||
+            errorMessage.toLowerCase().includes('qurilmani tasdiqlang');
+        
+        if (isInactiveDevice) {
+          // Inactive device - allow device verification via SMS
+          return {
+            success: false,
+            requiresDeviceVerification: true,
+            phone: error.data?.phone,
+            username: username, // Pass username for admin verification
+            deviceId: deviceInfo?.deviceId,
+            deviceInfo: deviceInfo,
+            message: errorMessage || 'Bu qurilma nofaol. Faqat faol qurilma bilan login qilish mumkin. Iltimos, faol qurilma bilan kirish yoki yangi qurilmani tasdiqlash uchun SMS kod so\'rang',
+            isInactiveDevice: true, // Flag to show different message
+          };
+        }
+        
+        // Return requiresDeviceVerification for new devices
+        return {
+          success: false,
+          requiresDeviceVerification: true,
+          phone: error.data?.phone,
+          username: username, // Pass username for admin verification
+          deviceId: deviceInfo?.deviceId,
+          deviceInfo: deviceInfo,
+          message: errorMessage || 'Qurilma tasdiqlash kerak',
+        };
+      }
+      
+      // Check if error message indicates inactive device (even without requiresDeviceVerification flag)
+      const errorMessage = error.message || '';
+      const isInactiveDevice = errorMessage.toLowerCase().includes('nofaol') || 
+          errorMessage.toLowerCase().includes('inactive') ||
+          errorMessage.toLowerCase().includes('faqat faol') ||
+          errorMessage.toLowerCase().includes('qurilma topilmadi') ||
+          errorMessage.toLowerCase().includes('qurilmani tasdiqlang');
+      
+      if (isInactiveDevice) {
+        // Inactive device - allow device verification via SMS
+        return {
+          success: false,
+          requiresDeviceVerification: true,
+          phone: error.data?.phone,
+          username: username, // Pass username for admin verification
+          deviceId: deviceInfo?.deviceId,
+          deviceInfo: deviceInfo,
+          message: errorMessage || 'Bu qurilma nofaol. Faqat faol qurilma bilan login qilish mumkin. Iltimos, faol qurilma bilan kirish yoki yangi qurilmani tasdiqlash uchun SMS kod so\'rang',
+          isInactiveDevice: true, // Flag to show different message
+        };
+      }
+      
+      throw error;
+    }
   },
   
   getProfile: async () => {
@@ -154,6 +289,106 @@ export const adminAPI = {
     return apiRequest(`/admins/${id}`, {
       method: 'DELETE',
     });
+  },
+};
+
+// Device Verification API functions
+export const deviceVerificationAPI = {
+  // Admin - Request verification code
+  // Accepts either username, adminId, or phone
+  requestAdminCode: async (identifier, deviceData, identifierType = 'username') => {
+    const requestBody = {
+      [identifierType]: identifier,
+      ...deviceData,
+    };
+    
+    return apiRequest('/device-verification/admin/request-code', {
+      method: 'POST',
+      body: JSON.stringify(requestBody),
+    }, false); // No auth required
+  },
+
+  // Admin - Verify device
+  // Accepts either username, adminId, or phone
+  verifyAdminDevice: async (identifier, deviceId, code, deviceData, identifierType = 'username') => {
+    const requestBody = {
+      [identifierType]: identifier,
+      deviceId,
+      code,
+      ...deviceData,
+    };
+    
+    return apiRequest('/device-verification/admin/verify', {
+      method: 'POST',
+      body: JSON.stringify(requestBody),
+    }, false); // No auth required
+  },
+
+  // Admin - Resend code
+  // Accepts either username, adminId, or phone
+  resendAdminCode: async (identifier, deviceId, identifierType = 'username') => {
+    const requestBody = {
+      [identifierType]: identifier,
+      deviceId,
+    };
+    
+    return apiRequest('/device-verification/admin/resend-code', {
+      method: 'POST',
+      body: JSON.stringify(requestBody),
+    }, false); // No auth required
+  },
+};
+
+// Admin Device Management API functions
+export const adminDeviceAPI = {
+  // Get all devices
+  getAllDevices: async (params = {}) => {
+    const { userModel, userId, page = 1, limit = 50 } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (userModel) queryParams.append('userModel', userModel);
+    if (userId) queryParams.append('userId', userId);
+    
+    return apiRequest(`/admins/devices?${queryParams.toString()}`);
+  },
+
+  // Get device by ID
+  getDeviceById: async (id) => {
+    return apiRequest(`/admins/devices/${id}`);
+  },
+
+  // Get user's devices
+  getUserDevices: async (userModel, userId) => {
+    return apiRequest(`/admins/devices/user/${userModel}/${userId}`);
+  },
+
+  // Deactivate device
+  deactivateDevice: async (id) => {
+    return apiRequest(`/admins/devices/${id}/deactivate`, {
+      method: 'PUT',
+    });
+  },
+
+  // Activate device
+  activateDevice: async (id) => {
+    return apiRequest(`/admins/devices/${id}/activate`, {
+      method: 'PUT',
+    });
+  },
+
+  // Delete device
+  deleteDevice: async (id) => {
+    return apiRequest(`/admins/devices/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Get device statistics
+  getDeviceStatistics: async () => {
+    return apiRequest('/admins/devices/statistics');
   },
 };
 
@@ -2332,7 +2567,10 @@ export const contragentPaymentAPI = {
     if (viloyatId) queryParams.append('viloyatId', viloyatId);
     if (tumanId) queryParams.append('tumanId', tumanId);
     if (mfyId) queryParams.append('mfyId', mfyId);
-    if (isOverdue !== undefined) queryParams.append('isOverdue', isOverdue.toString());
+    // API expects string 'true' or 'false' for isOverdue
+    if (isOverdue !== undefined && isOverdue !== '') {
+      queryParams.append('isOverdue', isOverdue === true || isOverdue === 'true' ? 'true' : 'false');
+    }
     
     return apiRequest(`/admin-contragent-payments/unpaid?${queryParams.toString()}`);
   },
@@ -2342,7 +2580,10 @@ export const contragentPaymentAPI = {
     const { isOverdue } = params;
     const queryParams = new URLSearchParams();
     
-    if (isOverdue !== undefined) queryParams.append('isOverdue', isOverdue.toString());
+    // API expects string 'true' or 'false' for isOverdue
+    if (isOverdue !== undefined && isOverdue !== '') {
+      queryParams.append('isOverdue', isOverdue === true || isOverdue === 'true' ? 'true' : 'false');
+    }
     
     const queryString = queryParams.toString();
     return apiRequest(`/admin-contragent-payments/unpaid/grouped${queryString ? `?${queryString}` : ''}`);
@@ -2352,7 +2593,7 @@ export const contragentPaymentAPI = {
   paySinglePayment: async (paymentId, notes) => {
     return apiRequest(`/admin-contragent-payments/${paymentId}/pay`, {
       method: 'POST',
-      body: JSON.stringify({ notes }),
+      body: JSON.stringify({ notes: notes || null }),
     });
   },
 
@@ -2364,9 +2605,9 @@ export const contragentPaymentAPI = {
       body: JSON.stringify({
         startDate,
         endDate,
-        contragentId,
-        isOverdue,
-        notes,
+        contragentId: contragentId || undefined,
+        isOverdue: isOverdue || false,
+        notes: notes || undefined,
       }),
     });
   },
@@ -2375,7 +2616,10 @@ export const contragentPaymentAPI = {
   markAsPaid: async (paymentIds, notes) => {
     return apiRequest('/admin-contragent-payments/mark-as-paid', {
       method: 'POST',
-      body: JSON.stringify({ paymentIds, notes }),
+      body: JSON.stringify({ 
+        paymentIds,
+        notes: notes || undefined,
+      }),
     });
   },
 
@@ -2417,6 +2661,55 @@ export const contragentPaymentAPI = {
       method: 'POST',
       body: JSON.stringify({ dueDateDays }),
     });
+  },
+};
+
+// Dashboard Statistics API
+export const dashboardAPI = {
+  // Get general statistics
+  getStatistics: async () => {
+    return apiRequest('/admins/dashboard/statistics');
+  },
+
+  // Get daily statistics (for charts)
+  getDailyStatistics: async (days = 30) => {
+    const queryParams = new URLSearchParams();
+    if (days) queryParams.append('days', days.toString());
+    return apiRequest(`/admins/dashboard/statistics/daily?${queryParams.toString()}`);
+  },
+
+  // Get weekly statistics (for charts)
+  getWeeklyStatistics: async (weeks = 12) => {
+    const queryParams = new URLSearchParams();
+    if (weeks) queryParams.append('weeks', weeks.toString());
+    return apiRequest(`/admins/dashboard/statistics/weekly?${queryParams.toString()}`);
+  },
+
+  // Get monthly statistics (for charts)
+  getMonthlyStatistics: async (months = 12) => {
+    const queryParams = new URLSearchParams();
+    if (months) queryParams.append('months', months.toString());
+    return apiRequest(`/admins/dashboard/statistics/monthly?${queryParams.toString()}`);
+  },
+
+  // Get orders statistics
+  getOrdersStatistics: async () => {
+    return apiRequest('/admins/dashboard/statistics/orders');
+  },
+
+  // Get finance statistics
+  getFinanceStatistics: async () => {
+    return apiRequest('/admins/dashboard/statistics/finance');
+  },
+
+  // Get users statistics
+  getUsersStatistics: async () => {
+    return apiRequest('/admins/dashboard/statistics/users');
+  },
+
+  // Get products statistics
+  getProductsStatistics: async () => {
+    return apiRequest('/admins/dashboard/statistics/products');
   },
 };
 

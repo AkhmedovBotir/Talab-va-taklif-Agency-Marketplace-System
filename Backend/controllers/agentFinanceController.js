@@ -4,6 +4,7 @@ const FinanceSubmission = require('../models/FinanceSubmission');
 const Order = require('../models/Order');
 const Agent = require('../models/Agent');
 const Region = require('../models/Region');
+const ContragentPaymentDistribution = require('../models/ContragentPaymentDistribution');
 
 // ==================== MFY AGENT FUNCTIONS ====================
 
@@ -12,9 +13,10 @@ const getMfyDailyReport = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
     // MFY agent ekanligini tekshirish
-    if (agent.agentType !== 'mfy') {
+    if (role !== 'mfy') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat MFY agentlar uchun',
@@ -109,8 +111,9 @@ const getMfyPendingPayments = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
-    if (agent.agentType !== 'mfy') {
+    if (role !== 'mfy') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat MFY agentlar uchun',
@@ -157,9 +160,10 @@ const collectPayment = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
     const { transactionId } = req.params;
 
-    if (agent.agentType !== 'mfy') {
+    if (role !== 'mfy') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat MFY agentlar uchun',
@@ -259,9 +263,10 @@ const submitToDistrict = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
     const { transactionIds, notes } = req.body;
 
-    if (agent.agentType !== 'mfy') {
+    if (role !== 'mfy') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat MFY agentlar uchun',
@@ -389,8 +394,9 @@ const getMfyStatistics = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
-    if (agent.agentType !== 'mfy') {
+    if (role !== 'mfy') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat MFY agentlar uchun',
@@ -453,8 +459,9 @@ const getDistrictReport = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
-    if (agent.agentType !== 'tuman') {
+    if (role !== 'tuman') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Tuman agentlar uchun',
@@ -518,8 +525,9 @@ const getDistrictSubmissions = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
-    if (agent.agentType !== 'tuman') {
+    if (role !== 'tuman') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Tuman agentlar uchun',
@@ -557,9 +565,10 @@ const confirmDistrictSubmission = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
     const { submissionId } = req.params;
 
-    if (agent.agentType !== 'tuman') {
+    if (role !== 'tuman') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Tuman agentlar uchun',
@@ -635,9 +644,10 @@ const submitToProvince = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
     const { transactionIds, notes } = req.body;
 
-    if (agent.agentType !== 'tuman') {
+    if (role !== 'tuman') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Tuman agentlar uchun',
@@ -749,8 +759,9 @@ const getDistrictStatistics = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
-    if (agent.agentType !== 'tuman') {
+    if (role !== 'tuman') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Tuman agentlar uchun',
@@ -806,8 +817,9 @@ const getProvinceReport = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
-    if (agent.agentType !== 'viloyat') {
+    if (role !== 'viloyat') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Viloyat agentlar uchun',
@@ -870,8 +882,9 @@ const getProvinceSubmissions = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
-    if (agent.agentType !== 'viloyat') {
+    if (role !== 'viloyat') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Viloyat agentlar uchun',
@@ -909,9 +922,10 @@ const confirmProvinceSubmission = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
     const { submissionId } = req.params;
 
-    if (agent.agentType !== 'viloyat') {
+    if (role !== 'viloyat') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Viloyat agentlar uchun',
@@ -987,9 +1001,10 @@ const submitToFinance = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
     const { transactionIds, notes } = req.body;
 
-    if (agent.agentType !== 'viloyat') {
+    if (role !== 'viloyat') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Viloyat agentlar uchun',
@@ -1053,6 +1068,166 @@ const submitToFinance = async (req, res) => {
       await transaction.save();
     }
 
+    // Contragent to'lovlarini yaratish/yangilash
+    console.log('=== CONTRAGENT TO\'LOVLARINI YARATISH ===');
+    console.log('Transaksiyalar soni:', transactions.length);
+    
+    // Get unique orders from transactions
+    const orderIds = [...new Set(transactions.map(t => t.order?.toString() || t.order))];
+    console.log('Buyurtmalar soni:', orderIds.length);
+    
+    // Get orders with full details
+    const orders = await Order.find({
+      _id: { $in: orderIds },
+      status: 'confirmed_by_customer',
+    })
+      .populate('items.product', 'contragent')
+      .populate('contragentRequests.contragentId');
+
+    console.log('Topilgan buyurtmalar soni:', orders.length);
+
+    // Calculate due date (7 days from now)
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 7);
+    const dueDateStart = new Date(dueDate);
+    dueDateStart.setHours(0, 0, 0, 0);
+    const dueDateEnd = new Date(dueDate);
+    dueDateEnd.setHours(23, 59, 59, 999);
+
+    const createdPayments = [];
+    const updatedPayments = [];
+
+    // Process each order
+    for (const order of orders) {
+      // Filter orders that have at least one delivered contragent request
+      if (!order.contragentRequests || order.contragentRequests.length === 0) {
+        continue;
+      }
+
+      const hasDeliveredRequest = order.contragentRequests.some((req) => req.status === 'delivered_to_punkt');
+      if (!hasDeliveredRequest) {
+        continue;
+      }
+
+      // Group items by contragent
+      const contragentItems = new Map();
+
+      if (!order.items || order.items.length === 0) {
+        continue;
+      }
+
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        if (!item.product) {
+          continue;
+        }
+
+        // Get contragent from product
+        let productContragent = null;
+        if (typeof item.product === 'object' && item.product.contragent) {
+          productContragent = item.product.contragent;
+        } else if (typeof item.product === 'object' && item.product._id) {
+          const Product = require('../models/Product');
+          const productDoc = await Product.findById(item.product._id).select('contragent');
+          if (productDoc && productDoc.contragent) {
+            productContragent = productDoc.contragent;
+          }
+        }
+
+        if (!productContragent) {
+          continue;
+        }
+
+        const contragentId = productContragent.toString();
+
+        // Check if this item is in a delivered contragent request
+        const deliveredRequest = order.contragentRequests.find(
+          (req) => {
+            const reqContragentId = req.contragentId?._id?.toString() || req.contragentId?.toString() || req.contragentId;
+            return reqContragentId === contragentId && req.status === 'delivered_to_punkt';
+          }
+        );
+
+        if (!deliveredRequest) {
+          continue;
+        }
+
+        // Check if item index is in the request (if itemIds specified)
+        if (deliveredRequest.itemIds && Array.isArray(deliveredRequest.itemIds) && deliveredRequest.itemIds.length > 0) {
+          if (!deliveredRequest.itemIds.includes(i)) {
+            continue;
+          }
+        }
+
+        if (!contragentItems.has(contragentId)) {
+          contragentItems.set(contragentId, {
+            contragentId,
+            items: [],
+            totalPrice: 0,
+            totalKpiPrice: 0,
+          });
+        }
+
+        const contragentData = contragentItems.get(contragentId);
+        const itemTotalPrice = item.price * item.quantity;
+        const profitPerUnit = item.price - item.originalPrice;
+        const itemKpiPrice = (profitPerUnit * item.quantity * item.kpiBonusPercent) / 100;
+
+        contragentData.items.push(i);
+        contragentData.totalPrice += itemTotalPrice;
+        contragentData.totalKpiPrice += itemKpiPrice;
+      }
+
+      // Create or update payment for each contragent
+      for (const [contragentId, data] of contragentItems) {
+        const paymentAmount = data.totalPrice - data.totalKpiPrice;
+
+        if (paymentAmount <= 0) {
+          continue;
+        }
+
+        // Check if payment already exists for this contragent (pending status)
+        const existingPayment = await ContragentPaymentDistribution.findOne({
+          contragent: contragentId,
+          status: 'pending',
+          dueDate: {
+            $gte: dueDateStart,
+            $lte: dueDateEnd,
+          },
+        });
+
+        if (existingPayment) {
+          // Add order if not already in the array
+          if (!existingPayment.orders.includes(order._id)) {
+            existingPayment.orders.push(order._id);
+          }
+          // Update amount (add to existing)
+          existingPayment.amount += paymentAmount;
+          await existingPayment.save();
+          if (!updatedPayments.includes(existingPayment._id.toString())) {
+            updatedPayments.push(existingPayment._id);
+          }
+          console.log('To\'lov yangilandi:', existingPayment._id, 'Summa:', paymentAmount);
+        } else {
+          // Create new payment
+          const newPayment = new ContragentPaymentDistribution({
+            contragent: contragentId,
+            amount: paymentAmount,
+            status: 'pending',
+            orders: [order._id],
+            dueDate: dueDate,
+          });
+
+          await newPayment.save();
+          createdPayments.push(newPayment._id);
+          console.log('Yangi to\'lov yaratildi:', newPayment._id, 'Summa:', paymentAmount);
+        }
+      }
+    }
+
+    console.log('Yaratilgan to\'lovlar:', createdPayments.length);
+    console.log('Yangilangan to\'lovlar:', updatedPayments.length);
+
     res.status(201).json({
       success: true,
       message: 'To\'lovlar muvaffaqiyatli moliya bo\'limiga topshirildi',
@@ -1061,6 +1236,12 @@ const submitToFinance = async (req, res) => {
         amount: submission.amount,
         transactionsCount: submission.transactionsCount,
         submittedAt: submission.createdAt,
+      },
+      contragentPayments: {
+        created: createdPayments.length,
+        updated: updatedPayments.length,
+        createdIds: createdPayments,
+        updatedIds: updatedPayments,
       },
     });
   } catch (error) {
@@ -1078,8 +1259,9 @@ const getProvinceStatistics = async (req, res) => {
   try {
     const agentId = req.user.userId;
     const agent = req.user.agent;
+    const role = req.user.role;
 
-    if (agent.agentType !== 'viloyat') {
+    if (role !== 'viloyat') {
       return res.status(403).json({
         success: false,
         message: 'Bu funksiya faqat Viloyat agentlar uchun',

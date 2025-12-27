@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://192.168.1.6:5000';
+const BASE_URL = 'https://api.ttsa.uz';
 
 export interface LoginRequest {
   phone: string;
@@ -68,9 +68,12 @@ export interface Contragent {
 export interface LoginResponse {
   success: boolean;
   message: string;
+  requiresDeviceVerification?: boolean;
   data: {
-    token: string;
-    contragent: Contragent;
+    token?: string;
+    contragent?: Contragent;
+    phone?: string;
+    deviceId?: string;
   };
 }
 
@@ -420,17 +423,20 @@ class ApiService {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...(options.headers || {}),
       },
     };
 
-    // Add token to headers if available
-    const token = await this.getToken();
-    if (token) {
-      config.headers = {
-        ...config.headers,
-        Authorization: `Bearer ${token}`,
-      };
+    // Add token to headers if available (only for authenticated endpoints)
+    // Device verification endpoints don't require authentication
+    if (!endpoint.includes('/device-verification/')) {
+      const token = await this.getToken();
+      if (token) {
+        config.headers = {
+          ...config.headers,
+          Authorization: `Bearer ${token}`,
+        };
+      }
     }
 
     try {
@@ -457,9 +463,18 @@ class ApiService {
     }
   }
 
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
+  async login(credentials: LoginRequest, deviceId?: string): Promise<LoginResponse> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (deviceId) {
+      headers['X-Device-Id'] = deviceId;
+    }
+
     return this.request<LoginResponse>('/api/contragents/auth/login', {
       method: 'POST',
+      headers,
       body: JSON.stringify(credentials),
     });
   }
@@ -482,6 +497,223 @@ class ApiService {
     return this.request<PasswordSetupStep3Response>('/api/contragents/password-setup/step3', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  // Device Verification methods for Contragent
+  async requestDeviceVerificationCode(data: {
+    phone: string;
+    deviceId: string;
+    deviceName?: string;
+    deviceType?: string;
+    platform?: string;
+    os?: string;
+    browser?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    location?: {
+      country?: string;
+      city?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+  }): Promise<{ success: boolean; message: string; data: { phone: string; expiresAt: string } }> {
+    return this.request('/api/device-verification/contragent/request-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyDevice(data: {
+    phone: string;
+    deviceId: string;
+    code: string;
+    deviceName?: string;
+    deviceType?: string;
+    platform?: string;
+    os?: string;
+    browser?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    location?: {
+      country?: string;
+      city?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+  }): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      device: {
+        _id: string;
+        deviceId: string;
+        deviceName?: string;
+        isPrimary: boolean;
+        lastLoginAt: string;
+      };
+      isNew: boolean;
+    };
+  }> {
+    return this.request('/api/device-verification/contragent/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async resendDeviceVerificationCode(data: {
+    phone: string;
+    deviceId: string;
+  }): Promise<{ success: boolean; message: string; data: { phone: string; expiresAt: string } }> {
+    return this.request('/api/device-verification/contragent/resend-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Admin Device Management methods
+  async getAllDevices(params?: {
+    userModel?: 'Admin' | 'Contragent' | 'Punkt' | 'Agent';
+    userId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    success: boolean;
+    count: number;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    data: Array<{
+      _id: string;
+      user: {
+        _id: string;
+        name: string;
+        phone: string;
+      };
+      userModel: string;
+      deviceId: string;
+      deviceName?: string;
+      isActive: boolean;
+      isPrimary: boolean;
+      lastLoginAt: string;
+      lastActivityAt: string;
+    }>;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.userModel) queryParams.append('userModel', params.userModel);
+    if (params?.userId) queryParams.append('userId', params.userId);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const query = queryParams.toString();
+    return this.request(`/api/admins/devices${query ? `?${query}` : ''}`, {
+      method: 'GET',
+    });
+  }
+
+  async getDeviceById(deviceId: string): Promise<{
+    success: boolean;
+    data: {
+      _id: string;
+      user: {
+        _id: string;
+        name: string;
+        phone: string;
+      };
+      userModel: string;
+      deviceId: string;
+      deviceName?: string;
+      deviceType?: string;
+      platform?: string;
+      os?: string;
+      browser?: string;
+      ipAddress?: string;
+      isActive: boolean;
+      isPrimary: boolean;
+      lastLoginAt: string;
+      lastActivityAt: string;
+    };
+  }> {
+    return this.request(`/api/admins/devices/${deviceId}`, {
+      method: 'GET',
+    });
+  }
+
+  async getUserDevices(userModel: 'Admin' | 'Contragent' | 'Punkt' | 'Agent', userId: string): Promise<{
+    success: boolean;
+    count: number;
+    data: Array<{
+      _id: string;
+      deviceId: string;
+      deviceName?: string;
+      isActive: boolean;
+      isPrimary: boolean;
+      lastLoginAt: string;
+    }>;
+  }> {
+    return this.request(`/api/admins/devices/user/${userModel}/${userId}`, {
+      method: 'GET',
+    });
+  }
+
+  async deactivateDevice(deviceId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      _id: string;
+      isActive: boolean;
+      lastActivityAt: string;
+    };
+  }> {
+    return this.request(`/api/admins/devices/${deviceId}/deactivate`, {
+      method: 'PUT',
+    });
+  }
+
+  async activateDevice(deviceId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      _id: string;
+      isActive: boolean;
+      lastLoginAt: string;
+    };
+  }> {
+    return this.request(`/api/admins/devices/${deviceId}/activate`, {
+      method: 'PUT',
+    });
+  }
+
+  async deleteDevice(deviceId: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/api/admins/devices/${deviceId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getDeviceStatistics(): Promise<{
+    success: boolean;
+    data: {
+      total: number;
+      active: number;
+      inactive: number;
+      byUserModel: Array<{
+        _id: string;
+        total: number;
+        active: number;
+        inactive: number;
+      }>;
+      byDeviceType: Array<{
+        _id: string;
+        count: number;
+      }>;
+    };
+  }> {
+    return this.request('/api/admins/devices/statistics', {
+      method: 'GET',
     });
   }
 
@@ -907,6 +1139,65 @@ class ApiService {
       { method: 'POST' }
     );
   }
+
+  // Payment methods
+  async getPaidPayments(params?: {
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<PaidPaymentsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    
+    const query = queryParams.toString();
+    return this.request<PaidPaymentsResponse>(
+      `/api/contragents/payments/paid${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async getUnpaidPayments(params?: {
+    page?: number;
+    limit?: number;
+    isOverdue?: string;
+  }): Promise<UnpaidPaymentsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.isOverdue) queryParams.append('isOverdue', params.isOverdue);
+    
+    const query = queryParams.toString();
+    return this.request<UnpaidPaymentsResponse>(
+      `/api/contragents/payments/unpaid${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async getPaymentStatistics(params?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<PaymentStatisticsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    
+    const query = queryParams.toString();
+    return this.request<PaymentStatisticsResponse>(
+      `/api/contragents/payments/statistics${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async getPaymentById(paymentId: string): Promise<PaymentDetailResponse> {
+    return this.request<PaymentDetailResponse>(
+      `/api/contragents/payments/${paymentId}`,
+      { method: 'GET' }
+    );
+  }
 }
 
 // Statistics interfaces
@@ -970,6 +1261,93 @@ export interface UnreadCountResponse {
   data: {
     unreadCount: number;
   };
+}
+
+// Payment interfaces
+export interface PaymentOrder {
+  _id: string;
+  orderNumber: string;
+  totalPrice: number;
+  totalKpiPrice: number;
+  createdAt: string;
+}
+
+export interface PaidBy {
+  _id: string;
+  name: string;
+  phone: string;
+}
+
+export interface ContragentPayment {
+  _id: string;
+  contragent: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'cancelled';
+  paidAt: string | null;
+  paidBy: PaidBy | null;
+  notes: string | null;
+  orders: PaymentOrder[];
+  dueDate: string;
+  isOverdue: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaidPaymentsResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalAmount: number;
+  totalPaidAmount: number;
+  data: ContragentPayment[];
+}
+
+export interface UnpaidPaymentsResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalAmount: number;
+  totalUnpaidAmount: number;
+  overdue: {
+    totalAmount: number;
+    count: number;
+  };
+  data: ContragentPayment[];
+}
+
+export interface PaymentStatisticsData {
+  period: {
+    startDate: string | null;
+    endDate: string | null;
+  } | null;
+  unpaid: {
+    totalAmount: number;
+    count: number;
+  };
+  paid: {
+    totalAmount: number;
+    count: number;
+  };
+  overdue: {
+    totalAmount: number;
+    count: number;
+  };
+}
+
+export interface PaymentStatisticsResponse {
+  success: boolean;
+  data: PaymentStatisticsData;
+}
+
+export interface PaymentDetailResponse {
+  success: boolean;
+  data: ContragentPayment;
 }
 
 export const apiService = new ApiService();

@@ -11,6 +11,8 @@ import {
   AdminPanelSettings,
   Login as LoginIcon,
 } from '@mui/icons-material';
+import DeviceVerificationModal from './DeviceVerificationModal';
+import { getDeviceInfo } from '../utils/deviceUtils';
 
 const Login = () => {
   const { showSuccess, showError } = useSnackbar();
@@ -19,6 +21,8 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [deviceVerificationOpen, setDeviceVerificationOpen] = useState(false);
+  const [verificationData, setVerificationData] = useState(null);
   const { login, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -45,13 +49,55 @@ const Login = () => {
     setError('');
     setLoading(true);
 
+    const deviceInfo = getDeviceInfo();
+    const result = await login(username, password);
+    
+    if (result.success) {
+      showSuccess('Muvaffaqiyatli kirildi');
+      navigate('/dashboard');
+    } else if (result.requiresDeviceVerification) {
+      // Device verification required (for NEW devices OR inactive devices)
+      // For inactive devices, user can verify via SMS to reactivate the device
+      // Show info message about device verification
+      if (result.message) {
+        // Show as info message, not error, since user can still verify via SMS
+        if (result.isInactiveDevice) {
+          showError(result.message); // Show as error for inactive devices
+        } else {
+          showError(result.message);
+        }
+      }
+      
+      setVerificationData({
+        phone: result.phone,
+        username: username, // Pass username for admin verification
+        deviceId: result.deviceId,
+        deviceInfo: result.deviceInfo || deviceInfo,
+        isInactiveDevice: result.isInactiveDevice || false,
+      });
+      setDeviceVerificationOpen(true);
+    } else {
+      const errorMsg = result.error || "Username yoki parol noto'g'ri";
+      setError(errorMsg);
+      showError(errorMsg);
+    }
+    
+    setLoading(false);
+  };
+
+  const handleVerificationSuccess = async () => {
+    // After successful verification, try login again
+    setDeviceVerificationOpen(false);
+    setLoading(true);
+    
+    const deviceInfo = getDeviceInfo();
     const result = await login(username, password);
     
     if (result.success) {
       showSuccess('Muvaffaqiyatli kirildi');
       navigate('/dashboard');
     } else {
-      const errorMsg = result.error || "Username yoki parol noto'g'ri";
+      const errorMsg = result.error || "Login failed";
       setError(errorMsg);
       showError(errorMsg);
     }
@@ -268,6 +314,23 @@ const Login = () => {
           </motion.p>
         </motion.div>
         </div>
+
+        {/* Device Verification Modal */}
+        {verificationData && (
+          <DeviceVerificationModal
+            open={deviceVerificationOpen}
+            onClose={() => {
+              setDeviceVerificationOpen(false);
+              setVerificationData(null);
+            }}
+            onSuccess={handleVerificationSuccess}
+            phone={verificationData.phone}
+            username={verificationData.username}
+            deviceId={verificationData.deviceId}
+            deviceInfo={verificationData.deviceInfo}
+            isInactiveDevice={verificationData.isInactiveDevice || false}
+          />
+        )}
     </div>
   );
 };

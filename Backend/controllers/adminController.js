@@ -1,4 +1,6 @@
 const Admin = require('../models/Admin');
+const Device = require('../models/Device');
+const { extractDeviceInfo } = require('../utils/deviceHelper');
 const jwt = require('jsonwebtoken');
 
 // Create new admin
@@ -210,12 +212,91 @@ const loginAdmin = async (req, res) => {
       });
     }
 
+    // Extract device information (deviceId is required for admin)
+    const deviceInfo = extractDeviceInfo(req);
+
+    // Check if deviceId is provided
+    if (!deviceInfo.deviceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Qurilma ID kiritilishi shart',
+      });
+    }
+
+    // Check if device exists (active or inactive)
+    const existingDevice = await Device.findOne({
+      user: admin._id,
+      userModel: 'Admin',
+      deviceId: deviceInfo.deviceId,
+    });
+
+    // If device exists but is inactive, reject login immediately
+    if (existingDevice && !existingDevice.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu qurilma nofaol. Faqat faol qurilma bilan login qilish mumkin. Iltimos, faol qurilma bilan kirish yoki yangi qurilmani tasdiqlash uchun SMS kod so\'rang',
+      });
+    }
+
+    // Check if user has any active devices
+    const activeDevices = await Device.find({
+      user: admin._id,
+      userModel: 'Admin',
+      isActive: true,
+    });
+
+    // If device exists and is active, update and proceed
+    if (existingDevice && existingDevice.isActive) {
+      existingDevice.lastLoginAt = new Date();
+      existingDevice.lastActivityAt = new Date();
+      if (deviceInfo.ipAddress) existingDevice.ipAddress = deviceInfo.ipAddress;
+      if (deviceInfo.userAgent) existingDevice.userAgent = deviceInfo.userAgent;
+      await existingDevice.save();
+    } else if (!existingDevice) {
+      // Device doesn't exist - check if this is first device or not
+      // If no active devices, this is the first device - auto-create and activate
+      if (activeDevices.length === 0) {
+        const { device, isNew } = await Device.findOrCreateDevice(admin, 'Admin', deviceInfo);
+        // Device is already active from findOrCreateDevice
+      } else {
+        // There are active devices, require device verification
+        return res.status(403).json({
+          success: false,
+          message: 'Yangi qurilma aniqlandi. Qurilmani tasdiqlash kerak',
+          requiresDeviceVerification: true,
+          data: {
+            phone: admin.telefonRaqam,
+            username: admin.username,
+            adminId: admin._id.toString(),
+            deviceId: deviceInfo.deviceId,
+          },
+        });
+      }
+    }
+
+    // Get the device (either existing or newly created) - MUST be active
+    const device = await Device.findOne({
+      user: admin._id,
+      userModel: 'Admin',
+      deviceId: deviceInfo.deviceId,
+      isActive: true,
+    });
+
+    // Final check: if device is not found or not active, reject login
+    if (!device || !device.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Qurilma topilmadi yoki nofaol. Iltimos, qurilmani tasdiqlang',
+      });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       {
         id: admin._id,
         username: admin.username,
         role: admin.role,
+        deviceId: device.deviceId,
       },
       process.env.JWT_SECRET || 'your-secret-key-change-in-production',
       {
@@ -237,6 +318,11 @@ const loginAdmin = async (req, res) => {
           status: admin.status,
           createdAt: admin.createdAt,
           updatedAt: admin.updatedAt,
+        },
+        device: {
+          deviceId: device.deviceId,
+          deviceName: device.deviceName,
+          isPrimary: device.isPrimary,
         },
       },
     });

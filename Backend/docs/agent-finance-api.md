@@ -7,23 +7,9 @@
 - [Data Models](#data-models)
 - [Endpoints](#endpoints)
   - [MFY Agent](#mfy-agent)
-    - [Kunlik Hisobot](#1-mfy-kunlik-hisobot)
-    - [Kutilayotgan To'lovlar](#2-mfy-kutilayotgan-tolovlar)
-    - [To'lovni Qabul Qilish](#3-mfy-tolovni-qabul-qilish)
-    - [Tuman Agentga Topshirish](#4-mfy-tuman-agentga-topshirish)
-    - [Statistika](#5-mfy-statistika)
   - [Tuman Agent](#tuman-agent)
-    - [Tuman Hisoboti](#6-tuman-hisoboti)
-    - [MFY Agentlardan Kelgan Topshiruvlar](#7-tuman-mfy-agentlardan-kelgan-topshiruvlar)
-    - [Topshiruvni Tasdiqlash](#8-tuman-topshiruvni-tasdiqlash)
-    - [Viloyat Agentga Topshirish](#9-tuman-viloyat-agentga-topshirish)
-    - [Statistika](#10-tuman-statistika)
   - [Viloyat Agent](#viloyat-agent)
-    - [Viloyat Hisoboti](#11-viloyat-hisoboti)
-    - [Tuman Agentlardan Kelgan Topshiruvlar](#12-viloyat-tuman-agentlardan-kelgan-topshiruvlar)
-    - [Topshiruvni Tasdiqlash](#13-viloyat-topshiruvni-tasdiqlash)
-    - [Moliya Bo'limiga Topshirish](#14-viloyat-moliya-bolimiga-topshirish)
-    - [Statistika](#15-viloyat-statistika)
+- [Workflow](#workflow)
 - [Error Handling](#error-handling)
 - [Examples](#examples)
 
@@ -31,83 +17,102 @@
 
 ## Overview
 
-Agent Finance API agentlar (MFY, Tuman, Viloyat) uchun moliya boshqaruvi funksiyalarini ta'minlaydi. Har bir agent turi uchun alohida endpoint'lar mavjud.
+Agent Finance API agentlar tomonidan to'lovlarni qabul qilish, boshqarish va yuqori darajadagi agentlarga topshirish uchun ishlatiladi.
 
-**Base Path:** `/api/agent-finance`
+**Asosiy Xususiyatlar:**
+- MFY agentlar mijozlardan to'lovlarni qabul qiladi
+- MFY agentlar to'lovlarni tuman agentga topshiradi
+- Tuman agentlar barcha MFY agentlardan kelgan to'lovlarni qabul qiladi va viloyat agentga topshiradi
+- Viloyat agentlar barcha tuman agentlardan kelgan to'lovlarni qabul qiladi va moliya bo'limiga topshiradi
+- Har kuni kunlik hisobotlar va statistikalar
+
+**Base Path:** `/api/agent/finance`
 
 ---
 
 ## Base URL
 
 ```
-http://localhost:5000/api/agent-finance
+http://localhost:5000/api/agent/finance
 ```
 
 ---
 
 ## Authentication
 
-Barcha endpoint'lar Agent autentifikatsiyasini talab qiladi.
+Barcha endpointlar Agent JWT token talab qiladi.
 
-**Format:** `Authorization: Bearer <agent_token>`
-
-**Eslatma:** Har bir endpoint faqat tegishli agent turi uchun ishlaydi. Masalan, MFY agent endpoint'lari faqat MFY agentlar tomonidan ishlatilishi mumkin.
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 ---
 
 ## Data Models
 
-### PaymentTransaction
-```json
-{
-  "_id": "ObjectId",
-  "order": "ObjectId (Order)",
-  "user": "ObjectId (MarketplaceUser)",
-  "amount": 150000,
-  "paymentMethod": "cash|card",
-  "status": "pending|collected|submitted|received|confirmed|rejected",
-  "collectedBy": "ObjectId (Agent)",
-  "collectedAt": "2024-01-15T10:30:00.000Z",
-  "currentHolder": "user|mfy_agent|district_agent|province_agent|finance",
-  "transactionPath": [],
-  "createdAt": "2024-01-15T10:30:00.000Z"
-}
-```
+### Agent Daily Report
 
-### AgentDailyReport
 ```json
 {
-  "_id": "ObjectId",
-  "agent": "ObjectId (Agent)",
+  "_id": "507f1f77bcf86cd799439011",
+  "agent": "507f1f77bcf86cd799439012",
   "date": "2024-01-15T00:00:00.000Z",
-  "agentType": "mfy|tuman|viloyat",
-  "ordersCount": 25,
-  "totalAmount": 3750000,
-  "collectedAmount": 3750000,
-  "submittedAmount": 3000000,
-  "pendingAmount": 750000,
-  "cashAmount": 2250000,
-  "cardAmount": 1500000,
+  "agentType": "mfy",
+  "ordersCount": 10,
+  "totalAmount": 500000,
+  "collectedAmount": 500000,
+  "submittedAmount": 300000,
+  "pendingAmount": 200000,
+  "receivedAmount": 0,
+  "cashAmount": 300000,
+  "cardAmount": 200000,
   "isSubmitted": false,
-  "transactions": ["ObjectId (PaymentTransaction)"]
+  "submittedAt": null,
+  "transactions": ["507f1f77bcf86cd799439013"],
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:00:00.000Z"
 }
 ```
 
-### FinanceSubmission
+### Finance Submission
+
 ```json
 {
-  "_id": "ObjectId",
-  "fromAgent": "ObjectId (Agent)",
-  "fromAgentType": "mfy|tuman|viloyat",
-  "toAgent": "ObjectId (Agent)",
-  "toAgentType": "tuman|viloyat|finance",
-  "amount": 5000000,
-  "submissionDate": "2024-01-15T10:30:00.000Z",
-  "status": "pending|confirmed|rejected",
-  "transactions": ["ObjectId (PaymentTransaction)"],
-  "cashAmount": 3000000,
-  "cardAmount": 2000000,
-  "transactionsCount": 25
+  "_id": "507f1f77bcf86cd799439014",
+  "fromAgent": "507f1f77bcf86cd799439012",
+  "fromAgentType": "mfy",
+  "toAgent": "507f1f77bcf86cd799439015",
+  "toAgentType": "tuman",
+  "amount": 300000,
+  "cashAmount": 200000,
+  "cardAmount": 100000,
+  "transactionsCount": 5,
+  "submissionDate": "2024-01-15T14:00:00.000Z",
+  "status": "pending",
+  "transactions": ["507f1f77bcf86cd799439013"],
+  "notes": "",
+  "createdAt": "2024-01-15T14:00:00.000Z",
+  "updatedAt": "2024-01-15T14:00:00.000Z"
+}
+```
+
+### Payment Transaction
+
+```json
+{
+  "_id": "507f1f77bcf86cd799439013",
+  "order": "507f1f77bcf86cd799439016",
+  "user": "507f1f77bcf86cd799439017",
+  "amount": 50000,
+  "paymentMethod": "cash",
+  "status": "collected",
+  "collectedBy": "507f1f77bcf86cd799439012",
+  "collectedAt": "2024-01-15T10:30:00.000Z",
+  "currentHolder": "mfy_agent",
+  "currentHolderId": "507f1f77bcf86cd799439012",
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:30:00.000Z"
 }
 ```
 
@@ -115,113 +120,111 @@ Barcha endpoint'lar Agent autentifikatsiyasini talab qiladi.
 
 ## Endpoints
 
-### MFY Agent
+## MFY Agent
 
-MFY agentlar uchun endpoint'lar. Faqat `mfy` agentType'ga ega agentlar ishlatishi mumkin.
+### 1. Get Daily Report
 
----
+Kunlik hisobotni olish. Har kuni qancha buyurtma qabul qilgani, qancha to'lovni qabul qilgani, umumiy summalar va qancha topshirayotgani ko'rsatiladi.
 
-#### 1. MFY Kunlik Hisobot
-
-MFY agent uchun kunlik hisobot. Qabul qilingan to'lovlar, topshirilgan summalar va kutilayotgan summalar ko'rsatiladi.
-
-**Endpoint:** `GET /mfy/daily-report`
+**Endpoint:** `GET /api/agent/finance/mfy/daily-report`
 
 **Query Parameters:**
-- `date` (optional): Sana (format: `YYYY-MM-DD`). Agar berilmasa, bugungi sana ishlatiladi.
+- `date` (optional, format: `YYYY-MM-DD`): Sana. Default: bugungi sana
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
 {
   "success": true,
   "report": {
-    "id": "ObjectId",
+    "id": "507f1f77bcf86cd799439011",
     "date": "2024-01-15T00:00:00.000Z",
-    "ordersCount": 25,
-    "totalAmount": 3750000,
-    "collectedAmount": 3750000,
-    "submittedAmount": 3000000,
-    "pendingAmount": 750000,
-    "cashAmount": 2250000,
-    "cardAmount": 1500000,
+    "ordersCount": 10,
+    "totalAmount": 500000,
+    "collectedAmount": 500000,
+    "submittedAmount": 300000,
+    "pendingAmount": 200000,
+    "cashAmount": 300000,
+    "cardAmount": 200000,
     "isSubmitted": false,
     "submittedAt": null,
-    "transactions": [
-      {
-        "_id": "ObjectId",
-        "order": {
-          "orderNumber": "00001",
-          "totalPrice": 150000
-        },
-        "amount": 150000,
-        "paymentMethod": "cash",
-        "status": "collected"
-      }
-    ]
+    "transactions": ["507f1f77bcf86cd799439013"]
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/mfy/daily-report?date=2024-01-15" \
-  -H "Authorization: Bearer <mfy_agent_token>"
-```
+**Response Fields:**
+- `ordersCount`: Qabul qilingan buyurtmalar soni
+- `totalAmount`: Jami summa
+- `collectedAmount`: Qabul qilingan summa
+- `submittedAmount`: Topshirilgan summa
+- `pendingAmount`: Kutilayotgan summa (collectedAmount - submittedAmount)
+- `cashAmount`: Naqd pul summa
+- `cardAmount`: Karta orqali to'lov summa
+- `isSubmitted`: Topshirilgan yoki yo'q
+- `submittedAt`: Topshirilgan vaqt
 
 ---
 
-#### 2. MFY Kutilayotgan To'lovlar
+### 2. Get Pending Payments
 
-MFY agent hududidagi kutilayotgan to'lovlar ro'yxati.
+Kutilayotgan to'lovlarni ko'rish (mijozlar tomonidan to'langan, lekin hali MFY agent tomonidan qabul qilinmagan).
 
-**Endpoint:** `GET /mfy/pending-payments`
+**Endpoint:** `GET /api/agent/finance/mfy/pending-payments`
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
 {
   "success": true,
-  "count": 10,
+  "count": 5,
   "transactions": [
     {
-      "_id": "ObjectId",
+      "_id": "507f1f77bcf86cd799439013",
       "order": {
-        "_id": "ObjectId",
+        "_id": "507f1f77bcf86cd799439016",
         "orderNumber": "00001",
-        "totalPrice": 150000,
+        "totalPrice": 50000,
         "status": "confirmed_by_customer",
-        "deliveryMfy": "ObjectId"
+        "deliveryMfy": "507f1f77bcf86cd799439018"
       },
       "user": {
-        "_id": "ObjectId",
-        "name": "Foydalanuvchi",
+        "_id": "507f1f77bcf86cd799439017",
+        "name": "Ali Valiyev",
         "phone": "+998901234567"
       },
-      "amount": 150000,
+      "amount": 50000,
       "paymentMethod": "cash",
       "status": "pending",
-      "currentHolder": "user",
-      "createdAt": "2024-01-15T10:30:00.000Z"
+      "createdAt": "2024-01-15T10:00:00.000Z"
     }
   ]
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/mfy/pending-payments" \
-  -H "Authorization: Bearer <mfy_agent_token>"
-```
-
 ---
 
-#### 3. MFY To'lovni Qabul Qilish
+### 3. Collect Payment
 
-MFY agent to'lovni qabul qiladi.
+To'lovni qabul qilish (mijozdan to'lovni olish).
 
-**Endpoint:** `POST /mfy/collect-payment/:transactionId`
+**Endpoint:** `POST /api/agent/finance/mfy/collect-payment/:transactionId`
 
-**URL Parameters:**
-- `transactionId`: To'lov transaksiyasi ID
+**Path Parameters:**
+- `transactionId` (required): To'lov transaksiyasi ID
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
@@ -229,36 +232,56 @@ MFY agent to'lovni qabul qiladi.
   "success": true,
   "message": "To'lov muvaffaqiyatli qabul qilindi",
   "transaction": {
-    "id": "ObjectId",
+    "id": "507f1f77bcf86cd799439013",
     "status": "collected",
     "collectedAt": "2024-01-15T10:30:00.000Z"
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X POST "http://localhost:5000/api/agent-finance/mfy/collect-payment/65a1b2c3d4e5f6g7h8i9j0k1" \
-  -H "Authorization: Bearer <mfy_agent_token>"
+**Error Responses:**
+
+**403 Forbidden:**
+```json
+{
+  "success": false,
+  "message": "Bu to'lov sizning hududingizga tegishli emas"
+}
+```
+
+**400 Bad Request:**
+```json
+{
+  "success": false,
+  "message": "Bu to'lov allaqachon qabul qilingan"
+}
 ```
 
 ---
 
-#### 4. MFY Tuman Agentga Topshirish
+### 4. Submit to District
 
-MFY agent to'lovlarni tuman agentga topshiradi.
+Tuman agentga to'lovlarni topshirish.
 
-**Endpoint:** `POST /mfy/submit-to-district`
+**Endpoint:** `POST /api/agent/finance/mfy/submit-to-district`
 
 **Request Body:**
 ```json
 {
-  "transactionIds": [
-    "65a1b2c3d4e5f6g7h8i9j0k1",
-    "65a1b2c3d4e5f6g7h8i9j0k2"
-  ],
-  "notes": "Kunlik topshiruv"
+  "transactionIds": ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439019"],
+  "notes": "Kunlik to'lovlar"
 }
+```
+
+**Required Fields:**
+- `transactionIds` (array, required): Topshiriladigan transaksiyalar ID'lari
+
+**Optional Fields:**
+- `notes` (string): Qo'shimcha eslatma
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
 ```
 
 **Response:**
@@ -267,36 +290,40 @@ MFY agent to'lovlarni tuman agentga topshiradi.
   "success": true,
   "message": "To'lovlar muvaffaqiyatli topshirildi",
   "submission": {
-    "id": "ObjectId",
-    "amount": 3000000,
-    "transactionsCount": 20,
-    "submittedAt": "2024-01-15T18:00:00.000Z"
+    "id": "507f1f77bcf86cd799439014",
+    "amount": 300000,
+    "transactionsCount": 5,
+    "submittedAt": "2024-01-15T14:00:00.000Z"
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X POST "http://localhost:5000/api/agent-finance/mfy/submit-to-district" \
-  -H "Authorization: Bearer <mfy_agent_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "transactionIds": ["65a1b2c3d4e5f6g7h8i9j0k1", "65a1b2c3d4e5f6g7h8i9j0k2"],
-    "notes": "Kunlik topshiruv"
-  }'
+**Error Responses:**
+
+**400 Bad Request:**
+```json
+{
+  "success": false,
+  "message": "Ba'zi transaksiyalar topilmadi yoki qabul qilinmagan"
+}
 ```
 
 ---
 
-#### 5. MFY Statistika
+### 5. Get Statistics
 
-MFY agent uchun statistika.
+Statistikani olish (sana oralig'ida).
 
-**Endpoint:** `GET /mfy/statistics`
+**Endpoint:** `GET /api/agent/finance/mfy/statistics`
 
 **Query Parameters:**
-- `startDate` (optional): Boshlanish sanasi
-- `endDate` (optional): Tugash sanasi
+- `startDate` (optional, format: `YYYY-MM-DD`): Boshlanish sanasi. Default: bugungi sana
+- `endDate` (optional, format: `YYYY-MM-DD`): Tugash sanasi. Default: bugungi sana
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
@@ -304,42 +331,37 @@ MFY agent uchun statistika.
   "success": true,
   "statistics": {
     "period": {
-      "startDate": "2024-01-01T00:00:00.000Z",
-      "endDate": "2024-01-31T23:59:59.999Z"
+      "startDate": "2024-01-15T00:00:00.000Z",
+      "endDate": "2024-01-15T23:59:59.999Z"
     },
-    "totalOrders": 500,
-    "totalAmount": 75000000,
-    "collectedAmount": 75000000,
-    "submittedAmount": 70000000,
-    "pendingAmount": 5000000,
-    "cashAmount": 45000000,
-    "cardAmount": 30000000
+    "totalOrders": 50,
+    "totalAmount": 2500000,
+    "collectedAmount": 2500000,
+    "submittedAmount": 2000000,
+    "pendingAmount": 500000,
+    "cashAmount": 1500000,
+    "cardAmount": 1000000
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/mfy/statistics?startDate=2024-01-01&endDate=2024-01-31" \
-  -H "Authorization: Bearer <mfy_agent_token>"
-```
-
 ---
 
-### Tuman Agent
+## Tuman Agent
 
-Tuman agentlar uchun endpoint'lar. Faqat `tuman` agentType'ga ega agentlar ishlatishi mumkin.
+### 1. Get District Report
 
----
+Tuman hisoboti. Barcha MFY agentlardan kelgan topshiruvlar va qabul qilingan summalar.
 
-#### 6. Tuman Hisoboti
-
-Tuman agent uchun kunlik hisobot. Barcha MFY agentlardan kelgan topshiruvlar ko'rsatiladi.
-
-**Endpoint:** `GET /district/report`
+**Endpoint:** `GET /api/agent/finance/district/report`
 
 **Query Parameters:**
-- `date` (optional): Sana (format: `YYYY-MM-DD`). Agar berilmasa, bugungi sana ishlatiladi.
+- `date` (optional, format: `YYYY-MM-DD`): Sana. Default: bugungi sana
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
@@ -348,86 +370,93 @@ Tuman agent uchun kunlik hisobot. Barcha MFY agentlardan kelgan topshiruvlar ko'
   "report": {
     "date": "2024-01-15T00:00:00.000Z",
     "submissionsCount": 5,
-    "totalReceived": 15000000,
-    "pendingAmount": 5000000,
+    "totalReceived": 1500000,
+    "pendingAmount": 500000,
     "submissions": [
       {
-        "id": "ObjectId",
+        "id": "507f1f77bcf86cd799439014",
         "fromAgent": {
-          "_id": "ObjectId",
-          "name": "MFY Agent",
+          "_id": "507f1f77bcf86cd799439012",
+          "name": "Ali Valiyev",
           "phone": "+998901234567"
         },
-        "amount": 3000000,
+        "amount": 300000,
         "status": "confirmed",
-        "submissionDate": "2024-01-15T18:00:00.000Z",
-        "transactionsCount": 20
+        "submissionDate": "2024-01-15T14:00:00.000Z",
+        "transactionsCount": 5
       }
     ]
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/district/report?date=2024-01-15" \
-  -H "Authorization: Bearer <tuman_agent_token>"
-```
+**Response Fields:**
+- `submissionsCount`: Topshiruvlar soni
+- `totalReceived`: Qabul qilingan jami summa (status: confirmed)
+- `pendingAmount`: Kutilayotgan summa (status: pending)
 
 ---
 
-#### 7. Tuman MFY Agentlardan Kelgan Topshiruvlar
+### 2. Get District Submissions
 
-Tuman agentga MFY agentlardan kelgan topshiruvlar ro'yxati.
+MFY agentlardan kelgan topshiruvlarni ko'rish.
 
-**Endpoint:** `GET /district/submissions`
+**Endpoint:** `GET /api/agent/finance/district/submissions`
 
 **Query Parameters:**
-- `status` (optional): Status (`pending`, `confirmed`, `rejected`). Default: `pending`
+- `status` (optional, enum: `pending`, `confirmed`, `rejected`): Topshiruv holati. Default: `pending`
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
 {
   "success": true,
-  "count": 5,
+  "count": 3,
   "submissions": [
     {
-      "_id": "ObjectId",
+      "_id": "507f1f77bcf86cd799439014",
       "fromAgent": {
-        "_id": "ObjectId",
-        "name": "MFY Agent",
+        "_id": "507f1f77bcf86cd799439012",
+        "name": "Ali Valiyev",
         "phone": "+998901234567",
         "mfy": {
-          "_id": "ObjectId",
+          "_id": "507f1f77bcf86cd799439018",
           "name": "Yunusobod MFY"
         }
       },
-      "amount": 3000000,
+      "amount": 300000,
+      "cashAmount": 200000,
+      "cardAmount": 100000,
+      "transactionsCount": 5,
       "status": "pending",
-      "transactionsCount": 20,
-      "submissionDate": "2024-01-15T18:00:00.000Z",
-      "createdAt": "2024-01-15T18:00:00.000Z"
+      "submissionDate": "2024-01-15T14:00:00.000Z",
+      "transactions": ["507f1f77bcf86cd799439013"],
+      "notes": "",
+      "createdAt": "2024-01-15T14:00:00.000Z"
     }
   ]
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/district/submissions?status=pending" \
-  -H "Authorization: Bearer <tuman_agent_token>"
-```
-
 ---
 
-#### 8. Tuman Topshiruvni Tasdiqlash
+### 3. Confirm District Submission
 
-Tuman agent MFY agentdan kelgan topshiruvni tasdiqlaydi.
+Topshiruvni tasdiqlash (MFY agentdan kelgan to'lovlarni qabul qilish).
 
-**Endpoint:** `POST /district/confirm-submission/:submissionId`
+**Endpoint:** `POST /api/agent/finance/district/confirm-submission/:submissionId`
 
-**URL Parameters:**
-- `submissionId`: Topshiruv ID
+**Path Parameters:**
+- `submissionId` (required): Topshiruv ID
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
@@ -435,36 +464,56 @@ Tuman agent MFY agentdan kelgan topshiruvni tasdiqlaydi.
   "success": true,
   "message": "Topshiruv muvaffaqiyatli tasdiqlandi",
   "submission": {
-    "id": "ObjectId",
+    "id": "507f1f77bcf86cd799439014",
     "status": "confirmed",
-    "confirmedAt": "2024-01-15T19:00:00.000Z"
+    "confirmedAt": "2024-01-15T15:00:00.000Z"
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X POST "http://localhost:5000/api/agent-finance/district/confirm-submission/65a1b2c3d4e5f6g7h8i9j0k1" \
-  -H "Authorization: Bearer <tuman_agent_token>"
+**Error Responses:**
+
+**403 Forbidden:**
+```json
+{
+  "success": false,
+  "message": "Bu topshiruv sizga tegishli emas"
+}
+```
+
+**400 Bad Request:**
+```json
+{
+  "success": false,
+  "message": "Bu topshiruv allaqachon tasdiqlangan yoki rad etilgan"
+}
 ```
 
 ---
 
-#### 9. Tuman Viloyat Agentga Topshirish
+### 4. Submit to Province
 
-Tuman agent to'lovlarni viloyat agentga topshiradi.
+Viloyat agentga to'lovlarni topshirish.
 
-**Endpoint:** `POST /district/submit-to-province`
+**Endpoint:** `POST /api/agent/finance/district/submit-to-province`
 
 **Request Body:**
 ```json
 {
-  "transactionIds": [
-    "65a1b2c3d4e5f6g7h8i9j0k1",
-    "65a1b2c3d4e5f6g7h8i9j0k2"
-  ],
-  "notes": "Kunlik topshiruv"
+  "transactionIds": ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439019"],
+  "notes": "Kunlik to'lovlar"
 }
+```
+
+**Required Fields:**
+- `transactionIds` (array, required): Topshiriladigan transaksiyalar ID'lari
+
+**Optional Fields:**
+- `notes` (string): Qo'shimcha eslatma
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
 ```
 
 **Response:**
@@ -473,36 +522,30 @@ Tuman agent to'lovlarni viloyat agentga topshiradi.
   "success": true,
   "message": "To'lovlar muvaffaqiyatli topshirildi",
   "submission": {
-    "id": "ObjectId",
-    "amount": 15000000,
-    "transactionsCount": 100,
-    "submittedAt": "2024-01-15T20:00:00.000Z"
+    "id": "507f1f77bcf86cd799439020",
+    "amount": 1500000,
+    "transactionsCount": 25,
+    "submittedAt": "2024-01-15T16:00:00.000Z"
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X POST "http://localhost:5000/api/agent-finance/district/submit-to-province" \
-  -H "Authorization: Bearer <tuman_agent_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "transactionIds": ["65a1b2c3d4e5f6g7h8i9j0k1", "65a1b2c3d4e5f6g7h8i9j0k2"],
-    "notes": "Kunlik topshiruv"
-  }'
-```
-
 ---
 
-#### 10. Tuman Statistika
+### 5. Get District Statistics
 
-Tuman agent uchun statistika.
+Statistikani olish (sana oralig'ida).
 
-**Endpoint:** `GET /district/statistics`
+**Endpoint:** `GET /api/agent/finance/district/statistics`
 
 **Query Parameters:**
-- `startDate` (optional): Boshlanish sanasi
-- `endDate` (optional): Tugash sanasi
+- `startDate` (optional, format: `YYYY-MM-DD`): Boshlanish sanasi. Default: bugungi sana
+- `endDate` (optional, format: `YYYY-MM-DD`): Tugash sanasi. Default: bugungi sana
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
@@ -510,38 +553,33 @@ Tuman agent uchun statistika.
   "success": true,
   "statistics": {
     "period": {
-      "startDate": "2024-01-01T00:00:00.000Z",
-      "endDate": "2024-01-31T23:59:59.999Z"
+      "startDate": "2024-01-15T00:00:00.000Z",
+      "endDate": "2024-01-15T23:59:59.999Z"
     },
-    "submissionsCount": 150,
-    "totalReceived": 450000000,
-    "pendingAmount": 50000000
+    "submissionsCount": 10,
+    "totalReceived": 5000000,
+    "pendingAmount": 1000000
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/district/statistics?startDate=2024-01-01&endDate=2024-01-31" \
-  -H "Authorization: Bearer <tuman_agent_token>"
-```
-
 ---
 
-### Viloyat Agent
+## Viloyat Agent
 
-Viloyat agentlar uchun endpoint'lar. Faqat `viloyat` agentType'ga ega agentlar ishlatishi mumkin.
+### 1. Get Province Report
 
----
+Viloyat hisoboti. Barcha tuman agentlardan kelgan topshiruvlar va qabul qilingan summalar.
 
-#### 11. Viloyat Hisoboti
-
-Viloyat agent uchun kunlik hisobot. Barcha tuman agentlardan kelgan topshiruvlar ko'rsatiladi.
-
-**Endpoint:** `GET /province/report`
+**Endpoint:** `GET /api/agent/finance/province/report`
 
 **Query Parameters:**
-- `date` (optional): Sana (format: `YYYY-MM-DD`). Agar berilmasa, bugungi sana ishlatiladi.
+- `date` (optional, format: `YYYY-MM-DD`): Sana. Default: bugungi sana
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
@@ -549,91 +587,93 @@ Viloyat agent uchun kunlik hisobot. Barcha tuman agentlardan kelgan topshiruvlar
   "success": true,
   "report": {
     "date": "2024-01-15T00:00:00.000Z",
-    "submissionsCount": 10,
-    "totalReceived": 50000000,
-    "pendingAmount": 10000000,
+    "submissionsCount": 3,
+    "totalReceived": 5000000,
+    "pendingAmount": 1000000,
     "submissions": [
       {
-        "id": "ObjectId",
+        "id": "507f1f77bcf86cd799439020",
         "fromAgent": {
-          "_id": "ObjectId",
-          "name": "Tuman Agent",
-          "phone": "+998901234567",
+          "_id": "507f1f77bcf86cd799439015",
+          "name": "Hasan Toshmatov",
+          "phone": "+998901234568",
           "tuman": {
-            "_id": "ObjectId",
-            "name": "Chirchiq tumani"
+            "_id": "507f1f77bcf86cd799439021",
+            "name": "Yunusobod tumani"
           }
         },
-        "amount": 15000000,
+        "amount": 1500000,
         "status": "confirmed",
-        "submissionDate": "2024-01-15T20:00:00.000Z",
-        "transactionsCount": 100
+        "submissionDate": "2024-01-15T16:00:00.000Z",
+        "transactionsCount": 25
       }
     ]
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/province/report?date=2024-01-15" \
-  -H "Authorization: Bearer <viloyat_agent_token>"
-```
-
 ---
 
-#### 12. Viloyat Tuman Agentlardan Kelgan Topshiruvlar
+### 2. Get Province Submissions
 
-Viloyat agentga tuman agentlardan kelgan topshiruvlar ro'yxati.
+Tuman agentlardan kelgan topshiruvlarni ko'rish.
 
-**Endpoint:** `GET /province/submissions`
+**Endpoint:** `GET /api/agent/finance/province/submissions`
 
 **Query Parameters:**
-- `status` (optional): Status (`pending`, `confirmed`, `rejected`). Default: `pending`
+- `status` (optional, enum: `pending`, `confirmed`, `rejected`): Topshiruv holati. Default: `pending`
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
 {
   "success": true,
-  "count": 10,
+  "count": 2,
   "submissions": [
     {
-      "_id": "ObjectId",
+      "_id": "507f1f77bcf86cd799439020",
       "fromAgent": {
-        "_id": "ObjectId",
-        "name": "Tuman Agent",
-        "phone": "+998901234567",
+        "_id": "507f1f77bcf86cd799439015",
+        "name": "Hasan Toshmatov",
+        "phone": "+998901234568",
         "tuman": {
-          "_id": "ObjectId",
-          "name": "Chirchiq tumani"
+          "_id": "507f1f77bcf86cd799439021",
+          "name": "Yunusobod tumani"
         }
       },
-      "amount": 15000000,
+      "amount": 1500000,
+      "cashAmount": 1000000,
+      "cardAmount": 500000,
+      "transactionsCount": 25,
       "status": "pending",
-      "transactionsCount": 100,
-      "submissionDate": "2024-01-15T20:00:00.000Z",
-      "createdAt": "2024-01-15T20:00:00.000Z"
+      "submissionDate": "2024-01-15T16:00:00.000Z",
+      "transactions": ["507f1f77bcf86cd799439013"],
+      "notes": "",
+      "createdAt": "2024-01-15T16:00:00.000Z"
     }
   ]
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/province/submissions?status=pending" \
-  -H "Authorization: Bearer <viloyat_agent_token>"
-```
-
 ---
 
-#### 13. Viloyat Topshiruvni Tasdiqlash
+### 3. Confirm Province Submission
 
-Viloyat agent tuman agentdan kelgan topshiruvni tasdiqlaydi.
+Topshiruvni tasdiqlash (Tuman agentdan kelgan to'lovlarni qabul qilish).
 
-**Endpoint:** `POST /province/confirm-submission/:submissionId`
+**Endpoint:** `POST /api/agent/finance/province/confirm-submission/:submissionId`
 
-**URL Parameters:**
-- `submissionId`: Topshiruv ID
+**Path Parameters:**
+- `submissionId` (required): Topshiruv ID
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
@@ -641,36 +681,38 @@ Viloyat agent tuman agentdan kelgan topshiruvni tasdiqlaydi.
   "success": true,
   "message": "Topshiruv muvaffaqiyatli tasdiqlandi",
   "submission": {
-    "id": "ObjectId",
+    "id": "507f1f77bcf86cd799439020",
     "status": "confirmed",
-    "confirmedAt": "2024-01-15T21:00:00.000Z"
+    "confirmedAt": "2024-01-15T17:00:00.000Z"
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X POST "http://localhost:5000/api/agent-finance/province/confirm-submission/65a1b2c3d4e5f6g7h8i9j0k1" \
-  -H "Authorization: Bearer <viloyat_agent_token>"
-```
-
 ---
 
-#### 14. Viloyat Moliya Bo'limiga Topshirish
+### 4. Submit to Finance
 
-Viloyat agent to'lovlarni moliya bo'limiga topshiradi.
+Moliya bo'limiga to'lovlarni topshirish.
 
-**Endpoint:** `POST /province/submit-to-finance`
+**Endpoint:** `POST /api/agent/finance/province/submit-to-finance`
 
 **Request Body:**
 ```json
 {
-  "transactionIds": [
-    "65a1b2c3d4e5f6g7h8i9j0k1",
-    "65a1b2c3d4e5f6g7h8i9j0k2"
-  ],
-  "notes": "Kunlik topshiruv"
+  "transactionIds": ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439019"],
+  "notes": "Kunlik to'lovlar"
 }
+```
+
+**Required Fields:**
+- `transactionIds` (array, required): Topshiriladigan transaksiyalar ID'lari
+
+**Optional Fields:**
+- `notes` (string): Qo'shimcha eslatma
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
 ```
 
 **Response:**
@@ -679,36 +721,30 @@ Viloyat agent to'lovlarni moliya bo'limiga topshiradi.
   "success": true,
   "message": "To'lovlar muvaffaqiyatli moliya bo'limiga topshirildi",
   "submission": {
-    "id": "ObjectId",
-    "amount": 50000000,
-    "transactionsCount": 350,
-    "submittedAt": "2024-01-15T22:00:00.000Z"
+    "id": "507f1f77bcf86cd799439021",
+    "amount": 5000000,
+    "transactionsCount": 100,
+    "submittedAt": "2024-01-15T18:00:00.000Z"
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X POST "http://localhost:5000/api/agent-finance/province/submit-to-finance" \
-  -H "Authorization: Bearer <viloyat_agent_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "transactionIds": ["65a1b2c3d4e5f6g7h8i9j0k1", "65a1b2c3d4e5f6g7h8i9j0k2"],
-    "notes": "Kunlik topshiruv"
-  }'
-```
-
 ---
 
-#### 15. Viloyat Statistika
+### 5. Get Province Statistics
 
-Viloyat agent uchun statistika.
+Statistikani olish (sana oralig'ida).
 
-**Endpoint:** `GET /province/statistics`
+**Endpoint:** `GET /api/agent/finance/province/statistics`
 
 **Query Parameters:**
-- `startDate` (optional): Boshlanish sanasi
-- `endDate` (optional): Tugash sanasi
+- `startDate` (optional, format: `YYYY-MM-DD`): Boshlanish sanasi. Default: bugungi sana
+- `endDate` (optional, format: `YYYY-MM-DD`): Tugash sanasi. Default: bugungi sana
+
+**Headers:**
+```
+Authorization: Bearer <agent_token>
+```
 
 **Response:**
 ```json
@@ -716,128 +752,200 @@ Viloyat agent uchun statistika.
   "success": true,
   "statistics": {
     "period": {
-      "startDate": "2024-01-01T00:00:00.000Z",
-      "endDate": "2024-01-31T23:59:59.999Z"
+      "startDate": "2024-01-15T00:00:00.000Z",
+      "endDate": "2024-01-15T23:59:59.999Z"
     },
-    "submissionsCount": 300,
-    "totalReceived": 1500000000,
-    "pendingAmount": 100000000
+    "submissionsCount": 5,
+    "totalReceived": 20000000,
+    "pendingAmount": 2000000
   }
 }
 ```
 
-**Example:**
-```bash
-curl -X GET "http://localhost:5000/api/agent-finance/province/statistics?startDate=2024-01-01&endDate=2024-01-31" \
-  -H "Authorization: Bearer <viloyat_agent_token>"
+---
+
+## Workflow
+
+### 1. MFY Agent To'lov Qabul Qilish
+
+```
+1. Mijoz buyurtmani qabul qiladi va to'lov qiladi
+2. To'lov transaksiyasi yaratiladi (status: pending)
+3. MFY agent kutilayotgan to'lovlarni ko'radi (GET /mfy/pending-payments)
+4. MFY agent to'lovni qabul qiladi (POST /mfy/collect-payment/:transactionId)
+5. To'lov transaksiyasi yangilanadi (status: collected)
+6. Kunlik hisobot avtomatik yangilanadi
+```
+
+### 2. MFY Agent Tuman Agentga Topshirish
+
+```
+1. MFY agent kunlik hisobotni ko'radi (GET /mfy/daily-report)
+2. MFY agent qabul qilgan to'lovlarni tanlaydi
+3. MFY agent tuman agentga topshiradi (POST /mfy/submit-to-district)
+4. FinanceSubmission yaratiladi (status: pending)
+5. To'lov transaksiyalari yangilanadi (status: submitted)
+6. Kunlik hisobot yangilanadi (submittedAmount oshadi)
+```
+
+### 3. Tuman Agent Qabul Qilish va Viloyat Agentga Topshirish
+
+```
+1. Tuman agent MFY agentlardan kelgan topshiruvlarni ko'radi (GET /district/submissions)
+2. Tuman agent topshiruvni tasdiqlaydi (POST /district/confirm-submission/:submissionId)
+3. FinanceSubmission yangilanadi (status: confirmed)
+4. To'lov transaksiyalari yangilanadi (status: received)
+5. Tuman agent barcha qabul qilingan to'lovlarni viloyat agentga topshiradi (POST /district/submit-to-province)
+6. Yangi FinanceSubmission yaratiladi (status: pending)
+```
+
+### 4. Viloyat Agent Qabul Qilish va Moliya Bo'limiga Topshirish
+
+```
+1. Viloyat agent tuman agentlardan kelgan topshiruvlarni ko'radi (GET /province/submissions)
+2. Viloyat agent topshiruvni tasdiqlaydi (POST /province/confirm-submission/:submissionId)
+3. FinanceSubmission yangilanadi (status: confirmed)
+4. To'lov transaksiyalari yangilanadi (status: received)
+5. Viloyat agent barcha qabul qilingan to'lovlarni moliya bo'limiga topshiradi (POST /province/submit-to-finance)
+6. FinanceSubmission yaratiladi (toAgentType: finance)
+7. To'lov transaksiyalari yangilanadi (currentHolder: finance)
 ```
 
 ---
 
 ## Error Handling
 
-Barcha endpoint'lar quyidagi formatda xatolarni qaytaradi:
+### Common Error Responses
 
+**400 Bad Request:**
 ```json
 {
   "success": false,
-  "message": "Xato xabari",
-  "error": "Batafsil xato ma'lumoti"
+  "message": "Transaksiyalar ro'yxati kiritilishi shart"
 }
 ```
 
-**HTTP Status Codes:**
-- `200` - Muvaffaqiyatli
-- `400` - Noto'g'ri so'rov
-- `401` - Autentifikatsiya talab qilinadi
-- `403` - Ruxsat yo'q (agent turi mos kelmaydi)
-- `404` - Topilmadi
-- `500` - Server xatosi
+**401 Unauthorized:**
+```json
+{
+  "success": false,
+  "message": "Token topilmadi"
+}
+```
 
-**Eslatma:** Agar agent noto'g'ri turda bo'lsa (masalan, MFY agent Tuman agent endpoint'ini chaqirsa), `403` status code qaytariladi.
+**403 Forbidden:**
+```json
+{
+  "success": false,
+  "message": "Bu funksiya faqat MFY agentlar uchun"
+}
+```
+
+**404 Not Found:**
+```json
+{
+  "success": false,
+  "message": "To'lov transaksiyasi topilmadi"
+}
+```
+
+**500 Internal Server Error:**
+```json
+{
+  "success": false,
+  "message": "Kunlik hisobotni olishda xatolik yuz berdi",
+  "error": "Error details"
+}
+```
 
 ---
 
 ## Examples
 
-### MFY Agent: To'liq misol
+### Example 1: MFY Agent Kunlik Hisobot
 
 ```bash
-# 1. Kunlik hisobotni olish
-curl -X GET "http://localhost:5000/api/agent-finance/mfy/daily-report" \
-  -H "Authorization: Bearer <mfy_agent_token>"
+curl -X GET "http://localhost:5000/api/agent/finance/mfy/daily-report?date=2024-01-15" \
+  -H "Authorization: Bearer <agent_token>"
+```
 
-# 2. Kutilayotgan to'lovlarni ko'rish
-curl -X GET "http://localhost:5000/api/agent-finance/mfy/pending-payments" \
-  -H "Authorization: Bearer <mfy_agent_token>"
+### Example 2: MFY Agent To'lovni Qabul Qilish
 
-# 3. To'lovni qabul qilish
-curl -X POST "http://localhost:5000/api/agent-finance/mfy/collect-payment/65a1b2c3d4e5f6g7h8i9j0k1" \
-  -H "Authorization: Bearer <mfy_agent_token>"
+```bash
+curl -X POST "http://localhost:5000/api/agent/finance/mfy/collect-payment/507f1f77bcf86cd799439013" \
+  -H "Authorization: Bearer <agent_token>"
+```
 
-# 4. Tuman agentga topshirish
-curl -X POST "http://localhost:5000/api/agent-finance/mfy/submit-to-district" \
-  -H "Authorization: Bearer <mfy_agent_token>" \
+### Example 3: MFY Agent Tuman Agentga Topshirish
+
+```bash
+curl -X POST "http://localhost:5000/api/agent/finance/mfy/submit-to-district" \
+  -H "Authorization: Bearer <agent_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "transactionIds": ["65a1b2c3d4e5f6g7h8i9j0k1"],
-    "notes": "Kunlik topshiruv"
+    "transactionIds": ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439019"],
+    "notes": "Kunlik to'lovlar"
   }'
 ```
 
-### Tuman Agent: To'liq misol
+### Example 4: Tuman Agent Topshiruvni Tasdiqlash
 
 ```bash
-# 1. Tuman hisobotini olish
-curl -X GET "http://localhost:5000/api/agent-finance/district/report" \
-  -H "Authorization: Bearer <tuman_agent_token>"
+curl -X POST "http://localhost:5000/api/agent/finance/district/confirm-submission/507f1f77bcf86cd799439014" \
+  -H "Authorization: Bearer <agent_token>"
+```
 
-# 2. MFY agentlardan kelgan topshiruvlarni ko'rish
-curl -X GET "http://localhost:5000/api/agent-finance/district/submissions" \
-  -H "Authorization: Bearer <tuman_agent_token>"
+### Example 5: Tuman Agent Viloyat Agentga Topshirish
 
-# 3. Topshiruvni tasdiqlash
-curl -X POST "http://localhost:5000/api/agent-finance/district/confirm-submission/65a1b2c3d4e5f6g7h8i9j0k1" \
-  -H "Authorization: Bearer <tuman_agent_token>"
-
-# 4. Viloyat agentga topshirish
-curl -X POST "http://localhost:5000/api/agent-finance/district/submit-to-province" \
-  -H "Authorization: Bearer <tuman_agent_token>" \
+```bash
+curl -X POST "http://localhost:5000/api/agent/finance/district/submit-to-province" \
+  -H "Authorization: Bearer <agent_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "transactionIds": ["65a1b2c3d4e5f6g7h8i9j0k1"],
-    "notes": "Kunlik topshiruv"
+    "transactionIds": ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439019"],
+    "notes": "Kunlik to'lovlar"
   }'
 ```
 
-### Viloyat Agent: To'liq misol
+### Example 6: Viloyat Agent Moliya Bo'limiga Topshirish
 
 ```bash
-# 1. Viloyat hisobotini olish
-curl -X GET "http://localhost:5000/api/agent-finance/province/report" \
-  -H "Authorization: Bearer <viloyat_agent_token>"
-
-# 2. Tuman agentlardan kelgan topshiruvlarni ko'rish
-curl -X GET "http://localhost:5000/api/agent-finance/province/submissions" \
-  -H "Authorization: Bearer <viloyat_agent_token>"
-
-# 3. Topshiruvni tasdiqlash
-curl -X POST "http://localhost:5000/api/agent-finance/province/confirm-submission/65a1b2c3d4e5f6g7h8i9j0k1" \
-  -H "Authorization: Bearer <viloyat_agent_token>"
-
-# 4. Moliya bo'limiga topshirish
-curl -X POST "http://localhost:5000/api/agent-finance/province/submit-to-finance" \
-  -H "Authorization: Bearer <viloyat_agent_token>" \
+curl -X POST "http://localhost:5000/api/agent/finance/province/submit-to-finance" \
+  -H "Authorization: Bearer <agent_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "transactionIds": ["65a1b2c3d4e5f6g7h8i9j0k1"],
-    "notes": "Kunlik topshiruv"
+    "transactionIds": ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439019"],
+    "notes": "Kunlik to'lovlar"
   }'
 ```
 
 ---
 
+## Important Notes
+
+1. **Agent Types:** Agent turlari avtomatik aniqlanadi (mfy, tuman, viloyat) va faqat tegishli endpointlarga kirish mumkin.
+
+2. **Daily Reports:** Har kuni avtomatik yaratiladi yoki yangilanadi. Bir kunda bir marta yaratiladi.
+
+3. **Transaction Status Flow:**
+   - `pending` → `collected` (MFY agent qabul qilganda)
+   - `collected` → `submitted` (MFY agent tuman agentga topshirganda)
+   - `submitted` → `received` (Tuman agent tasdiqlaganda)
+   - `received` → `submitted` (Tuman agent viloyat agentga topshirganda)
+   - `submitted` → `received` (Viloyat agent tasdiqlaganda)
+   - `received` → `submitted` (Viloyat agent moliya bo'limiga topshirganda)
+
+4. **Finance Submission Status:**
+   - `pending`: Kutilayotgan (qabul qilinmagan)
+   - `confirmed`: Tasdiqlangan (qabul qilingan)
+   - `rejected`: Rad etilgan
+
+5. **Amount Calculations:**
+   - `collectedAmount`: Qabul qilingan jami summa
+   - `submittedAmount`: Topshirilgan jami summa
+   - `pendingAmount`: Kutilayotgan summa (collectedAmount - submittedAmount)
+
+---
+
 **Yaratilgan:** 2024  
 **Versiya:** 1.0.0
-
-

@@ -13,10 +13,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
 import PartnershipBlock from '../../components/PartnershipBlock';
@@ -47,8 +47,12 @@ export default function ProfileScreen() {
   });
   const [editLoading, setEditLoading] = useState(false);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [birthDay, setBirthDay] = useState<number | null>(null);
+  const [birthMonth, setBirthMonth] = useState<number | null>(null);
+  const [birthYear, setBirthYear] = useState<number | null>(null);
+  const [showDayPicker, setShowDayPicker] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
 
   // Password Modal
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -134,11 +138,16 @@ export default function ProfileScreen() {
     if (!profile) return;
     
     const birthDateStr = profile.birthDate ? profile.birthDate.split('T')[0] : '';
-    let initialDate: Date | null = null;
+    let day: number | null = null;
+    let month: number | null = null;
+    let year: number | null = null;
+    
     if (birthDateStr) {
       const date = new Date(birthDateStr);
       if (!isNaN(date.getTime())) {
-        initialDate = date;
+        day = date.getDate();
+        month = date.getMonth() + 1; // getMonth() returns 0-11
+        year = date.getFullYear();
       }
     }
     
@@ -148,7 +157,9 @@ export default function ProfileScreen() {
       gender: profile.gender,
       birthDate: birthDateStr,
     });
-    setSelectedDate(initialDate);
+    setBirthDay(day);
+    setBirthMonth(month);
+    setBirthYear(year);
     setEditErrors({});
     setEditModalVisible(true);
   };
@@ -156,14 +167,42 @@ export default function ProfileScreen() {
   const validateEditForm = () => {
     const errors: Record<string, string> = {};
     
-    if (!editFormData.firstName || editFormData.firstName.length < 2) {
-      errors.firstName = 'Ism kamida 2 ta belgi bo\'lishi kerak';
+    // Validate firstName (2-50 characters)
+    if (editFormData.firstName) {
+      if (editFormData.firstName.length < 2) {
+        errors.firstName = 'Ism kamida 2 ta belgidan iborat bo\'lishi kerak';
+      } else if (editFormData.firstName.length > 50) {
+        errors.firstName = 'Ism 50 ta belgidan oshmasligi kerak';
+      }
     }
-    if (!editFormData.lastName || editFormData.lastName.length < 2) {
-      errors.lastName = 'Familiya kamida 2 ta belgi bo\'lishi kerak';
+    
+    // Validate lastName (2-50 characters)
+    if (editFormData.lastName) {
+      if (editFormData.lastName.length < 2) {
+        errors.lastName = 'Familiya kamida 2 ta belgidan iborat bo\'lishi kerak';
+      } else if (editFormData.lastName.length > 50) {
+        errors.lastName = 'Familiya 50 ta belgidan oshmasligi kerak';
+      }
     }
-    if (!editFormData.birthDate) {
-      errors.birthDate = 'Tug\'ilgan sanani kiriting';
+    
+    // Validate gender
+    if (editFormData.gender && editFormData.gender !== 'ayol' && editFormData.gender !== 'erkak') {
+      errors.gender = 'Jins "ayol" yoki "erkak" bo\'lishi kerak';
+    }
+    
+    // Validate birthDate (day, month, year)
+    if (!birthDay || !birthMonth || !birthYear) {
+      errors.birthDate = 'Tug\'ilgan sanani to\'liq kiriting';
+    } else {
+      // Validate date
+      const date = new Date(birthYear, birthMonth - 1, birthDay);
+      if (isNaN(date.getTime())) {
+        errors.birthDate = 'Noto\'g\'ri sana';
+      } else if (date > new Date()) {
+        errors.birthDate = 'Tug\'ilgan sana kelajakda bo\'lishi mumkin emas';
+      } else if (date.getDate() !== birthDay || date.getMonth() + 1 !== birthMonth || date.getFullYear() !== birthYear) {
+        errors.birthDate = 'Noto\'g\'ri sana (masalan, 30-fevral)';
+      }
     }
     
     setEditErrors(errors);
@@ -175,15 +214,66 @@ export default function ProfileScreen() {
     
     try {
       setEditLoading(true);
-      const response = await apiService.updateProfile(editFormData, token);
+      setEditErrors({});
+      
+      // Prepare data according to API documentation
+      const updateData: {
+        firstName?: string;
+        lastName?: string;
+        gender?: 'ayol' | 'erkak';
+        birthDate?: string;
+      } = {};
+      
+      // Only include fields that have values and are different from current profile
+      if (editFormData.firstName && editFormData.firstName.trim()) {
+        updateData.firstName = editFormData.firstName.trim();
+      }
+      if (editFormData.lastName && editFormData.lastName.trim()) {
+        updateData.lastName = editFormData.lastName.trim();
+      }
+      if (editFormData.gender) {
+        updateData.gender = editFormData.gender;
+      }
+      if (birthDay && birthMonth && birthYear) {
+        // Format birthDate as YYYY-MM-DD
+        const formattedDate = `${birthYear}-${String(birthMonth).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`;
+        updateData.birthDate = formattedDate;
+      }
+      
+      const response = await apiService.updateProfile(updateData, token);
       if (response.success && response.data) {
         // Reload profile to get latest data
         await loadProfile();
         setEditModalVisible(false);
-        Alert.alert('Muvaffaqiyatli', 'Profil yangilandi');
+        Alert.alert('Muvaffaqiyatli', response.message || 'Profil yangilandi');
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Profil yangilashda xatolik yuz berdi');
+      // Handle API error responses
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        // Handle validation errors array
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          const errors: Record<string, string> = {};
+          errorData.errors.forEach((errMsg: string) => {
+            if (errMsg.includes('Ism')) {
+              errors.firstName = errMsg;
+            } else if (errMsg.includes('Familiya') || errMsg.includes('Familiya')) {
+              errors.lastName = errMsg;
+            } else if (errMsg.includes('Jins') || errMsg.includes('jins')) {
+              errors.gender = errMsg;
+            } else if (errMsg.includes('sana') || errMsg.includes('Sana') || errMsg.includes('date')) {
+              errors.birthDate = errMsg;
+            }
+          });
+          setEditErrors(errors);
+        }
+        
+        // Show error message
+        Alert.alert('Xatolik', errorData.message || error.message || 'Profil yangilashda xatolik yuz berdi');
+      } else {
+        Alert.alert('Xatolik', error.message || 'Profil yangilashda xatolik yuz berdi');
+      }
     } finally {
       setEditLoading(false);
     }
@@ -284,7 +374,7 @@ export default function ProfileScreen() {
   const handlePickImage = () => {
     const options = {
       mediaType: 'photo' as MediaType,
-        quality: 0.8,
+      quality: 0.8 as const,
       includeBase64: true,
     };
 
@@ -359,6 +449,39 @@ export default function ProfileScreen() {
       month: 'long',
       day: 'numeric',
     });
+  };
+
+  const getMonthName = (month: number): string => {
+    const months = [
+      'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+      'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
+    ];
+    return months[month - 1] || '';
+  };
+
+  const getDaysInMonth = (month: number, year: number): number => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  const generateYears = (): number[] => {
+    const currentYear = new Date().getFullYear();
+    const years: number[] = [];
+    for (let i = currentYear; i >= 1900; i--) {
+      years.push(i);
+    }
+    return years;
+  };
+
+  const generateMonths = (): number[] => {
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  };
+
+  const generateDays = (month: number | null, year: number | null): number[] => {
+    if (!month || !year) {
+      return Array.from({ length: 31 }, (_, i) => i + 1);
+    }
+    const daysInMonth = getDaysInMonth(month, year);
+    return Array.from({ length: daysInMonth }, (_, i) => i + 1);
   };
 
   const handleNotificationPress = () => {
@@ -543,32 +666,55 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <Input
-              label="Ism"
-              value={editFormData.firstName}
-              onChangeText={(text) => setEditFormData({ ...editFormData, firstName: text })}
-              error={editErrors.firstName}
-              placeholder="Ismingizni kiriting"
-            />
+          <ScrollView 
+            style={styles.modalContent} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.modalContentContainer}
+          >
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Shaxsiy ma'lumotlar</Text>
+              
+              <Input
+                label="Ism"
+                value={editFormData.firstName}
+                onChangeText={(text) => {
+                  setEditFormData({ ...editFormData, firstName: text });
+                  if (editErrors.firstName) {
+                    setEditErrors({ ...editErrors, firstName: '' });
+                  }
+                }}
+                error={editErrors.firstName}
+                placeholder="Ismingizni kiriting"
+              />
 
-            <Input
-              label="Familiya"
-              value={editFormData.lastName}
-              onChangeText={(text) => setEditFormData({ ...editFormData, lastName: text })}
-              error={editErrors.lastName}
-              placeholder="Familiyangizni kiriting"
-            />
+              <Input
+                label="Familiya"
+                value={editFormData.lastName}
+                onChangeText={(text) => {
+                  setEditFormData({ ...editFormData, lastName: text });
+                  if (editErrors.lastName) {
+                    setEditErrors({ ...editErrors, lastName: '' });
+                  }
+                }}
+                error={editErrors.lastName}
+                placeholder="Familiyangizni kiriting"
+              />
+            </View>
 
-            <View style={styles.genderContainer}>
-              <Text style={styles.genderLabel}>Jins</Text>
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Jins</Text>
               <View style={styles.genderButtons}>
                 <TouchableOpacity
                   style={[
                     styles.genderButton,
                     editFormData.gender === 'erkak' && styles.genderButtonActive,
                   ]}
-                  onPress={() => setEditFormData({ ...editFormData, gender: 'erkak' })}
+                  onPress={() => {
+                    setEditFormData({ ...editFormData, gender: 'erkak' });
+                    if (editErrors.gender) {
+                      setEditErrors({ ...editErrors, gender: '' });
+                    }
+                  }}
                 >
                   <Text
                     style={[
@@ -584,7 +730,12 @@ export default function ProfileScreen() {
                     styles.genderButton,
                     editFormData.gender === 'ayol' && styles.genderButtonActive,
                   ]}
-                  onPress={() => setEditFormData({ ...editFormData, gender: 'ayol' })}
+                  onPress={() => {
+                    setEditFormData({ ...editFormData, gender: 'ayol' });
+                    if (editErrors.gender) {
+                      setEditErrors({ ...editErrors, gender: '' });
+                    }
+                  }}
                 >
                   <Text
                     style={[
@@ -596,116 +747,262 @@ export default function ProfileScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+              {editErrors.gender && (
+                <Text style={styles.errorText}>{editErrors.gender}</Text>
+              )}
             </View>
 
-            <View style={styles.dateContainer}>
-              <Text style={styles.dateLabel}>Tug'ilgan sana</Text>
-              <TouchableOpacity
-                style={[
-                  styles.dateInput,
-                  editErrors.birthDate && styles.dateInputError,
-                ]}
-                onPress={() => {
-                  if (editFormData.birthDate) {
-                    const date = new Date(editFormData.birthDate);
-                    if (!isNaN(date.getTime())) {
-                      setSelectedDate(date);
-                    } else {
-                      setSelectedDate(new Date());
-                    }
-                  } else {
-                    setSelectedDate(new Date());
-                  }
-                  setShowDatePicker(true);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.dateInputText,
-                    !editFormData.birthDate && styles.dateInputPlaceholder,
-                  ]}
-                >
-                  {editFormData.birthDate || 'YYYY-MM-DD'}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>Tug'ilgan sana</Text>
+              <View style={styles.datePickerContainer}>
+                {/* Year Picker */}
+                <View style={styles.datePickerItem}>
+                  <Text style={styles.datePickerLabel}>Yil</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.datePickerButton,
+                      editErrors.birthDate && styles.dateInputError,
+                    ]}
+                    onPress={() => setShowYearPicker(true)}
+                  >
+                    <Text style={[styles.datePickerText, !birthYear && styles.datePickerPlaceholder]}>
+                      {birthYear || 'Yil'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Month Picker */}
+                <View style={styles.datePickerItem}>
+                  <Text style={styles.datePickerLabel}>Oy</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.datePickerButton,
+                      editErrors.birthDate && styles.dateInputError,
+                    ]}
+                    onPress={() => setShowMonthPicker(true)}
+                  >
+                    <Text style={[styles.datePickerText, !birthMonth && styles.datePickerPlaceholder]}>
+                      {birthMonth ? getMonthName(birthMonth) : 'Oy'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Day Picker */}
+                <View style={styles.datePickerItem}>
+                  <Text style={styles.datePickerLabel}>Kun</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.datePickerButton,
+                      editErrors.birthDate && styles.dateInputError,
+                    ]}
+                    onPress={() => setShowDayPicker(true)}
+                  >
+                    <Text style={[styles.datePickerText, !birthDay && styles.datePickerPlaceholder]}>
+                      {birthDay || 'Kun'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              </View>
               {editErrors.birthDate && (
                 <Text style={styles.errorText}>{editErrors.birthDate}</Text>
               )}
             </View>
 
-            {showDatePicker && (
-              <>
-                {Platform.OS === 'ios' ? (
-                  <Modal
-                    visible={showDatePicker}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => setShowDatePicker(false)}
-                  >
-                    <View style={styles.modalDateContainer}>
-                      <View style={styles.modalDateContent}>
-                        <View style={styles.modalDateHeader}>
-                          <TouchableOpacity
-                            onPress={() => setShowDatePicker(false)}
-                          >
-                            <Text style={styles.modalDateCancel}>Bekor qilish</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => {
-                              if (selectedDate) {
-                                const formattedDate = selectedDate.toISOString().split('T')[0];
-                                setEditFormData({
-                                  ...editFormData,
-                                  birthDate: formattedDate,
-                                });
-                                if (editErrors.birthDate) {
-                                  setEditErrors({ ...editErrors, birthDate: '' });
-                                }
+            {/* Year Picker Modal */}
+            {showYearPicker && (
+              <Modal
+                visible={showYearPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowYearPicker(false)}
+              >
+                <View style={styles.pickerModalContainer}>
+                  <View style={styles.pickerModalContent}>
+                    <View style={styles.pickerModalHeader}>
+                      <TouchableOpacity onPress={() => setShowYearPicker(false)}>
+                        <Text style={styles.pickerModalCancel}>Bekor qilish</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.pickerModalTitle}>Yilni tanlang</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowYearPicker(false);
+                          if (editErrors.birthDate) {
+                            setEditErrors({ ...editErrors, birthDate: '' });
+                          }
+                        }}
+                      >
+                        <Text style={styles.pickerModalDone}>Tasdiqlash</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView style={styles.pickerList}>
+                      {generateYears().map((year) => (
+                        <TouchableOpacity
+                          key={year}
+                          style={[
+                            styles.pickerItem,
+                            birthYear === year && styles.pickerItemActive,
+                          ]}
+                          onPress={() => {
+                            setBirthYear(year);
+                            // Validate day if month is selected
+                            if (birthMonth && birthDay) {
+                              const daysInMonth = getDaysInMonth(birthMonth, year);
+                              if (birthDay > daysInMonth) {
+                                setBirthDay(daysInMonth);
                               }
-                              setShowDatePicker(false);
-                            }}
-                          >
-                            <Text style={styles.modalDateDone}>Tasdiqlash</Text>
-                          </TouchableOpacity>
-                        </View>
-                        <DateTimePicker
-                          value={selectedDate || new Date()}
-                          mode="date"
-                          display="spinner"
-                          maximumDate={new Date()}
-                          onChange={(event, date) => {
-                            if (date) {
-                              setSelectedDate(date);
+                            }
+                            if (editErrors.birthDate) {
+                              setEditErrors({ ...editErrors, birthDate: '' });
                             }
                           }}
-                          style={styles.datePicker}
-                        />
-                      </View>
+                        >
+                          <Text
+                            style={[
+                              styles.pickerItemText,
+                              birthYear === year && styles.pickerItemTextActive,
+                            ]}
+                          >
+                            {year}
+                          </Text>
+                          {birthYear === year && (
+                            <Ionicons name="checkmark" size={20} color="#007AFF" />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
+            )}
+
+            {/* Month Picker Modal */}
+            {showMonthPicker && (
+              <Modal
+                visible={showMonthPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowMonthPicker(false)}
+              >
+                <View style={styles.pickerModalContainer}>
+                  <View style={styles.pickerModalContent}>
+                    <View style={styles.pickerModalHeader}>
+                      <TouchableOpacity onPress={() => setShowMonthPicker(false)}>
+                        <Text style={styles.pickerModalCancel}>Bekor qilish</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.pickerModalTitle}>Oyni tanlang</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowMonthPicker(false);
+                          if (editErrors.birthDate) {
+                            setEditErrors({ ...editErrors, birthDate: '' });
+                          }
+                        }}
+                      >
+                        <Text style={styles.pickerModalDone}>Tasdiqlash</Text>
+                      </TouchableOpacity>
                     </View>
-                  </Modal>
-                ) : (
-                  <DateTimePicker
-                    value={selectedDate || new Date()}
-                    mode="date"
-                    display="default"
-                    maximumDate={new Date()}
-                    onChange={(event, date) => {
-                      setShowDatePicker(false);
-                      if (event.type === 'set' && date) {
-                        const formattedDate = date.toISOString().split('T')[0];
-                        setEditFormData({
-                          ...editFormData,
-                          birthDate: formattedDate,
-                        });
-                        setSelectedDate(date);
-                        if (editErrors.birthDate) {
-                          setEditErrors({ ...editErrors, birthDate: '' });
-                        }
-                      }
-                    }}
-                  />
-                )}
-              </>
+                    <ScrollView style={styles.pickerList}>
+                      {generateMonths().map((month) => (
+                        <TouchableOpacity
+                          key={month}
+                          style={[
+                            styles.pickerItem,
+                            birthMonth === month && styles.pickerItemActive,
+                          ]}
+                          onPress={() => {
+                            setBirthMonth(month);
+                            // Validate day if year is selected
+                            if (birthYear && birthDay) {
+                              const daysInMonth = getDaysInMonth(month, birthYear);
+                              if (birthDay > daysInMonth) {
+                                setBirthDay(daysInMonth);
+                              }
+                            }
+                            if (editErrors.birthDate) {
+                              setEditErrors({ ...editErrors, birthDate: '' });
+                            }
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.pickerItemText,
+                              birthMonth === month && styles.pickerItemTextActive,
+                            ]}
+                          >
+                            {getMonthName(month)}
+                          </Text>
+                          {birthMonth === month && (
+                            <Ionicons name="checkmark" size={20} color="#007AFF" />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
+            )}
+
+            {/* Day Picker Modal */}
+            {showDayPicker && (
+              <Modal
+                visible={showDayPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowDayPicker(false)}
+              >
+                <View style={styles.pickerModalContainer}>
+                  <View style={styles.pickerModalContent}>
+                    <View style={styles.pickerModalHeader}>
+                      <TouchableOpacity onPress={() => setShowDayPicker(false)}>
+                        <Text style={styles.pickerModalCancel}>Bekor qilish</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.pickerModalTitle}>Kunni tanlang</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowDayPicker(false);
+                          if (editErrors.birthDate) {
+                            setEditErrors({ ...editErrors, birthDate: '' });
+                          }
+                        }}
+                      >
+                        <Text style={styles.pickerModalDone}>Tasdiqlash</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView style={styles.pickerList}>
+                      {generateDays(birthMonth, birthYear).map((day) => (
+                        <TouchableOpacity
+                          key={day}
+                          style={[
+                            styles.pickerItem,
+                            birthDay === day && styles.pickerItemActive,
+                          ]}
+                          onPress={() => {
+                            setBirthDay(day);
+                            if (editErrors.birthDate) {
+                              setEditErrors({ ...editErrors, birthDate: '' });
+                            }
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.pickerItemText,
+                              birthDay === day && styles.pickerItemTextActive,
+                            ]}
+                          >
+                            {day}
+                          </Text>
+                          {birthDay === day && (
+                            <Ionicons name="checkmark" size={20} color="#007AFF" />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
             )}
           </ScrollView>
         </View>
@@ -1045,16 +1342,19 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
+  },
+  modalContentContainer: {
     padding: 16,
+    paddingBottom: 32,
   },
-  genderContainer: {
-    marginBottom: 16,
+  formSection: {
+    marginBottom: 24,
   },
-  genderLabel: {
-    fontSize: 14,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   genderButtons: {
     flexDirection: 'row',
@@ -1081,35 +1381,115 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  dateContainer: {
-    marginBottom: 16,
+  datePickerContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
   },
-  dateLabel: {
+  datePickerItem: {
+    flex: 1,
+  },
+  datePickerLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
   },
-  dateInput: {
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
     backgroundColor: '#fff',
     minHeight: 48,
-    justifyContent: 'center',
   },
-  dateInputError: {
-    borderColor: '#ef4444',
-  },
-  dateInputText: {
+  datePickerText: {
     fontSize: 16,
     color: '#333',
   },
-  dateInputPlaceholder: {
+  datePickerPlaceholder: {
     color: '#999',
+  },
+  pickerModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  pickerModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  pickerModalCancel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  pickerModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  pickerModalDone: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  pickerList: {
+    maxHeight: 400,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  pickerItemActive: {
+    backgroundColor: '#f5f5f5',
+  },
+  pickerItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  pickerItemTextActive: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  dateInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    minHeight: 48,
+  },
+  dateInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  dateInputError: {
+    borderColor: '#ef4444',
   },
   errorText: {
     fontSize: 12,
@@ -1144,6 +1524,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#007AFF',
     fontWeight: '600',
+  },
+  modalDateContentAndroid: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    margin: 20,
+    alignItems: 'center',
   },
   datePicker: {
     width: '100%',

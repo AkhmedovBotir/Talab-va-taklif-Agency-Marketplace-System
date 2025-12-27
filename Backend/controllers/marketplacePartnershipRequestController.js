@@ -1,6 +1,7 @@
 const MarketplacePartnershipRequest = require('../models/MarketplacePartnershipRequest');
 const Region = require('../models/Region');
 const Contragent = require('../models/Contragent');
+const ContragentType = require('../models/ContragentType');
 
 // ==================== MARKETPLACE USER ENDPOINTS ====================
 
@@ -15,7 +16,7 @@ const createMarketplacePartnershipRequest = async (req, res) => {
       viloyat,
       tuman,
       mfy,
-      activity,
+      activityType,
       managerFirstName,
       managerLastName,
       managerPhone,
@@ -48,6 +49,22 @@ const createMarketplacePartnershipRequest = async (req, res) => {
       });
     }
 
+    // Validate activityType
+    const contragentType = await ContragentType.findById(activityType);
+    if (!contragentType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faoliyat turi topilmadi',
+      });
+    }
+
+    if (contragentType.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Faoliyat turi faol emas',
+      });
+    }
+
     // Check if user already has a pending or reviewing request
     const existingRequest = await MarketplacePartnershipRequest.findOne({
       marketplaceUser: userId,
@@ -70,7 +87,7 @@ const createMarketplacePartnershipRequest = async (req, res) => {
       viloyat,
       tuman,
       mfy,
-      activity,
+      activityType,
       managerFirstName,
       managerLastName,
       managerPhone,
@@ -81,7 +98,8 @@ const createMarketplacePartnershipRequest = async (req, res) => {
       .populate('marketplaceUser', 'firstName lastName phone')
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
-      .populate('mfy', 'name type code');
+      .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status');
 
     res.status(201).json({
       success: true,
@@ -120,6 +138,7 @@ const getMyMarketplacePartnershipRequests = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status')
       .populate('reviewedBy', 'firstName lastName')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -158,6 +177,7 @@ const getMyMarketplacePartnershipRequestById = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status')
       .populate('reviewedBy', 'firstName lastName');
 
     if (!request) {
@@ -213,6 +233,7 @@ const getAllMarketplacePartnershipRequests = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status')
       .populate('reviewedBy', 'firstName lastName')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -247,6 +268,7 @@ const getMarketplacePartnershipRequestById = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status')
       .populate('reviewedBy', 'firstName lastName');
 
     if (!request) {
@@ -300,6 +322,7 @@ const updateStatusToReviewing = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status')
       .populate('reviewedBy', 'firstName lastName');
 
     if (!request) {
@@ -359,6 +382,7 @@ const updateStatusToContacted = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status')
       .populate('reviewedBy', 'firstName lastName');
 
     if (!request) {
@@ -418,6 +442,7 @@ const approveMarketplacePartnershipRequest = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status')
       .populate('reviewedBy', 'firstName lastName');
 
     if (!request) {
@@ -481,6 +506,7 @@ const rejectMarketplacePartnershipRequest = async (req, res) => {
       .populate('viloyat', 'name type code')
       .populate('tuman', 'name type code')
       .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon status')
       .populate('reviewedBy', 'firstName lastName');
 
     if (!request) {
@@ -565,6 +591,7 @@ const convertMarketplacePartnershipRequestToContragent = async (req, res) => {
       tuman: request.tuman,
       mfy: request.mfy,
       phone: request.managerPhone,
+      activityType: request.activityType,
       passwordSetupAllowed: true,
     });
 
