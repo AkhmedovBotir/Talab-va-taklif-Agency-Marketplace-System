@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api, { CreatePartnershipRequest, Region, ContragentType } from '../services/api';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import RegionPicker from './ui/RegionPicker';
 import ActivityTypePicker from './ui/ActivityTypePicker';
 
@@ -32,6 +32,7 @@ export default function PartnershipRequestModal({
   onSuccess,
 }: PartnershipRequestModalProps) {
   const insets = useSafeAreaInsets();
+  const { showSuccess, showError } = useSnackbar();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CreatePartnershipRequest>({
     companyName: '',
@@ -98,7 +99,7 @@ export default function PartnershipRequestModal({
       setLoading(true);
       const response = await api.createPartnershipRequest(formData, token);
       if (response.success) {
-        Alert.alert('Muvaffaqiyatli', 'Hamkorlik so\'rovi muvaffaqiyatli yuborildi');
+        showSuccess('Hamkorlik so\'rovi muvaffaqiyatli yuborildi');
         onSuccess();
         onClose();
         // Reset form
@@ -118,11 +119,222 @@ export default function PartnershipRequestModal({
         setErrors({});
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Hamkorlik so\'rovini yuborishda xatolik yuz berdi');
+      showError(error.message || 'Hamkorlik so\'rovini yuborishda xatolik yuz berdi');
     } finally {
       setLoading(false);
     }
   };
+
+  const renderModalContent = () => (
+    <View style={[styles.modalContent, { paddingBottom: insets.bottom }]}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Hamkorlik so'rovi</Text>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Ionicons name="close" size={24} color="#666" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.modalBody}
+        contentContainerStyle={styles.modalBodyContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled={true}
+        bounces={false}
+      >
+        <Text style={styles.sectionTitle}>Kompaniya ma'lumotlari</Text>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Kompaniya nomi *</Text>
+          <TextInput
+            style={[styles.input, errors.companyName && styles.inputError]}
+            placeholder="Kompaniya nomini kiriting"
+            value={formData.companyName}
+            onChangeText={(text) => {
+              setFormData({ ...formData, companyName: text });
+              if (errors.companyName) setErrors({ ...errors, companyName: '' });
+            }}
+          />
+          {errors.companyName && <Text style={styles.errorText}>{errors.companyName}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>INN *</Text>
+          <TextInput
+            style={[styles.input, errors.inn && styles.inputError]}
+            placeholder="INN raqamini kiriting (9 yoki 12 raqam)"
+            value={formData.inn}
+            onChangeText={(text) => {
+              setFormData({ ...formData, inn: text.replace(/\D/g, '') });
+              if (errors.inn) setErrors({ ...errors, inn: '' });
+            }}
+            keyboardType="numeric"
+            maxLength={12}
+          />
+          {errors.inn && <Text style={styles.errorText}>{errors.inn}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>MFO *</Text>
+          <TextInput
+            style={[styles.input, errors.mfo && styles.inputError]}
+            placeholder="MFO raqamini kiriting"
+            value={formData.mfo}
+            onChangeText={(text) => {
+              setFormData({ ...formData, mfo: text });
+              if (errors.mfo) setErrors({ ...errors, mfo: '' });
+            }}
+          />
+          {errors.mfo && <Text style={styles.errorText}>{errors.mfo}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Hisob raqami (XR) *</Text>
+          <TextInput
+            style={[styles.input, errors.accountNumber && styles.inputError]}
+            placeholder="Hisob raqamini kiriting"
+            value={formData.accountNumber}
+            onChangeText={(text) => {
+              setFormData({ ...formData, accountNumber: text });
+              if (errors.accountNumber) setErrors({ ...errors, accountNumber: '' });
+            }}
+          />
+          {errors.accountNumber && <Text style={styles.errorText}>{errors.accountNumber}</Text>}
+        </View>
+
+        <Text style={styles.sectionTitle}>Manzil</Text>
+
+        <View style={styles.inputGroup}>
+          <RegionPicker
+            label="Viloyat *"
+            value={formData.viloyat}
+            type="region"
+            onSelect={(region: Region) => {
+              setFormData({
+                ...formData,
+                viloyat: region._id,
+                tuman: '',
+                mfy: '',
+              });
+              if (errors.viloyat) setErrors({ ...errors, viloyat: '' });
+            }}
+          />
+          {errors.viloyat && <Text style={styles.errorText}>{errors.viloyat}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <RegionPicker
+            label="Tuman *"
+            value={formData.tuman}
+            type="district"
+            parentId={formData.viloyat}
+            onSelect={(region: Region) => {
+              setFormData({
+                ...formData,
+                tuman: region._id,
+                mfy: '',
+              });
+              if (errors.tuman) setErrors({ ...errors, tuman: '' });
+            }}
+            disabled={!formData.viloyat}
+          />
+          {errors.tuman && <Text style={styles.errorText}>{errors.tuman}</Text>}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <RegionPicker
+            label="MFY *"
+            value={formData.mfy}
+            type="mfy"
+            parentId={formData.tuman}
+            onSelect={(region: Region) => {
+              setFormData({ ...formData, mfy: region._id });
+              if (errors.mfy) setErrors({ ...errors, mfy: '' });
+            }}
+            disabled={!formData.tuman}
+          />
+          {errors.mfy && <Text style={styles.errorText}>{errors.mfy}</Text>}
+        </View>
+
+        <Text style={styles.sectionTitle}>Faoliyat</Text>
+
+        <View style={styles.inputGroup}>
+          <ActivityTypePicker
+            label="Faoliyat turi *"
+            value={formData.activityType}
+            onSelect={(activityType: ContragentType) => {
+              setFormData({ ...formData, activityType: activityType._id });
+              if (errors.activityType) setErrors({ ...errors, activityType: '' });
+            }}
+            error={errors.activityType}
+          />
+        </View>
+
+        <Text style={styles.sectionTitle}>Rahbar ma'lumotlari</Text>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Rahbar ismi *</Text>
+          <TextInput
+            style={[styles.input, errors.managerFirstName && styles.inputError]}
+            placeholder="Rahbar ismini kiriting"
+            value={formData.managerFirstName}
+            onChangeText={(text) => {
+              setFormData({ ...formData, managerFirstName: text });
+              if (errors.managerFirstName) setErrors({ ...errors, managerFirstName: '' });
+            }}
+          />
+          {errors.managerFirstName && (
+            <Text style={styles.errorText}>{errors.managerFirstName}</Text>
+          )}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Rahbar familiyasi *</Text>
+          <TextInput
+            style={[styles.input, errors.managerLastName && styles.inputError]}
+            placeholder="Rahbar familiyasini kiriting"
+            value={formData.managerLastName}
+            onChangeText={(text) => {
+              setFormData({ ...formData, managerLastName: text });
+              if (errors.managerLastName) setErrors({ ...errors, managerLastName: '' });
+            }}
+          />
+          {errors.managerLastName && (
+            <Text style={styles.errorText}>{errors.managerLastName}</Text>
+          )}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Rahbar telefon raqami *</Text>
+          <TextInput
+            style={[styles.input, errors.managerPhone && styles.inputError]}
+            placeholder="+998901234567"
+            value={formData.managerPhone}
+            onChangeText={(text) => {
+              setFormData({ ...formData, managerPhone: text });
+              if (errors.managerPhone) setErrors({ ...errors, managerPhone: '' });
+            }}
+            keyboardType="phone-pad"
+          />
+          {errors.managerPhone && <Text style={styles.errorText}>{errors.managerPhone}</Text>}
+        </View>
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <TouchableOpacity
+          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Yuborish</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
     <Modal
@@ -130,222 +342,35 @@ export default function PartnershipRequestModal({
       animationType="slide"
       transparent
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <View style={styles.modalOverlay}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardAvoidingView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-        <View style={[styles.modalContent, { paddingBottom: insets.bottom }]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Hamkorlik so'rovi</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-            <ScrollView
-              style={styles.modalBody}
-              contentContainerStyle={styles.modalBodyContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled={true}
+      <TouchableOpacity 
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        {Platform.OS === 'ios' ? (
+          <KeyboardAvoidingView
+            behavior="padding"
+            style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={0}
+          >
+            <TouchableOpacity 
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
             >
-            <Text style={styles.sectionTitle}>Kompaniya ma'lumotlari</Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Kompaniya nomi *</Text>
-              <TextInput
-                style={[styles.input, errors.companyName && styles.inputError]}
-                placeholder="Kompaniya nomini kiriting"
-                value={formData.companyName}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, companyName: text });
-                  if (errors.companyName) setErrors({ ...errors, companyName: '' });
-                }}
-              />
-              {errors.companyName && <Text style={styles.errorText}>{errors.companyName}</Text>}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>INN *</Text>
-              <TextInput
-                style={[styles.input, errors.inn && styles.inputError]}
-                placeholder="INN raqamini kiriting (9 yoki 12 raqam)"
-                value={formData.inn}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, inn: text.replace(/\D/g, '') });
-                  if (errors.inn) setErrors({ ...errors, inn: '' });
-                }}
-                keyboardType="numeric"
-                maxLength={12}
-              />
-              {errors.inn && <Text style={styles.errorText}>{errors.inn}</Text>}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>MFO *</Text>
-              <TextInput
-                style={[styles.input, errors.mfo && styles.inputError]}
-                placeholder="MFO raqamini kiriting"
-                value={formData.mfo}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, mfo: text });
-                  if (errors.mfo) setErrors({ ...errors, mfo: '' });
-                }}
-              />
-              {errors.mfo && <Text style={styles.errorText}>{errors.mfo}</Text>}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Hisob raqami (XR) *</Text>
-              <TextInput
-                style={[styles.input, errors.accountNumber && styles.inputError]}
-                placeholder="Hisob raqamini kiriting"
-                value={formData.accountNumber}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, accountNumber: text });
-                  if (errors.accountNumber) setErrors({ ...errors, accountNumber: '' });
-                }}
-              />
-              {errors.accountNumber && <Text style={styles.errorText}>{errors.accountNumber}</Text>}
-            </View>
-
-            <Text style={styles.sectionTitle}>Manzil</Text>
-
-            <View style={styles.inputGroup}>
-              <RegionPicker
-                label="Viloyat *"
-                value={formData.viloyat}
-                type="region"
-                onSelect={(region: Region) => {
-                  setFormData({
-                    ...formData,
-                    viloyat: region._id,
-                    tuman: '',
-                    mfy: '',
-                  });
-                  if (errors.viloyat) setErrors({ ...errors, viloyat: '' });
-                }}
-              />
-              {errors.viloyat && <Text style={styles.errorText}>{errors.viloyat}</Text>}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <RegionPicker
-                label="Tuman *"
-                value={formData.tuman}
-                type="district"
-                parentId={formData.viloyat}
-                onSelect={(region: Region) => {
-                  setFormData({
-                    ...formData,
-                    tuman: region._id,
-                    mfy: '',
-                  });
-                  if (errors.tuman) setErrors({ ...errors, tuman: '' });
-                }}
-                disabled={!formData.viloyat}
-              />
-              {errors.tuman && <Text style={styles.errorText}>{errors.tuman}</Text>}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <RegionPicker
-                label="MFY *"
-                value={formData.mfy}
-                type="mfy"
-                parentId={formData.tuman}
-                onSelect={(region: Region) => {
-                  setFormData({ ...formData, mfy: region._id });
-                  if (errors.mfy) setErrors({ ...errors, mfy: '' });
-                }}
-                disabled={!formData.tuman}
-              />
-              {errors.mfy && <Text style={styles.errorText}>{errors.mfy}</Text>}
-            </View>
-
-            <Text style={styles.sectionTitle}>Faoliyat</Text>
-
-            <View style={styles.inputGroup}>
-              <ActivityTypePicker
-                label="Faoliyat turi *"
-                value={formData.activityType}
-                onSelect={(activityType: ContragentType) => {
-                  setFormData({ ...formData, activityType: activityType._id });
-                  if (errors.activityType) setErrors({ ...errors, activityType: '' });
-                }}
-                error={errors.activityType}
-              />
-            </View>
-
-            <Text style={styles.sectionTitle}>Rahbar ma'lumotlari</Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Rahbar ismi *</Text>
-              <TextInput
-                style={[styles.input, errors.managerFirstName && styles.inputError]}
-                placeholder="Rahbar ismini kiriting"
-                value={formData.managerFirstName}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, managerFirstName: text });
-                  if (errors.managerFirstName) setErrors({ ...errors, managerFirstName: '' });
-                }}
-              />
-              {errors.managerFirstName && (
-                <Text style={styles.errorText}>{errors.managerFirstName}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Rahbar familiyasi *</Text>
-              <TextInput
-                style={[styles.input, errors.managerLastName && styles.inputError]}
-                placeholder="Rahbar familiyasini kiriting"
-                value={formData.managerLastName}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, managerLastName: text });
-                  if (errors.managerLastName) setErrors({ ...errors, managerLastName: '' });
-                }}
-              />
-              {errors.managerLastName && (
-                <Text style={styles.errorText}>{errors.managerLastName}</Text>
-              )}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Rahbar telefon raqami *</Text>
-              <TextInput
-                style={[styles.input, errors.managerPhone && styles.inputError]}
-                placeholder="+998901234567"
-                value={formData.managerPhone}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, managerPhone: text });
-                  if (errors.managerPhone) setErrors({ ...errors, managerPhone: '' });
-                }}
-                keyboardType="phone-pad"
-              />
-              {errors.managerPhone && <Text style={styles.errorText}>{errors.managerPhone}</Text>}
-            </View>
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.submitButtonText}>Yuborish</Text>
-              )}
+              {renderModalContent()}
             </TouchableOpacity>
-          </View>
-        </View>
-        </KeyboardAvoidingView>
-      </View>
+          </KeyboardAvoidingView>
+        ) : (
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {renderModalContent()}
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -362,10 +387,9 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 24,
     maxHeight: '90%',
-    flex: 1,
+    minHeight: '50%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -385,7 +409,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modalBody: {
-    flex: 1,
+    flexGrow: 1,
   },
   modalBodyContent: {
     paddingHorizontal: 20,
@@ -463,7 +487,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
-
-
-

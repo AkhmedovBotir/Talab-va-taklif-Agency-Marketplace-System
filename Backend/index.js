@@ -4,7 +4,6 @@ const cors = require('cors');
 const http = require('http');
 const connectDB = require('./config/database');
 const { initializeSocket } = require('./config/socket');
-const { connectRedis } = require('./config/redis');
 
 // Import routes
 const adminRoutes = require('./routes/adminRoutes');
@@ -40,9 +39,6 @@ const io = initializeSocket(server);
 
 // Connect to MongoDB
 connectDB();
-
-// Connect to Redis
-connectRedis();
 
 
 // Middleware

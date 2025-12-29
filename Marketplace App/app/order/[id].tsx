@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReviewModal from '../../components/ReviewModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 import apiService, { Order } from '../../services/api';
 
 export default function OrderDetailScreen() {
@@ -22,6 +23,7 @@ export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
+  const { showSuccess, showError } = useSnackbar();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,7 +47,7 @@ export default function OrderDetailScreen() {
         console.log("order", response.data);
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Buyurtmani yuklashda xatolik yuz berdi');
+      showError(error.message || 'Buyurtmani yuklashda xatolik yuz berdi');
       router.push('/order' as any);
     } finally {
       setLoading(false);
@@ -92,10 +94,10 @@ export default function OrderDetailScreen() {
               const response = await apiService.cancelOrder(id, token);
               if (response.success) {
                 setOrder(response.data);
-                Alert.alert('Muvaffaqiyatli', 'Buyurtma bekor qilindi');
+                showSuccess('Buyurtma bekor qilindi');
               }
             } catch (error: any) {
-              Alert.alert('Xatolik', error.message || 'Buyurtmani bekor qilishda xatolik yuz berdi');
+              showError(error.message || 'Buyurtmani bekor qilishda xatolik yuz berdi');
             } finally {
               setCancelling(false);
             }
@@ -122,10 +124,10 @@ export default function OrderDetailScreen() {
               const response = await apiService.confirmDelivery(id, token);
               if (response.success && response.data) {
                 setOrder(response.data);
-                Alert.alert('Muvaffaqiyatli', 'Buyurtma muvaffaqiyatli tasdiqlandi');
+                showSuccess('Buyurtma muvaffaqiyatli tasdiqlandi');
               }
             } catch (error: any) {
-              Alert.alert('Xatolik', error.message || 'Buyurtmani tasdiqlashda xatolik yuz berdi');
+              showError(error.message || 'Buyurtmani tasdiqlashda xatolik yuz berdi');
             } finally {
               setConfirming(false);
             }

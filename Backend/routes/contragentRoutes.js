@@ -31,7 +31,6 @@ const {
 } = require('../controllers/contragentPaymentController');
 const { validate, contragentValidationSchemas } = require('../middleware/validation');
 const { contragentAuth } = require('../middleware/auth');
-const { redisCache, invalidateCache } = require('../middleware/redisCache');
 
 // Password setup (for new contragents from partnership requests)
 router.post('/password-setup/step1', validate(contragentValidationSchemas.passwordSetupStep1), passwordSetupStep1);
@@ -45,40 +44,40 @@ router.post('/login', validate(contragentValidationSchemas.login), loginContrage
 router.post('/auth/login', validate(contragentValidationSchemas.login), loginContragentAuth);
 
 // Get current contragent (me)
-router.get('/me', contragentAuth, redisCache(60), getMe); // 1 daqiqa cache (user-specific)
+router.get('/me', contragentAuth, getMe);
 
 // Update current contragent profile
-router.put('/me', contragentAuth, validate(contragentValidationSchemas.updateProfile), invalidateCache(['cache:/api/contragents/me*', 'cache:/api/contragents/:id*']), updateMyProfile);
+router.put('/me', contragentAuth, validate(contragentValidationSchemas.updateProfile), updateMyProfile);
 
 // Update only logo
-router.patch('/me/logo', contragentAuth, validate(contragentValidationSchemas.updateLogo), invalidateCache(['cache:/api/contragents/me*', 'cache:/api/contragents/:id*', 'cache:/api/marketplace/contragents*']), updateMyLogo);
+router.patch('/me/logo', contragentAuth, validate(contragentValidationSchemas.updateLogo), updateMyLogo);
 
 // Create contragent
-router.post('/', validate(contragentValidationSchemas.create), invalidateCache(['cache:/api/contragents*', 'cache:/api/marketplace/contragents*']), createContragent);
+router.post('/', validate(contragentValidationSchemas.create), createContragent);
 
 // Get all contragents (with optional filters: ?status=active&address=regionId&page=1&limit=10)
-router.get('/', redisCache(300), getAllContragents); // 5 daqiqa cache
+router.get('/', getAllContragents);
 
 // Get contragent by ID
-router.get('/:id', redisCache(600), getContragentById); // 10 daqiqa cache
+router.get('/:id', getContragentById);
 
 // Update contragent
-router.put('/:id', validate(contragentValidationSchemas.update), invalidateCache(['cache:/api/contragents*', 'cache:/api/marketplace/contragents*']), updateContragent);
+router.put('/:id', validate(contragentValidationSchemas.update), updateContragent);
 
 // Delete contragent
-router.delete('/:id', invalidateCache(['cache:/api/contragents*', 'cache:/api/marketplace/contragents*']), deleteContragent);
+router.delete('/:id', deleteContragent);
 
 // Notification routes for Contragent
-router.get('/notifications/list', contragentAuth, redisCache(30), getContragentNotifications); // 30 sekund cache (user-specific)
-router.get('/notifications/unread-count', contragentAuth, redisCache(30), getContragentUnreadCount); // 30 sekund cache (user-specific)
-router.post('/notifications/:notificationId/read', contragentAuth, invalidateCache(['cache:/api/contragents/notifications*']), markContragentNotificationRead);
-router.post('/notifications/read-all', contragentAuth, invalidateCache(['cache:/api/contragents/notifications*']), markAllContragentNotificationsRead);
+router.get('/notifications/list', contragentAuth, getContragentNotifications);
+router.get('/notifications/unread-count', contragentAuth, getContragentUnreadCount);
+router.post('/notifications/:notificationId/read', contragentAuth, markContragentNotificationRead);
+router.post('/notifications/read-all', contragentAuth, markAllContragentNotificationsRead);
 
 // Payment routes for Contragent
-router.get('/payments/paid', contragentAuth, redisCache(60), getMyPaidPayments); // 1 daqiqa cache (user-specific)
-router.get('/payments/unpaid', contragentAuth, redisCache(30), getMyUnpaidPayments); // 30 sekund cache (user-specific)
-router.get('/payments/statistics', contragentAuth, redisCache(120), getMyPaymentStatistics); // 2 daqiqa cache (user-specific)
-router.get('/payments/:id', contragentAuth, redisCache(60), getMyPaymentById); // 1 daqiqa cache (user-specific)
+router.get('/payments/paid', contragentAuth, getMyPaidPayments);
+router.get('/payments/unpaid', contragentAuth, getMyUnpaidPayments);
+router.get('/payments/statistics', contragentAuth, getMyPaymentStatistics);
+router.get('/payments/:id', contragentAuth, getMyPaymentById);
 
 module.exports = router;
 

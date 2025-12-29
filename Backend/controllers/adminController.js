@@ -3,10 +3,33 @@ const Device = require('../models/Device');
 const { extractDeviceInfo } = require('../utils/deviceHelper');
 const jwt = require('jsonwebtoken');
 
+// Default permissions for admin
+const DEFAULT_PERMISSIONS = [
+  'dashboard',
+  'admins',
+  'regions',
+  'counterparties',
+  'agents',
+  'points',
+  'archive',
+  'warehouse',
+  'marketplace_clients',
+  'messages',
+  'orders',
+  'kpi_bonuses',
+  'area_statistics',
+  'sms',
+  'finance',
+  'pricing',
+  'partnership_requests',
+  'vacancies',
+  'settings',
+];
+
 // Create new admin
 const createAdmin = async (req, res) => {
   try {
-    const { name, role, telefonRaqam, username, parol } = req.body;
+    const { name, role, telefonRaqam, username, parol, permissions } = req.body;
 
     // Check if username already exists
     const existingUsername = await Admin.findOne({ username });
@@ -33,6 +56,7 @@ const createAdmin = async (req, res) => {
       username,
       parol,
       status: req.body.status || 'active',
+      permissions: permissions || DEFAULT_PERMISSIONS,
     });
 
     res.status(201).json({
@@ -55,10 +79,19 @@ const getAllAdmins = async (req, res) => {
   try {
     const admins = await Admin.find().select('-parol').sort({ createdAt: -1 });
 
+    // Ensure all admins have permissions
+    const adminsWithPermissions = admins.map(admin => {
+      const adminObj = admin.toObject();
+      if (!adminObj.permissions || adminObj.permissions.length === 0) {
+        adminObj.permissions = DEFAULT_PERMISSIONS;
+      }
+      return adminObj;
+    });
+
     res.status(200).json({
       success: true,
-      count: admins.length,
-      data: admins,
+      count: adminsWithPermissions.length,
+      data: adminsWithPermissions,
     });
   } catch (error) {
     console.error('Error fetching admins:', error);
@@ -84,9 +117,15 @@ const getAdminById = async (req, res) => {
       });
     }
 
+    // Ensure admin has permissions
+    const adminObj = admin.toObject();
+    if (!adminObj.permissions || adminObj.permissions.length === 0) {
+      adminObj.permissions = DEFAULT_PERMISSIONS;
+    }
+
     res.status(200).json({
       success: true,
-      data: admin,
+      data: adminObj,
     });
   } catch (error) {
     console.error('Error fetching admin:', error);
@@ -156,10 +195,18 @@ const updateAdmin = async (req, res) => {
       });
     }
 
+    // Ensure admin has permissions
+    const adminObj = admin.toObject();
+    if (!adminObj.permissions || adminObj.permissions.length === 0) {
+      adminObj.permissions = DEFAULT_PERMISSIONS;
+      // Update in database if permissions were missing
+      await Admin.findByIdAndUpdate(id, { permissions: DEFAULT_PERMISSIONS });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Admin muvaffaqiyatli yangilandi',
-      data: admin,
+      data: adminObj,
     });
   } catch (error) {
     console.error('Error updating admin:', error);
@@ -304,6 +351,15 @@ const loginAdmin = async (req, res) => {
       }
     );
 
+    // Ensure admin has permissions
+    let adminPermissions = admin.permissions;
+    if (!adminPermissions || adminPermissions.length === 0) {
+      adminPermissions = DEFAULT_PERMISSIONS;
+      // Update in database if permissions were missing
+      admin.permissions = DEFAULT_PERMISSIONS;
+      await admin.save();
+    }
+
     res.status(200).json({
       success: true,
       message: 'Muvaffaqiyatli kirildi',
@@ -316,6 +372,7 @@ const loginAdmin = async (req, res) => {
           telefonRaqam: admin.telefonRaqam,
           username: admin.username,
           status: admin.status,
+          permissions: adminPermissions,
           createdAt: admin.createdAt,
           updatedAt: admin.updatedAt,
         },

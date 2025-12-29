@@ -277,3 +277,4 @@ const ViewDeviceModal = ({ open, onClose, device }) => {
 export default ViewDeviceModal;
 
 
+

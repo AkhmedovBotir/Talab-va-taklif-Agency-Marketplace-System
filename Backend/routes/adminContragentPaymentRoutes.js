@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { adminAuth } = require('../middleware/auth');
-const { redisCache, invalidateCache } = require('../middleware/redisCache');
 const {
   getUnpaidPayments,
   getUnpaidPaymentsGrouped,
@@ -24,26 +23,26 @@ router.post('/:id/pay', (req, res, next) => {
   console.log('Route query:', req.query);
   console.log('User:', req.user ? { userId: req.user.userId, userType: req.user.userType } : 'User topilmadi');
   next();
-}, invalidateCache(['cache:/api/admin-contragent-payments*']), payContragentPayment);
+}, payContragentPayment);
 
 // Belgilangan muddat orasida filterlangan to'lanmagan to'lovlarni to'lash
-router.post('/pay-by-date-range', invalidateCache(['cache:/api/admin-contragent-payments*']), payContragentPaymentsByDateRange);
+router.post('/pay-by-date-range', payContragentPaymentsByDateRange);
 
 // To'lanmagan to'lovlar
-router.get('/unpaid', redisCache(30), getUnpaidPayments); // 30 sekund cache
-router.get('/unpaid/grouped', redisCache(30), getUnpaidPaymentsGrouped); // 30 sekund cache
+router.get('/unpaid', getUnpaidPayments);
+router.get('/unpaid/grouped', getUnpaidPaymentsGrouped);
 
 // To'lovni tasdiqlash (bir nechta to'lovlarni)
-router.post('/mark-as-paid', invalidateCache(['cache:/api/admin-contragent-payments*']), markPaymentsAsPaid);
+router.post('/mark-as-paid', markPaymentsAsPaid);
 
 // To'lovlar statistikasi
-router.get('/statistics', redisCache(120), getPaymentStatistics); // 2 daqiqa cache
+router.get('/statistics', getPaymentStatistics);
 
 // To'langan to'lovlar
-router.get('/paid', redisCache(60), getPaidPayments); // 1 daqiqa cache
+router.get('/paid', getPaidPayments);
 
 // Sinxronlashtirish (buyurtmalardan to'lovlarni yaratish)
-router.post('/sync', invalidateCache(['cache:/api/admin-contragent-payments*']), syncContragentPayments);
+router.post('/sync', syncContragentPayments);
 
 module.exports = router;
 

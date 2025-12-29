@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocation } from '../contexts/LocationContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import RegionPicker from './ui/RegionPicker';
 import { Region } from '../services/api';
 import apiService from '../services/api';
@@ -28,6 +29,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
   const insets = useSafeAreaInsets();
   const { isAuthenticated, token } = useAuth();
   const { selectedViloyat, selectedTuman, setSelectedViloyat, setSelectedTuman } = useLocation();
+  const { showError } = useSnackbar();
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [tempViloyat, setTempViloyat] = useState<Region | null>(null);
   const [tempTuman, setTempTuman] = useState<Region | null>(null);
@@ -190,7 +192,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
 
   const handleSave = async () => {
     if (!tempViloyat || !tempTuman) {
-      Alert.alert('Xatolik', 'Iltimos, viloyat va tumanni tanlang');
+      showError('Iltimos, viloyat va tumanni tanlang');
       return;
     }
 
@@ -229,10 +231,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
           setSelectedTuman(tempTuman);
           
           // Show error to user
-          Alert.alert(
-            'Xatolik', 
-            error.message || 'Hududni saqlashda xatolik yuz berdi. Hudud mahalliy saqlandi.'
-          );
+          showError(error.message || 'Hududni saqlashda xatolik yuz berdi. Hudud mahalliy saqlandi.');
           setLocationModalVisible(false);
           setSaving(false);
           return;
@@ -246,7 +245,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
       setLocationModalVisible(false);
     } catch (error: any) {
       console.error('Error in handleSave:', error);
-      Alert.alert('Xatolik', error.message || 'Hududni saqlashda xatolik yuz berdi');
+      showError(error.message || 'Hududni saqlashda xatolik yuz berdi');
     } finally {
       setSaving(false);
     }

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Close } from '@mui/icons-material';
+import { Close, CheckCircle } from '@mui/icons-material';
 import { adminAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { ALL_PERMISSIONS } from '../../utils/permissions';
 
 const ViewAdminModal = ({ open, onClose, admin }) => {
   const { showError } = useSnackbar();
@@ -151,6 +152,41 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
                       </div>
                     </div>
 
+                    {/* Permissions */}
+                    {adminData.permissions && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Ruhsatlar</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {ALL_PERMISSIONS.map((permission) => {
+                            const hasPermission = adminData.permissions.includes(permission.value);
+                            return (
+                              <div
+                                key={permission.value}
+                                className={`flex items-center gap-2 p-3 rounded-md border ${
+                                  hasPermission
+                                    ? 'bg-green-50 border-green-200'
+                                    : 'bg-gray-50 border-gray-200'
+                                }`}
+                              >
+                                {hasPermission && (
+                                  <CheckCircle className="text-green-600 w-5 h-5" />
+                                )}
+                                <span
+                                  className={`text-sm ${
+                                    hasPermission ? 'text-green-800 font-medium' : 'text-gray-500'
+                                  }`}
+                                >
+                                  {permission.label}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-3">
+                          Jami: {adminData.permissions.length} ta ruhsat
+                        </p>
+                      </div>
+                    )}
 
                     {/* Timestamps */}
                     <div>

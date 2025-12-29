@@ -26,12 +26,14 @@ import PasswordInput from '../../components/ui/PasswordInput';
 import RegionPicker from '../../components/ui/RegionPicker';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 import apiService, { Region, User } from '../../services/api';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { logout, user: authUser, token, updateUser } = useAuth();
   const { unreadCount } = useNotification();
+  const { showSuccess, showError } = useSnackbar();
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,7 @@ export default function ProfileScreen() {
         updateUser(response.data);
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Profil yuklashda xatolik yuz berdi');
+      showError(error.message || 'Profil yuklashda xatolik yuz berdi');
     } finally {
       setLoading(false);
     }
@@ -245,7 +247,7 @@ export default function ProfileScreen() {
         // Reload profile to get latest data
         await loadProfile();
         setEditModalVisible(false);
-        Alert.alert('Muvaffaqiyatli', response.message || 'Profil yangilandi');
+        showSuccess(response.message || 'Profil yangilandi');
       }
     } catch (error: any) {
       // Handle API error responses
@@ -270,9 +272,9 @@ export default function ProfileScreen() {
         }
         
         // Show error message
-        Alert.alert('Xatolik', errorData.message || error.message || 'Profil yangilashda xatolik yuz berdi');
+        showError(errorData.message || error.message || 'Profil yangilashda xatolik yuz berdi');
       } else {
-        Alert.alert('Xatolik', error.message || 'Profil yangilashda xatolik yuz berdi');
+        showError(error.message || 'Profil yangilashda xatolik yuz berdi');
       }
     } finally {
       setEditLoading(false);
@@ -318,7 +320,7 @@ export default function ProfileScreen() {
       );
       if (response.success) {
         setPasswordModalVisible(false);
-        Alert.alert('Muvaffaqiyatli', 'Parol muvaffaqiyatli o\'zgartirildi');
+        showSuccess('Parol muvaffaqiyatli o\'zgartirildi');
         setPasswordData({
           currentPassword: '',
           newPassword: '',
@@ -326,7 +328,7 @@ export default function ProfileScreen() {
         });
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Parol o\'zgartirishda xatolik yuz berdi');
+      showError(error.message || 'Parol o\'zgartirishda xatolik yuz berdi');
     } finally {
       setPasswordLoading(false);
     }
@@ -362,10 +364,10 @@ export default function ProfileScreen() {
         // Reload profile to get latest data
         await loadProfile();
         setLocationModalVisible(false);
-        Alert.alert('Muvaffaqiyatli', 'Manzil yangilandi');
+        showSuccess('Manzil yangilandi');
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Manzil yangilashda xatolik yuz berdi');
+      showError(error.message || 'Manzil yangilashda xatolik yuz berdi');
     } finally {
       setLocationLoading(false);
     }
@@ -384,7 +386,7 @@ export default function ProfileScreen() {
       }
 
       if (response.errorMessage) {
-        Alert.alert('Xatolik', response.errorMessage || 'Rasm tanlashda xatolik yuz berdi');
+        showError(response.errorMessage || 'Rasm tanlashda xatolik yuz berdi');
         return;
       }
 
@@ -408,10 +410,10 @@ export default function ProfileScreen() {
       if (response.success && response.data) {
         // Reload profile to get latest data
         await loadProfile();
-        Alert.alert('Muvaffaqiyatli', 'Avatar yangilandi');
+        showSuccess('Avatar yangilandi');
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Avatar yangilashda xatolik yuz berdi');
+      showError(error.message || 'Avatar yangilashda xatolik yuz berdi');
     } finally {
       setLoading(false);
     }
@@ -433,7 +435,7 @@ export default function ProfileScreen() {
             try {
               await logout();
             } catch (error) {
-              Alert.alert('Xatolik', 'Chiqishda xatolik yuz berdi');
+              showError('Chiqishda xatolik yuz berdi');
             }
           },
         },
@@ -650,30 +652,38 @@ export default function ProfileScreen() {
       <Modal
         visible={editModalVisible}
         animationType="slide"
-        presentationStyle="pageSheet"
+        transparent={true}
         onRequestClose={() => setEditModalVisible(false)}
+        statusBarTranslucent
       >
-        <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-              <Text style={styles.modalCancel}>Bekor qilish</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Profilni tahrirlash</Text>
-            <TouchableOpacity onPress={handleSaveProfile} disabled={editLoading}>
-              <Text style={[styles.modalSave, editLoading && styles.modalSaveDisabled]}>
-                Saqlash
-              </Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainerNew, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+            <View style={styles.modalHeaderNew}>
+              <View style={styles.modalHeaderTop}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="person-outline" size={24} color="#007AFF" />
+                </View>
+                <View style={styles.modalTitleContainer}>
+                  <Text style={styles.modalTitleNew}>Shaxsiy ma'lumotlar</Text>
+                  <Text style={styles.modalSubtitle}>Profil ma'lumotlarini yangilang</Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setEditModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
 
-          <ScrollView 
-            style={styles.modalContent} 
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.modalContentContainer}
-          >
+          <View style={styles.scrollViewContainer}>
+            <ScrollView 
+              style={styles.modalContentNew} 
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={styles.modalContentContainerNew}
+              indicatorStyle="black"
+            >
             <View style={styles.formSection}>
-              <Text style={styles.sectionTitle}>Shaxsiy ma'lumotlar</Text>
-              
               <Input
                 label="Ism"
                 value={editFormData.firstName}
@@ -1004,58 +1014,111 @@ export default function ProfileScreen() {
                 </View>
               </Modal>
             )}
-          </ScrollView>
+            </ScrollView>
+            <View style={styles.scrollGradientTop} pointerEvents="none" />
+            <View style={styles.scrollGradientBottom} pointerEvents="none" />
+          </View>
+          
+          <View style={styles.modalFooterNew}>
+            <TouchableOpacity
+              style={[styles.modalSaveButton, editLoading && styles.modalSaveButtonDisabled]}
+              onPress={handleSaveProfile}
+              disabled={editLoading}
+            >
+              {editLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                  <Text style={styles.modalSaveButtonText}>Saqlash</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </Modal>
+      </View>
+    </Modal>
 
       {/* Password Modal */}
       <Modal
         visible={passwordModalVisible}
         animationType="slide"
-        presentationStyle="pageSheet"
+        transparent={true}
         onRequestClose={() => setPasswordModalVisible(false)}
+        statusBarTranslucent
       >
-        <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setPasswordModalVisible(false)}>
-              <Text style={styles.modalCancel}>Bekor qilish</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Parolni o'zgartirish</Text>
-            <View style={{ width: 80 }} />
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainerNew, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+            <View style={styles.modalHeaderNew}>
+              <View style={styles.modalHeaderTop}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="lock-closed-outline" size={24} color="#007AFF" />
+                </View>
+                <View style={styles.modalTitleContainer}>
+                  <Text style={styles.modalTitleNew}>Xavfsizlik</Text>
+                  <Text style={styles.modalSubtitle}>Parolingizni o'zgartiring</Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setPasswordModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.scrollViewContainer}>
+              <ScrollView 
+                style={styles.modalContentNew} 
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={styles.modalContentContainerNew}
+                indicatorStyle="black"
+              >
+                <PasswordInput
+                  label="Joriy parol"
+                  value={passwordData.currentPassword}
+                  onChangeText={(text) => setPasswordData({ ...passwordData, currentPassword: text })}
+                  error={passwordErrors.currentPassword}
+                  placeholder="Joriy parolingizni kiriting"
+                />
+
+                <PasswordInput
+                  label="Yangi parol"
+                  value={passwordData.newPassword}
+                  onChangeText={(text) => setPasswordData({ ...passwordData, newPassword: text })}
+                  error={passwordErrors.newPassword}
+                  placeholder="Yangi parolingizni kiriting"
+                />
+
+                <PasswordInput
+                  label="Yangi parolni tasdiqlash"
+                  value={passwordData.confirmPassword}
+                  onChangeText={(text) => setPasswordData({ ...passwordData, confirmPassword: text })}
+                  error={passwordErrors.confirmPassword}
+                  placeholder="Yangi parolni qayta kiriting"
+                />
+              </ScrollView>
+              <View style={styles.scrollGradientTop} pointerEvents="none" />
+              <View style={styles.scrollGradientBottom} pointerEvents="none" />
+            </View>
+            
+            <View style={styles.modalFooterNew}>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, passwordLoading && styles.modalSaveButtonDisabled]}
+                onPress={handleSavePassword}
+                disabled={passwordLoading}
+              >
+                {passwordLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    <Text style={styles.modalSaveButtonText}>Parolni o'zgartirish</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <PasswordInput
-              label="Joriy parol"
-              value={passwordData.currentPassword}
-              onChangeText={(text) => setPasswordData({ ...passwordData, currentPassword: text })}
-              error={passwordErrors.currentPassword}
-              placeholder="Joriy parolingizni kiriting"
-            />
-
-            <PasswordInput
-              label="Yangi parol"
-              value={passwordData.newPassword}
-              onChangeText={(text) => setPasswordData({ ...passwordData, newPassword: text })}
-              error={passwordErrors.newPassword}
-              placeholder="Yangi parolingizni kiriting"
-            />
-
-            <PasswordInput
-              label="Yangi parolni tasdiqlash"
-              value={passwordData.confirmPassword}
-              onChangeText={(text) => setPasswordData({ ...passwordData, confirmPassword: text })}
-              error={passwordErrors.confirmPassword}
-              placeholder="Yangi parolni qayta kiriting"
-            />
-
-            <Button
-              title="Parolni o'zgartirish"
-              onPress={handleSavePassword}
-              loading={passwordLoading}
-              style={{ marginTop: 8 }}
-            />
-          </ScrollView>
         </View>
       </Modal>
 
@@ -1063,72 +1126,107 @@ export default function ProfileScreen() {
       <Modal
         visible={locationModalVisible}
         animationType="slide"
-        presentationStyle="pageSheet"
+        transparent={true}
         onRequestClose={() => setLocationModalVisible(false)}
+        statusBarTranslucent
       >
-        <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setLocationModalVisible(false)}>
-              <Text style={styles.modalCancel}>Bekor qilish</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Manzilni yangilash</Text>
-            <TouchableOpacity onPress={handleSaveLocation} disabled={locationLoading}>
-              <Text style={[styles.modalSave, locationLoading && styles.modalSaveDisabled]}>
-                Saqlash
-              </Text>
-            </TouchableOpacity>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainerNew, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+            <View style={styles.modalHeaderNew}>
+              <View style={styles.modalHeaderTop}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="location-outline" size={24} color="#007AFF" />
+                </View>
+                <View style={styles.modalTitleContainer}>
+                  <Text style={styles.modalTitleNew}>Manzil</Text>
+                  <Text style={styles.modalSubtitle}>Manzilingizni yangilang</Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setLocationModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.scrollViewContainer}>
+              <ScrollView 
+                style={styles.modalContentNew} 
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={styles.modalContentContainerNew}
+                indicatorStyle="black"
+              >
+                <RegionPicker
+                  label="Viloyat"
+                  value={locationData.viloyatId}
+                  type="region"
+                  onSelect={(region: Region) => {
+                    setLocationData({
+                      ...locationData,
+                      viloyat: region.name,
+                      viloyatId: region._id,
+                      tuman: '',
+                      tumanId: '',
+                      mfy: '',
+                      mfyId: '',
+                    });
+                  }}
+                />
+
+                <RegionPicker
+                  label="Tuman"
+                  value={locationData.tumanId}
+                  type="district"
+                  parentId={locationData.viloyatId}
+                  onSelect={(region: Region) => {
+                    setLocationData({
+                      ...locationData,
+                      tuman: region.name,
+                      tumanId: region._id,
+                      mfy: '',
+                      mfyId: '',
+                    });
+                  }}
+                  disabled={!locationData.viloyatId}
+                />
+
+                <RegionPicker
+                  label="MFY"
+                  value={locationData.mfyId}
+                  type="mfy"
+                  parentId={locationData.tumanId}
+                  onSelect={(region: Region) => {
+                    setLocationData({
+                      ...locationData,
+                      mfy: region.name,
+                      mfyId: region._id,
+                    });
+                  }}
+                  disabled={!locationData.tumanId}
+                />
+              </ScrollView>
+              <View style={styles.scrollGradientTop} pointerEvents="none" />
+              <View style={styles.scrollGradientBottom} pointerEvents="none" />
+            </View>
+            
+            <View style={styles.modalFooterNew}>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, locationLoading && styles.modalSaveButtonDisabled]}
+                onPress={handleSaveLocation}
+                disabled={locationLoading}
+              >
+                {locationLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    <Text style={styles.modalSaveButtonText}>Saqlash</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <RegionPicker
-              label="Viloyat"
-              value={locationData.viloyatId}
-              type="region"
-              onSelect={(region: Region) => {
-                setLocationData({
-                  ...locationData,
-                  viloyat: region.name,
-                  viloyatId: region._id,
-                  tuman: '',
-                  tumanId: '',
-                  mfy: '',
-                  mfyId: '',
-                });
-              }}
-            />
-
-            <RegionPicker
-              label="Tuman"
-              value={locationData.tumanId}
-              type="district"
-              parentId={locationData.viloyatId}
-              onSelect={(region: Region) => {
-                setLocationData({
-                  ...locationData,
-                  tuman: region.name,
-                  tumanId: region._id,
-                  mfy: '',
-                  mfyId: '',
-                });
-              }}
-              disabled={!locationData.viloyatId}
-            />
-
-            <RegionPicker
-              label="MFY"
-              value={locationData.mfyId}
-              type="mfy"
-              parentId={locationData.tumanId}
-              onSelect={(region: Region) => {
-                setLocationData({
-                  ...locationData,
-                  mfy: region.name,
-                  mfyId: region._id,
-                });
-              }}
-              disabled={!locationData.tumanId}
-            />
-          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -1351,10 +1449,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
     marginBottom: 16,
+    marginTop: 8,
   },
   genderButtons: {
     flexDirection: 'row',
@@ -1534,6 +1633,127 @@ const styles = StyleSheet.create({
   },
   datePicker: {
     width: '100%',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainerNew: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '100%',
+    minHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalHeaderNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  modalIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  modalTitleContainer: {
+    flex: 1,
+  },
+  modalTitleNew: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  modalCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContentNew: {
+    flex: 1,
+  },
+  modalContentContainerNew: {
+    padding: 20,
+    paddingBottom: 24,
+  },
+  modalFooterNew: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  modalSaveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalSaveButtonDisabled: {
+    opacity: 0.6,
+  },
+  modalSaveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  scrollViewContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  scrollGradientTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    zIndex: 1,
+    pointerEvents: 'none',
+  },
+  scrollGradientBottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    zIndex: 1,
+    pointerEvents: 'none',
   },
 });
 

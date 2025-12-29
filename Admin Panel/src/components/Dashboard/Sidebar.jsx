@@ -41,10 +41,11 @@ import {
   TrendingUp,
   Archive,
 } from '@mui/icons-material';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { filterMenuItemsByPermissions } from '../../utils/permissions';
 
 const menuItems = [
   { icon: DashboardIcon, label: 'Dashboard', path: '/dashboard' },
@@ -105,9 +106,18 @@ const Sidebar = () => {
     return location.pathname === menu.path;
   };
 
+  // Filter menu items based on permissions
+  const filteredMenuItems = useMemo(() => {
+    if (!admin || !admin.permissions) {
+      // If no admin or permissions, show only dashboard
+      return menuItems.filter(item => item.path === '/dashboard');
+    }
+    return filterMenuItemsByPermissions(menuItems, admin.permissions);
+  }, [admin]);
+
   // Auto-expand parent menu if child is active
   useEffect(() => {
-    menuItems.forEach((item) => {
+    filteredMenuItems.forEach((item) => {
       if (item.children) {
         const hasActiveChild = item.children.some((child) => location.pathname === child.path);
         if (hasActiveChild && !expandedMenus[item.path]) {
@@ -118,7 +128,7 @@ const Sidebar = () => {
         }
       }
     });
-  }, [location.pathname]);
+  }, [location.pathname, filteredMenuItems]);
 
   return (
     <motion.div
@@ -177,7 +187,7 @@ const Sidebar = () => {
 
         {/* Menu Items */}
         <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar">
-          {menuItems.map((item, index) => {
+          {filteredMenuItems.map((item, index) => {
             const Icon = item.icon;
             const hasChildren = item.children && item.children.length > 0;
             const isExpanded = expandedMenus[item.path];

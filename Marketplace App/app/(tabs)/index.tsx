@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -21,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useLocation } from '../../contexts/LocationContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 import apiService, { FeaturedContragent, Product } from '../../services/api';
 
 // Helper function to calculate age from birthDate
@@ -54,6 +54,7 @@ export default function HomeScreen() {
   const { unreadCount } = useNotification();
   const { user } = useAuth();
   const { selectedViloyat, selectedTuman } = useLocation();
+  const { showSuccess, showError } = useSnackbar();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,7 +130,7 @@ export default function HomeScreen() {
       setHasMore(response.page < response.totalPages);
     } catch (error: any) {
       console.error('Error loading products:', error);
-      Alert.alert('Xatolik', error.message || 'Mahsulotlarni yuklashda xatolik yuz berdi');
+      showError(error.message || 'Mahsulotlarni yuklashda xatolik yuz berdi');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -211,23 +212,16 @@ export default function HomeScreen() {
 
   const handleAddToCart = async (product: Product) => {
     if (!isAuthenticated) {
-      Alert.alert(
-        'Kirish kerak',
-        'Korzinkaga qo\'shish uchun tizimga kiring',
-        [
-          { text: 'Bekor qilish', style: 'cancel' },
-          {
-            text: 'Kirish',
-            onPress: () => router.push('/(auth)/login'),
-          },
-        ]
-      );
+      showError('Korzinkaga qo\'shish uchun tizimga kiring', 3000, {
+        label: 'Kirish',
+        onPress: () => router.push('/(auth)/login'),
+      });
       return;
     }
 
     try {
       await addToCart(product._id, 1);
-      Alert.alert('Muvaffaqiyatli', `${product.name} korzinkaga qo'shildi`);
+      showSuccess(`${product.name} korzinkaga qo'shildi`);
     } catch (error) {
       // Error is already shown in context
     }

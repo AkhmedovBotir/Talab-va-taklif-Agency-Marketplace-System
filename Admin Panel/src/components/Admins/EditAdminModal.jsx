@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Close, Visibility, VisibilityOff } from '@mui/icons-material';
+import { Close, Visibility, VisibilityOff, CheckBox, CheckBoxOutlineBlank } from '@mui/icons-material';
 import { adminAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { ALL_PERMISSIONS } from '../../utils/permissions';
 
 const EditAdminModal = ({ open, onClose, onSuccess, admin }) => {
   const { showSuccess, showError } = useSnackbar();
@@ -14,12 +15,15 @@ const EditAdminModal = ({ open, onClose, onSuccess, admin }) => {
     status: 'active',
     username: '',
     parol: '',
+    permissions: [],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectAllPermissions, setSelectAllPermissions] = useState(false);
 
   useEffect(() => {
     if (admin && open) {
+      const adminPermissions = admin.permissions || [];
       setFormData({
         name: admin.name || '',
         telefonRaqam: admin.telefonRaqam || '',
@@ -27,7 +31,9 @@ const EditAdminModal = ({ open, onClose, onSuccess, admin }) => {
         status: admin.status || 'active',
         username: admin.username || '',
         parol: '', // Password is optional in update
+        permissions: adminPermissions,
       });
+      setSelectAllPermissions(adminPermissions.length === ALL_PERMISSIONS.length);
       setShowPassword(false);
     }
   }, [admin, open]);
@@ -37,6 +43,34 @@ const EditAdminModal = ({ open, onClose, onSuccess, admin }) => {
     // Convert username to lowercase automatically
     const processedValue = name === 'username' ? value.toLowerCase() : value;
     setFormData((prev) => ({ ...prev, [name]: processedValue }));
+  };
+
+  const handlePermissionToggle = (permission) => {
+    setFormData((prev) => {
+      const currentPermissions = prev.permissions || [];
+      const isSelected = currentPermissions.includes(permission);
+      const newPermissions = isSelected
+        ? currentPermissions.filter((p) => p !== permission)
+        : [...currentPermissions, permission];
+      
+      // Update select all state
+      setSelectAllPermissions(newPermissions.length === ALL_PERMISSIONS.length);
+      
+      return { ...prev, permissions: newPermissions };
+    });
+  };
+
+  const handleSelectAllPermissions = () => {
+    if (selectAllPermissions) {
+      // Deselect all
+      setFormData((prev) => ({ ...prev, permissions: [] }));
+      setSelectAllPermissions(false);
+    } else {
+      // Select all
+      const allPermissionValues = ALL_PERMISSIONS.map((p) => p.value);
+      setFormData((prev) => ({ ...prev, permissions: allPermissionValues }));
+      setSelectAllPermissions(true);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -219,6 +253,59 @@ const EditAdminModal = ({ open, onClose, onSuccess, admin }) => {
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Agar parolni o'zgartirmasangiz, bo'sh qoldiring</p>
                   </div>
+                </div>
+
+                {/* Permissions Section */}
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Ruhsatlar
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllPermissions}
+                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-2"
+                    >
+                      {selectAllPermissions ? (
+                        <>
+                          <CheckBox className="w-4 h-4" />
+                          <span>Barchasini tanlash</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckBoxOutlineBlank className="w-4 h-4" />
+                          <span>Barchasini bekor qilish</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-4">
+                    Agar ruhsatlar bo'sh qoldirilsa, barcha default ruhsatlar tayinlanadi
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto border border-gray-200 rounded-md p-4">
+                    {ALL_PERMISSIONS.map((permission) => {
+                      const isSelected = formData.permissions?.includes(permission.value) || false;
+                      return (
+                        <label
+                          key={permission.value}
+                          className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handlePermissionToggle(permission.value)}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <span className="text-sm text-gray-700">{permission.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {formData.permissions && formData.permissions.length > 0 && (
+                    <p className="text-xs text-indigo-600 mt-2">
+                      {formData.permissions.length} ta ruhsat tanlangan
+                    </p>
+                  )}
                 </div>
 
                 {/* Actions */}

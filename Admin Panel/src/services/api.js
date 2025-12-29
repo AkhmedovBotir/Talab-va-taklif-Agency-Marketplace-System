@@ -238,7 +238,7 @@ export const adminAPI = {
   },
 
   // Create new admin
-  // Expected fields: name, role, telefonRaqam, username, parol, status
+  // Expected fields: name, role, telefonRaqam, username, parol, status, permissions
   createAdmin: async (adminData) => {
     // Transform field names to match API
     const apiData = {
@@ -249,6 +249,10 @@ export const adminAPI = {
       parol: adminData.parol || adminData.password,
       status: adminData.status || 'active',
     };
+    // Add permissions if provided
+    if (adminData.permissions && Array.isArray(adminData.permissions) && adminData.permissions.length > 0) {
+      apiData.permissions = adminData.permissions;
+    }
     return apiRequest('/admins', {
       method: 'POST',
       body: JSON.stringify(apiData),
@@ -269,6 +273,15 @@ export const adminAPI = {
     if (adminData.parol !== undefined) apiData.parol = adminData.parol;
     if (adminData.password !== undefined && adminData.password.trim() !== '') apiData.parol = adminData.password;
     if (adminData.status !== undefined) apiData.status = adminData.status;
+    // Add permissions if provided
+    if (adminData.permissions !== undefined) {
+      if (Array.isArray(adminData.permissions) && adminData.permissions.length > 0) {
+        apiData.permissions = adminData.permissions;
+      } else {
+        // Empty array means no permissions, but API will assign defaults
+        apiData.permissions = adminData.permissions;
+      }
+    }
     
     return apiRequest(`/admins/${id}`, {
       method: 'PUT',

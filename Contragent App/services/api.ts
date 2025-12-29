@@ -1325,7 +1325,7 @@ export interface PaymentStatisticsData {
   period: {
     startDate: string | null;
     endDate: string | null;
-  } | null;
+  };
   unpaid: {
     totalAmount: number;
     count: number;

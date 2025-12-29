@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import PartnershipRequestModal from './PartnershipRequestModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,31 +15,32 @@ export default function PartnershipBlock({ compact = false }: PartnershipBlockPr
   const [hasRequest, setHasRequest] = useState(false);
   const [checking, setChecking] = useState(true);
 
-  useEffect(() => {
-    const checkPartnershipRequests = async () => {
-      if (!token) {
-        setHasRequest(false);
-        setChecking(false);
-        return;
-      }
+  const checkPartnershipRequests = useCallback(async () => {
+    if (!token) {
+      setHasRequest(false);
+      setChecking(false);
+      return;
+    }
 
-      try {
-        const response = await apiService.getMyPartnershipRequests({ limit: 1 }, token);
-        if (response.success && response.data && response.data.length > 0) {
-          setHasRequest(true);
-        } else {
-          setHasRequest(false);
-        }
-      } catch (error: any) {
-        // Don't show error, just assume no requests
+    try {
+      setChecking(true);
+      const response = await apiService.getMyPartnershipRequests({ limit: 1 }, token);
+      if (response.success && response.data && response.data.length > 0) {
+        setHasRequest(true);
+      } else {
         setHasRequest(false);
-      } finally {
-        setChecking(false);
       }
-    };
-
-    checkPartnershipRequests();
+    } catch (error: any) {
+      // Don't show error, just assume no requests
+      setHasRequest(false);
+    } finally {
+      setChecking(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    checkPartnershipRequests();
+  }, [checkPartnershipRequests]);
 
   if (!token || checking || hasRequest) return null;
 
@@ -73,6 +74,8 @@ export default function PartnershipBlock({ compact = false }: PartnershipBlockPr
           token={token}
           onSuccess={() => {
             setModalVisible(false);
+            // Check again after successful submission
+            checkPartnershipRequests();
           }}
         />
       )}

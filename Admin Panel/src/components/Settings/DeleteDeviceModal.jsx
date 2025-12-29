@@ -120,3 +120,4 @@ const DeleteDeviceModal = ({ open, onClose, onSuccess, device }) => {
 export default DeleteDeviceModal;
 
 
+

@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 import apiService, { Order, PaymentTransaction } from '../../services/api';
 
 export default function OrdersScreen() {
@@ -22,6 +23,7 @@ export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const { unreadCount } = useNotification();
+  const { showSuccess, showError, showInfo } = useSnackbar();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,7 +99,7 @@ export default function OrdersScreen() {
       }
     } catch (error: any) {
       console.error('Error loading orders:', error);
-      Alert.alert('Xatolik', error.message || 'Buyurtmalarni yuklashda xatolik yuz berdi');
+      showError(error.message || 'Buyurtmalarni yuklashda xatolik yuz berdi');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -110,13 +112,13 @@ export default function OrdersScreen() {
 
     // Check if order is confirmed by customer
     if (order.status !== 'confirmed_by_customer') {
-      Alert.alert('Xatolik', 'To\'lov qilish uchun buyurtma mijoz tomonidan tasdiqlangan bo\'lishi kerak');
+      showError('To\'lov qilish uchun buyurtma mijoz tomonidan tasdiqlangan bo\'lishi kerak');
       return;
     }
 
     // Check if already paid
     if (order.paymentStatus === 'paid') {
-      Alert.alert('Ma\'lumot', 'Bu buyurtma uchun to\'lov allaqachon qilingan');
+      showInfo('Bu buyurtma uchun to\'lov allaqachon qilingan');
       return;
     }
 
@@ -136,7 +138,7 @@ export default function OrdersScreen() {
               const response = await apiService.payOrder(order._id, token);
               
               if (response.success && response.transaction) {
-                Alert.alert('Muvaffaqiyatli', 'To\'lov muvaffaqiyatli amalga oshirildi');
+                showSuccess('To\'lov muvaffaqiyatli amalga oshirildi');
                 
                 // Update payment status
                 setPaymentStatuses((prev) => ({
@@ -149,7 +151,7 @@ export default function OrdersScreen() {
               }
             } catch (error: any) {
               console.error('Error making payment:', error);
-              Alert.alert('Xatolik', error.message || 'To\'lov qilishda xatolik yuz berdi');
+              showError(error.message || 'To\'lov qilishda xatolik yuz berdi');
             } finally {
               setPayingOrders((prev) => {
                 const newState = { ...prev };

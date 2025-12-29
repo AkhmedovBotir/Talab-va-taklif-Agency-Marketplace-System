@@ -279,3 +279,4 @@ const ContragentTypeSelect = ({ value, onChange, disabled, label, required, name
 export default ContragentTypeSelect;
 
 
+

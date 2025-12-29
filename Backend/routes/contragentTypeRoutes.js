@@ -12,16 +12,15 @@ const {
   contragentTypeValidationSchemas,
 } = require('../middleware/validation');
 const { adminAuth } = require('../middleware/auth');
-const { redisCache, invalidateCache } = require('../middleware/redisCache');
 
 // Public routes (GET - open access)
-router.get('/', redisCache(1800), getAllContragentTypes); // 30 daqiqa cache
-router.get('/:id', redisCache(1800), getContragentTypeById); // 30 daqiqa cache
+router.get('/', getAllContragentTypes);
+router.get('/:id', getContragentTypeById);
 
 // Admin routes (CRUD - require authentication)
-router.post('/', adminAuth, validate(contragentTypeValidationSchemas.create), invalidateCache(['cache:/api/contragent-types*']), createContragentType);
-router.put('/:id', adminAuth, validate(contragentTypeValidationSchemas.update), invalidateCache(['cache:/api/contragent-types*']), updateContragentType);
-router.delete('/:id', adminAuth, invalidateCache(['cache:/api/contragent-types*']), deleteContragentType);
+router.post('/', adminAuth, validate(contragentTypeValidationSchemas.create), createContragentType);
+router.put('/:id', adminAuth, validate(contragentTypeValidationSchemas.update), updateContragentType);
+router.delete('/:id', adminAuth, deleteContragentType);
 
 module.exports = router;
 

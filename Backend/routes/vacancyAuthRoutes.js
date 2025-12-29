@@ -12,13 +12,12 @@ const {
   forgotPasswordConfirm,
   resendCode,
 } = require('../controllers/vacancyAuthController');
-const { redisCache } = require('../middleware/redisCache');
 
 // Phone check
 router.get('/register/check', checkPhone);
 
 // Regions
-router.get('/regions', redisCache(1800), getRegions); // 30 daqiqa cache
+router.get('/regions', getRegions);
 
 // Register
 router.post('/register/send-code', sendRegisterCode);

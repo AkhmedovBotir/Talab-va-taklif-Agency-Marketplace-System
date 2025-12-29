@@ -58,12 +58,34 @@ The API uses JWT (JSON Web Token) for authentication. After successful login, yo
   "telefonRaqam": "string (valid phone number)",
   "username": "string (3-30 characters, alphanumeric, lowercase)",
   "status": "string (enum: 'active' | 'inactive', default: 'active')",
+  "permissions": "array of strings (default: all permissions)",
   "createdAt": "string (ISO 8601 date)",
   "updatedAt": "string (ISO 8601 date)"
 }
 ```
 
 **Note:** The `parol` (password) field is never returned in API responses for security reasons.
+
+**Permissions:** Array of permission strings. When a new admin is created, all default permissions are automatically assigned:
+- `dashboard`
+- `admins`
+- `regions`
+- `counterparties`
+- `agents`
+- `points`
+- `archive`
+- `warehouse`
+- `marketplace_clients`
+- `messages`
+- `orders`
+- `kpi_bonuses`
+- `area_statistics`
+- `sms`
+- `finance`
+- `pricing`
+- `partnership_requests`
+- `vacancies`
+- `settings`
 
 ---
 
@@ -103,6 +125,27 @@ Authenticate an admin user and receive a JWT token.
       "telefonRaqam": "+998901234567",
       "username": "johndoe",
       "status": "active",
+      "permissions": [
+        "dashboard",
+        "admins",
+        "regions",
+        "counterparties",
+        "agents",
+        "points",
+        "archive",
+        "warehouse",
+        "marketplace_clients",
+        "messages",
+        "orders",
+        "kpi_bonuses",
+        "area_statistics",
+        "sms",
+        "finance",
+        "pricing",
+        "partnership_requests",
+        "vacancies",
+        "settings"
+      ],
       "createdAt": "2024-01-15T10:30:00.000Z",
       "updatedAt": "2024-01-15T10:30:00.000Z"
     }
@@ -134,7 +177,8 @@ Create a new admin user.
   "telefonRaqam": "string (required, valid phone format)",
   "username": "string (required, 3-30 chars, alphanumeric)",
   "parol": "string (required, min 6 chars)",
-  "status": "string (optional, 'active' | 'inactive', default: 'active')"
+  "status": "string (optional, 'active' | 'inactive', default: 'active')",
+  "permissions": "array of strings (optional, defaults to all permissions)"
 }
 ```
 
@@ -145,19 +189,42 @@ Create a new admin user.
 - `username`: Required, 3-30 characters, alphanumeric only, lowercase, unique
 - `parol`: Required, minimum 6 characters
 - `status`: Optional, must be 'active' or 'inactive', defaults to 'active'
+- `permissions`: Optional, array of permission strings. If not provided, all default permissions are assigned
 
 **Success Response (201 Created):**
 
 ```json
 {
   "success": true,
-  "message": "Admin created successfully",
+  "message": "Admin muvaffaqiyatli yaratildi",
   "data": {
     "_id": "507f1f77bcf86cd799439011",
     "name": "John Doe",
     "role": "general",
     "telefonRaqam": "+998901234567",
     "username": "johndoe",
+    "status": "active",
+    "permissions": [
+      "dashboard",
+      "admins",
+      "regions",
+      "counterparties",
+      "agents",
+      "points",
+      "archive",
+      "warehouse",
+      "marketplace_clients",
+      "messages",
+      "orders",
+      "kpi_bonuses",
+      "area_statistics",
+      "sms",
+      "finance",
+      "pricing",
+      "partnership_requests",
+      "vacancies",
+      "settings"
+    ],
     "createdAt": "2024-01-15T10:30:00.000Z",
     "updatedAt": "2024-01-15T10:30:00.000Z"
   }
@@ -192,6 +259,28 @@ Retrieve all admin users.
       "role": "general",
       "telefonRaqam": "+998901234567",
       "username": "johndoe",
+      "status": "active",
+      "permissions": [
+        "dashboard",
+        "admins",
+        "regions",
+        "counterparties",
+        "agents",
+        "points",
+        "archive",
+        "warehouse",
+        "marketplace_clients",
+        "messages",
+        "orders",
+        "kpi_bonuses",
+        "area_statistics",
+        "sms",
+        "finance",
+        "pricing",
+        "partnership_requests",
+        "vacancies",
+        "settings"
+      ],
       "createdAt": "2024-01-15T10:30:00.000Z",
       "updatedAt": "2024-01-15T10:30:00.000Z"
     },
@@ -201,6 +290,28 @@ Retrieve all admin users.
       "role": "admin",
       "telefonRaqam": "+998901234568",
       "username": "janesmith",
+      "status": "active",
+      "permissions": [
+        "dashboard",
+        "admins",
+        "regions",
+        "counterparties",
+        "agents",
+        "points",
+        "archive",
+        "warehouse",
+        "marketplace_clients",
+        "messages",
+        "orders",
+        "kpi_bonuses",
+        "area_statistics",
+        "sms",
+        "finance",
+        "pricing",
+        "partnership_requests",
+        "vacancies",
+        "settings"
+      ],
       "createdAt": "2024-01-15T11:00:00.000Z",
       "updatedAt": "2024-01-15T11:00:00.000Z"
     }
@@ -235,6 +346,27 @@ Retrieve a specific admin by their ID.
     "telefonRaqam": "+998901234567",
     "username": "johndoe",
     "status": "active",
+    "permissions": [
+      "dashboard",
+      "admins",
+      "regions",
+      "counterparties",
+      "agents",
+      "points",
+      "archive",
+      "warehouse",
+      "marketplace_clients",
+      "messages",
+      "orders",
+      "kpi_bonuses",
+      "area_statistics",
+      "sms",
+      "finance",
+      "pricing",
+      "partnership_requests",
+      "vacancies",
+      "settings"
+    ],
     "createdAt": "2024-01-15T10:30:00.000Z",
     "updatedAt": "2024-01-15T10:30:00.000Z"
   }
@@ -269,26 +401,50 @@ All fields are optional. Only include fields you want to update.
   "telefonRaqam": "string (optional, valid phone format)",
   "username": "string (optional, 3-30 chars, alphanumeric)",
   "parol": "string (optional, min 6 chars)",
-  "status": "string (optional, 'active' | 'inactive')"
+  "status": "string (optional, 'active' | 'inactive')",
+  "permissions": "array of strings (optional)"
 }
 ```
 
 **Validation Rules:**
 - Same as create, but all fields are optional
 - Username and telefonRaqam must be unique (cannot duplicate existing values)
+- If `permissions` is not provided or is empty, default permissions will be assigned
 
 **Success Response (200 OK):**
 
 ```json
 {
   "success": true,
-  "message": "Admin updated successfully",
+  "message": "Admin muvaffaqiyatli yangilandi",
   "data": {
     "_id": "507f1f77bcf86cd799439011",
     "name": "John Updated",
     "role": "admin",
     "telefonRaqam": "+998901234567",
     "username": "johndoe",
+    "status": "active",
+    "permissions": [
+      "dashboard",
+      "admins",
+      "regions",
+      "counterparties",
+      "agents",
+      "points",
+      "archive",
+      "warehouse",
+      "marketplace_clients",
+      "messages",
+      "orders",
+      "kpi_bonuses",
+      "area_statistics",
+      "sms",
+      "finance",
+      "pricing",
+      "partnership_requests",
+      "vacancies",
+      "settings"
+    ],
     "createdAt": "2024-01-15T10:30:00.000Z",
     "updatedAt": "2024-01-15T12:00:00.000Z"
   }
@@ -466,6 +622,33 @@ All error responses follow a consistent format:
 - **Default:** `'active'`
 - **Description:** Indicates whether the admin account is active or inactive
 
+### Permissions
+- **Type:** Array of Strings
+- **Required:** No (defaults to all permissions)
+- **Default:** All 19 default permissions are assigned automatically
+- **Description:** Array of permission strings that define what the admin can access
+- **Available Permissions:**
+  - `dashboard` - Access to dashboard
+  - `admins` - Manage admins
+  - `regions` - Manage regions
+  - `counterparties` - Manage counterparties
+  - `agents` - Manage agents
+  - `points` - Manage points
+  - `archive` - Access archive
+  - `warehouse` - Manage warehouse
+  - `marketplace_clients` - Manage marketplace clients
+  - `messages` - Manage messages
+  - `orders` - Manage orders
+  - `kpi_bonuses` - Manage KPI bonuses
+  - `area_statistics` - View area statistics
+  - `sms` - Manage SMS
+  - `finance` - Manage finance
+  - `pricing` - Manage pricing
+  - `partnership_requests` - Manage partnership requests
+  - `vacancies` - Manage vacancies
+  - `settings` - Access settings
+- **Note:** If permissions are not provided when creating an admin, all default permissions are automatically assigned. If an existing admin has no permissions, default permissions are assigned when the admin is retrieved or updated.
+
 ---
 
 ## Examples
@@ -498,6 +681,27 @@ curl -X POST http://localhost:5000/api/admins/login \
       "telefonRaqam": "+998901234567",
       "username": "johndoe",
       "status": "active",
+      "permissions": [
+        "dashboard",
+        "admins",
+        "regions",
+        "counterparties",
+        "agents",
+        "points",
+        "archive",
+        "warehouse",
+        "marketplace_clients",
+        "messages",
+        "orders",
+        "kpi_bonuses",
+        "area_statistics",
+        "sms",
+        "finance",
+        "pricing",
+        "partnership_requests",
+        "vacancies",
+        "settings"
+      ],
       "createdAt": "2024-01-15T10:30:00.000Z",
       "updatedAt": "2024-01-15T10:30:00.000Z"
     }
@@ -534,6 +738,27 @@ curl -X POST http://localhost:5000/api/admins \
     "telefonRaqam": "+998901234567",
     "username": "johndoe",
     "status": "active",
+    "permissions": [
+      "dashboard",
+      "admins",
+      "regions",
+      "counterparties",
+      "agents",
+      "points",
+      "archive",
+      "warehouse",
+      "marketplace_clients",
+      "messages",
+      "orders",
+      "kpi_bonuses",
+      "area_statistics",
+      "sms",
+      "finance",
+      "pricing",
+      "partnership_requests",
+      "vacancies",
+      "settings"
+    ],
     "createdAt": "2024-01-15T10:30:00.000Z",
     "updatedAt": "2024-01-15T10:30:00.000Z"
   }
@@ -554,6 +779,91 @@ curl -X POST http://localhost:5000/api/admins \
     "username": "janesmith",
     "parol": "adminpass456"
   }'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Admin muvaffaqiyatli yaratildi",
+  "data": {
+    "_id": "507f1f77bcf86cd799439012",
+    "name": "Jane Smith",
+    "role": "admin",
+    "telefonRaqam": "+998901234568",
+    "username": "janesmith",
+    "status": "active",
+    "permissions": [
+      "dashboard",
+      "admins",
+      "regions",
+      "counterparties",
+      "agents",
+      "points",
+      "archive",
+      "warehouse",
+      "marketplace_clients",
+      "messages",
+      "orders",
+      "kpi_bonuses",
+      "area_statistics",
+      "sms",
+      "finance",
+      "pricing",
+      "partnership_requests",
+      "vacancies",
+      "settings"
+    ],
+    "createdAt": "2024-01-15T11:00:00.000Z",
+    "updatedAt": "2024-01-15T11:00:00.000Z"
+  }
+}
+```
+
+### Example 3.1: Create Admin with Custom Permissions
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:5000/api/admins \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Limited Admin",
+    "role": "general",
+    "telefonRaqam": "+998901234569",
+    "username": "limitedadmin",
+    "parol": "securepass123",
+    "permissions": [
+      "dashboard",
+      "orders",
+      "messages"
+    ]
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Admin muvaffaqiyatli yaratildi",
+  "data": {
+    "_id": "507f1f77bcf86cd799439013",
+    "name": "Limited Admin",
+    "role": "general",
+    "telefonRaqam": "+998901234569",
+    "username": "limitedadmin",
+    "status": "active",
+    "permissions": [
+      "dashboard",
+      "orders",
+      "messages"
+    ],
+    "createdAt": "2024-01-15T11:30:00.000Z",
+    "updatedAt": "2024-01-15T11:30:00.000Z"
+  }
+}
 ```
 
 ### Example 4: Get All Admins
@@ -577,6 +887,28 @@ curl -X GET http://localhost:5000/api/admins
       "role": "general",
       "telefonRaqam": "+998901234567",
       "username": "johndoe",
+      "status": "active",
+      "permissions": [
+        "dashboard",
+        "admins",
+        "regions",
+        "counterparties",
+        "agents",
+        "points",
+        "archive",
+        "warehouse",
+        "marketplace_clients",
+        "messages",
+        "orders",
+        "kpi_bonuses",
+        "area_statistics",
+        "sms",
+        "finance",
+        "pricing",
+        "partnership_requests",
+        "vacancies",
+        "settings"
+      ],
       "createdAt": "2024-01-15T10:30:00.000Z",
       "updatedAt": "2024-01-15T10:30:00.000Z"
     },
@@ -587,6 +919,27 @@ curl -X GET http://localhost:5000/api/admins
       "telefonRaqam": "+998901234568",
       "username": "janesmith",
       "status": "active",
+      "permissions": [
+        "dashboard",
+        "admins",
+        "regions",
+        "counterparties",
+        "agents",
+        "points",
+        "archive",
+        "warehouse",
+        "marketplace_clients",
+        "messages",
+        "orders",
+        "kpi_bonuses",
+        "area_statistics",
+        "sms",
+        "finance",
+        "pricing",
+        "partnership_requests",
+        "vacancies",
+        "settings"
+      ],
       "createdAt": "2024-01-15T11:00:00.000Z",
       "updatedAt": "2024-01-15T11:00:00.000Z"
     }
@@ -614,6 +967,27 @@ curl -X GET http://localhost:5000/api/admins/507f1f77bcf86cd799439011
     "telefonRaqam": "+998901234567",
     "username": "johndoe",
     "status": "active",
+    "permissions": [
+      "dashboard",
+      "admins",
+      "regions",
+      "counterparties",
+      "agents",
+      "points",
+      "archive",
+      "warehouse",
+      "marketplace_clients",
+      "messages",
+      "orders",
+      "kpi_bonuses",
+      "area_statistics",
+      "sms",
+      "finance",
+      "pricing",
+      "partnership_requests",
+      "vacancies",
+      "settings"
+    ],
     "createdAt": "2024-01-15T10:30:00.000Z",
     "updatedAt": "2024-01-15T10:30:00.000Z"
   }
@@ -633,6 +1007,23 @@ curl -X PUT http://localhost:5000/api/admins/507f1f77bcf86cd799439011 \
   }'
 ```
 
+### Example 6.1: Update Admin Permissions
+
+**Request:**
+
+```bash
+curl -X PUT http://localhost:5000/api/admins/507f1f77bcf86cd799439011 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "permissions": [
+      "dashboard",
+      "orders",
+      "messages",
+      "finance"
+    ]
+  }'
+```
+
 **Response:**
 
 ```json
@@ -646,6 +1037,52 @@ curl -X PUT http://localhost:5000/api/admins/507f1f77bcf86cd799439011 \
     "telefonRaqam": "+998901234567",
     "username": "johndoe",
     "status": "active",
+    "permissions": [
+      "dashboard",
+      "orders",
+      "messages",
+      "finance"
+    ],
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T12:30:00.000Z"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Admin muvaffaqiyatli yangilandi",
+  "data": {
+    "_id": "507f1f77bcf86cd799439011",
+    "name": "John Updated",
+    "role": "admin",
+    "telefonRaqam": "+998901234567",
+    "username": "johndoe",
+    "status": "active",
+    "permissions": [
+      "dashboard",
+      "admins",
+      "regions",
+      "counterparties",
+      "agents",
+      "points",
+      "archive",
+      "warehouse",
+      "marketplace_clients",
+      "messages",
+      "orders",
+      "kpi_bonuses",
+      "area_statistics",
+      "sms",
+      "finance",
+      "pricing",
+      "partnership_requests",
+      "vacancies",
+      "settings"
+    ],
     "createdAt": "2024-01-15T10:30:00.000Z",
     "updatedAt": "2024-01-15T12:00:00.000Z"
   }
@@ -728,6 +1165,14 @@ curl -X POST http://localhost:5000/api/admins \
 
 7. **Partial Updates:** When updating an admin, you only need to include the fields you want to change. All fields are optional in update requests.
 
+8. **Permissions:** All new admins automatically receive all 19 default permissions. If an existing admin has no permissions (e.g., created before permissions were added), default permissions are automatically assigned when the admin is retrieved or updated. You can customize permissions by providing a `permissions` array when creating or updating an admin.
+
+9. **Permissions Auto-Assignment:** The system automatically ensures all admins have permissions. If an admin is missing permissions, they are automatically assigned default permissions when:
+   - Retrieving admin by ID
+   - Getting all admins
+   - Updating admin
+   - Logging in
+
 ---
 
 ## Health Check
@@ -749,4 +1194,6 @@ To verify the server is running, you can use the health check endpoint:
 ---
 
 **Last Updated:** 2024-01-15
+
+**Version:** 2.0 (Added Permissions Support)
 

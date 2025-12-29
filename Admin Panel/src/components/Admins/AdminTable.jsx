@@ -69,6 +69,9 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
                 Username
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Role
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -101,6 +104,15 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
                     <div className="text-sm text-gray-900">{admin.username}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      admin.role === 'admin'
+                        ? 'bg-purple-100 text-purple-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {admin.role === 'admin' ? 'Admin' : 'General'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <label className={`relative inline-flex items-center ${isGeneralRole ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input
                         type="checkbox"
@@ -123,6 +135,7 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
+                      {/* View button - always enabled */}
                       <button
                         onClick={() => onView(admin)}
                         className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
@@ -130,30 +143,42 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
                       >
                         <Visibility className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => onEdit(admin)}
-                        disabled={isGeneralRole}
-                        className={`p-1 rounded transition-colors ${
-                          isGeneralRole
-                            ? 'text-gray-300 cursor-not-allowed'
-                            : 'text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50'
-                        }`}
-                        title={isGeneralRole ? 'Sizda bu amalni bajarish huquqi yo\'q' : 'Tahrirlash'}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onDelete(admin)}
-                        disabled={isGeneralRole}
-                        className={`p-1 rounded transition-colors ${
-                          isGeneralRole
-                            ? 'text-gray-300 cursor-not-allowed'
-                            : 'text-red-600 hover:text-red-900 hover:bg-red-50'
-                        }`}
-                        title={isGeneralRole ? 'Sizda bu amalni bajarish huquqi yo\'q' : 'O\'chirish'}
-                      >
-                        <Delete className="w-4 h-4" />
-                      </button>
+                      {/* Edit button - disabled for general role */}
+                      {isGeneralRole ? (
+                        <button
+                          disabled
+                          className="text-gray-300 cursor-not-allowed p-1 rounded transition-colors"
+                          title="General role uchun tahrirlash mumkin emas"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onEdit(admin)}
+                          className="text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 p-1 rounded transition-colors"
+                          title="Tahrirlash"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {/* Delete button - disabled for general role */}
+                      {isGeneralRole ? (
+                        <button
+                          disabled
+                          className="text-gray-300 cursor-not-allowed p-1 rounded transition-colors"
+                          title="General role uchun o'chirish mumkin emas"
+                        >
+                          <Delete className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onDelete(admin)}
+                          className="text-red-600 hover:text-red-900 hover:bg-red-50 p-1 rounded transition-colors"
+                          title="O'chirish"
+                        >
+                          <Delete className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </motion.tr>

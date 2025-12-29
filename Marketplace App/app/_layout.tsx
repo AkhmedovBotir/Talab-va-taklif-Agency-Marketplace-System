@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { CartProvider } from '../contexts/CartContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
 import { LocationProvider } from '../contexts/LocationContext';
+import { SnackbarProvider } from '../contexts/SnackbarContext';
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -68,7 +69,9 @@ export default function RootLayout() {
       <LocationProvider>
         <CartProvider>
           <NotificationProvider>
-            <RootLayoutNav />
+            <SnackbarProvider>
+              <RootLayoutNav />
+            </SnackbarProvider>
           </NotificationProvider>
         </CartProvider>
       </LocationProvider>

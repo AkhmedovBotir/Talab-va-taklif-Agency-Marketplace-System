@@ -10,11 +10,12 @@ const createGeneralAdmin = async () => {
 
     // Admin data
     const adminData = {
-      name: process.env.ADMIN_NAME || 'General Admin',
+      name: process.env.ADMIN_NAME,
       role: 'general',
-      telefonRaqam: process.env.ADMIN_PHONE || '+998901234567',
-      username: process.env.ADMIN_USERNAME || 'generaladmin',
-      parol: process.env.ADMIN_PASSWORD || 'admin123',
+      telefonRaqam: process.env.ADMIN_PHONE,
+      username: process.env.ADMIN_USERNAME,
+      parol: process.env.ADMIN_PASSWORD,
+      permissions: ['dashboard', 'admins', 'regions', 'counterparties', 'agents', 'points', 'archive', 'warehouse', 'marketplace_clients', 'messages', 'orders', 'kpi_bonuses', 'area_statistics', 'sms', 'finance', 'pricing', 'partnership_requests', 'vacancies', 'settings'],
     };
 
     // Check if admin already exists
@@ -32,6 +33,7 @@ const createGeneralAdmin = async () => {
         name: existingAdmin.name,
         username: existingAdmin.username,
         role: existingAdmin.role,
+        permissions: existingAdmin.permissions,
       });
       process.exit(1);
     }
@@ -48,6 +50,7 @@ const createGeneralAdmin = async () => {
       role: admin.role,
       telefonRaqam: admin.telefonRaqam,
       createdAt: admin.createdAt,
+      permissions: admin.permissions,
     });
 
     process.exit(0);

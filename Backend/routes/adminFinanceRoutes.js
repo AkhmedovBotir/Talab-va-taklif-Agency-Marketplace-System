@@ -27,77 +27,76 @@ const {
   getTotalBalance,
 } = require('../controllers/adminFinanceController');
 const { adminAuth } = require('../middleware/auth');
-const { redisCache, invalidateCache } = require('../middleware/redisCache');
 
 // ==================== HISOBOTLAR ====================
 
 // Kunlik hisobot
-router.get('/reports/daily', adminAuth, redisCache(60), getDailyReport); // 1 daqiqa cache
+router.get('/reports/daily', adminAuth, getDailyReport);
 
 // Haftalik hisobot
-router.get('/reports/weekly', adminAuth, redisCache(120), getWeeklyReport); // 2 daqiqa cache
+router.get('/reports/weekly', adminAuth, getWeeklyReport);
 
 // Oylik hisobot
-router.get('/reports/monthly', adminAuth, redisCache(300), getMonthlyReport); // 5 daqiqa cache
+router.get('/reports/monthly', adminAuth, getMonthlyReport);
 
 // Yillik hisobot
-router.get('/reports/yearly', adminAuth, redisCache(600), getYearlyReport); // 10 daqiqa cache
+router.get('/reports/yearly', adminAuth, getYearlyReport);
 
 // Belgilangan muddat hisoboti
-router.get('/reports/custom', adminAuth, redisCache(60), getCustomReport); // 1 daqiqa cache
+router.get('/reports/custom', adminAuth, getCustomReport);
 
 // ==================== TOPSHIRUVLAR ====================
 
 // Kutilayotgan topshiruvlar
-router.get('/submissions/pending', adminAuth, redisCache(30), getPendingSubmissions); // 30 sekund cache
+router.get('/submissions/pending', adminAuth, getPendingSubmissions);
 
 // Topshiruvni tasdiqlash
-router.post('/submissions/:submissionId/confirm', adminAuth, invalidateCache(['cache:/api/admin-finance*']), confirmSubmission);
+router.post('/submissions/:submissionId/confirm', adminAuth, confirmSubmission);
 
 // Topshiruvni rad etish
-router.post('/submissions/:submissionId/reject', adminAuth, invalidateCache(['cache:/api/admin-finance*']), rejectSubmission);
+router.post('/submissions/:submissionId/reject', adminAuth, rejectSubmission);
 
 // ==================== TRANSAKSIYALAR ====================
 
 // Barcha transaksiyalar
-router.get('/transactions', adminAuth, redisCache(60), getAllTransactions); // 1 daqiqa cache
+router.get('/transactions', adminAuth, getAllTransactions);
 
 // ==================== STATISTIKA ====================
 
 // Umumiy statistika
-router.get('/statistics', adminAuth, redisCache(120), getStatistics); // 2 daqiqa cache
+router.get('/statistics', adminAuth, getStatistics);
 
 // Viloyat bo'yicha statistika
-router.get('/statistics/region', adminAuth, redisCache(120), getStatisticsByRegion); // 2 daqiqa cache
+router.get('/statistics/region', adminAuth, getStatisticsByRegion);
 
 // Tuman bo'yicha statistika
-router.get('/statistics/district', adminAuth, redisCache(120), getStatisticsByDistrict); // 2 daqiqa cache
+router.get('/statistics/district', adminAuth, getStatisticsByDistrict);
 
 // MFY bo'yicha statistika
-router.get('/statistics/mfy', adminAuth, redisCache(120), getStatisticsByMfy); // 2 daqiqa cache
+router.get('/statistics/mfy', adminAuth, getStatisticsByMfy);
 
 // Agentlar faolligi
-router.get('/statistics/agent-performance', adminAuth, redisCache(120), getAgentPerformance); // 2 daqiqa cache
+router.get('/statistics/agent-performance', adminAuth, getAgentPerformance);
 
 // ==================== MOLIYA BALANSLARI ====================
 
 // Umumiy balans (Umumiy tushgan summa, Tarqatilgan summa, Moliya bo'limiga ajratilgan summa)
-router.get('/balance', adminAuth, redisCache(60), getFinanceBalance); // 1 daqiqa cache
+router.get('/balance', adminAuth, getFinanceBalance);
 
 // Umumiy tushgan summa
-router.get('/balance/total-received', adminAuth, redisCache(60), getTotalReceived); // 1 daqiqa cache
+router.get('/balance/total-received', adminAuth, getTotalReceived);
 
 // Tarqatilgan summa (KPI bonuslar)
-router.get('/balance/total-distributed', adminAuth, redisCache(120), getTotalDistributed); // 2 daqiqa cache
+router.get('/balance/total-distributed', adminAuth, getTotalDistributed);
 
 // Moliya bo'limiga ajratilgan summa (KPI bonuslardan)
-router.get('/balance/finance-kpi', adminAuth, redisCache(120), getFinanceKpiAmount); // 2 daqiqa cache
+router.get('/balance/finance-kpi', adminAuth, getFinanceKpiAmount);
 
 // Yetkazib berish xizmati summasi (KPI bonuslardan)
-router.get('/balance/delivery-service-kpi', adminAuth, redisCache(120), getDeliveryServiceKpiAmount); // 2 daqiqa cache
+router.get('/balance/delivery-service-kpi', adminAuth, getDeliveryServiceKpiAmount);
 
 // Umumiy balans (Tushgan - Tarqatilgan)
-router.get('/balance/total-balance', adminAuth, redisCache(60), getTotalBalance); // 1 daqiqa cache
+router.get('/balance/total-balance', adminAuth, getTotalBalance);
 
 module.exports = router;
 

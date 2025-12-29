@@ -18,6 +18,7 @@ import Input from '../components/ui/Input';
 import RegionPicker from '../components/ui/RegionPicker';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import apiService, { Region } from '../services/api';
 
 export default function CheckoutScreen() {
@@ -25,6 +26,7 @@ export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const { token, user, logout } = useAuth();
   const { cart, refreshCart } = useCart();
+  const { showSuccess, showError } = useSnackbar();
 
   const [profile, setProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -89,9 +91,8 @@ export default function CheckoutScreen() {
   useEffect(() => {
     // Only check cart on initial load, not after order creation
     if (!orderCreated && (!cart || cart.items.length === 0)) {
-      Alert.alert('Xatolik', 'Korzinka bo\'sh', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      showError('Korzinka bo\'sh');
+      setTimeout(() => router.back(), 1500);
     }
   }, [cart, orderCreated]);
 
@@ -177,21 +178,18 @@ export default function CheckoutScreen() {
       if (response.success) {
         setOrderCreated(true);
         await refreshCart();
-        Alert.alert(
-          'Muvaffaqiyatli',
-          'Buyurtma muvaffaqiyatli yaratildi',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace(`/order/${response.data._id}` as any);
-              },
-            },
-          ]
-        );
+        showSuccess('Buyurtma muvaffaqiyatli yaratildi', 2000, {
+          label: 'Ko\'rish',
+          onPress: () => {
+            router.replace(`/order/${response.data._id}` as any);
+          },
+        });
+        setTimeout(() => {
+          router.replace(`/order/${response.data._id}` as any);
+        }, 2000);
       } else {
         console.error('Order creation failed:', response);
-        Alert.alert('Xatolik', response.message || 'Buyurtma yaratishda xatolik yuz berdi');
+        showError(response.message || 'Buyurtma yaratishda xatolik yuz berdi');
       }
     } catch (error: any) {
       console.error('Order creation error:', error);
@@ -203,7 +201,7 @@ export default function CheckoutScreen() {
       
       // 401 error is handled globally in API service and layout
       // Just show error message
-      Alert.alert('Xatolik', error.message || 'Buyurtma yaratishda xatolik yuz berdi');
+      showError(error.message || 'Buyurtma yaratishda xatolik yuz berdi');
     } finally {
       setLoading(false);
     }

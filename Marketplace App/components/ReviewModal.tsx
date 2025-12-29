@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api, { CommentTemplate, CreateReviewRequest } from '../services/api';
+import { useSnackbar } from '../contexts/SnackbarContext';
 
 interface ReviewModalProps {
   visible: boolean;
@@ -34,6 +34,7 @@ export default function ReviewModal({
   onSuccess,
 }: ReviewModalProps) {
   const insets = useSafeAreaInsets();
+  const { showSuccess, showError } = useSnackbar();
   const [templates, setTemplates] = useState<CommentTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -61,7 +62,7 @@ export default function ReviewModal({
         setTemplates(response.data);
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Shablonlarni yuklashda xatolik yuz berdi');
+      showError(error.message || 'Shablonlarni yuklashda xatolik yuz berdi');
     } finally {
       setLoading(false);
     }
@@ -87,17 +88,17 @@ export default function ReviewModal({
 
   const handleSubmit = async () => {
     if (rating === 0) {
-      Alert.alert('Xatolik', 'Iltimos, baholashni tanlang');
+      showError('Iltimos, baholashni tanlang');
       return;
     }
 
     if (!selectedTemplateId && !customComment.trim()) {
-      Alert.alert('Xatolik', 'Iltimos, shablon yoki kommentariya kiriting');
+      showError('Iltimos, shablon yoki kommentariya kiriting');
       return;
     }
 
     if (showCustomComment && !customComment.trim()) {
-      Alert.alert('Xatolik', 'Iltimos, kommentariya kiriting');
+      showError('Iltimos, kommentariya kiriting');
       return;
     }
 
@@ -118,12 +119,12 @@ export default function ReviewModal({
 
       const response = await api.createReview(reviewData, token);
       if (response.success) {
-        Alert.alert('Muvaffaqiyatli', 'Baholash muvaffaqiyatli yuborildi');
+        showSuccess('Baholash muvaffaqiyatli yuborildi');
         onSuccess();
         onClose();
       }
     } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Baholash yuborishda xatolik yuz berdi');
+      showError(error.message || 'Baholash yuborishda xatolik yuz berdi');
     } finally {
       setSubmitting(false);
     }

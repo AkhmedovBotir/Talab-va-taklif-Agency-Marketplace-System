@@ -11,19 +11,18 @@ const {
   getNotificationStats,
 } = require('../controllers/notificationController');
 const { adminAuth } = require('../middleware/auth');
-const { redisCache, invalidateCache } = require('../middleware/redisCache');
 
 // Admin routes
-router.post('/', adminAuth, invalidateCache(['cache:/api/notifications*']), createNotification);
-router.get('/', adminAuth, redisCache(30), getAllNotifications); // 30 sekund cache
-router.get('/stats', adminAuth, redisCache(60), getNotificationStats); // 1 daqiqa cache
-router.get('/:id', adminAuth, redisCache(60), getNotificationById); // 1 daqiqa cache
-router.put('/:id', adminAuth, invalidateCache(['cache:/api/notifications*']), updateNotification);
-router.delete('/:id', adminAuth, invalidateCache(['cache:/api/notifications*']), deleteNotification);
+router.post('/', adminAuth, createNotification);
+router.get('/', adminAuth, getAllNotifications);
+router.get('/stats', adminAuth, getNotificationStats);
+router.get('/:id', adminAuth, getNotificationById);
+router.put('/:id', adminAuth, updateNotification);
+router.delete('/:id', adminAuth, deleteNotification);
 
 // User routes (for punkts, agents, marketplace users)
-router.get('/my/:userType/:userId', redisCache(30), getMyNotifications); // 30 sekund cache
-router.post('/:notificationId/read', invalidateCache(['cache:/api/notifications/my/*']), markAsRead);
+router.get('/my/:userType/:userId', getMyNotifications);
+router.post('/:notificationId/read', markAsRead);
 
 module.exports = router;
 

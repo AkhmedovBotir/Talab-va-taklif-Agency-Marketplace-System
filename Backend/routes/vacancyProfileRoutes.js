@@ -8,25 +8,24 @@ const {
   updateLocation,
 } = require('../controllers/vacancyProfileController');
 const { vacancyApplicantAuth } = require('../middleware/auth');
-const { redisCache, invalidateCache } = require('../middleware/redisCache');
 
 // All routes require authentication
 router.use(vacancyApplicantAuth);
 
 // Get current applicant profile
-router.get('/me', redisCache(60), getMe); // 1 daqiqa cache (user-specific, lekin kam o'zgaradi)
+router.get('/me', getMe);
 
 // Update profile (firstName, lastName, gender, birthDate)
-router.put('/me', invalidateCache(['cache:/api/vacancy-profile/me*']), updateProfile);
+router.put('/me', updateProfile);
 
 // Update password
-router.patch('/me/password', invalidateCache(['cache:/api/vacancy-profile/me*']), updatePassword);
+router.patch('/me/password', updatePassword);
 
 // Update avatar
-router.patch('/me/avatar', invalidateCache(['cache:/api/vacancy-profile/me*']), updateAvatar);
+router.patch('/me/avatar', updateAvatar);
 
 // Update location (viloyat, tuman, mfy)
-router.patch('/me/location', invalidateCache(['cache:/api/vacancy-profile/me*']), updateLocation);
+router.patch('/me/location', updateLocation);
 
 module.exports = router;
 

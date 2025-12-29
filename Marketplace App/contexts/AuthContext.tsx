@@ -95,8 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handle401Error = async () => {
       console.log('Received 401 unauthorized event, logging out user');
       // Clear state immediately
-      setToken(null);
-      setUser(null);
+        setToken(null);
+        setUser(null);
       // Also call logout to ensure all cleanup is done
       await logout();
     };
