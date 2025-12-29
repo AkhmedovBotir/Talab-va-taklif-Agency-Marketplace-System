@@ -127,45 +127,63 @@ class EskizService {
     return Math.floor(10000 + Math.random() * 90000).toString();
   }
 
-  // Send verification code for registration
+  // Send verification code for registration (Marketplace)
   async sendRegistrationCode(phone, code) {
-    const message = `Talab va Taklif Agency platformasida ro'yxatdan o'tish uchun kod: ${code}. Amal 5 daqiqa.`;
+    const message = `${code} - Marketplace ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
     return await this.sendSMS(phone, message);
   }
 
-  // Send verification code for login
+  // Send verification code for login (Marketplace)
   async sendLoginCode(phone, code) {
-    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    const message = `${code} - Marketplace ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
     return await this.sendSMS(phone, message);
   }
 
-  // Send verification code for forgot password
+  // Send verification code for forgot password (Marketplace)
   async sendForgotPasswordCode(phone, code) {
-    const message = `Talab va Taklif Agency platformasida parolingizni tiklash uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    const message = `${code} - Marketplace ilovasida parol tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
     return await this.sendSMS(phone, message);
   }
 
   // Send verification code for contragent password setup
   async sendContragentPasswordSetupCode(phone, code) {
-    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    const message = `${code} - Kontragent hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
     return await this.sendSMS(phone, message);
   }
 
   // Send verification code for punkt password setup
   async sendPunktPasswordSetupCode(phone, code) {
-    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    const message = `${code} - Punkt hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
     return await this.sendSMS(phone, message);
   }
 
   // Send verification code for agent password setup
   async sendAgentPasswordSetupCode(phone, code) {
-    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    const message = `${code} - Agent hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
     return await this.sendSMS(phone, message);
   }
 
   // Send verification code for device verification
   async sendDeviceVerificationCode(phone, code) {
-    const message = `Talab va Taklif Agency platformasiga kirish uchun tasdiqlash kodi: ${code}. Kod 5 daqiqa amal qiladi.`;
+    const message = `${code} - Yangi qurilmani tasdiqlash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
+    return await this.sendSMS(phone, message);
+  }
+
+  // Send verification code for vacancy registration
+  async sendVacancyRegistrationCode(phone, code) {
+    const message = `${code} - Vakansiya ilovasida ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
+    return await this.sendSMS(phone, message);
+  }
+
+  // Send verification code for vacancy login
+  async sendVacancyLoginCode(phone, code) {
+    const message = `${code} - Vakansiya ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
+    return await this.sendSMS(phone, message);
+  }
+
+  // Send verification code for vacancy forgot password
+  async sendVacancyForgotPasswordCode(phone, code) {
+    const message = `${code} - Vakansiya ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
     return await this.sendSMS(phone, message);
   }
 }

@@ -338,17 +338,15 @@ Quyida barcha SMS turlari uchun Eskiz moderatsiya qoidalariga mos keladigan matn
 
 **Moderatsiya uchun matn** (${code} o'rniga real kod):
 ```
-12345 - Talab va Taklif Agency Marketplace ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Marketplace ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun** (eskizService.js):
 ```
-${code} - Talab va Taklif Agency Marketplace ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Marketplace ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 142 (1 SMS) ✅
+**Simvollar soni**: 115 (1 SMS) ✅
 
 ---
 
@@ -356,17 +354,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency Marketplace ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Marketplace ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency Marketplace ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Marketplace ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 136 (1 SMS) ✅
+**Simvollar soni**: 109 (1 SMS) ✅
 
 ---
 
@@ -374,17 +370,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency Marketplace ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Marketplace ilovasida parol tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency Marketplace ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Marketplace ilovasida parol tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 143 (1 SMS) ✅
+**Simvollar soni**: 116 (1 SMS) ✅
 
 ---
 
@@ -392,17 +386,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency Vakansiya ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Vakansiya ilovasida ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency Vakansiya ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Vakansiya ilovasida ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 140 (1 SMS) ✅
+**Simvollar soni**: 113 (1 SMS) ✅
 
 ---
 
@@ -410,17 +402,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency Vakansiya ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Vakansiya ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency Vakansiya ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Vakansiya ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 134 (1 SMS) ✅
+**Simvollar soni**: 107 (1 SMS) ✅
 
 ---
 
@@ -428,17 +418,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency Vakansiya ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Vakansiya ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency Vakansiya ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Vakansiya ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 141 (1 SMS) ✅
+**Simvollar soni**: 114 (1 SMS) ✅
 
 ---
 
@@ -446,17 +434,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency Kontragent hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Kontragent hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency Kontragent hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Kontragent hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 130 (1 SMS) ✅
+**Simvollar soni**: 100 (1 SMS) ✅
 
 ---
 
@@ -464,17 +450,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency Punkt hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Punkt hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency Punkt hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Punkt hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 125 (1 SMS) ✅
+**Simvollar soni**: 95 (1 SMS) ✅
 
 ---
 
@@ -482,17 +466,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency Agent hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Agent hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency Agent hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Agent hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 123 (1 SMS) ✅
+**Simvollar soni**: 93 (1 SMS) ✅
 
 ---
 
@@ -500,17 +482,15 @@ Talab va Taklif Agency.
 
 **Moderatsiya uchun matn**:
 ```
-12345 - Talab va Taklif Agency yangi qurilmani tasdiqlash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+12345 - Yangi qurilmani tasdiqlash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
 **Kodda ishlatish uchun**:
 ```
-${code} - Talab va Taklif Agency yangi qurilmani tasdiqlash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-Talab va Taklif Agency.
+${code} - Yangi qurilmani tasdiqlash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
 ```
 
-**Simvollar soni**: 127 (1 SMS) ✅
+**Simvollar soni**: 97 (1 SMS) ✅
 
 ---
 
@@ -520,62 +500,52 @@ Quyida barcha matnlar **moderatsiyadan o'tkazish uchun** tayyorlangan ko'rinishd
 
 1. **Marketplace Register**:
    ```
-   12345 - Talab va Taklif Agency Marketplace ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Marketplace ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 2. **Marketplace Login**:
    ```
-   12345 - Talab va Taklif Agency Marketplace ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Marketplace ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 3. **Marketplace Forgot Password**:
    ```
-   12345 - Talab va Taklif Agency Marketplace ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Marketplace ilovasida parol tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 4. **Vacancy Register**:
    ```
-   12345 - Talab va Taklif Agency Vakansiya ilovasidan ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Vakansiya ilovasida ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 5. **Vacancy Login**:
    ```
-   12345 - Talab va Taklif Agency Vakansiya ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Vakansiya ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 6. **Vacancy Forgot Password**:
    ```
-   12345 - Talab va Taklif Agency Vakansiya ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Vakansiya ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 7. **Contragent Password Setup**:
    ```
-   12345 - Talab va Taklif Agency Kontragent hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Kontragent hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 8. **Punkt Password Setup**:
    ```
-   12345 - Talab va Taklif Agency Punkt hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Punkt hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 9. **Agent Password Setup**:
    ```
-   12345 - Talab va Taklif Agency Agent hisobingiz uchun parol o'rnatish tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-   Talab va Taklif Agency.
+   12345 - Agent hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
    ```
 
 10. **Device Verification**:
     ```
-    12345 - Talab va Taklif Agency yangi qurilmani tasdiqlash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi.
-    Talab va Taklif Agency.
+    12345 - Yangi qurilmani tasdiqlash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.
     ```
 
 ---

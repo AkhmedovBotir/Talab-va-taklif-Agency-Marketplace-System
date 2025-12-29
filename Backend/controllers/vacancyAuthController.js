@@ -74,7 +74,7 @@ const sendRegisterCode = async (req, res) => {
 
     const code = eskizService.generateCode();
     await upsertCode(phone, 'register', code);
-    await eskizService.sendRegistrationCode(phone, code);
+    await eskizService.sendVacancyRegistrationCode(phone, code);
 
     res.status(200).json({ success: true, message: 'Tasdiqlash kodi yuborildi' });
   } catch (error) {
@@ -187,7 +187,7 @@ const loginSendCode = async (req, res) => {
 
     const code = eskizService.generateCode();
     await upsertCode(phone, 'login', code);
-    await eskizService.sendLoginCode(phone, code);
+    await eskizService.sendVacancyLoginCode(phone, code);
 
     res.status(200).json({ success: true, message: 'Tasdiqlash kodi yuborildi' });
   } catch (error) {
@@ -274,9 +274,9 @@ const resendCode = async (req, res) => {
 
     const code = eskizService.generateCode();
     await upsertCode(phone, purpose, code);
-    if (purpose === 'register') await eskizService.sendRegistrationCode(phone, code);
-    else if (purpose === 'login') await eskizService.sendLoginCode(phone, code);
-    else await eskizService.sendForgotPasswordCode(phone, code);
+    if (purpose === 'register') await eskizService.sendVacancyRegistrationCode(phone, code);
+    else if (purpose === 'login') await eskizService.sendVacancyLoginCode(phone, code);
+    else await eskizService.sendVacancyForgotPasswordCode(phone, code);
 
     res.status(200).json({ success: true, message: 'Kod qayta yuborildi' });
   } catch (error) {
@@ -300,7 +300,7 @@ const forgotPasswordSendCode = async (req, res) => {
 
     const code = eskizService.generateCode();
     await upsertCode(phone, 'forgot_password', code);
-    await eskizService.sendForgotPasswordCode(phone, code);
+    await eskizService.sendVacancyForgotPasswordCode(phone, code);
 
     res.status(200).json({ success: true, message: 'Tasdiqlash kodi yuborildi' });
   } catch (error) {

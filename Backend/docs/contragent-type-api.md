@@ -580,3 +580,4 @@ curl -X GET "http://localhost:5000/api/contragent-types?status=active"
 
 
 
+
