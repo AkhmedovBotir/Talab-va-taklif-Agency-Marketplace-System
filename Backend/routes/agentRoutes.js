@@ -23,7 +23,7 @@ const {
 const { validate, agentValidationSchemas } = require('../middleware/validation');
 const { agentAuth } = require('../middleware/auth');
 
-// Password setup (for new agents from vacancy applications)
+// Password setup
 router.post('/password-setup/step1', validate(agentValidationSchemas.passwordSetupStep1), passwordSetupStep1);
 router.post('/password-setup/step2', validate(agentValidationSchemas.passwordSetupStep2), passwordSetupStep2);
 router.post('/password-setup/step3', validate(agentValidationSchemas.passwordSetupStep3), passwordSetupStep3);

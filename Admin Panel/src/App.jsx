@@ -21,8 +21,6 @@ import Notifications from './pages/Notifications/Notifications';
 import ReviewsMain from './pages/Reviews/ReviewsMain';
 import OmborMain from './pages/Ombor/OmborMain';
 import PartnershipRequests from './pages/PartnershipRequests/PartnershipRequests';
-import Vacancies from './pages/Vacancies/Vacancies';
-import VacancyApplications from './pages/Vacancies/VacancyApplications';
 import FinanceMain from './pages/Finance/FinanceMain';
 import ArchiveMain from './pages/Archive/ArchiveMain';
 import ArchivedPunktWorkHistory from './pages/Archive/ArchivedPunktWorkHistory';
@@ -61,8 +59,6 @@ function App() {
               <Route path="notifications" element={<Notifications />} />
               <Route path="reviews" element={<ReviewsMain />} />
               <Route path="partnership-requests" element={<PartnershipRequests />} />
-              <Route path="vacancies" element={<Vacancies />} />
-              <Route path="vacancies/:vacancyId/applications" element={<VacancyApplications />} />
               <Route path="finance" element={<FinanceMain />} />
               <Route path="archive" element={<ArchiveMain />} />
               <Route path="archive/punkts/:id/work" element={<ArchivedPunktWorkHistory />} />

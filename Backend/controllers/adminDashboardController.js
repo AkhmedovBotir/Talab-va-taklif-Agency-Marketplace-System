@@ -11,8 +11,6 @@ const ContragentPaymentDistribution = require('../models/ContragentPaymentDistri
 const FinanceSubmission = require('../models/FinanceSubmission');
 const KpiBonusTransaction = require('../models/KpiBonusTransaction');
 const Review = require('../models/Review');
-const Vacancy = require('../models/Vacancy');
-const VacancyApplication = require('../models/VacancyApplication');
 
 // ==================== UMUMIY STATISTIKALAR ====================
 
@@ -120,10 +118,6 @@ const getDashboardStatistics = async (req, res) => {
       Review.aggregate([
         { $group: { _id: null, avg: { $avg: '$rating' } } },
       ]),
-
-      // Vacancies
-      Vacancy.countDocuments(),
-      VacancyApplication.countDocuments(),
 
       // Payments
       ContragentPaymentDistribution.aggregate([
@@ -1073,6 +1067,9 @@ module.exports = {
   getUsersStatistics,
   getProductsStatistics,
 };
+
+
+
 
 
 

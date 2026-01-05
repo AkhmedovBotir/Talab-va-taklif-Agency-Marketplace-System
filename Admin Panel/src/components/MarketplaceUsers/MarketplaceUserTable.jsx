@@ -1,16 +1,8 @@
 import { motion } from 'framer-motion';
 import { Visibility } from '@mui/icons-material';
+import { formatDate } from '../../utils/dateFormatter';
 
 const MarketplaceUserTable = ({ marketplaceUsers, loading, onView, pagination, onPageChange }) => {
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  };
 
   const getStatusBadge = (status) => {
     const baseClasses = 'px-2 py-1 rounded text-xs font-medium';

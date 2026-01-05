@@ -3,22 +3,11 @@ import { motion } from 'framer-motion';
 import { Edit, Delete, Visibility } from '@mui/icons-material';
 import { punktAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const PunktTable = ({ punkts, loading, onEdit, onDelete, onView, pagination, onPageChange, onStatusChange }) => {
   const [updatingStatus, setUpdatingStatus] = useState({});
   const { showSuccess, showError } = useSnackbar();
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const handleStatusToggle = async (punkt, newStatus) => {
     setUpdatingStatus({ ...updatingStatus, [punkt._id]: true });
@@ -112,7 +101,7 @@ const PunktTable = ({ punkts, loading, onEdit, onDelete, onView, pagination, onP
                   </label>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(punkt.createdAt)}
+                  {formatTableDate(punkt.createdAt)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2">

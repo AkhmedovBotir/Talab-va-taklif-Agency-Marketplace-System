@@ -11,15 +11,7 @@ const formatNumber = (num) => {
   return new Intl.NumberFormat('uz-UZ').format(num);
 };
 
-const formatDate = (dateString) => {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('uz-UZ', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-};
+import { formatDate } from '../../utils/dateFormatter';
 
 const orderStatusOptions = [
   { value: '', label: 'Barchasi' },

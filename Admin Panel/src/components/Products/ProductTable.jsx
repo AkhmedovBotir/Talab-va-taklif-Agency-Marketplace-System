@@ -1,18 +1,8 @@
 import { motion } from 'framer-motion';
 import { Visibility, CheckCircle, Cancel, Edit } from '@mui/icons-material';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const ProductTable = ({ products, loading, onView, onApprove, onReject, onEdit, pagination, onPageChange }) => {
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const formatPrice = (price) => {
     if (!price) return '-';

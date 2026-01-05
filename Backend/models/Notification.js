@@ -29,7 +29,6 @@ const notificationSchema = new mongoose.Schema(
         'mfy_agents',
         'marketplace_users',
         'contragents',
-        'vacancy_applicants',
       ],
       required: [true, 'Target type is required'],
     },
@@ -40,7 +39,7 @@ const notificationSchema = new mongoose.Schema(
     }],
     targetRefModel: {
       type: String,
-      enum: ['Punkt', 'Agent', 'MarketplaceUser', 'Contragent', 'VacancyApplicant'],
+      enum: ['Punkt', 'Agent', 'MarketplaceUser', 'Contragent'],
     },
     // For viloyat/tuman filtering
     viloyatId: {
@@ -66,7 +65,7 @@ const notificationSchema = new mongoose.Schema(
       },
       recipientType: {
         type: String,
-        enum: ['Punkt', 'Agent', 'MarketplaceUser', 'Contragent', 'VacancyApplicant'],
+        enum: ['Punkt', 'Agent', 'MarketplaceUser', 'Contragent'],
       },
       readAt: {
         type: Date,

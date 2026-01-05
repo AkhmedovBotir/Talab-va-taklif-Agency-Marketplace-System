@@ -3,18 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { kpiAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { Visibility, Close, CheckCircle, Cancel } from '@mui/icons-material';
-
-const formatDate = (dateString) => {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('uz-UZ', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const formatNumber = (num) => {
   if (num === undefined || num === null) return '0';
@@ -198,7 +187,7 @@ const TransactionDetailModal = ({ transaction, open, onClose }) => {
             </div>
 
             <div className="text-sm text-gray-500">
-              Yaratilgan: {formatDate(transaction.createdAt)}
+              Yaratilgan: {formatTableDate(transaction.createdAt)}
             </div>
           </div>
         </div>
@@ -436,7 +425,7 @@ const KPITransactionsSection = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
-                      {formatDate(transaction.createdAt)}
+                      {formatTableDate(transaction.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

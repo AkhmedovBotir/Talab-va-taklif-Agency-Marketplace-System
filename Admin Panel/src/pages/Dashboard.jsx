@@ -19,6 +19,7 @@ import {
 } from 'recharts';
 import { dashboardAPI } from '../services/api';
 import { useSnackbar } from '../contexts/SnackbarContext';
+import { formatDate } from '../utils/dateFormatter';
 import {
   Dashboard as DashboardIcon,
   ShoppingCart,
@@ -116,7 +117,7 @@ const Dashboard = () => {
   const getChartData = () => {
     if (activeChart === 'daily') {
       return dailyStats.map((item) => ({
-        date: new Date(item.date).toLocaleDateString('uz-UZ', { month: 'short', day: 'numeric' }),
+        date: formatDate(item.date, { format: 'short', includeTime: false }),
         orders: item.orders,
         revenue: item.revenue,
       }));

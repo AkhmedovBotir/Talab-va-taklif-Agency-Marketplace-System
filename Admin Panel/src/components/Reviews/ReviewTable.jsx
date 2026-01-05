@@ -1,18 +1,8 @@
 import { motion } from 'framer-motion';
 import { Visibility, Star } from '@mui/icons-material';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const ReviewTable = ({ reviews, loading, onView, pagination, onPageChange }) => {
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const renderStars = (rating) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -109,7 +99,7 @@ const ReviewTable = ({ reviews, loading, onView, pagination, onPageChange }) => 
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(review.createdAt)}
+                  {formatTableDate(review.createdAt)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { motion } from 'framer-motion';
 import ImageGalleryModal from '../Common/ImageGalleryModal';
+import { formatDateTime } from '../../utils/dateFormatter';
 
 const ViewProductModal = ({ open, onClose, product }) => {
   const [imageGalleryOpen, setImageGalleryOpen] = useState(false);
@@ -12,18 +13,6 @@ const ViewProductModal = ({ open, onClose, product }) => {
   const handleImageClick = (index) => {
     setSelectedImageIndex(index);
     setImageGalleryOpen(true);
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const formatPrice = (price) => {
@@ -305,13 +294,13 @@ const ViewProductModal = ({ open, onClose, product }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Yaratilgan sana</label>
                 <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {formatDate(product.createdAt)}
+                  {formatDateTime(product.createdAt)}
                 </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Yangilangan sana</label>
                 <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {formatDate(product.updatedAt)}
+                  {formatDateTime(product.updatedAt)}
                 </p>
               </div>
             </div>

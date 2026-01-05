@@ -1,20 +1,9 @@
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { motion } from 'framer-motion';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const ViewOrderModal = ({ open, onClose, order }) => {
   if (!order) return null;
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const formatPrice = (price) => {
     if (!price) return '0';
@@ -173,7 +162,7 @@ const ViewOrderModal = ({ open, onClose, order }) => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Yaratilgan sana</label>
               <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                {formatDate(order.createdAt)}
+                {formatTableDate(order.createdAt)}
               </p>
             </div>
             <div>

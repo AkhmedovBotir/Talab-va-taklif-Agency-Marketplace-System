@@ -32,7 +32,6 @@ import {
   Handshake,
   LocationDisabledSharp,
   LocationCity,
-  WorkOutline,
   Description,
   AttachMoney,
   Assessment,
@@ -76,7 +75,6 @@ const menuItems = [
   { icon: AttachMoney, label: 'Moliya', path: '/dashboard/finance' },
   { icon: RateReview, label: 'Baholar', path: '/dashboard/reviews' },
   { icon: Handshake, label: 'Hamkorlik So\'rovlari', path: '/dashboard/partnership-requests' },
-  { icon: WorkOutline, label: 'Vakansiyalar', path: '/dashboard/vacancies' },
   { icon: Settings, label: 'Sozlamalar', path: '/dashboard/settings' },
 ];
 

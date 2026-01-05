@@ -626,83 +626,6 @@ const agentAuth = async (req, res, next) => {
   }
 };
 
-// Authentication middleware for vacancy applicant
-const vacancyApplicantAuth = async (req, res, next) => {
-  try {
-    // Get token from Authorization header
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token topilmadi',
-      });
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    // Verify and decode token
-    let decoded;
-    try {
-      decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-      );
-    } catch (error) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token noto\'g\'ri yoki muddati tugagan',
-      });
-    }
-
-    // Check if token is for vacancy applicant
-    if (decoded.role !== 'vacancy_applicant') {
-      return res.status(403).json({
-        success: false,
-        message: 'Bu token vakansiya nomzodi uchun emas',
-      });
-    }
-
-    const VacancyApplicant = require('../models/VacancyApplicant');
-    const applicant = await VacancyApplicant.findById(decoded.id)
-      .populate('viloyat', 'name type code')
-      .populate('tuman', 'name type code')
-      .populate('mfy', 'name type code')
-      .select('-password');
-    
-    if (!applicant) {
-      return res.status(401).json({
-        success: false,
-        message: 'Nomzod topilmadi',
-      });
-    }
-
-    if (applicant.status !== 'active') {
-      return res.status(403).json({
-        success: false,
-        message: 'Hisobingiz faol emas',
-      });
-    }
-
-    // Attach applicant info to request
-    req.user = {
-      userId: applicant._id,
-      userType: 'VacancyApplicant',
-      phone: applicant.phone,
-      applicant: applicant,
-    };
-
-    next();
-  } catch (error) {
-    console.error('Error in vacancyApplicantAuth:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Autentifikatsiya xatosi',
-      error: error.message,
-    });
-  }
-};
-
 module.exports = {
   adminAuth,
   contragentAuth,
@@ -711,7 +634,6 @@ module.exports = {
   optionalMarketplaceUserAuth,
   punktAuth,
   agentAuth,
-  vacancyApplicantAuth,
 };
 
 

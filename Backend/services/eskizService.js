@@ -169,23 +169,6 @@ class EskizService {
     return await this.sendSMS(phone, message);
   }
 
-  // Send verification code for vacancy registration
-  async sendVacancyRegistrationCode(phone, code) {
-    const message = `${code} - Vakansiya ilovasida ro'yxatdan o'tish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
-    return await this.sendSMS(phone, message);
-  }
-
-  // Send verification code for vacancy login
-  async sendVacancyLoginCode(phone, code) {
-    const message = `${code} - Vakansiya ilovasiga kirish uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
-    return await this.sendSMS(phone, message);
-  }
-
-  // Send verification code for vacancy forgot password
-  async sendVacancyForgotPasswordCode(phone, code) {
-    const message = `${code} - Vakansiya ilovasida parolni tiklash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
-    return await this.sendSMS(phone, message);
-  }
 }
 
 module.exports = new EskizService();

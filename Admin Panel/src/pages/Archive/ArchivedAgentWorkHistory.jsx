@@ -6,6 +6,7 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 import OrderTable from '../../components/Orders/OrderTable';
 import ViewOrderModal from '../../components/Orders/ViewOrderModal';
 import { ArrowBack, AssignmentInd, Assessment, ShoppingCart } from '@mui/icons-material';
+import { formatDate } from '../../utils/dateFormatter';
 
 const formatNumber = (num) => {
   if (num === undefined || num === null) return '0';
@@ -162,13 +163,7 @@ const ArchivedAgentWorkHistory = () => {
           <div>
             <p className="text-sm text-gray-500">O'chirilgan sana</p>
             <p className="text-base font-medium text-gray-900">
-              {agent.deletedAt
-                ? new Date(agent.deletedAt).toLocaleDateString('uz-UZ', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })
-                : '-'}
+              {formatDate(agent.deletedAt)}
             </p>
           </div>
         </div>

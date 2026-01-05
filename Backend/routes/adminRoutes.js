@@ -88,26 +88,6 @@ const {
   convertPartnershipRequestToContragent,
 } = require('../controllers/partnershipRequestController');
 const {
-  createVacancy,
-  getVacancies,
-  getVacancyById,
-  updateVacancy,
-  deleteVacancy,
-} = require('../controllers/vacancyController');
-const {
-  getApplicationsByVacancy,
-  getApplicationById,
-  decideApplication,
-  addInterviewStage,
-  updateInterviewStage,
-  deleteInterviewStage,
-  getInterviewStage,
-  submitInterviewResult,
-  makeFinalDecision,
-  convertApplicationToPunkt,
-  convertApplicationToAgent,
-} = require('../controllers/adminVacancyApplicationController');
-const {
   updateFeaturedContragents,
   getFeaturedContragentsForAdmin,
 } = require('../controllers/featuredContragentController');
@@ -116,7 +96,6 @@ const {
   adminValidationSchemas,
   adminCategoryValidationSchemas,
   adminProductModerationValidationSchemas,
-  adminVacancyApplicationValidationSchemas,
   partnershipRequestValidationSchemas,
   marketplacePartnershipRequestValidationSchemas,
   featuredContragentValidationSchemas,
@@ -338,37 +317,6 @@ router.patch('/marketplace-partnership-requests/:id/contacted', adminAuth, valid
 router.patch('/marketplace-partnership-requests/:id/approve', adminAuth, validate(marketplacePartnershipRequestValidationSchemas.approve), approveMarketplacePartnershipRequest);
 router.patch('/marketplace-partnership-requests/:id/reject', adminAuth, validate(marketplacePartnershipRequestValidationSchemas.reject), rejectMarketplacePartnershipRequest);
 router.post('/marketplace-partnership-requests/:id/convert-to-contragent', adminAuth, convertMarketplacePartnershipRequestToContragent);
-
-// Vacancies (admin only)
-router.post('/vacancies', adminAuth, createVacancy);
-router.get('/vacancies', adminAuth, getVacancies);
-router.get('/vacancies/:id', adminAuth, getVacancyById);
-router.put('/vacancies/:id', adminAuth, updateVacancy);
-router.delete('/vacancies/:id', adminAuth, deleteVacancy);
-
-// Vacancy Applications (admin only)
-// Get all applications for a vacancy
-router.get('/vacancies/:vacancyId/applications', adminAuth, getApplicationsByVacancy);
-// Get application by ID
-router.get('/applications/:id', adminAuth, getApplicationById);
-// Accept or reject application
-router.post('/applications/:id/decide', adminAuth, decideApplication);
-// Add interview stage
-router.post('/applications/:id/interview-stages', adminAuth, addInterviewStage);
-// Get interview stage by ID
-router.get('/applications/:id/interview-stages/:stageId', adminAuth, getInterviewStage);
-// Update interview stage
-router.put('/applications/:id/interview-stages/:stageId', adminAuth, updateInterviewStage);
-// Submit interview result
-router.post('/applications/:id/interview-stages/:stageId/result', adminAuth, submitInterviewResult);
-// Delete interview stage
-router.delete('/applications/:id/interview-stages/:stageId', adminAuth, deleteInterviewStage);
-// Make final decision
-router.post('/applications/:id/final-decision', adminAuth, makeFinalDecision);
-// Convert application to Punkt
-router.post('/applications/:id/convert-to-punkt', adminAuth, validate(adminVacancyApplicationValidationSchemas.convertToPunkt), convertApplicationToPunkt);
-// Convert application to Agent
-router.post('/applications/:id/convert-to-agent', adminAuth, validate(adminVacancyApplicationValidationSchemas.convertToAgent), convertApplicationToAgent);
 
 // ==================== DEVICE MANAGEMENT ====================
 

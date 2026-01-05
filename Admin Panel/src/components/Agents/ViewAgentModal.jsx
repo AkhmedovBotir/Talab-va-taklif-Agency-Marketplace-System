@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
 import { agentAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { formatDateTime } from '../../utils/dateFormatter';
 
 const ViewAgentModal = ({ open, onClose, agent }) => {
   const { showError } = useSnackbar();
@@ -206,13 +207,13 @@ const ViewAgentModal = ({ open, onClose, agent }) => {
                           <label className="block text-sm font-medium text-gray-500 mb-1">
                             Yaratilgan
                           </label>
-                          <p className="text-gray-900">{formatDate(agentData.createdAt)}</p>
+                          <p className="text-gray-900">{formatDateTime(agentData.createdAt)}</p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
                             Yangilangan
                           </label>
-                          <p className="text-gray-900">{formatDate(agentData.updatedAt)}</p>
+                          <p className="text-gray-900">{formatDateTime(agentData.updatedAt)}</p>
                         </div>
                       </div>
                     </div>

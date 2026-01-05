@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Edit, Delete, Visibility, ExpandMore, ChevronRight } from '@mui/icons-material';
 import { regionAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { formatDate } from '../../utils/dateFormatter';
 
 const RegionTable = ({ regions, loading, onEdit, onDelete, onView, onStatusChange }) => {
   const [expandedRegions, setExpandedRegions] = useState({});
@@ -71,16 +72,6 @@ const RegionTable = ({ regions, loading, onEdit, onDelete, onView, onStatusChang
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regions]);
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  };
 
   const toggleRegion = async (regionId) => {
     const isExpanded = expandedRegions[regionId];

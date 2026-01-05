@@ -24,7 +24,7 @@ const {
 const { validate, punktValidationSchemas } = require('../middleware/validation');
 const { punktAuth } = require('../middleware/auth');
 
-// Password setup (for new punkts from vacancy applications)
+// Password setup
 router.post('/password-setup/step1', validate(punktValidationSchemas.passwordSetupStep1), passwordSetupStep1);
 router.post('/password-setup/step2', validate(punktValidationSchemas.passwordSetupStep2), passwordSetupStep2);
 router.post('/password-setup/step3', validate(punktValidationSchemas.passwordSetupStep3), passwordSetupStep3);

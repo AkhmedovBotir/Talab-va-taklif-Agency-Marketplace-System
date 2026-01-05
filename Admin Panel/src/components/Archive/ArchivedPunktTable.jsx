@@ -1,18 +1,8 @@
 import { motion } from 'framer-motion';
 import { Visibility, LocationOn } from '@mui/icons-material';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const ArchivedPunktTable = ({ punkts, loading, pagination, onPageChange, onViewWorkHistory }) => {
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const getStatusBadge = (status) => {
     const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
@@ -103,7 +93,7 @@ const ArchivedPunktTable = ({ punkts, loading, pagination, onPageChange, onViewW
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-500">
-                  {formatDate(punkt.deletedAt)}
+                  {formatTableDate(punkt.deletedAt)}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -157,6 +147,8 @@ const ArchivedPunktTable = ({ punkts, loading, pagination, onPageChange, onViewW
 };
 
 export default ArchivedPunktTable;
+
+
 
 
 

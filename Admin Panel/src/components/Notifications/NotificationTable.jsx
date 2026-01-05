@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { Visibility, Delete, ChevronLeft, ChevronRight } from '@mui/icons-material';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const targetTypeLabels = {
   all: 'Barchaga',
@@ -9,7 +10,6 @@ const targetTypeLabels = {
   mfy_agents: 'MFY agentlari',
   marketplace_users: 'Marketplace foydalanuvchilari',
   contragents: 'Kontragentlar',
-  vacancy_applicants: 'Vakansiya nomzodlari',
 };
 
 const notificationTypeConfig = {
@@ -32,16 +32,6 @@ const NotificationTable = ({
   currentTargetType,
   onTargetTypeChange,
 }) => {
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   return (
     <motion.div
@@ -158,7 +148,7 @@ const NotificationTable = ({
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(notification.createdAt)}
+                      {formatTableDate(notification.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">

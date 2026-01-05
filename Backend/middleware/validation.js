@@ -1914,42 +1914,6 @@ const adminProductModerationValidationSchemas = {
   }),
 };
 
-// Admin Vacancy Application Validation Schemas
-const adminVacancyApplicationValidationSchemas = {
-  convertToPunkt: Joi.object({
-    viloyat: Joi.string()
-      .required()
-      .messages({
-        'string.empty': 'Viloyat kiritilishi shart',
-        'any.required': 'Viloyat kiritilishi shart',
-      }),
-    tuman: Joi.string()
-      .allow(null, '')
-      .messages({
-        'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
-      }),
-  }),
-
-  convertToAgent: Joi.object({
-    viloyat: Joi.string()
-      .required()
-      .messages({
-        'string.empty': 'Viloyat kiritilishi shart',
-        'any.required': 'Viloyat kiritilishi shart',
-      }),
-    tuman: Joi.string()
-      .allow(null, '')
-      .messages({
-        'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
-      }),
-    mfy: Joi.string()
-      .allow(null, '')
-      .messages({
-        'string.base': 'MFY ID to\'g\'ri formatda bo\'lishi kerak',
-      }),
-  }),
-};
-
 // Contragent Type Validation Schemas
 const contragentTypeValidationSchemas = {
   create: Joi.object({
@@ -2018,5 +1982,4 @@ module.exports = {
   marketplacePartnershipRequestValidationSchemas,
   featuredContragentValidationSchemas,
   adminProductModerationValidationSchemas,
-  adminVacancyApplicationValidationSchemas,
 };

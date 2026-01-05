@@ -6,11 +6,7 @@ const Agent = require('../models/Agent');
 const Punkt = require('../models/Punkt');
 const Region = require('../models/Region');
 const SmsVerification = require('../models/SmsVerification');
-const VacancyApplicantCode = require('../models/VacancyApplicantCode');
 const MarketplaceUser = require('../models/MarketplaceUser');
-const Vacancy = require('../models/Vacancy');
-const VacancyApplicant = require('../models/VacancyApplicant');
-const VacancyApplication = require('../models/VacancyApplication');
 const PartnershipRequest = require('../models/PartnershipRequest');
 const Order = require('../models/Order');
 const mongoose = require('mongoose');
@@ -429,61 +425,22 @@ const getAllSmsVerificationsForAdmin = async (req, res) => {
       }
     }
 
-    // Build filters for VacancyApplicantCode
-    const vacancyFilter = {};
-    if (phone) {
-      vacancyFilter.phone = { $regex: phone, $options: 'i' };
-    }
-    if (purpose) {
-      vacancyFilter.purpose = purpose;
-    }
-    // Map type to purpose for vacancy codes
-    if (type && !purpose) {
-      vacancyFilter.purpose = type;
-    }
-    if (startDate || endDate) {
-      vacancyFilter.createdAt = {};
-      if (startDate) {
-        vacancyFilter.createdAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        vacancyFilter.createdAt.$lte = new Date(endDate);
-      }
-    }
+    // Get data from SmsVerification model
+    const smsVerifications = await SmsVerification.find(smsFilter).sort({ createdAt: -1 });
 
-    // Get data from both models
-    const [smsVerifications, vacancyCodes] = await Promise.all([
-      source === 'vacancy' ? [] : SmsVerification.find(smsFilter).sort({ createdAt: -1 }),
-      source === 'marketplace' ? [] : VacancyApplicantCode.find(vacancyFilter).sort({ createdAt: -1 }),
-    ]);
-
-    // Combine and format data
-    const allCodes = [
-      ...smsVerifications.map((item) => ({
-        _id: item._id,
-        phone: item.phone,
-        code: item.code,
-        type: item.type,
-        purpose: item.type, // For compatibility
-        isUsed: item.isUsed,
-        expiresAt: item.expiresAt,
-        source: 'marketplace',
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      })),
-      ...vacancyCodes.map((item) => ({
-        _id: item._id,
-        phone: item.phone,
-        code: item.code,
-        type: item.purpose, // For compatibility
-        purpose: item.purpose,
-        isUsed: false, // Vacancy codes don't have isUsed field
-        expiresAt: item.expiresAt,
-        source: 'vacancy',
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      })),
-    ];
+    // Format data
+    const allCodes = smsVerifications.map((item) => ({
+      _id: item._id,
+      phone: item.phone,
+      code: item.code,
+      type: item.type,
+      purpose: item.type, // For compatibility
+      isUsed: item.isUsed,
+      expiresAt: item.expiresAt,
+      source: 'marketplace',
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
 
     // Sort by createdAt descending
     allCodes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -2196,14 +2153,9 @@ const getAdminDashboardOverview = async (req, res) => {
       totalAgents,
       totalProducts,
       totalCategories,
-      totalVacancies,
-      totalVacancyApplicants,
-      totalVacancyApplications,
       totalAdmins,
       openPartnershipRequests,
       latestOrders,
-      latestVacancies,
-      latestApplications,
     ] = await Promise.all([
       Order.aggregate([
         { $match: { status: 'confirmed_by_customer' } },
@@ -2243,27 +2195,12 @@ const getAdminDashboardOverview = async (req, res) => {
       Agent.countDocuments(),
       Product.countDocuments(),
       Category.countDocuments(),
-      Vacancy.countDocuments(),
-      VacancyApplicant.countDocuments(),
-      VacancyApplication.countDocuments(),
       Admin.countDocuments(),
       PartnershipRequest.countDocuments({ contactStatus: { $ne: 'done' } }),
       Order.find({})
         .select('orderNumber totalPrice status createdAt')
         .sort({ createdAt: -1 })
         .limit(5)
-        .lean(),
-      Vacancy.find({})
-        .select('name target type createdAt')
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .lean(),
-      VacancyApplication.find({})
-        .select('vacancy applicant status createdAt')
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .populate('vacancy', 'name target type')
-        .populate('applicant', 'firstName lastName phone')
         .lean(),
     ]);
 
@@ -2284,9 +2221,6 @@ const getAdminDashboardOverview = async (req, res) => {
           punkts: totalPunkts,
           agents: totalAgents,
           admins: totalAdmins,
-          vacancies: totalVacancies,
-          vacancyApplicants: totalVacancyApplicants,
-          vacancyApplications: totalVacancyApplications,
           openPartnershipRequests,
           avgOrderValue: Math.round(total.avgOrderValue || 0),
         },
@@ -2302,8 +2236,6 @@ const getAdminDashboardOverview = async (req, res) => {
         },
         latest: {
           orders: latestOrders,
-          vacancies: latestVacancies,
-          vacancyApplications: latestApplications,
         },
       },
     });

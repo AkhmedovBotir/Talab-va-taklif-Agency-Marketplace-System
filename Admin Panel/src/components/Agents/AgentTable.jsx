@@ -3,22 +3,11 @@ import { motion } from 'framer-motion';
 import { Edit, Delete, Visibility } from '@mui/icons-material';
 import { agentAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onPageChange, onStatusChange, activeTab }) => {
   const [updatingStatus, setUpdatingStatus] = useState({});
   const { showSuccess, showError } = useSnackbar();
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const getAgentTypeLabel = (agentType) => {
     switch (agentType) {

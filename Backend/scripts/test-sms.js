@@ -27,18 +27,6 @@ const testSMS = async () => {
       func: () => eskizService.sendForgotPasswordCode(phone, '12345'),
     },
     {
-      name: 'Vakansiya - Ro\'yxatdan o\'tish (Register)',
-      func: () => eskizService.sendVacancyRegistrationCode(phone, '12345'),
-    },
-    {
-      name: 'Vakansiya - Kirish (Login)',
-      func: () => eskizService.sendVacancyLoginCode(phone, '12345'),
-    },
-    {
-      name: 'Vakansiya - Parol tiklash (Forgot Password)',
-      func: () => eskizService.sendVacancyForgotPasswordCode(phone, '12345'),
-    },
-    {
       name: 'Kontragent - Parol o\'rnatish',
       func: () => eskizService.sendContragentPasswordSetupCode(phone, '12345'),
     },
@@ -110,4 +98,7 @@ testSMS()
     console.error('\n❌ Xatolik:', error);
     process.exit(1);
   });
+
+
+
 

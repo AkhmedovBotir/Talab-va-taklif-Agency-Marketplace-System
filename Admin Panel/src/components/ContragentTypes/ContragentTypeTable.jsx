@@ -4,22 +4,11 @@ import { Edit, Delete, Visibility } from '@mui/icons-material';
 import * as Icons from '@mui/icons-material';
 import { contragentTypeAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const ContragentTypeTable = ({ contragentTypes, loading, onEdit, onDelete, onView, onStatusChange }) => {
   const [updatingStatus, setUpdatingStatus] = useState({});
   const { showSuccess, showError } = useSnackbar();
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const handleStatusToggle = async (contragentType, newStatus) => {
     setUpdatingStatus({ ...updatingStatus, [contragentType._id]: true });
@@ -126,7 +115,7 @@ const ContragentTypeTable = ({ contragentTypes, loading, onEdit, onDelete, onVie
                   </label>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-500">{formatDate(contragentType.createdAt)}</div>
+                  <div className="text-sm text-gray-500">{formatTableDate(contragentType.createdAt)}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2">

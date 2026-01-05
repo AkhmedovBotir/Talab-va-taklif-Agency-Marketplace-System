@@ -1,21 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Visibility, ExpandMore, ChevronRight, Edit, Delete } from '@mui/icons-material';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const CategoryTable = ({ categories, loading, onView, onEdit, onDelete, onCreateSubcategory, pagination, onPageChange }) => {
   const [expandedCategories, setExpandedCategories] = useState({});
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const toggleCategory = (categoryId) => {
     setExpandedCategories((prev) => ({
@@ -128,7 +117,7 @@ const CategoryTable = ({ categories, loading, onView, onEdit, onDelete, onCreate
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="text-xs text-gray-500">
-                        {formatDate(category.createdAt)}
+                        {formatTableDate(category.createdAt)}
                       </div>
                       <div className="flex items-center gap-1">
                       <button
@@ -204,7 +193,7 @@ const CategoryTable = ({ categories, loading, onView, onEdit, onDelete, onCreate
                               </div>
                               <div className="flex items-center gap-2">
                                 <div className="text-xs text-gray-500">
-                                  {formatDate(subcategory.createdAt)}
+                                  {formatTableDate(subcategory.createdAt)}
                                 </div>
                                 <div className="flex items-center gap-1">
                                 <button

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
 import { punktAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { formatDateTime } from '../../utils/dateFormatter';
 
 const ViewPunktModal = ({ open, onClose, punkt }) => {
   const { showError } = useSnackbar();
@@ -31,18 +32,6 @@ const ViewPunktModal = ({ open, onClose, punkt }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const getStatusBadge = (status) => {
@@ -152,13 +141,13 @@ const ViewPunktModal = ({ open, onClose, punkt }) => {
                           <label className="block text-sm font-medium text-gray-500 mb-1">
                             Yaratilgan
                           </label>
-                          <p className="text-gray-900">{formatDate(punktData.createdAt)}</p>
+                          <p className="text-gray-900">{formatDateTime(punktData.createdAt)}</p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
                             Yangilangan
                           </label>
-                          <p className="text-gray-900">{formatDate(punktData.updatedAt)}</p>
+                          <p className="text-gray-900">{formatDateTime(punktData.updatedAt)}</p>
                         </div>
                       </div>
                     </div>

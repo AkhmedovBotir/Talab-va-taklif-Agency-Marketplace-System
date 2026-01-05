@@ -4,6 +4,7 @@ import { reviewAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { Search, Clear, Edit } from '@mui/icons-material';
 import UpdateContactStatusModal from '../../components/Contacts/UpdateContactStatusModal';
+import { formatDate } from '../../utils/dateFormatter';
 
 const Contacts = ({ hideHeader = false }) => {
   const { showError } = useSnackbar();
@@ -320,7 +321,7 @@ const Contacts = ({ hideHeader = false }) => {
                       <span>Holatni yangilash</span>
                     </button>
                     <div className="text-xs text-gray-500">
-                      {new Date(contact.createdAt).toLocaleDateString('uz-UZ')}
+                      {formatDate(contact.createdAt, { format: 'short' })}
                     </div>
                   </div>
                 </div>

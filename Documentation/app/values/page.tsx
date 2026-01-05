@@ -68,13 +68,13 @@ export default function ValuesPage() {
 
           {/* Core Values */}
           <section className="space-y-8">
-            <h2 className="text-3xl font-bold">Uchta Asosiy Qadriyat</h2>
+            <h2 className="text-3xl font-bold">Asosiy Qadriyat</h2>
 
             <div className="space-y-6">
               {[
                 {
                   icon: Heart,
-                  title: "Halollik (Honesty)",
+                  title: "Halollik ",
                   color: "from-red-500/10 to-pink-500/10",
                   borderColor: "border-red-500/20",
                   textColor: "text-red-500",
@@ -86,34 +86,7 @@ export default function ValuesPage() {
                     "Hech qanday yashiringan to'lovlar yo'q",
                   ],
                 },
-                {
-                  icon: Shield,
-                  title: "Xavfsizlik (Security)",
-                  color: "from-orange-500/10 to-yellow-500/10",
-                  borderColor: "border-orange-500/20",
-                  textColor: "text-orange-500",
-                  description: "Barcha ma'lumot va to'lovlar eng yuqori xavfsizlik standartiga asosan o'tadi.",
-                  details: [
-                    "Shifrlangan tranzaksiyalar",
-                    "Identifikatsiya tekshiruvi",
-                    "Noto'g'ri foydalanishni monitoringi",
-                    "Qonuniy to'lov to'sigi",
-                  ],
-                },
-                {
-                  icon: Zap,
-                  title: "Avtomatlashtirilgan (Automation)",
-                  color: "from-emerald-500/10 to-teal-500/10",
-                  borderColor: "border-emerald-500/20",
-                  textColor: "text-emerald-500",
-                  description: "Buyurtmalar, to'lovlar va ma'lumotlar avtomatik ravishda lo'nda ishlaydi.",
-                  details: [
-                    "Vaqt sezimlari kamaytiradi",
-                    "Inson xatosini bartaraf etadi",
-                    "Samaradorlikni ko'taradi",
-                    "Real-time yangilanishlar",
-                  ],
-                },
+                
               ].map((value) => (
                 <motion.div
                   key={value.title}

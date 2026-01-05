@@ -1,19 +1,8 @@
 import { motion } from 'framer-motion';
 import { Visibility } from '@mui/icons-material';
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const SMSVerificationTable = ({ smsVerifications, loading, onView, pagination, onPageChange }) => {
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  };
 
   const getTypeBadge = (type) => {
     const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
@@ -152,10 +141,10 @@ const SMSVerificationTable = ({ smsVerifications, loading, onView, pagination, o
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(sms.createdAt)}
+                  {formatTableDate(sms.createdAt)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(sms.expiresAt)}
+                  {formatTableDate(sms.expiresAt)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button

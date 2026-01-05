@@ -3,18 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { kpiAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { Close, CheckCircle, Cancel } from '@mui/icons-material';
-
-const formatDate = (dateString) => {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('uz-UZ', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+import { formatTableDate } from '../../utils/dateFormatter';
 
 const formatNumber = (num) => {
   if (num === undefined || num === null) return '0';
@@ -189,7 +178,7 @@ const KPIAgentDetailModal = ({ agentId, role, open, onClose }) => {
                                 {tx.isPaid ? 'To\'langan' : 'Kutilmoqda'}
                               </span>
                             </td>
-                            <td className="px-4 py-2 text-sm text-gray-500">{formatDate(tx.createdAt)}</td>
+                            <td className="px-4 py-2 text-sm text-gray-500">{formatTableDate(tx.createdAt)}</td>
                           </tr>
                         ))}
                       </tbody>
