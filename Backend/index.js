@@ -26,6 +26,8 @@ const adminKpiPaymentRoutes = require('./routes/adminKpiPaymentRoutes');
 const adminContragentPaymentRoutes = require('./routes/adminContragentPaymentRoutes');
 const contragentTypeRoutes = require('./routes/contragentTypeRoutes');
 const deviceVerificationRoutes = require('./routes/deviceVerificationRoutes');
+const companyIntegrationRoutes = require('./routes/companyIntegrationRoutes');
+const certificateAssignmentRoutes = require('./routes/certificateAssignmentRoutes');
 
 // Initialize Express app
 const app = express();
@@ -64,6 +66,8 @@ app.use('/api/admin-kpi-payments', adminKpiPaymentRoutes);
 app.use('/api/admin-contragent-payments', adminContragentPaymentRoutes);
 app.use('/api/contragent-types', contragentTypeRoutes);
 app.use('/api/device-verification', deviceVerificationRoutes);
+app.use('/api/company-integration', companyIntegrationRoutes);
+app.use('/api/admin/certificate-assignment', certificateAssignmentRoutes);
 // Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({

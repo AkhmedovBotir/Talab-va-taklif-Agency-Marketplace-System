@@ -25,6 +25,7 @@ import FinanceMain from './pages/Finance/FinanceMain';
 import ArchiveMain from './pages/Archive/ArchiveMain';
 import ArchivedPunktWorkHistory from './pages/Archive/ArchivedPunktWorkHistory';
 import ArchivedAgentWorkHistory from './pages/Archive/ArchivedAgentWorkHistory';
+import CertificateAssignment from './pages/CertificateAssignment/CertificateAssignment';
 import NotFound from './pages/NotFound/NotFound';
 
 function App() {
@@ -63,6 +64,7 @@ function App() {
               <Route path="archive" element={<ArchiveMain />} />
               <Route path="archive/punkts/:id/work" element={<ArchivedPunktWorkHistory />} />
               <Route path="archive/agents/:id/work" element={<ArchivedAgentWorkHistory />} />
+              <Route path="certificate-assignment" element={<CertificateAssignment />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>

@@ -1,4 +1,5 @@
 const API_BASE_URL = 'http://localhost:5000/api';
+const PUBLIC_API_BASE_URL = 'http://localhost:3000/api';
 
 // Helper function to get token from localStorage
 const getToken = () => {
@@ -117,10 +118,20 @@ const apiRequest = async (endpoint, options = {}, requiresAuth = true) => {
       // Handle validation errors (400) with detailed error messages
       if (response.status === 400 && data.errors && Array.isArray(data.errors)) {
         const errorMessages = data.errors.map(err => err.message || `${err.field}: ${err.message}`).join(', ');
-        throw new Error(errorMessages || data.message || 'Validatsiya xatosi');
+        const error = new Error(errorMessages || data.message || 'Validatsiya xatosi');
+        // Preserve existingUser info if present
+        if (data.existingUser) {
+          error.existingUser = data.existingUser;
+        }
+        throw error;
       }
       
-      throw new Error(data.message || 'Something went wrong');
+      // Create error with existingUser info if present
+      const error = new Error(data.message || 'Something went wrong');
+      if (data.existingUser) {
+        error.existingUser = data.existingUser;
+      }
+      throw error;
     }
     
     return data;
@@ -2588,6 +2599,63 @@ export const dashboardAPI = {
   // Get products statistics
   getProductsStatistics: async () => {
     return apiRequest('/admins/dashboard/statistics/products');
+  },
+};
+
+// Helper function to make Public API requests (no auth, different base URL)
+const publicApiRequest = async (endpoint, options = {}) => {
+  const config = {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  };
+
+  try {
+    const response = await fetch(`${PUBLIC_API_BASE_URL}${endpoint}`, config);
+    
+    // Handle non-JSON responses
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      if (!response.ok) {
+        throw new Error(`Server xatolik: ${response.status}`);
+      }
+      throw jsonError;
+    }
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Something went wrong');
+    }
+    
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Certificate Integration API functions
+export const certificateAPI = {
+  // Public API - Get candidate data by certificate ID (no auth required)
+  getCandidateByCertificateId: async (certificateId) => {
+    return publicApiRequest(`/company-integration/certificate/${certificateId}`);
+  },
+
+  // Public API - Get candidate data by certificate number (no auth required)
+  getCandidateByCertificateNumber: async (certificateNumber) => {
+    return publicApiRequest(`/company-integration/certificate-number/${certificateNumber}`);
+  },
+
+  // Admin API - Assign certificate to position (auth required)
+  // Note: Admin API uses http://localhost:5000/api (internal backend)
+  // Public API uses http://localhost:3000/api (external/public API)
+  assignCertificateToPosition: async (assignmentData) => {
+    return apiRequest('/admin/certificate-assignment/assign', {
+      method: 'POST',
+      body: JSON.stringify(assignmentData),
+    });
   },
 };
 

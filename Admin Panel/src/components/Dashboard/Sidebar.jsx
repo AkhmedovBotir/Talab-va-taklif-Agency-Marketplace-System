@@ -39,6 +39,7 @@ import {
   PendingActions,
   TrendingUp,
   Archive,
+  VerifiedUser,
 } from '@mui/icons-material';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -75,6 +76,7 @@ const menuItems = [
   { icon: AttachMoney, label: 'Moliya', path: '/dashboard/finance' },
   { icon: RateReview, label: 'Baholar', path: '/dashboard/reviews' },
   { icon: Handshake, label: 'Hamkorlik So\'rovlari', path: '/dashboard/partnership-requests' },
+  { icon: VerifiedUser, label: 'Sertifikat Integratsiyasi', path: '/dashboard/certificate-assignment' },
   { icon: Settings, label: 'Sozlamalar', path: '/dashboard/settings' },
 ];
 
