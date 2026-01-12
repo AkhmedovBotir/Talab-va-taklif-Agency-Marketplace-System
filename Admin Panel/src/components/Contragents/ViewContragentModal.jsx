@@ -184,6 +184,14 @@ const ViewContragentModal = ({ open, onClose, contragent }) => {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
+                            Kontragent Darajasi
+                          </label>
+                          <p className="text-gray-900">
+                            {contragentData.contragentLevel === 'tuman' ? 'Tuman Kontragenti' : 'MFY Kontragenti'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500 mb-1">
                             Status
                           </label>
                           <span className={getStatusBadge(contragentData.status)}>

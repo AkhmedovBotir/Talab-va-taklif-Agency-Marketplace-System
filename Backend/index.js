@@ -28,6 +28,8 @@ const contragentTypeRoutes = require('./routes/contragentTypeRoutes');
 const deviceVerificationRoutes = require('./routes/deviceVerificationRoutes');
 const companyIntegrationRoutes = require('./routes/companyIntegrationRoutes');
 const certificateAssignmentRoutes = require('./routes/certificateAssignmentRoutes');
+const maxallaContragentRoutes = require('./routes/maxallaContragentRoutes');
+const deliveryProviderRoutes = require('./routes/deliveryProviderRoutes');
 
 // Initialize Express app
 const app = express();
@@ -68,6 +70,8 @@ app.use('/api/contragent-types', contragentTypeRoutes);
 app.use('/api/device-verification', deviceVerificationRoutes);
 app.use('/api/company-integration', companyIntegrationRoutes);
 app.use('/api/admin/certificate-assignment', certificateAssignmentRoutes);
+app.use('/api/maxalla-contragents', maxallaContragentRoutes);
+app.use('/api/delivery-providers', deliveryProviderRoutes);
 // Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Category, Business } from '@mui/icons-material';
+import { Category, LocationCity, PinDrop } from '@mui/icons-material';
 import { contragentAPI, contragentTypeAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import ContragentTable from '../../components/Contragents/ContragentTable';
@@ -23,9 +23,14 @@ const TABS = [
     icon: Category,
   },
   {
-    id: 'contragents',
-    label: 'Kontragentlar',
-    icon: Business,
+    id: 'tuman',
+    label: 'Tuman Kontragentlari',
+    icon: LocationCity,
+  },
+  {
+    id: 'mfy',
+    label: 'MFY Kontragentlari',
+    icon: PinDrop,
   },
 ];
 
@@ -109,7 +114,7 @@ const Contragents = ({ hideHeader = false }) => {
   };
 
   // Fetch Contragents
-  const fetchContragents = async () => {
+  const fetchContragents = async (contragentLevel) => {
     setContragentsLoading(true);
     setContragentsError('');
     try {
@@ -120,6 +125,7 @@ const Contragents = ({ hideHeader = false }) => {
         viloyat: contragentsFilters.viloyat || undefined,
         tuman: contragentsFilters.tuman || undefined,
         mfy: contragentsFilters.mfy || undefined,
+        contragentLevel: contragentLevel || undefined,
       });
 
       if (response.success) {
@@ -155,8 +161,8 @@ const Contragents = ({ hideHeader = false }) => {
   useEffect(() => {
     if (activeTab === 'types') {
       fetchContragentTypes();
-    } else {
-      fetchContragents();
+    } else if (activeTab === 'tuman' || activeTab === 'mfy') {
+      fetchContragents(activeTab);
     }
   }, [activeTab, contragentTypesFilters.status, contragentTypesFilters.search, pagination.page, pagination.limit, contragentsFilters.status, contragentsFilters.viloyat, contragentsFilters.tuman, contragentsFilters.mfy, contragentsFilters.search]);
 
@@ -196,19 +202,25 @@ const Contragents = ({ hideHeader = false }) => {
   // Contragents Handlers
   const handleCreateSuccess = () => {
     setCreateModalOpen(false);
-    fetchContragents();
+    if (activeTab === 'tuman' || activeTab === 'mfy') {
+      fetchContragents(activeTab);
+    }
   };
 
   const handleEditSuccess = () => {
     setEditModalOpen(false);
     setSelectedContragent(null);
-    fetchContragents();
+    if (activeTab === 'tuman' || activeTab === 'mfy') {
+      fetchContragents(activeTab);
+    }
   };
 
   const handleDeleteSuccess = () => {
     setDeleteModalOpen(false);
     setSelectedContragent(null);
-    fetchContragents();
+    if (activeTab === 'tuman' || activeTab === 'mfy') {
+      fetchContragents(activeTab);
+    }
   };
 
   const handlePageChange = (newPage) => {
@@ -389,8 +401,14 @@ const Contragents = ({ hideHeader = false }) => {
             {/* Contragents Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">Kontragentlar</h2>
-                <p className="text-gray-600 text-sm">Kontragentlarni boshqarish va ko'rish</p>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {activeTab === 'tuman' ? 'Tuman Kontragentlari' : 'MFY Kontragentlari'}
+                </h2>
+                <p className="text-gray-600 text-sm">
+                  {activeTab === 'tuman' 
+                    ? 'Tuman darajasidagi kontragentlarni boshqarish va ko\'rish'
+                    : 'MFY darajasidagi kontragentlarni boshqarish va ko\'rish'}
+                </p>
               </div>
               <button
                 onClick={() => setCreateModalOpen(true)}
@@ -512,7 +530,11 @@ const Contragents = ({ hideHeader = false }) => {
               onView={handleView}
               pagination={pagination}
               onPageChange={handlePageChange}
-              onStatusChange={fetchContragents}
+              onStatusChange={() => {
+                if (activeTab === 'tuman' || activeTab === 'mfy') {
+                  fetchContragents(activeTab);
+                }
+              }}
             />
           </>
         )}
@@ -563,6 +585,7 @@ const Contragents = ({ hideHeader = false }) => {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
+        defaultContragentLevel={activeTab === 'mfy' ? 'mfy' : 'tuman'}
       />
 
       {selectedContragent && (

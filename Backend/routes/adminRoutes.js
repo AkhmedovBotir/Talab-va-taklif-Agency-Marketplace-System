@@ -21,6 +21,17 @@ const {
   deleteSubcategory,
 } = require('../controllers/adminCategoryController');
 const {
+  createBaseProduct,
+  getAllBaseProducts,
+  getBaseProductById,
+  updateBaseProduct,
+  deleteBaseProduct,
+} = require('../controllers/adminBaseProductController');
+const {
+  getAllMaxallaProducts,
+  getMaxallaProductById,
+} = require('../controllers/adminMaxallaProductController');
+const {
   getAllCategoriesForAdmin,
   getAllSubcategoriesForAdmin,
   getAllProductsForAdmin,
@@ -181,6 +192,23 @@ router.put('/products/:id', adminAuth, validate(adminProductModerationValidation
 
 // Get product by ID (for admin)
 router.get('/data/products/:id', adminAuth, getProductByIdForAdmin);
+
+// ==================== BASE PRODUCT MANAGEMENT ====================
+
+// Base Product CRUD
+router.post('/base-products', adminAuth, validate(adminValidationSchemas.createBaseProduct), createBaseProduct);
+router.get('/base-products', adminAuth, getAllBaseProducts);
+router.get('/base-products/:id', adminAuth, getBaseProductById);
+router.put('/base-products/:id', adminAuth, validate(adminValidationSchemas.updateBaseProduct), updateBaseProduct);
+router.delete('/base-products/:id', adminAuth, deleteBaseProduct);
+
+// ==================== MAXALLA PRODUCT MANAGEMENT (READ ONLY) ====================
+
+// Get all maxalla products (created by maxalla contragents)
+router.get('/maxalla-products', adminAuth, getAllMaxallaProducts);
+
+// Get maxalla product by ID
+router.get('/maxalla-products/:id', adminAuth, getMaxallaProductById);
 
 // ==================== ADMIN PRODUCT MODERATION ====================
 

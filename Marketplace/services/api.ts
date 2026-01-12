@@ -70,6 +70,12 @@ export interface Contragent {
   status: 'active' | 'inactive';
   logo?: string | null;
   activityType?: ContragentType | string;
+  contragentLevel?: 'tuman' | 'mfy';
+  workingHours?: {
+    open: string | null; // HH:MM formatida
+    close: string | null; // HH:MM formatida
+  };
+  isOpen?: boolean | null; // true, false, yoki null
   createdAt?: string;
   updatedAt?: string;
 }
@@ -110,6 +116,7 @@ export interface Product {
     tuman: Region | null;
   }>;
   productCode: string;
+  productType?: 'tuman' | 'maxalla';
   censored?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -204,10 +211,23 @@ export interface ProductResponse {
   data: Product;
 }
 
+// Maxalla Store Interfaces
+export interface MaxallaStore {
+  contragent: Contragent;
+  product: Product;
+}
+
+export interface MaxallaStoresResponse {
+  success: boolean;
+  count: number;
+  data: MaxallaStore[];
+}
+
 // Cart Interfaces
 export interface CartItem {
   product: Product;
   quantity: number;
+  productType?: 'tuman' | 'maxalla';
 }
 
 export interface Cart {
@@ -760,7 +780,6 @@ class ApiService {
     }
     
     const url = `${BASE_URL}/check-phone?phone=${cleanedPhone}`;
-    console.log('Checking phone:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -770,7 +789,6 @@ class ApiService {
     });
 
     const data = await response.json();
-    console.log('Check phone response:', data);
     
     if (!response.ok) {
       throw new Error(data.message || 'Xatolik yuz berdi');
@@ -873,6 +891,93 @@ class ApiService {
     return data;
   }
 
+  // Get All Maxalla Products
+  async getMaxallaProducts(params?: {
+    category?: string;
+    subcategory?: string;
+    contragent?: string;
+    status?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ProductsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.subcategory) queryParams.append('subcategory', params.subcategory);
+    if (params?.contragent) queryParams.append('contragent', params.contragent);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.minPrice) queryParams.append('minPrice', params.minPrice.toString());
+    if (params?.maxPrice) queryParams.append('maxPrice', params.maxPrice.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/maxalla-products${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Xatolik yuz berdi');
+    }
+
+    return data;
+  }
+
+  // Get Maxalla Product by ID
+  async getMaxallaProductById(id: string): Promise<ProductResponse> {
+    const response = await fetch(`${BASE_URL}/maxalla-products/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Xatolik yuz berdi');
+    }
+
+    return data;
+  }
+
+  // Get Maxalla Stores for Product
+  async getMaxallaStores(
+    productId: string,
+    token?: string | null
+  ): Promise<MaxallaStoresResponse> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${BASE_URL}/maxalla-products/${productId}/stores`, {
+      method: 'GET',
+      headers,
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Xatolik yuz berdi');
+    }
+
+    return data;
+  }
+
   // Get All Categories
   async getCategories(params?: {
     status?: string;
@@ -935,6 +1040,8 @@ class ApiService {
     limit?: number;
     search?: string;
     activityType?: string;
+    contragentLevel?: 'tuman' | 'mfy';
+    mfy?: string; // MFY ID for filtering maxalla contragents
   }): Promise<ContragentsResponse> {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
@@ -942,6 +1049,8 @@ class ApiService {
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.search) queryParams.append('search', params.search);
     if (params?.activityType) queryParams.append('activityType', params.activityType);
+    if (params?.contragentLevel) queryParams.append('contragentLevel', params.contragentLevel);
+    if (params?.mfy) queryParams.append('mfy', params.mfy);
 
     const queryString = queryParams.toString();
     const endpoint = `/contragents${queryString ? `?${queryString}` : ''}`;
@@ -960,6 +1069,20 @@ class ApiService {
     }
 
     return data;
+  }
+
+  // Get Maxalla Contragents by MFY
+  async getMaxallaContragentsByMfy(mfyId: string, params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<ContragentsResponse> {
+    return this.getContragents({
+      ...params,
+      contragentLevel: 'mfy',
+      mfy: mfyId,
+    });
   }
 
   // Get Featured Contragents (public)
@@ -1089,9 +1212,11 @@ class ApiService {
   async addToCart(
     productId: string,
     quantity: number = 1,
-    token: string
+    token: string,
+    productType: 'tuman' | 'maxalla' = 'tuman'
   ): Promise<CartResponse> {
-    return this.request<Cart>('/cart', {
+    const endpoint = productType === 'maxalla' ? '/maxalla-cart' : '/cart';
+    return this.request<Cart>(endpoint, {
       method: 'POST',
       body: JSON.stringify({
         productId,
@@ -1103,9 +1228,11 @@ class ApiService {
   async updateCartItem(
     productId: string,
     quantity: number,
-    token: string
+    token: string,
+    productType: 'tuman' | 'maxalla' = 'tuman'
   ): Promise<CartResponse> {
-    return this.request<Cart>(`/cart/${productId}`, {
+    const endpoint = productType === 'maxalla' ? `/maxalla-cart/${productId}` : `/cart/${productId}`;
+    return this.request<Cart>(endpoint, {
       method: 'PUT',
       body: JSON.stringify({
         quantity,
@@ -1115,16 +1242,26 @@ class ApiService {
 
   async removeFromCart(
     productId: string,
-    token: string
+    token: string,
+    productType: 'tuman' | 'maxalla' = 'tuman'
   ): Promise<CartResponse> {
-    return this.request<Cart>(`/cart/${productId}`, {
+    const endpoint = productType === 'maxalla' ? `/maxalla-cart/${productId}` : `/cart/${productId}`;
+    return this.request<Cart>(endpoint, {
       method: 'DELETE',
     }, token);
   }
 
-  async clearCart(token: string): Promise<CartResponse> {
-    return this.request<Cart>('/cart', {
+  async clearCart(token: string, productType: 'tuman' | 'maxalla' = 'tuman'): Promise<CartResponse> {
+    const endpoint = productType === 'maxalla' ? '/maxalla-cart' : '/cart';
+    return this.request<Cart>(endpoint, {
       method: 'DELETE',
+    }, token);
+  }
+
+  // Get Maxalla Cart
+  async getMaxallaCart(token: string): Promise<CartResponse> {
+    return this.request<Cart>('/maxalla-cart', {
+      method: 'GET',
     }, token);
   }
 
@@ -1205,15 +1342,26 @@ class ApiService {
     }, token);
   }
 
-  // Update Viloyat and Tuman
+  // Update Viloyat, Tuman and MFY
   async updateViloyatTuman(
     data: {
-      viloyat?: string;
+      viloyat?: string | null;
       tuman?: string | null;
+      mfy?: string | null;
     },
     token: string
-  ): Promise<ApiResponse<User>> {
-    return this.request<User>('/me/viloyat-tuman', {
+  ): Promise<ApiResponse<{
+    _id: string;
+    viloyat: Region | null;
+    tuman: Region | null;
+    mfy: Region | null;
+  }>> {
+    return this.request<{
+      _id: string;
+      viloyat: Region | null;
+      tuman: Region | null;
+      mfy: Region | null;
+    }>('/me/viloyat-tuman', {
       method: 'PATCH',
       body: JSON.stringify(data),
     }, token);
@@ -1222,11 +1370,69 @@ class ApiService {
   // Order Methods
   async createOrder(
     data: CreateOrderRequest,
-    token: string
+    token: string,
+    productType: 'tuman' | 'maxalla' = 'tuman'
   ): Promise<OrderResponse> {
-    return this.request<Order>('/orders', {
+    const endpoint = productType === 'maxalla' ? '/maxalla-orders' : '/orders';
+    return this.request<Order>(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
+    }, token);
+  }
+
+  // Get Maxalla Orders
+  async getMaxallaOrders(
+    params?: {
+      status?: 'pending' | 'confirmed_by_punkt' | 'requested_to_contragent' | 'accepted_by_contragent' | 'delivered_to_punkt' | 'assigned_to_agent' | 'confirmed_by_agent' | 'confirmed_by_customer' | 'cancelled';
+      paymentStatus?: 'pending' | 'paid' | 'failed' | 'refunded';
+      page?: number;
+      limit?: number;
+    },
+    token?: string
+  ): Promise<OrdersResponse> {
+    if (!token) {
+      throw new Error('Token is required');
+    }
+
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.paymentStatus) queryParams.append('paymentStatus', params.paymentStatus);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/maxalla-orders${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await this.request<Order[]>(endpoint, {
+      method: 'GET',
+    }, token);
+
+    return {
+      success: response.success,
+      count: (response as any).count || 0,
+      total: (response as any).total || 0,
+      page: (response as any).page || 1,
+      limit: (response as any).limit || 20,
+      totalPages: (response as any).totalPages || 1,
+      data: (response as any).data || response.data || [],
+    };
+  }
+
+  async getMaxallaOrderById(
+    orderId: string,
+    token: string
+  ): Promise<OrderResponse> {
+    return this.request<Order>(`/maxalla-orders/${orderId}`, {
+      method: 'GET',
+    }, token);
+  }
+
+  async cancelMaxallaOrder(
+    orderId: string,
+    token: string
+  ): Promise<OrderResponse> {
+    return this.request<Order>(`/maxalla-orders/${orderId}`, {
+      method: 'DELETE',
     }, token);
   }
 
@@ -1287,9 +1493,13 @@ class ApiService {
 
   async confirmDelivery(
     orderId: string,
-    token: string
+    token: string,
+    productType: 'tuman' | 'maxalla' = 'tuman'
   ): Promise<OrderResponse> {
-    return this.request<Order>(`/orders/${orderId}/confirm-delivery`, {
+    const endpoint = productType === 'maxalla' 
+      ? `/maxalla-orders/${orderId}/confirm-delivery`
+      : `/orders/${orderId}/confirm-delivery`;
+    return this.request<Order>(endpoint, {
       method: 'POST',
     }, token);
   }

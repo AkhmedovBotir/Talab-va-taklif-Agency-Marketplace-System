@@ -28,11 +28,12 @@ interface LocationSelectorProps {
 export default function LocationSelector({ show = true, autoOpen = false }: LocationSelectorProps) {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, token } = useAuth();
-  const { selectedViloyat, selectedTuman, setSelectedViloyat, setSelectedTuman } = useLocation();
+  const { selectedViloyat, selectedTuman, selectedMfy, setSelectedViloyat, setSelectedTuman, setSelectedMfy } = useLocation();
   const { showError } = useSnackbar();
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [tempViloyat, setTempViloyat] = useState<Region | null>(null);
   const [tempTuman, setTempTuman] = useState<Region | null>(null);
+  const [tempMfy, setTempMfy] = useState<Region | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasCheckedLocation, setHasCheckedLocation] = useState(false);
@@ -70,6 +71,12 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
           } else {
             setSelectedTuman(null);
           }
+          
+          if (response.data.mfy && typeof response.data.mfy === 'object') {
+            setSelectedMfy(response.data.mfy);
+          } else {
+            setSelectedMfy(null);
+          }
         }
       } catch (error: any) {
         console.error('Error loading user location:', error);
@@ -89,9 +96,10 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
       // Set temp values from current selected location when modal opens
       setTempViloyat(selectedViloyat);
       setTempTuman(selectedTuman);
-      console.log('LocationSelector: Modal opened, temp values set - viloyat:', selectedViloyat?.name || 'none', 'tuman:', selectedTuman?.name || 'none');
+      setTempMfy(selectedMfy);
+      console.log('LocationSelector: Modal opened, temp values set - viloyat:', selectedViloyat?.name || 'none', 'tuman:', selectedTuman?.name || 'none', 'mfy:', selectedMfy?.name || 'none');
     }
-  }, [locationModalVisible, selectedViloyat, selectedTuman]);
+  }, [locationModalVisible, selectedViloyat, selectedTuman, selectedMfy]);
 
   // Show highlight alert for new users
   useEffect(() => {
@@ -143,6 +151,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
         // Initialize temp values when auto opening
         setTempViloyat(null);
         setTempTuman(null);
+        setTempMfy(null);
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -157,7 +166,8 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
     // These values come from API (GET /api/marketplace/me/viloyat-tuman)
     setTempViloyat(selectedViloyat);
     setTempTuman(selectedTuman);
-    console.log('LocationSelector: Modal opened with viloyat:', selectedViloyat?._id || 'none', selectedViloyat?.name || 'none', 'tuman:', selectedTuman?._id || 'none', selectedTuman?.name || 'none');
+    setTempMfy(selectedMfy);
+    console.log('LocationSelector: Modal opened with viloyat:', selectedViloyat?._id || 'none', selectedViloyat?.name || 'none', 'tuman:', selectedTuman?._id || 'none', selectedTuman?.name || 'none', 'mfy:', selectedMfy?._id || 'none', selectedMfy?.name || 'none');
     setLocationModalVisible(true);
   };
 
@@ -184,10 +194,16 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
   const handleViloyatSelect = (region: Region) => {
     setTempViloyat(region);
     setTempTuman(null); // Clear tuman when viloyat changes
+    setTempMfy(null); // Clear mfy when viloyat changes
   };
 
   const handleTumanSelect = (region: Region) => {
     setTempTuman(region);
+    setTempMfy(null); // Clear mfy when tuman changes
+  };
+
+  const handleMfySelect = (region: Region) => {
+    setTempMfy(region);
   };
 
   const handleSave = async () => {
@@ -201,10 +217,21 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
       // Save to API if authenticated
       if (isAuthenticated && token) {
         try {
-          const requestData = {
+          const requestData: {
+            viloyat: string;
+            tuman: string;
+            mfy?: string | null;
+          } = {
             viloyat: tempViloyat._id,
             tuman: tempTuman._id,
           };
+          
+          // Add mfy if selected
+          if (tempMfy) {
+            requestData.mfy = tempMfy._id;
+          } else {
+            requestData.mfy = null;
+          }
           
           console.log('PATCH /api/marketplace/me/viloyat-tuman Request:', JSON.stringify(requestData, null, 2));
           
@@ -218,9 +245,18 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
             // API dan kelgan ma'lumotlar to'g'ri formatda bo'lishi kerak
             if (response.data.viloyat && typeof response.data.viloyat === 'object') {
               setSelectedViloyat(response.data.viloyat);
+            } else {
+              setSelectedViloyat(null);
             }
             if (response.data.tuman && typeof response.data.tuman === 'object') {
               setSelectedTuman(response.data.tuman);
+            } else {
+              setSelectedTuman(null);
+            }
+            if (response.data.mfy && typeof response.data.mfy === 'object') {
+              setSelectedMfy(response.data.mfy);
+            } else {
+              setSelectedMfy(null);
             }
           }
         } catch (error: any) {
@@ -229,6 +265,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
           // Update location in context locally even if API fails
           setSelectedViloyat(tempViloyat);
           setSelectedTuman(tempTuman);
+          setSelectedMfy(tempMfy);
           
           // Show error to user
           showError(error.message || 'Hududni saqlashda xatolik yuz berdi. Hudud mahalliy saqlandi.');
@@ -240,6 +277,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
         // Update location in context if not authenticated
         setSelectedViloyat(tempViloyat);
         setSelectedTuman(tempTuman);
+        setSelectedMfy(tempMfy);
       }
 
       setLocationModalVisible(false);
@@ -254,15 +292,18 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
   const handleClear = async () => {
     setTempViloyat(null);
     setTempTuman(null);
+    setTempMfy(null);
     setSelectedViloyat(null);
     setSelectedTuman(null);
+    setSelectedMfy(null);
     
     // Clear from API if authenticated
     if (isAuthenticated && token) {
       try {
         const requestData = {
-          viloyat: undefined,
+          viloyat: null,
           tuman: null,
+          mfy: null,
         };
         
         console.log('PATCH /api/marketplace/me/viloyat-tuman (Clear) Request:', JSON.stringify(requestData, null, 2));
@@ -284,6 +325,9 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
   };
 
   const getLocationText = () => {
+    if (selectedMfy && selectedTuman && selectedViloyat) {
+      return `${selectedViloyat.name}, ${selectedTuman.name}, ${selectedMfy.name}`;
+    }
     if (selectedTuman && selectedViloyat) {
       return `${selectedViloyat.name}, ${selectedTuman.name}`;
     }
@@ -428,7 +472,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoTitle}>Qanday tanlash kerak?</Text>
                   <Text style={styles.infoDescription}>
-                    Avval viloyatni, keyin tumanni tanlang. Tanlangan hududga qarab faqat sizning hududingizga yetkazib beriladigan mahsulotlar ko'rsatiladi.
+                    Avval viloyatni, keyin tumanni, so'ng MFY ni tanlang. Tanlangan hududga qarab faqat sizning hududingizga yetkazib beriladigan mahsulotlar ko'rsatiladi.
               </Text>
                 </View>
             </View>
@@ -480,6 +524,36 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
                 </View>
               </View>
 
+              {/* MFY Selector Card */}
+              <View style={[styles.selectorCard, (!tempViloyat || !tempTuman) && styles.selectorCardDisabled]}>
+                <View style={styles.selectorCardHeader}>
+                  <View style={styles.selectorIconContainer}>
+                    <Ionicons name="home" size={18} color={(tempViloyat && tempTuman) ? "#007AFF" : "#ccc"} />
+                  </View>
+                  <Text style={[styles.selectorCardTitle, (!tempViloyat || !tempTuman) && styles.selectorCardTitleDisabled]}>
+                    MFY
+                  </Text>
+                  {(!tempViloyat || !tempTuman) && (
+                    <View style={styles.requiredBadge}>
+                      <Text style={styles.requiredBadgeText}>
+                        {!tempViloyat ? 'Viloyat tanlang' : 'Tuman tanlang'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.regionPickerWrapper}>
+            <RegionPicker
+                    label=""
+                    value={tempMfy?._id || ''}
+              type="mfy"
+                    parentId={tempTuman?._id}
+              onSelect={handleMfySelect}
+                    displayValue={tempMfy?.name}
+                    disabled={!tempViloyat || !tempTuman}
+            />
+                </View>
+              </View>
+
               {/* Selected Location Preview */}
               {tempTuman && tempViloyat && (
                 <View style={styles.selectedLocationCard}>
@@ -499,6 +573,15 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
                       <Ionicons name="location" size={16} color="#007AFF" />
                       <Text style={styles.selectedLocationText}>{tempTuman.name}</Text>
                     </View>
+                    {tempMfy && (
+                      <>
+                        <View style={styles.selectedLocationDivider} />
+                        <View style={styles.selectedLocationItem}>
+                          <Ionicons name="home" size={16} color="#007AFF" />
+                          <Text style={styles.selectedLocationText}>{tempMfy.name}</Text>
+                        </View>
+                      </>
+                    )}
                   </View>
                 </View>
               )}
@@ -522,7 +605,7 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
             )}
                   </TouchableOpacity>
                 )}
-                {(tempViloyat || tempTuman) && (
+                {(tempViloyat || tempTuman || tempMfy) && (
                   <TouchableOpacity
                     style={styles.clearButton}
                     onPress={handleClear}

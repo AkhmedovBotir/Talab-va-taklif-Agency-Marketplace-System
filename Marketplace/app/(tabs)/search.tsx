@@ -14,13 +14,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
+import MaxallaStoreSelectionModal from '../../components/MaxallaStoreSelectionModal';
 import FilterModal from '../../components/ui/FilterModal';
 import ProductCard from '../../components/ui/ProductCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import { useLocation } from '../../contexts/LocationContext';
 import { useNotification } from '../../contexts/NotificationContext';
-import apiService, { Product } from '../../services/api';
+import { useSnackbar } from '../../contexts/SnackbarContext';
+import apiService, { MaxallaStore, Product } from '../../services/api';
 
 // Helper function to calculate age from birthDate
 const calculateAge = (birthDate: string | null | undefined): number | null => {
@@ -54,8 +56,9 @@ export default function SearchScreen() {
     }>();
     const insets = useSafeAreaInsets();
     const { unreadCount } = useNotification();
-    const { user } = useAuth();
-    const { selectedTuman } = useLocation();
+    const { user, token } = useAuth();
+    const { selectedTuman, selectedMfy } = useLocation();
+    const { showError, showSuccess } = useSnackbar();
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [products, setProducts] = useState<Product[]>([]);
@@ -71,6 +74,8 @@ export default function SearchScreen() {
         category?: string;
         subcategory?: string;
     }>({});
+    const [storeModalVisible, setStoreModalVisible] = useState(false);
+    const [selectedProductForStore, setSelectedProductForStore] = useState<Product | null>(null);
 
     // Debounce search query - 500ms delay
     useEffect(() => {
@@ -313,9 +318,38 @@ export default function SearchScreen() {
             return;
         }
 
+        const productType = product.productType || 'tuman';
+        
+        // For maxalla products, show store selection modal
+        if (productType === 'maxalla') {
+            // Check if user has selected MFY
+            if (!selectedMfy) {
+                showError('Maxalla mahsulotlarini qo\'shish uchun MFY tanlang');
+                return;
+            }
+            setSelectedProductForStore(product);
+            setStoreModalVisible(true);
+            return;
+        }
+
+        // For tuman products, add directly to cart
         try {
-            await addToCart(product._id, 1);
-            Alert.alert('Muvaffaqiyatli', `${product.name} korzinkaga qo'shildi`);
+            await addToCart(product._id, 1, productType);
+            showSuccess(`${product.name} korzinkaga qo'shildi`);
+        } catch (error) {
+            // Error is already shown in context
+        }
+    };
+
+    const handleStoreSelect = async (store: MaxallaStore) => {
+        if (!selectedProductForStore) return;
+
+        try {
+            // Add the selected store's product to maxalla cart
+            await addToCart(store.product._id, 1, 'maxalla');
+            showSuccess(`${selectedProductForStore.name} ${store.contragent.name} dokonidan korzinkaga qo'shildi`);
+            setStoreModalVisible(false);
+            setSelectedProductForStore(null);
         } catch (error) {
             // Error is already shown in context
         }
@@ -326,7 +360,8 @@ export default function SearchScreen() {
     };
 
     const renderItem = ({ item }: { item: Product }) => {
-        const isInCart = getCartItemQuantity(item._id) > 0;
+        const productType = item.productType || 'tuman';
+        const isInCart = getCartItemQuantity(item._id, productType) > 0;
         return (
             <ProductCard
                 product={item}
@@ -513,6 +548,20 @@ export default function SearchScreen() {
                 }}
                 hideContragentFilter={!!contragentFilter}
             />
+
+            {/* Maxalla Store Selection Modal */}
+            {selectedProductForStore && (
+                <MaxallaStoreSelectionModal
+                    visible={storeModalVisible}
+                    productId={selectedProductForStore._id}
+                    productName={selectedProductForStore.name}
+                    onClose={() => {
+                        setStoreModalVisible(false);
+                        setSelectedProductForStore(null);
+                    }}
+                    onSelectStore={handleStoreSelect}
+                />
+            )}
         </View>
     );
 }

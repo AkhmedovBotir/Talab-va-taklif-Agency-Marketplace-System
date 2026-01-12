@@ -1,4 +1,4 @@
-import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -15,48 +15,89 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
+import MaxallaStoreSelectionModal from '../../components/MaxallaStoreSelectionModal';
+import ProductCard from '../../components/ui/ProductCard';
+import { useAuth } from '../../contexts/AuthContext';
+import { useCart } from '../../contexts/CartContext';
+import { useLocation } from '../../contexts/LocationContext';
 import { useNotification } from '../../contexts/NotificationContext';
-import apiService, { Contragent, ContragentType } from '../../services/api';
+import { useSnackbar } from '../../contexts/SnackbarContext';
+import apiService, { Category, MaxallaStore, Product } from '../../services/api';
 
-export default function ShopsScreen() {
+export default function CategoriesScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { unreadCount } = useNotification();
+    const { addToCart, getCartItemQuantity } = useCart();
+    const { selectedViloyat, selectedTuman, selectedMfy } = useLocation();
+    const { isAuthenticated } = useAuth();
+    const { showError, showSuccess } = useSnackbar();
     
-    // Contragent Types state
-    const [contragentTypes, setContragentTypes] = useState<ContragentType[]>([]);
-    const [typesLoading, setTypesLoading] = useState(true);
-    const [typesRefreshing, setTypesRefreshing] = useState(false);
-    const [selectedType, setSelectedType] = useState<ContragentType | null>(null);
+    // Categories state
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [categoriesLoading, setCategoriesLoading] = useState(true);
+    const [categoriesRefreshing, setCategoriesRefreshing] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
     
-    // Contragents state
-    const [allContragents, setAllContragents] = useState<Contragent[]>([]);
-    const [contragents, setContragents] = useState<Contragent[]>([]);
+    // Subcategories state
+    const [subcategories, setSubcategories] = useState<Category[]>([]);
+    const [subcategoriesLoading, setSubcategoriesLoading] = useState(false);
+    const [selectedSubcategory, setSelectedSubcategory] = useState<Category | null>(null);
+    
+    // Products state
+    const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [imgBase, setImgBase] = useState<string | null>(null);
+    const [storeModalVisible, setStoreModalVisible] = useState(false);
+    const [selectedProductForStore, setSelectedProductForStore] = useState<Product | null>(null);
 
-    // Load Contragent Types
-    const loadContragentTypes = useCallback(async () => {
+    // Load Categories (parent categories only)
+    const loadCategories = useCallback(async () => {
         try {
-            setTypesLoading(true);
-            const response = await apiService.getContragentTypes({ status: 'active' });
-            setContragentTypes(response.data);
+            setCategoriesLoading(true);
+            const response = await apiService.getCategories({ 
+                status: 'active',
+                includeSubcategories: false,
+            });
+            // Filter to only show parent categories (no parent)
+            const parentCategories = response.data.filter(cat => !cat.parent);
+            setCategories(parentCategories);
         } catch (error: any) {
-            console.error('Error loading contragent types:', error);
-            Alert.alert('Xatolik', error.message || 'Faoliyat turlarini yuklashda xatolik yuz berdi');
+            console.error('Error loading categories:', error);
+            Alert.alert('Xatolik', error.message || 'Kategoriyalarni yuklashda xatolik yuz berdi');
         } finally {
-            setTypesLoading(false);
-            setTypesRefreshing(false);
+            setCategoriesLoading(false);
+            setCategoriesRefreshing(false);
         }
     }, []);
 
-    // Load Contragents by Activity Type
-    const loadContragents = useCallback(async (pageNum: number = 1, append: boolean = false, search?: string, activityTypeId?: string) => {
+    // Load Subcategories for selected category
+    const loadSubcategories = useCallback(async (categoryId: string) => {
+        try {
+            setSubcategoriesLoading(true);
+            const response = await apiService.getCategoryById(categoryId, true);
+            if (response.success && response.data) {
+                const category = response.data;
+                // Get subcategories from the category
+                const subs = category.subcategories || [];
+                setSubcategories(subs);
+            }
+        } catch (error: any) {
+            console.error('Error loading subcategories:', error);
+            Alert.alert('Xatolik', error.message || 'Kichik kategoriyalarni yuklashda xatolik yuz berdi');
+        } finally {
+            setSubcategoriesLoading(false);
+        }
+    }, []);
+
+    // Load Products for selected subcategory
+    const loadProducts = useCallback(async (pageNum: number = 1, append: boolean = false) => {
+        if (!selectedSubcategory) return;
+
         try {
             if (!append) {
                 setLoading(true);
@@ -64,639 +105,201 @@ export default function ShopsScreen() {
                 setLoadingMore(true);
             }
 
-            const response = await apiService.getContragents({
+            const response = await apiService.getProducts({
                 page: pageNum,
                 limit: 20,
                 status: 'active',
-                search: search || undefined,
-                activityType: activityTypeId,
+                subcategory: selectedSubcategory._id,
             });
 
-            if (response.imgBase) {
-                setImgBase(response.imgBase);
+            // Filter products by selected tuman
+            let filteredProducts = response.data;
+            if (selectedTuman) {
+                filteredProducts = response.data.filter((product) => {
+                    if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
+                        return false;
+                    }
+                    const matches = product.deliveryRegions.some((region) => {
+                        if (region.tuman) {
+                            return region.tuman._id === selectedTuman._id;
+                        }
+                        if (region.viloyat && selectedViloyat) {
+                            return region.viloyat._id === selectedViloyat._id;
+                        }
+                        return false;
+                    });
+                    return matches;
+                });
             }
 
             if (append) {
-                setAllContragents((prev) => [...prev, ...response.data]);
+                setProducts((prev) => [...prev, ...filteredProducts]);
             } else {
-                setAllContragents(response.data);
+                setProducts(filteredProducts);
             }
 
             setPage(response.page);
-            
-            if (response.next) {
-                setHasMore(true);
-            } else {
             setHasMore(response.page < response.totalPages);
-            }
         } catch (error: any) {
-            console.error('Error loading contragents:', error);
-            Alert.alert('Xatolik', error.message || 'Do\'konlarni yuklashda xatolik yuz berdi');
+            console.error('Error loading products:', error);
+            Alert.alert('Xatolik', error.message || 'Mahsulotlarni yuklashda xatolik yuz berdi');
         } finally {
             setLoading(false);
             setRefreshing(false);
             setLoadingMore(false);
         }
+    }, [selectedSubcategory, selectedTuman, selectedViloyat]);
+
+    useEffect(() => {
+        loadCategories();
     }, []);
 
     useEffect(() => {
-        loadContragentTypes();
-    }, []);
+        if (selectedCategory) {
+            loadSubcategories(selectedCategory._id);
+            setSelectedSubcategory(null);
+            setProducts([]);
+        }
+    }, [selectedCategory, loadSubcategories]);
 
     useEffect(() => {
-        if (selectedType) {
+        if (selectedSubcategory) {
             setPage(1);
             setHasMore(true);
             setSearchQuery('');
-            loadContragents(1, false, undefined, selectedType._id);
+            loadProducts(1, false);
         }
-    }, [selectedType, loadContragents]);
+    }, [selectedSubcategory, loadProducts]);
 
-    // Local filter - search query ga qarab do'konlarni filter qilish
-    useEffect(() => {
-        if (!searchQuery.trim()) {
-            setContragents(allContragents);
-        } else {
-            const query = searchQuery.toLowerCase().trim();
-            const filtered = allContragents.filter((contragent) =>
-                contragent.name.toLowerCase().includes(query)
-            );
-            setContragents(filtered);
-        }
-    }, [searchQuery, allContragents]);
+    // Local filter - search query ga qarab mahsulotlarni filter qilish
+    const filteredProducts = searchQuery.trim()
+        ? products.filter((product) =>
+            product.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
+          )
+        : products;
 
     const handleRefresh = useCallback(() => {
-        if (selectedType) {
+        if (selectedSubcategory) {
         setRefreshing(true);
         setPage(1);
         setHasMore(true);
             setSearchQuery('');
-            loadContragents(1, false, undefined, selectedType._id);
+            loadProducts(1, false);
+        } else if (selectedCategory) {
+            setCategoriesRefreshing(true);
+            loadSubcategories(selectedCategory._id);
         } else {
-            setTypesRefreshing(true);
-            loadContragentTypes();
+            setCategoriesRefreshing(true);
+            loadCategories();
         }
-    }, [selectedType, loadContragents, loadContragentTypes]);
+    }, [selectedCategory, selectedSubcategory, loadCategories, loadSubcategories, loadProducts]);
 
     const handleLoadMore = useCallback(() => {
-        if (!loadingMore && hasMore && !searchQuery.trim() && selectedType) {
-            loadContragents(page + 1, true, undefined, selectedType._id);
+        if (!loadingMore && hasMore && !searchQuery.trim() && selectedSubcategory) {
+            loadProducts(page + 1, true);
         }
-    }, [loadingMore, hasMore, page, loadContragents, searchQuery, selectedType]);
+    }, [loadingMore, hasMore, page, loadProducts, searchQuery, selectedSubcategory]);
 
-    const handleTypePress = (type: ContragentType) => {
-        setSelectedType(type);
+    const handleCategoryPress = (category: Category) => {
+        setSelectedCategory(category);
+    };
+
+    const handleSubcategoryPress = (subcategory: Category) => {
+        setSelectedSubcategory(subcategory);
     };
 
     const handleBackPress = () => {
-        setSelectedType(null);
-        setAllContragents([]);
-        setContragents([]);
+        if (selectedSubcategory) {
+            setSelectedSubcategory(null);
+            setProducts([]);
         setSearchQuery('');
         setPage(1);
         setHasMore(true);
+        } else if (selectedCategory) {
+            setSelectedCategory(null);
+            setSubcategories([]);
+            setSelectedSubcategory(null);
+            setProducts([]);
+            setSearchQuery('');
+            setPage(1);
+            setHasMore(true);
+        }
     };
 
-    const handleShopPress = (contragent: Contragent) => {
-        router.push({
-            pathname: '/(tabs)/search',
-            params: { contragentId: contragent._id, contragentName: contragent.name },
-        });
+    const handleProductPress = (product: Product) => {
+        router.push(`/product/${product._id}` as any);
+    };
+
+    const handleAddToCart = async (product: Product) => {
+        if (!isAuthenticated) {
+            Alert.alert('Kirish kerak', 'Korzinkaga qo\'shish uchun tizimga kiring');
+            return;
+        }
+
+        const productType = product.productType || 'tuman';
+        
+        // For maxalla products, show store selection modal
+        if (productType === 'maxalla') {
+            // Check if user has selected MFY
+            if (!selectedMfy) {
+                showError('Maxalla mahsulotlarini qo\'shish uchun MFY tanlang');
+                return;
+            }
+            setSelectedProductForStore(product);
+            setStoreModalVisible(true);
+            return;
+        }
+
+        // For tuman products, add directly to cart
+        try {
+            await addToCart(product._id, 1, productType);
+            showSuccess(`${product.name} korzinkaga qo'shildi`);
+        } catch (error) {
+            // Error is already shown in context
+        }
+    };
+
+    const handleStoreSelect = async (store: MaxallaStore) => {
+        if (!selectedProductForStore) return;
+
+        try {
+            // Add the selected store's product to maxalla cart
+            await addToCart(store.product._id, 1, 'maxalla');
+            showSuccess(`${selectedProductForStore.name} ${store.contragent.name} dokonidan korzinkaga qo'shildi`);
+            setStoreModalVisible(false);
+            setSelectedProductForStore(null);
+        } catch (error) {
+            // Error is already shown in context
+        }
     };
 
     const handleNotificationPress = () => {
         router.push('/notifications' as any);
     };
 
-    // Material-UI icon names mapping to React Native Material icon names
-    // Converts PascalCase Material-UI names to kebab-case MaterialIcons names
-    const getMaterialIconName = (iconName: string): string => {
-        if (!iconName) return 'business';
-
-        // All Material-UI icons list
-        const materialUIIcons: { [key: string]: string } = {
-            // Business & Shopping
-            'Store': 'store',
-            'ShoppingBag': 'shopping-bag',
-            'ShoppingCart': 'shopping-cart',
-            'Category': 'category',
-            'Business': 'business',
-            'Work': 'work',
-            'BusinessCenter': 'business-center',
-            'Storefront': 'store',
-            'ShoppingMall': 'shopping-bag',
-            'LocalMall': 'shopping-bag',
-            'LocalGroceryStore': 'shopping-bag',
-            'BakeryDining': 'restaurant',
-            'PointOfSale': 'point-of-sale',
-            'Receipt': 'receipt',
-            'ReceiptLong': 'receipt-long',
-            'Inventory': 'inventory',
-            'Inventory2': 'inventory-2',
-            'Shop': 'store',
-            'Shop2': 'store',
-            'StoreMallDirectory': 'store',
-            'CorporateFare': 'business',
-            'Domain': 'domain',
-            'AccountBalance': 'account-balance',
-            'TrendingUp': 'trending-up',
-            'BarChart': 'bar-chart',
-            'Assessment': 'assessment',
-            'Analytics': 'analytics',
-            'PieChart': 'pie-chart',
-            'ShowChart': 'show-chart',
-            'Timeline': 'timeline',
-            
-            // Food & Restaurant
-            'Restaurant': 'restaurant',
-            'RestaurantMenu': 'restaurant-menu',
-            'Fastfood': 'fastfood',
-            'LocalCafe': 'local-cafe',
-            'LocalBar': 'local-bar',
-            'SportsBar': 'sports-bar',
-            'Dining': 'dining',
-            'RoomService': 'room-service',
-            'SetMeal': 'restaurant',
-            'BreakfastDining': 'restaurant',
-            'LunchDining': 'restaurant',
-            'DinnerDining': 'restaurant',
-            'Icecream': 'icecream',
-            'Cake': 'cake',
-            'LocalPizza': 'local-pizza',
-            'LocalDrink': 'local-drink',
-            'WineBar': 'wine-bar',
-            'FoodBank': 'food-bank',
-            'Kitchen': 'kitchen',
-            'Coffee': 'local-cafe',
-            'LocalDining': 'restaurant',
-            'RamenDining': 'restaurant',
-            'BrunchDining': 'restaurant',
-            'TakeoutDining': 'restaurant',
-            
-            // Transportation
-            'LocalShipping': 'local-shipping',
-            'DirectionsCar': 'directions-car',
-            'TwoWheeler': 'two-wheeler',
-            'Flight': 'flight',
-            'Train': 'train',
-            'DirectionsBus': 'directions-bus',
-            'Subway': 'subway',
-            'Tram': 'tram',
-            'DirectionsBike': 'directions-bike',
-            'ElectricBike': 'electric-bike',
-            'ElectricScooter': 'electric-scooter',
-            'AirportShuttle': 'airport-shuttle',
-            'LocalTaxi': 'local-taxi',
-            'Commute': 'commute',
-            'DirectionsWalk': 'directions-walk',
-            'DirectionsRun': 'directions-run',
-            'FlightTakeoff': 'flight-takeoff',
-            'FlightLand': 'flight-land',
-            'TrainIcon': 'train',
-            'DirectionsTransit': 'directions-transit',
-            'DirectionsSubway': 'directions-subway',
-            'DirectionsRailway': 'directions-railway',
-            'AirlineSeatReclineNormal': 'airline-seat-recline-normal',
-            'AirlineSeatFlat': 'airline-seat-flat',
-            'AirlineSeatIndividualSuite': 'airline-seat-individual-suite',
-            
-            // Building
-            'Home': 'home',
-            'Apartment': 'apartment',
-            'Factory': 'factory',
-            'Construction': 'construction',
-            'Build': 'build',
-            'Engineering': 'engineering',
-            'LocationCity': 'location-city',
-            'Place': 'place',
-            'Warehouse': 'warehouse',
-            'Museum': 'museum',
-            'TheaterComedy': 'theater-comedy',
-            'Stadium': 'stadium',
-            'Castle': 'castle',
-            'Church': 'church',
-            'Mosque': 'mosque',
-            'TempleBuddhist': 'temple-buddhist',
-            'TempleHindu': 'temple-hindu',
-            'School': 'school',
-            'Library': 'library',
-            'Hospital': 'local-hospital',
-            'Hotel': 'hotel',
-            'OfficeBuilding': 'business',
-            
-            // Finance
-            'Payment': 'payment',
-            'CreditCard': 'credit-card',
-            'AttachMoney': 'attach-money',
-            'MonetizationOn': 'monetization-on',
-            'Savings': 'savings',
-            'AccountBalanceWallet': 'account-balance-wallet',
-            'AccountTree': 'account-tree',
-            'CurrencyExchange': 'currency-exchange',
-            'Paid': 'paid',
-            'RequestQuote': 'request-quote',
-            'PriceCheck': 'price-check',
-            'Calculate': 'calculate',
-            'Payments': 'payments',
-            'Money': 'attach-money',
-            'MoneyOff': 'money-off',
-            'CreditScore': 'credit-score',
-            'SavingsOutlined': 'savings',
-            'AccountBalanceOutlined': 'account-balance',
-            'Euro': 'euro',
-            'Dollar': 'attach-money',
-            'Yen': 'yen',
-            
-            // Hospitality
-            'Spa': 'spa',
-            'BeachAccess': 'beach-access',
-            'Pool': 'pool',
-            'Casino': 'casino',
-            'GolfCourse': 'golf-course',
-            'FitnessCenter': 'fitness-center',
-            'Sports': 'sports',
-            'HotTub': 'hot-tub',
-            'AcUnit': 'ac-unit',
-            'Air': 'air',
-            'WaterDrop': 'water-drop',
-            'SportsSoccer': 'sports-soccer',
-            'SportsBasketball': 'sports-basketball',
-            'SportsTennis': 'sports-tennis',
-            'SportsVolleyball': 'sports-volleyball',
-            'SportsHockey': 'sports-hockey',
-            'SportsBaseball': 'sports-baseball',
-            'SportsCricket': 'sports-cricket',
-            'SportsKabaddi': 'sports-kabaddi',
-            'SportsEsports': 'sports-esports',
-            'SportsMotorsports': 'sports-motorsports',
-            'SportsMma': 'sports-mma',
-            
-            // Education
-            'Book': 'menu-book',
-            'MenuBook': 'menu-book',
-            'Computer': 'computer',
-            'Laptop': 'laptop',
-            'Tablet': 'tablet',
-            'Phone': 'phone',
-            'PhoneAndroid': 'phone-android',
-            'PhoneIphone': 'phone-iphone',
-            'Devices': 'devices',
-            'CastForEducation': 'cast-for-education',
-            'Science': 'science',
-            'Psychology': 'psychology',
-            'HistoryEdu': 'history-edu',
-            'AutoStories': 'auto-stories',
-            'BookOnline': 'menu-book',
-            'Class': 'class',
-            'WorkspacePremium': 'workspace-premium',
-            'GraduationCap': 'school',
-            'LibraryBooks': 'library-books',
-            'LocalLibrary': 'local-library',
-            'SchoolOutlined': 'school',
-            
-            // Communication
-            'Email': 'email',
-            'Message': 'message',
-            'Chat': 'chat',
-            'Forum': 'forum',
-            'Comment': 'comment',
-            'Comments': 'comments',
-            'Sms': 'sms',
-            'Call': 'call',
-            'CallEnd': 'call-end',
-            'CallMade': 'call-made',
-            'CallReceived': 'call-received',
-            'CallSplit': 'call-split',
-            'VideoCall': 'video-call',
-            'Videocam': 'videocam',
-            'VideocamOff': 'videocam-off',
-            'Mic': 'mic',
-            'MicOff': 'mic-off',
-            'PhoneInTalk': 'phone-in-talk',
-            'PhoneEnabled': 'phone-enabled',
-            'PhoneDisabled': 'phone-disabled',
-            'PhoneCallback': 'phone-callback',
-            'PhonePaused': 'phone-paused',
-            'ChatBubble': 'chat-bubble',
-            'ChatBubbleOutline': 'chat-bubble-outline',
-            'QuestionAnswer': 'question-answer',
-            'ContactMail': 'contact-mail',
-            
-            // Location
-            'LocationOn': 'location-on',
-            'Map': 'map',
-            'Navigation': 'navigation',
-            'MyLocation': 'my-location',
-            'NearMe': 'near-me',
-            'Directions': 'directions',
-            'Route': 'route',
-            'Explore': 'explore',
-            'ExploreOff': 'explore-off',
-            'LocalActivity': 'local-activity',
-            'LocalAtm': 'local-atm',
-            'LocalParking': 'local-parking',
-            'LocalGasStation': 'local-gas-station',
-            'LocalPharmacy': 'local-pharmacy',
-            'LocationSearching': 'location-searching',
-            'LocationDisabled': 'location-disabled',
-            'PinDrop': 'pin-drop',
-            'AddLocation': 'add-location',
-            'EditLocation': 'edit-location',
-            'LocationOff': 'location-off',
-            'WhereToVote': 'where-to-vote',
-            'Room': 'room',
-            
-            // Medical
-            'MedicalServices': 'medical-services',
-            'LocalHospital': 'local-hospital',
-            'Healing': 'healing',
-            'HealthAndSafety': 'health-and-safety',
-            'Vaccines': 'vaccines',
-            'Emergency': 'emergency',
-            'MedicalInformation': 'medical-information',
-            'Medication': 'medication',
-            'MonitorHeart': 'monitor-heart',
-            'Favorite': 'favorite',
-            'FavoriteBorder': 'favorite-border',
-            'Coronavirus': 'coronavirus',
-            'Sick': 'sick',
-            'MedicationLiquid': 'medication-liquid',
-            'PregnantWoman': 'pregnant-woman',
-            'ChildCare': 'child-care',
-            
-            // Services
-            'AutoRepair': 'build',
-            'CarRepair': 'build',
-            'BuildCircle': 'build',
-            'Handyman': 'build',
-            'Plumbing': 'plumbing',
-            'ElectricalServices': 'electrical-services',
-            'CleaningServices': 'cleaning-services',
-            'DryCleaning': 'dry-cleaning',
-            'LocalLaundryService': 'local-laundry-service',
-            'Carpenter': 'carpenter',
-            'PrecisionManufacturing': 'precision-manufacturing',
-            'HomeRepairService': 'build',
-            'MiscellaneousServices': 'miscellaneous-services',
-            
-            // Media
-            'Camera': 'camera-alt',
-            'PhotoCamera': 'camera-alt',
-            'MusicNote': 'music-note',
-            'Movie': 'movie',
-            'MovieFilter': 'movie-filter',
-            'VideoLibrary': 'video-library',
-            'PhotoLibrary': 'photo-library',
-            'Image': 'image',
-            'Images': 'images',
-            'VideoFile': 'video-file',
-            'AudioFile': 'audio-file',
-            'MovieCreation': 'movie-creation',
-            'LiveTv': 'live-tv',
-            'Radio': 'radio',
-            'CameraAlt': 'camera-alt',
-            'CameraRoll': 'camera-roll',
-            'CameraEnhance': 'camera-enhance',
-            'Photo': 'photo',
-            'PhotoAlbum': 'photo-album',
-            
-            // Technology
-            'Smartphone': 'smartphone',
-            'Watch': 'watch',
-            'Headphones': 'headphones',
-            'Speaker': 'speaker',
-            'Tv': 'tv',
-            'Monitor': 'monitor',
-            'Print': 'print',
-            'Scanner': 'scanner',
-            'Fax': 'fax',
-            'Router': 'router',
-            'Memory': 'memory',
-            'Storage': 'storage',
-            'LaptopMac': 'laptop-mac',
-            'LaptopWindows': 'laptop-windows',
-            'TabletAndroid': 'tablet-android',
-            'TabletMac': 'tablet-mac',
-            'WatchLater': 'watch-later',
-            
-            // Shopping
-            'AddShoppingCart': 'add-shopping-cart',
-            'RemoveShoppingCart': 'remove-shopping-cart',
-            'ShoppingBasket': 'shopping-basket',
-            'LocalOffer': 'local-offer',
-            'LocalOfferOutlined': 'local-offer',
-            'Discount': 'local-offer',
-            'Loyalty': 'loyalty',
-            'CardGiftcard': 'card-giftcard',
-            'Redeem': 'redeem',
-            'CardMembership': 'card-membership',
-            
-            // General
-            'Settings': 'settings',
-            'MoreVert': 'more-vert',
-            'MoreHoriz': 'more-horiz',
-            'Menu': 'menu',
-            'Apps': 'apps',
-            'Dashboard': 'dashboard',
-            'Notifications': 'notifications',
-            'NotificationsActive': 'notifications-active',
-            'NotificationsOff': 'notifications-off',
-            'Star': 'star',
-            'StarBorder': 'star-border',
-            'StarHalf': 'star-half',
-            'ThumbUp': 'thumb-up',
-            'ThumbDown': 'thumb-down',
-            'Share': 'share',
-            'Download': 'file-download',
-            'Upload': 'file-upload',
-            'Save': 'save',
-            'Edit': 'edit',
-            'Delete': 'delete',
-            'Add': 'add',
-            'Remove': 'remove',
-            'Close': 'close',
-            'Check': 'check',
-            'Cancel': 'cancel',
-            'Search': 'search',
-            'FilterList': 'filter-list',
-            'Sort': 'sort',
-            'ArrowUpward': 'arrow-upward',
-            'ArrowDownward': 'arrow-downward',
-            'ArrowForward': 'arrow-forward',
-            'ArrowBack': 'arrow-back',
-            'Refresh': 'refresh',
-            'Sync': 'sync',
-            'Autorenew': 'autorenew',
-            
-            // Security
-            'Lock': 'lock',
-            'LockOpen': 'lock-open',
-            'Visibility': 'visibility',
-            'VisibilityOff': 'visibility-off',
-            'Security': 'security',
-            'Verified': 'verified',
-            'VerifiedUser': 'verified-user',
-            'AdminPanelSettings': 'admin-panel-settings',
-            'Shield': 'security',
-            'ShieldCheck': 'security',
-            'LockClock': 'lock-clock',
-            'LockReset': 'lock-reset',
-            'Password': 'lock',
-            'Policy': 'policy',
-            
-            // People
-            'Person': 'person',
-            'People': 'people',
-            'Group': 'group',
-            'PersonAdd': 'person-add',
-            'PersonRemove': 'person-remove',
-            'AccountCircle': 'account-circle',
-            'AccountBox': 'account-box',
-            'PersonOutline': 'person-outline',
-            'PeopleOutline': 'people-outline',
-            'GroupAdd': 'group-add',
-            'GroupRemove': 'group-remove',
-            'SupervisorAccount': 'supervisor-account',
-            'PersonPin': 'person-pin',
-            'PersonPinCircle': 'person-pin-circle',
-            'HowToReg': 'how-to-reg',
-            'PersonAddAlt': 'person-add',
-            'PersonRemoveAlt': 'person-remove',
-            
-            // Documents
-            'Assignment': 'assignment',
-            'AssignmentInd': 'assignment-ind',
-            'AssignmentTurnedIn': 'assignment-turned-in',
-            'Description': 'description',
-            'Article': 'article',
-            'Note': 'note',
-            'Notes': 'notes',
-            'StickyNote2': 'note',
-            'TextSnippet': 'text-snippet',
-            'Folder': 'folder',
-            'FolderOpen': 'folder-open',
-            'InsertDriveFile': 'insert-drive-file',
-            'AttachFile': 'attach-file',
-            'Link': 'link',
-            
-            // Time
-            'CalendarToday': 'calendar-today',
-            'Event': 'event',
-            'Schedule': 'schedule',
-            'AccessTime': 'access-time',
-            'DateRange': 'date-range',
-            'Alarm': 'alarm',
-            'Timer': 'timer',
-            'Stopwatch': 'timer',
-            'HourglassEmpty': 'hourglass-empty',
-            'HourglassFull': 'hourglass-full',
-            'CalendarMonth': 'calendar-month',
-            'CalendarViewDay': 'calendar-view-day',
-            'CalendarViewWeek': 'calendar-view-week',
-            'CalendarViewMonth': 'calendar-view-month',
-            'Today': 'today',
-            'EventAvailable': 'event-available',
-            'EventBusy': 'event-busy',
-            'EventNote': 'event-note',
-            
-            // Weather
-            'Cloud': 'cloud',
-            'CloudQueue': 'cloud-queue',
-            'CloudDone': 'cloud-done',
-            'CloudOff': 'cloud-off',
-            'CloudUpload': 'cloud-upload',
-            'CloudDownload': 'cloud-download',
-            'Brightness': 'brightness-high',
-            'BrightnessHigh': 'brightness-high',
-            'BrightnessLow': 'brightness-low',
-            'WbSunny': 'wb-sunny',
-            'WbTwilight': 'wb-twilight',
-            'WbCloudy': 'wb-cloudy',
-            'Grain': 'grain',
-            'FilterDrama': 'filter-drama',
-            
-            // Arts
-            'Palette': 'palette',
-            'Brush': 'brush',
-            'ColorLens': 'color-lens',
-            'FormatPaint': 'format-paint',
-            'Draw': 'brush',
-            
-            // Tools
-            'Tune': 'tune',
-            'ViewList': 'view-list',
-            'ViewModule': 'view-module',
-            'GridOn': 'grid-on',
-            'GridOff': 'grid-off',
-            'ViewComfy': 'view-comfy',
-            'ViewCompact': 'view-compact',
-            'ViewHeadline': 'view-headline',
-        };
-
-        // Try exact match first
-        if (materialUIIcons[iconName]) {
-            return materialUIIcons[iconName];
-        }
-
-        // Try case-insensitive match
-        const lowerName = iconName.toLowerCase();
-        for (const [muiName, rnName] of Object.entries(materialUIIcons)) {
-            if (muiName.toLowerCase() === lowerName) {
-                return rnName;
-            }
-        }
-
-        // Convert PascalCase to kebab-case as fallback
-        const kebabCase = iconName
-            .replace(/([A-Z])/g, '-$1')
-            .toLowerCase()
-            .replace(/^-/, '');
-
-        return kebabCase;
-    };
-
-    // Helper function to render Material icon
-    const renderMaterialIcon = (iconName: string) => {
-        if (!iconName) {
-            return <MaterialIcons name="business" size={28} color="#007AFF" />;
-        }
-
-        const materialIconName = getMaterialIconName(iconName);
-
-        // For WaterDrop, use MaterialCommunityIcons as it's not in MaterialIcons
-        if (iconName.toLowerCase() === 'waterdrop' || materialIconName === 'water-drop') {
-            return (
-                <MaterialCommunityIcons 
-                    name="water" 
-                    size={28} 
-                    color="#007AFF" 
-                />
-            );
-        }
-
-        // Try MaterialIcons first
-        return (
-            <MaterialIcons 
-                name={materialIconName as any} 
-                size={28} 
-                color="#007AFF" 
-            />
-        );
-    };
-
-    // Render Contragent Type Item
-    const renderTypeItem = ({ item }: { item: ContragentType }) => {
+    // Render Category Item
+    const renderCategoryItem = ({ item }: { item: Category }) => {
+        const imageUri = item.image || undefined;
+        
         return (
             <TouchableOpacity
-                style={styles.typeCard}
-                onPress={() => handleTypePress(item)}
+                style={styles.categoryCard}
+                onPress={() => handleCategoryPress(item)}
                 activeOpacity={0.8}
             >
-                <View style={styles.typeIconContainer}>
-                    {renderMaterialIcon(item.icon)}
+                <View style={styles.categoryIconContainer}>
+                    {imageUri ? (
+                        <Image 
+                            source={{ uri: imageUri }} 
+                            style={styles.categoryImage}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <Ionicons name="grid-outline" size={32} color="#007AFF" />
+                    )}
                 </View>
-                <View style={styles.typeInfo}>
-                    <Text style={styles.typeName} numberOfLines={2}>
+                <View style={styles.categoryInfo}>
+                    <Text style={styles.categoryName} numberOfLines={2}>
                         {item.name}
                     </Text>
                 </View>
@@ -705,46 +308,49 @@ export default function ShopsScreen() {
         );
     };
 
-    // Render Contragent Item
-    const renderContragentItem = ({ item }: { item: Contragent }) => {
-        const logoUrl = item.logo 
-            ? (imgBase && !item.logo.startsWith('http') 
-                ? `${imgBase}${item.logo}` 
-                : item.logo)
-            : null;
+    // Render Subcategory Item
+    const renderSubcategoryItem = ({ item }: { item: Category }) => {
+        const imageUri = item.image || undefined;
 
         return (
         <TouchableOpacity
-            style={styles.shopCard}
-            onPress={() => handleShopPress(item)}
+                style={styles.subcategoryCard}
+                onPress={() => handleSubcategoryPress(item)}
             activeOpacity={0.8}
         >
-            <View style={styles.shopIconContainer}>
-                    {logoUrl ? (
+                <View style={styles.subcategoryIconContainer}>
+                    {imageUri ? (
                     <Image 
-                            source={{ uri: logoUrl }} 
-                        style={styles.shopLogo}
+                            source={{ uri: imageUri }} 
+                            style={styles.subcategoryImage}
                         resizeMode="cover"
                     />
                 ) : (
-                    <Ionicons name="storefront" size={24} color="#007AFF" />
+                        <Ionicons name="folder-outline" size={28} color="#007AFF" />
                 )}
             </View>
-            <View style={styles.shopInfo}>
-                <Text style={styles.shopName} numberOfLines={1}>
+                <View style={styles.subcategoryInfo}>
+                    <Text style={styles.subcategoryName} numberOfLines={2}>
                     {item.name}
-                </Text>
-                <View style={styles.shopLocation}>
-                        <Text style={styles.locationText}>
-                        {item.viloyat?.name || ''}
-                        {item.tuman?.name ? `, ${item.tuman.name}` : ''}
-                        {item.mfy?.name ? `, ${item.mfy.name}` : ''}
                     </Text>
-                </View>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#ccc" />
         </TouchableOpacity>
     );
+    };
+
+    // Render Product Item
+    const renderProductItem = ({ item }: { item: Product }) => {
+        const productType = item.productType || 'tuman';
+        const isInCart = getCartItemQuantity(item._id, productType) > 0;
+        return (
+            <ProductCard
+                product={item}
+                onPress={handleProductPress}
+                onAddToCart={handleAddToCart}
+                isInCart={isInCart}
+            />
+        );
     };
 
     const renderFooter = () => {
@@ -756,53 +362,63 @@ export default function ShopsScreen() {
         );
     };
 
-    const renderEmptyTypes = () => {
-        if (typesLoading) return null;
+    const renderEmptyCategories = () => {
+        if (categoriesLoading) return null;
         return (
             <View style={styles.emptyContainer}>
-                <Ionicons name="business-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyText}>Faoliyat turlari topilmadi</Text>
+                <Ionicons name="grid-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>Kategoriyalar topilmadi</Text>
             </View>
         );
     };
 
-    const renderEmptyContragents = () => {
+    const renderEmptySubcategories = () => {
+        if (subcategoriesLoading) return null;
+        return (
+            <View style={styles.emptyContainer}>
+                <Ionicons name="folder-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>Kichik kategoriyalar topilmadi</Text>
+            </View>
+        );
+    };
+
+    const renderEmptyProducts = () => {
         if (loading) return null;
         return (
             <View style={styles.emptyContainer}>
-                <Ionicons name="storefront-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyText}>Do'konlar topilmadi</Text>
+                <Ionicons name="cube-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>Mahsulotlar topilmadi</Text>
             </View>
         );
     };
 
-    // Show Contragent Types List
-    if (!selectedType) {
+    // Show Categories List
+    if (!selectedCategory) {
         return (
             <View style={styles.container}>
                 <Header 
-                    title="Do'konlar turlari" 
+                    title="Kategoriyalar" 
                     onNotificationPress={handleNotificationPress} 
                     unreadCount={unreadCount} 
                 />
 
-                {typesLoading && contragentTypes.length === 0 ? (
+                {categoriesLoading && categories.length === 0 ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color="#007AFF" />
                     </View>
                 ) : (
                     <FlatList
-                        data={contragentTypes}
-                        renderItem={renderTypeItem}
+                        data={categories}
+                        renderItem={renderCategoryItem}
                         keyExtractor={(item) => item._id}
                         contentContainerStyle={[
                             styles.listContent,
                             { paddingBottom: insets.bottom + 100 },
                         ]}
                         refreshControl={
-                            <RefreshControl refreshing={typesRefreshing} onRefresh={handleRefresh} />
+                            <RefreshControl refreshing={categoriesRefreshing} onRefresh={handleRefresh} />
                         }
-                        ListEmptyComponent={renderEmptyTypes}
+                        ListEmptyComponent={renderEmptyCategories}
                         showsVerticalScrollIndicator={false}
                     />
                 )}
@@ -810,11 +426,47 @@ export default function ShopsScreen() {
         );
     }
 
-    // Show Contragents List for Selected Type
+    // Show Subcategories List
+    if (!selectedSubcategory) {
     return (
         <View style={styles.container}>
             <Header 
-                title={selectedType.name} 
+                    title={selectedCategory.name} 
+                    onNotificationPress={handleNotificationPress} 
+                    unreadCount={unreadCount}
+                    showBackButton
+                    onBackPress={handleBackPress}
+                />
+
+                {subcategoriesLoading && subcategories.length === 0 ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#007AFF" />
+                    </View>
+                ) : (
+                    <FlatList
+                        data={subcategories}
+                        renderItem={renderSubcategoryItem}
+                        keyExtractor={(item) => item._id}
+                        contentContainerStyle={[
+                            styles.listContent,
+                            { paddingBottom: insets.bottom + 100 },
+                        ]}
+                        refreshControl={
+                            <RefreshControl refreshing={categoriesRefreshing} onRefresh={handleRefresh} />
+                        }
+                        ListEmptyComponent={renderEmptySubcategories}
+                        showsVerticalScrollIndicator={false}
+                    />
+                )}
+            </View>
+        );
+    }
+
+    // Show Products List
+    return (
+        <View style={styles.container}>
+            <Header 
+                title={selectedSubcategory.name} 
                 onNotificationPress={handleNotificationPress} 
                 unreadCount={unreadCount}
                 showBackButton
@@ -827,7 +479,7 @@ export default function ShopsScreen() {
                     <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Do'kon qidirish..."
+                        placeholder="Mahsulot qidirish..."
                         placeholderTextColor="#999"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -845,15 +497,17 @@ export default function ShopsScreen() {
                 </View>
             </View>
 
-            {loading && contragents.length === 0 ? (
+            {loading && products.length === 0 ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
                 </View>
             ) : (
                 <FlatList
-                    data={contragents}
-                    renderItem={renderContragentItem}
+                    data={filteredProducts}
+                    renderItem={renderProductItem}
                     keyExtractor={(item) => item._id}
+                    numColumns={2}
+                    columnWrapperStyle={styles.row}
                     contentContainerStyle={[
                         styles.listContent,
                         { paddingBottom: insets.bottom + 100 },
@@ -864,8 +518,22 @@ export default function ShopsScreen() {
                     onEndReached={!searchQuery.trim() ? handleLoadMore : undefined}
                     onEndReachedThreshold={0.5}
                     ListFooterComponent={renderFooter}
-                    ListEmptyComponent={renderEmptyContragents}
+                    ListEmptyComponent={renderEmptyProducts}
                     showsVerticalScrollIndicator={false}
+                />
+            )}
+
+            {/* Maxalla Store Selection Modal */}
+            {selectedProductForStore && (
+                <MaxallaStoreSelectionModal
+                    visible={storeModalVisible}
+                    productId={selectedProductForStore._id}
+                    productName={selectedProductForStore.name}
+                    onClose={() => {
+                        setStoreModalVisible(false);
+                        setSelectedProductForStore(null);
+                    }}
+                    onSelectStore={handleStoreSelect}
                 />
             )}
         </View>
@@ -908,6 +576,9 @@ const styles = StyleSheet.create({
     listContent: {
         padding: 16,
     },
+    row: {
+        justifyContent: 'space-between',
+    },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -928,7 +599,7 @@ const styles = StyleSheet.create({
         color: '#666',
         marginTop: 16,
     },
-    typeCard: {
+    categoryCard: {
         backgroundColor: '#fff',
         borderRadius: 12,
         padding: 16,
@@ -944,41 +615,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
     },
-    typeIconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: '#f0f7ff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    typeInfo: {
-        flex: 1,
-        marginRight: 12,
-    },
-    typeName: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#333',
-    },
-    shopCard: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    shopIconContainer: {
+    categoryIconContainer: {
         width: 56,
         height: 56,
         borderRadius: 28,
@@ -988,30 +625,58 @@ const styles = StyleSheet.create({
         marginRight: 12,
         overflow: 'hidden',
     },
-    shopLogo: {
+    categoryImage: {
         width: 56,
         height: 56,
         borderRadius: 28,
     },
-    shopInfo: {
+    categoryInfo: {
         flex: 1,
         marginRight: 12,
     },
-    shopName: {
+    categoryName: {
         fontSize: 18,
         fontWeight: '600',
         color: '#333',
-        marginBottom: 8,
     },
-    shopLocation: {
+    subcategoryCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 4,
-        gap: 6,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
-    locationText: {
-        fontSize: 14,
-        color: '#666',
+    subcategoryIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#f0f7ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+        overflow: 'hidden',
+    },
+    subcategoryImage: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+    },
+    subcategoryInfo: {
         flex: 1,
+        marginRight: 12,
+    },
+    subcategoryName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
     },
 });

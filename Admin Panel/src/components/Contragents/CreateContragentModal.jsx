@@ -6,7 +6,7 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 import RegionSelect from '../Regions/RegionSelect';
 import ContragentTypeSelect from './ContragentTypeSelect';
 
-const CreateContragentModal = ({ open, onClose, onSuccess }) => {
+const CreateContragentModal = ({ open, onClose, onSuccess, defaultContragentLevel = 'tuman' }) => {
   const { showSuccess, showError } = useSnackbar();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -19,6 +19,7 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
     password: '',
     logo: '',
     activityType: '',
+    contragentLevel: defaultContragentLevel,
     status: 'active',
   });
   const [loading, setLoading] = useState(false);
@@ -53,13 +54,33 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    // Validate INN if provided (for MFY contragents) or required (for tuman contragents)
+    if (formData.contragentLevel === 'tuman' && (!formData.inn || formData.inn.trim() === '')) {
+      setError('INN kiritilishi shart (Tuman kontragentlar uchun)');
+      return;
+    }
+    
+    // Validate INN format if provided
+    if (formData.inn && formData.inn.trim() !== '') {
+      const innPattern = /^\d{9}$|^\d{12}$/;
+      if (!innPattern.test(formData.inn.trim())) {
+        setError('INN 9 yoki 12 ta raqamdan iborat bo\'lishi kerak');
+        return;
+      }
+    }
+    
     setLoading(true);
 
     try {
-      // Prepare data - only include logo if provided
+      // Prepare data - only include logo and inn if provided
       const submitData = { ...formData };
       if (!submitData.logo || submitData.logo.trim() === '') {
         delete submitData.logo;
+      }
+      // For MFY contragents, if INN is empty, don't send it
+      if (submitData.contragentLevel === 'mfy' && (!submitData.inn || submitData.inn.trim() === '')) {
+        delete submitData.inn;
       }
       
       const response = await contragentAPI.createContragent(submitData);
@@ -75,6 +96,7 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
           password: '',
           logo: '',
           activityType: '',
+          contragentLevel: defaultContragentLevel,
           status: 'active',
         });
         onSuccess();
@@ -100,6 +122,7 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
       password: '',
       logo: '',
       activityType: '',
+      contragentLevel: defaultContragentLevel,
       status: 'active',
     });
     onClose();
@@ -167,19 +190,23 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
                     {/* INN */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        INN *
+                        INN {formData.contragentLevel === 'tuman' ? '*' : '(ixtiyoriy)'}
                       </label>
                       <input
                         type="text"
                         name="inn"
                         value={formData.inn}
                         onChange={handleChange}
-                        required
+                        required={formData.contragentLevel === 'tuman'}
                         pattern="^\d{9}$|^\d{12}$"
                         placeholder="9 yoki 12 ta raqam"
                         className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
-                      <p className="text-xs text-gray-500 mt-1">9 yoki 12 ta raqam</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formData.contragentLevel === 'tuman' 
+                          ? '9 yoki 12 ta raqam (majburiy)' 
+                          : '9 yoki 12 ta raqam (ixtiyoriy - faqat MFY kontragentlar uchun)'}
+                      </p>
                     </div>
                   </div>
 
@@ -284,6 +311,27 @@ const CreateContragentModal = ({ open, onClose, onSuccess }) => {
                         required
                         status="active"
                       />
+                    </div>
+
+                    {/* Contragent Level */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Kontragent Darajasi *
+                      </label>
+                      <select
+                        name="contragentLevel"
+                        value={formData.contragentLevel}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="tuman">Tuman Kontragenti</option>
+                        <option value="mfy">MFY Kontragenti</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Tuman kontragenti - barcha tuman bo'yicha buyurtmalarni qabul qiladi<br />
+                        MFY kontragenti - faqat o'z MFYsi bo'yicha buyurtmalarni qabul qiladi
+                      </p>
                     </div>
 
                     {/* Status */}

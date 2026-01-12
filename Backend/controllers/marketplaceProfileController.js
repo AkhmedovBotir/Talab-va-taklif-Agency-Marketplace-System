@@ -368,7 +368,8 @@ const getViloyatTuman = async (req, res) => {
     // Get or create region selection
     let regionSelection = await MarketplaceUserRegionSelection.findOne({ user: userId })
       .populate('viloyat', 'name type code')
-      .populate('tuman', 'name type code');
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code');
 
     // If doesn't exist, create empty one
     if (!regionSelection) {
@@ -376,9 +377,11 @@ const getViloyatTuman = async (req, res) => {
         user: userId,
         viloyat: null,
         tuman: null,
+        mfy: null,
       });
       await regionSelection.populate('viloyat', 'name type code');
       await regionSelection.populate('tuman', 'name type code');
+      await regionSelection.populate('mfy', 'name type code');
     }
 
     res.status(200).json({
@@ -388,23 +391,24 @@ const getViloyatTuman = async (req, res) => {
         user: regionSelection.user,
         viloyat: regionSelection.viloyat,
         tuman: regionSelection.tuman,
+        mfy: regionSelection.mfy,
       },
     });
   } catch (error) {
     console.error('Error fetching viloyat and tuman:', error);
     res.status(500).json({
       success: false,
-      message: 'Viloyat va tumanni olishda xatolik yuz berdi',
+      message: 'Viloyat, tuman va MFY ni olishda xatolik yuz berdi',
       error: error.message,
     });
   }
 };
 
-// Update viloyat and tuman only (separate API - from separate model)
+// Update viloyat, tuman, and mfy (separate API - from separate model)
 const updateViloyatTuman = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { viloyat, tuman } = req.body;
+    const { viloyat, tuman, mfy } = req.body;
 
     // Check if user exists
     const user = await MarketplaceUser.findById(userId);
@@ -423,6 +427,7 @@ const updateViloyatTuman = async (req, res) => {
         user: userId,
         viloyat: null,
         tuman: null,
+        mfy: null,
       });
     }
 
@@ -448,6 +453,16 @@ const updateViloyatTuman = async (req, res) => {
           const currentTuman = await Region.findById(regionSelection.tuman);
           if (currentTuman && currentTuman.parent?.toString() !== viloyat) {
             regionSelection.tuman = null;
+            // Also clear mfy if tuman is cleared
+            regionSelection.mfy = null;
+          }
+        }
+        // If viloyat is changed and tuman is not provided, clear mfy if it doesn't belong to new viloyat's tuman
+        if (tuman === undefined && mfy === undefined && regionSelection.mfy) {
+          const currentMfy = await Region.findById(regionSelection.mfy);
+          const currentTuman = regionSelection.tuman ? await Region.findById(regionSelection.tuman) : null;
+          if (currentMfy && currentTuman && currentMfy.parent?.toString() !== currentTuman._id.toString()) {
+            regionSelection.mfy = null;
           }
         }
       }
@@ -484,6 +499,48 @@ const updateViloyatTuman = async (req, res) => {
         }
 
         regionSelection.tuman = tuman;
+
+        // If tuman is changed and mfy is not provided, clear mfy if it doesn't belong to new tuman
+        if (mfy === undefined && regionSelection.mfy) {
+          const currentMfy = await Region.findById(regionSelection.mfy);
+          if (currentMfy && currentMfy.parent?.toString() !== tuman) {
+            regionSelection.mfy = null;
+          }
+        }
+      }
+    }
+
+    // Validate mfy if provided
+    if (mfy !== undefined) {
+      if (mfy === null || mfy === '') {
+        // Allow clearing mfy
+        regionSelection.mfy = null;
+      } else {
+        const mfyRegion = await Region.findById(mfy);
+        if (!mfyRegion || mfyRegion.type !== 'mfy') {
+          return res.status(400).json({
+            success: false,
+            message: 'MFY topilmadi yoki noto\'g\'ri tur',
+          });
+        }
+
+        // Validate hierarchy - mfy must belong to tuman
+        const targetTuman = tuman !== undefined ? tuman : regionSelection.tuman;
+        if (!targetTuman) {
+          return res.status(400).json({
+            success: false,
+            message: 'Avval tuman tanlashingiz kerak',
+          });
+        }
+
+        if (mfyRegion.parent?.toString() !== targetTuman.toString()) {
+          return res.status(400).json({
+            success: false,
+            message: 'MFY tanlangan tumanga tegishli emas',
+          });
+        }
+
+        regionSelection.mfy = mfy;
       }
     }
 
@@ -492,15 +549,17 @@ const updateViloyatTuman = async (req, res) => {
     // Populate regions
     await regionSelection.populate('viloyat', 'name type code');
     await regionSelection.populate('tuman', 'name type code');
+    await regionSelection.populate('mfy', 'name type code');
 
     res.status(200).json({
       success: true,
-      message: 'Viloyat va tuman yangilandi',
+      message: 'Viloyat, tuman va MFY yangilandi',
       data: {
         _id: regionSelection._id,
         user: regionSelection.user,
         viloyat: regionSelection.viloyat,
         tuman: regionSelection.tuman,
+        mfy: regionSelection.mfy,
       },
     });
   } catch (error) {
@@ -515,7 +574,7 @@ const updateViloyatTuman = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Viloyat va tumanni yangilashda xatolik yuz berdi',
+      message: 'Viloyat, tuman va MFY ni yangilashda xatolik yuz berdi',
       error: error.message,
     });
   }

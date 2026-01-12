@@ -4,8 +4,20 @@ const cartItemSchema = new mongoose.Schema(
   {
     product: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
+      refPath: 'productModel', // Dynamic reference based on productType
       required: [true, 'Maxsulot kiritilishi shart'],
+    },
+    productType: {
+      type: String,
+      enum: ['tuman', 'maxalla'],
+      default: 'tuman',
+      required: true,
+    },
+    productModel: {
+      type: String,
+      enum: ['Product', 'MaxallaProduct'],
+      default: 'Product',
+      required: true,
     },
     quantity: {
       type: Number,
@@ -23,6 +35,12 @@ const cartSchema = new mongoose.Schema(
       ref: 'MarketplaceUser',
       required: [true, 'Foydalanuvchi kiritilishi shart'],
     },
+    cartType: {
+      type: String,
+      enum: ['tuman', 'maxalla'],
+      default: 'tuman',
+      required: true,
+    },
     items: {
       type: [cartItemSchema],
       default: [],
@@ -33,8 +51,8 @@ const cartSchema = new mongoose.Schema(
   }
 );
 
-// Indexes
-cartSchema.index({ user: 1 }, { unique: true });
+// Indexes - user + cartType must be unique
+cartSchema.index({ user: 1, cartType: 1 }, { unique: true });
 
 const Cart = mongoose.model('Cart', cartSchema);
 

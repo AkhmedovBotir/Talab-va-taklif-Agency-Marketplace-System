@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import QuillEditor, { QuillEditorRef } from '../../../../components/QuillEditor';
-import { apiService, Category, DeliveryRegion, DeltaFormat } from '../../../../services/api';
+import { apiService, Category, DeltaFormat } from '../../../../services/api';
 import { formatNumberInput, unformatNumber } from '../../../../utils/formatNumber';
 
 export default function ProductCreateScreen() {
@@ -48,8 +48,8 @@ export default function ProductCreateScreen() {
   const [width, setWidth] = useState('');
   const [weight, setWeight] = useState('');
   const [kpiBonusPercent, setKpiBonusPercent] = useState('');
-  const [deliveryRegions, setDeliveryRegions] = useState<DeliveryRegion[]>([]);
   const isInitialMount = useRef(true);
+  const isModalOpen = useRef(false);
   const quillRef = useRef<QuillEditorRef>(null);
 
   const resetForm = useCallback(() => {
@@ -70,7 +70,6 @@ export default function ProductCreateScreen() {
     setWidth('');
     setWeight('');
     setKpiBonusPercent('');
-    setDeliveryRegions([]);
   }, []);
 
   const loadCategories = useCallback(async () => {
@@ -203,38 +202,21 @@ export default function ProductCreateScreen() {
     setImages(images.filter((_, i) => i !== index));
   };
 
-  const params = useLocalSearchParams<{ selectedRegions?: string }>();
-
-  const handleSelectRegions = () => {
-    router.push({
-      pathname: '/(tabs)/ombor/product/select-regions' as any,
-      params: {
-        selectedRegions: JSON.stringify(deliveryRegions),
-        returnPath: '/(tabs)/ombor/product/create',
-      },
-    });
-  };
-
   useFocusEffect(
     useCallback(() => {
-      // Get selected regions from params if coming back from region selection
-      if (params?.selectedRegions) {
-        try {
-          const regions = JSON.parse(params.selectedRegions);
-          setDeliveryRegions(regions);
-        } catch (e) {
-          console.error('Error parsing regions:', e);
-        }
+      // Reset form when screen comes into focus
+      // Only reset if it's not the initial mount and modal is not open
+      // (to avoid clearing when modal closes)
+      if (!isInitialMount.current && !isModalOpen.current) {
+        resetForm();
       } else {
-        // Reset form when screen comes into focus (except when coming from region selection)
-        // Only reset if it's not the initial mount (to avoid clearing on first load)
-        if (!isInitialMount.current) {
-          resetForm();
-        } else {
-          isInitialMount.current = false;
-        }
+        isInitialMount.current = false;
       }
-    }, [params?.selectedRegions, resetForm])
+      // Reset modal flag when screen loses focus
+      return () => {
+        isModalOpen.current = false;
+      };
+    }, [resetForm])
   );
 
   const handleCreate = async () => {
@@ -280,7 +262,6 @@ export default function ProductCreateScreen() {
         width: width ? parseFloat(width) : null,
         weight: weight ? parseFloat(weight) : null,
         kpiBonusPercent: parseFloat(kpiBonusPercent),
-        deliveryRegions: deliveryRegions.length > 0 ? deliveryRegions : undefined,
       });
       
       // Reset form after successful creation
@@ -382,7 +363,10 @@ export default function ProductCreateScreen() {
           <Text style={styles.label}>Kategoriya *</Text>
           <TouchableOpacity
             style={styles.selectButton}
-            onPress={() => setShowCategoryModal(true)}
+            onPress={() => {
+              isModalOpen.current = true;
+              setShowCategoryModal(true);
+            }}
           >
             <Text style={[styles.selectButtonText, !categoryId && styles.selectButtonPlaceholder]}>
               {selectedCategory ? selectedCategory.name : 'Kategoriyani tanlang'}
@@ -396,7 +380,10 @@ export default function ProductCreateScreen() {
               <Text style={styles.label}>Sub kategoriya (ixtiyoriy)</Text>
               <TouchableOpacity
                 style={styles.selectButton}
-                onPress={() => setShowSubcategoryModal(true)}
+                onPress={() => {
+                  isModalOpen.current = true;
+                  setShowSubcategoryModal(true);
+                }}
                 disabled={loadingSubcategories}
               >
                 {loadingSubcategories ? (
@@ -419,7 +406,10 @@ export default function ProductCreateScreen() {
           visible={showCategoryModal}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowCategoryModal(false)}
+          onRequestClose={() => {
+            isModalOpen.current = false;
+            setShowCategoryModal(false);
+          }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -427,6 +417,7 @@ export default function ProductCreateScreen() {
                 <Text style={styles.modalTitle}>Kategoriyani tanlang</Text>
                 <TouchableOpacity
                   onPress={() => {
+                    isModalOpen.current = false;
                     setShowCategoryModal(false);
                     setCategorySearchQuery('');
                   }}
@@ -468,6 +459,7 @@ export default function ProductCreateScreen() {
                       categoryId === item._id && styles.modalItemActive,
                     ]}
                     onPress={() => {
+                      isModalOpen.current = false;
                       setCategoryId(item._id);
                       setSubcategoryId(null);
                       setShowCategoryModal(false);
@@ -523,7 +515,10 @@ export default function ProductCreateScreen() {
           visible={showSubcategoryModal}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowSubcategoryModal(false)}
+          onRequestClose={() => {
+            isModalOpen.current = false;
+            setShowSubcategoryModal(false);
+          }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -531,6 +526,7 @@ export default function ProductCreateScreen() {
                 <Text style={styles.modalTitle}>Sub kategoriyani tanlang</Text>
                 <TouchableOpacity
                   onPress={() => {
+                    isModalOpen.current = false;
                     setShowSubcategoryModal(false);
                     setSubcategorySearchQuery('');
                   }}
@@ -572,6 +568,7 @@ export default function ProductCreateScreen() {
                       (subcategoryId === item._id || (item._id === 'none' && subcategoryId === null)) && styles.modalItemActive,
                     ]}
                     onPress={() => {
+                      isModalOpen.current = false;
                       setSubcategoryId(item._id === 'none' ? null : item._id);
                       setShowSubcategoryModal(false);
                       setSubcategorySearchQuery('');
@@ -754,27 +751,6 @@ export default function ProductCreateScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </View>
-
-        {/* Yetkazib berish hududlari blok */}
-        <View style={styles.block}>
-          <Text style={styles.blockTitle}>Yetkazib berish hududlari</Text>
-          <TouchableOpacity style={styles.regionButton} onPress={handleSelectRegions}>
-            <Ionicons name="location-outline" size={24} color="#007AFF" />
-            <View style={styles.regionButtonTextContainer}>
-              <Text style={styles.regionButtonText}>
-                {deliveryRegions.length > 0
-                  ? `${deliveryRegions.length} ta hudud tanlangan`
-                  : 'Hududlarni tanlash'}
-              </Text>
-              {deliveryRegions.length > 0 && (
-                <Text style={styles.regionButtonSubtext} numberOfLines={2}>
-                  {deliveryRegions.length} ta hudud
-                </Text>
-              )}
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
-          </TouchableOpacity>
         </View>
 
         {/* Create Button */}

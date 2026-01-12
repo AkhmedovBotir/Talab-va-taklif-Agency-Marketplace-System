@@ -12,9 +12,13 @@ const contragentSchema = new mongoose.Schema(
     },
     inn: {
       type: String,
-      required: [true, 'INN is required'],
+      required: function() {
+        // INN faqat tuman kontragentlar uchun required
+        return this.contragentLevel !== 'mfy';
+      },
       trim: true,
       match: [/^\d{9}$|^\d{12}$/, 'INN must be 9 or 12 digits'],
+      default: null,
     },
     viloyat: {
       type: mongoose.Schema.Types.ObjectId,
@@ -64,10 +68,62 @@ const contragentSchema = new mongoose.Schema(
       ref: 'ContragentType',
       required: [true, 'Faoliyat turi kiritilishi shart'],
     },
+    contragentLevel: {
+      type: String,
+      enum: ['tuman', 'mfy'],
+      default: 'tuman',
+      required: true,
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
+    },
+    // Maxalla kontragentlar uchun ish vaqti
+    workingHours: {
+      open: {
+        type: String,
+        trim: true,
+        match: [/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, 'Ish vaqti formati noto\'g\'ri (HH:MM)'],
+        default: null,
+      },
+      close: {
+        type: String,
+        trim: true,
+        match: [/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, 'Ish vaqti formati noto\'g\'ri (HH:MM)'],
+        default: null,
+      },
+    },
+    // Maxalla kontragentlar uchun xizmat ko'rsatish hududlari
+    serviceAreas: {
+      tuman: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Region',
+        default: null,
+      },
+      mfys: {
+        type: [{
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Region',
+        }],
+        default: [],
+      },
+    },
+    // Oddiy kontragentlar uchun yetkazib berish hududlari (viloyat -> tuman)
+    deliveryRegions: {
+      type: [{
+        viloyat: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Region',
+          required: true,
+        },
+        tuman: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Region',
+          default: null,
+        },
+      }],
+      default: [],
     },
   },
   {
@@ -108,14 +164,25 @@ contragentSchema.methods.toJSON = function () {
 };
 
 // Indexes
-contragentSchema.index({ inn: 1 }, { unique: true });
+// INN unique, lekin faqat null bo'lmaganlar uchun
+contragentSchema.index(
+  { inn: 1 },
+  {
+    unique: true,
+    sparse: true, // Sparse index allows multiple null values
+    partialFilterExpression: { inn: { $exists: true, $ne: null } },
+  }
+);
 contragentSchema.index({ phone: 1 }, { unique: true });
 contragentSchema.index({ viloyat: 1 });
 contragentSchema.index({ tuman: 1 });
 contragentSchema.index({ mfy: 1 });
 contragentSchema.index({ activityType: 1 });
+contragentSchema.index({ contragentLevel: 1 });
 contragentSchema.index({ status: 1 });
 contragentSchema.index({ isFeaturedForMarketplace: 1 });
+contragentSchema.index({ 'deliveryRegions.viloyat': 1 });
+contragentSchema.index({ 'deliveryRegions.tuman': 1 });
 
 const Contragent = mongoose.model('Contragent', contragentSchema);
 

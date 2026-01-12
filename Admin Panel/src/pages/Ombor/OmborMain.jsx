@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Category, ShoppingBag } from '@mui/icons-material';
+import { Category, ShoppingBag, Store } from '@mui/icons-material';
 import Categories from '../Categories/Categories';
 import Products from '../Products/Products';
+import MaxallaProducts from './MaxallaProducts';
 
 const TABS = [
   {
@@ -16,6 +17,12 @@ const TABS = [
     label: 'Mahsulotlar',
     icon: ShoppingBag,
     component: Products,
+  },
+  {
+    id: 'maxalla-products',
+    label: 'Maxalla Productlarida',
+    icon: Store,
+    component: MaxallaProducts,
   },
 ];
 

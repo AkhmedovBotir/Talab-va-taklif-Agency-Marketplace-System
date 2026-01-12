@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken');
 // Create new contragent
 const createContragent = async (req, res) => {
   try {
-    const { name, inn, viloyat, tuman, mfy, phone, password, status, logo, activityType } = req.body;
+    const { name, inn, viloyat, tuman, mfy, phone, password, status, logo, activityType, contragentLevel } = req.body;
 
     // Validate logo if provided
     if (logo) {
@@ -106,6 +106,7 @@ const createContragent = async (req, res) => {
       password,
       logo: logo || null,
       activityType,
+      contragentLevel: contragentLevel || 'tuman',
       status: status || 'active',
     });
 
@@ -135,7 +136,7 @@ const createContragent = async (req, res) => {
 // Get all contragents
 const getAllContragents = async (req, res) => {
   try {
-    const { status, viloyat, tuman, mfy, page = 1, limit = 10 } = req.query;
+    const { status, viloyat, tuman, mfy, contragentLevel, page = 1, limit = 10 } = req.query;
     const filter = {};
 
     if (status) {
@@ -152,6 +153,10 @@ const getAllContragents = async (req, res) => {
 
     if (mfy) {
       filter.mfy = mfy;
+    }
+
+    if (contragentLevel) {
+      filter.contragentLevel = contragentLevel;
     }
 
     // Pagination
@@ -238,6 +243,16 @@ const updateContragent = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
+
+    // Validate contragentLevel if being updated
+    if (updateData.contragentLevel) {
+      if (!['tuman', 'mfy'].includes(updateData.contragentLevel)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Kontragent darajasi "tuman" yoki "mfy" bo\'lishi kerak',
+        });
+      }
+    }
 
     // Validate logo if provided
     if (updateData.logo) {
@@ -855,6 +870,152 @@ const loginContragent = async (req, res) => {
   }
 };
 
+// Get delivery regions for current contragent
+const getMyDeliveryRegions = async (req, res) => {
+  try {
+    const contragentId = req.user.userId;
+
+    const contragent = await Contragent.findById(contragentId)
+      .populate('deliveryRegions.viloyat', 'name type code')
+      .populate('deliveryRegions.tuman', 'name type code')
+      .select('-password');
+
+    if (!contragent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kontragent topilmadi',
+      });
+    }
+
+    // Ensure deliveryRegions is always present (even if empty)
+    const deliveryRegions = contragent.deliveryRegions || [];
+
+    res.status(200).json({
+      success: true,
+      data: {
+        deliveryRegions: deliveryRegions,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching delivery regions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Yetkazib berish hududlarini olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Update delivery regions for current contragent
+const updateMyDeliveryRegions = async (req, res) => {
+  try {
+    const contragentId = req.user.userId;
+    const { deliveryRegions } = req.body;
+
+    const contragent = await Contragent.findById(contragentId);
+    if (!contragent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kontragent topilmadi',
+      });
+    }
+
+    // Check if contragent is tuman level (not mfy)
+    if (contragent.contragentLevel === 'mfy') {
+      return res.status(400).json({
+        success: false,
+        message: 'Maxalla kontragentlar uchun bu API ishlamaydi. Xizmat ko\'rsatish hududlarini boshqa API orqali yangilang.',
+      });
+    }
+
+    // Validate deliveryRegions
+    if (!Array.isArray(deliveryRegions)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Yetkazib berish hududlari array bo\'lishi kerak',
+      });
+    }
+
+    // Validate each delivery region
+    const Region = require('../models/Region');
+    for (let i = 0; i < deliveryRegions.length; i++) {
+      const region = deliveryRegions[i];
+      
+      if (!region.viloyat) {
+        return res.status(400).json({
+          success: false,
+          message: `Yetkazib berish hududi ${i + 1}: viloyat kiritilishi shart`,
+        });
+      }
+
+      // Validate viloyat
+      const viloyatRegion = await Region.findById(region.viloyat);
+      if (!viloyatRegion || viloyatRegion.type !== 'region') {
+        return res.status(400).json({
+          success: false,
+          message: `Yetkazib berish hududi ${i + 1}: viloyat topilmadi yoki noto'g'ri tur`,
+        });
+      }
+
+      // Validate tuman if provided
+      if (region.tuman) {
+        const tumanRegion = await Region.findById(region.tuman);
+        if (!tumanRegion || tumanRegion.type !== 'district') {
+          return res.status(400).json({
+            success: false,
+            message: `Yetkazib berish hududi ${i + 1}: tuman topilmadi yoki noto'g'ri tur`,
+          });
+        }
+
+        // Check if tuman belongs to viloyat
+        if (tumanRegion.parent?.toString() !== region.viloyat.toString()) {
+          return res.status(400).json({
+            success: false,
+            message: `Yetkazib berish hududi ${i + 1}: tuman tanlangan viloyatga tegishli emas`,
+          });
+        }
+      }
+    }
+
+    // Update delivery regions
+    const updated = await Contragent.findByIdAndUpdate(
+      contragentId,
+      { deliveryRegions: deliveryRegions },
+      { new: true, runValidators: true }
+    )
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code')
+      .populate('activityType', 'name icon')
+      .populate('deliveryRegions.viloyat', 'name type code')
+      .populate('deliveryRegions.tuman', 'name type code')
+      .select('-password');
+
+    res.status(200).json({
+      success: true,
+      message: 'Yetkazib berish hududlari yangilandi',
+      data: {
+        deliveryRegions: updated.deliveryRegions,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating delivery regions:', error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Noto\'g\'ri region ID',
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Yetkazib berish hududlarini yangilashda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createContragent,
   getAllContragents,
@@ -865,5 +1026,7 @@ module.exports = {
   getMe,
   updateMyProfile,
   updateMyLogo,
+  getMyDeliveryRegions,
+  updateMyDeliveryRegions,
 };
 

@@ -151,6 +151,12 @@ class EskizService {
     return await this.sendSMS(phone, message);
   }
 
+  // Send verification code for delivery provider password setup
+  async sendDeliveryProviderPasswordSetupCode(phone, code) {
+    const message = `${code} - Yetkazib beruvchi hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;
+    return await this.sendSMS(phone, message);
+  }
+
   // Send verification code for punkt password setup
   async sendPunktPasswordSetupCode(phone, code) {
     const message = `${code} - Punkt hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.`;

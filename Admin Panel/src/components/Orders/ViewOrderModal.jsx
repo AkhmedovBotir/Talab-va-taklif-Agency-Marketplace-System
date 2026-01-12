@@ -1,6 +1,6 @@
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { motion } from 'framer-motion';
-import { formatTableDate } from '../../utils/dateFormatter';
+import { formatTableDate, formatDate } from '../../utils/dateFormatter';
 
 const ViewOrderModal = ({ open, onClose, order }) => {
   if (!order) return null;

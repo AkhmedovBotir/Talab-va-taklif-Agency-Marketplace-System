@@ -41,10 +41,26 @@ export default function OrderDetailScreen() {
       } else {
         setLoading(true);
       }
-      const response = await apiService.getOrderById(id, token);
+      
+      // Try to load as tuman order first, then maxalla order
+      let response;
+      try {
+        response = await apiService.getOrderById(id, token);
+      } catch (error: any) {
+        // If not found, try maxalla order
+        if (error.status === 404 || error.message?.includes('topilmadi')) {
+          try {
+            response = await apiService.getMaxallaOrderById(id, token);
+          } catch (maxallaError: any) {
+            throw maxallaError;
+          }
+        } else {
+          throw error;
+        }
+      }
+      
       if (response.success && response.data) {
         setOrder(response.data);
-        console.log("order", response.data);
       }
     } catch (error: any) {
       showError(error.message || 'Buyurtmani yuklashda xatolik yuz berdi');
@@ -53,7 +69,7 @@ export default function OrderDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [id, token]);
+  }, [id, token, showError, router]);
 
   useEffect(() => {
     if (id && token) {
@@ -91,7 +107,14 @@ export default function OrderDetailScreen() {
             if (!id || !token) return;
             try {
               setCancelling(true);
-              const response = await apiService.cancelOrder(id, token);
+              // Determine order type from order data
+              const isMaxallaOrder = order.items && order.items.length > 0 && 
+                order.items[0].productType === 'maxalla';
+              
+              const response = isMaxallaOrder 
+                ? await apiService.cancelMaxallaOrder(id, token)
+                : await apiService.cancelOrder(id, token);
+              
               if (response.success) {
                 setOrder(response.data);
                 showSuccess('Buyurtma bekor qilindi');
@@ -121,7 +144,16 @@ export default function OrderDetailScreen() {
             if (!id || !token) return;
             try {
               setConfirming(true);
-              const response = await apiService.confirmDelivery(id, token);
+              // Determine order type from order data
+              const isMaxallaOrder = order.items && order.items.length > 0 && 
+                order.items[0].productType === 'maxalla';
+              
+              const response = await apiService.confirmDelivery(
+                id, 
+                token, 
+                isMaxallaOrder ? 'maxalla' : 'tuman'
+              );
+              
               if (response.success && response.data) {
                 setOrder(response.data);
                 showSuccess('Buyurtma muvaffaqiyatli tasdiqlandi');

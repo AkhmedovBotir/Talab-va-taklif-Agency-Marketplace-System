@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../../components/Header';
 import LocationSelector from '../../components/LocationSelector';
+import MaxallaStoreSelectionModal from '../../components/MaxallaStoreSelectionModal';
 import PartnershipBlock from '../../components/PartnershipBlock';
 import ProductCard from '../../components/ui/ProductCard';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,7 +23,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useLocation } from '../../contexts/LocationContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
-import apiService, { Category, FeaturedContragent, Product } from '../../services/api';
+import apiService, { FeaturedContragent, MaxallaStore, Product } from '../../services/api';
 
 // Helper function to calculate age from birthDate
 const calculateAge = (birthDate: string | null | undefined): number | null => {
@@ -54,7 +55,7 @@ export default function HomeScreen() {
   const { autoOpenLocation } = useLocalSearchParams<{ autoOpenLocation?: string }>();
   const { unreadCount } = useNotification();
   const { user } = useAuth();
-  const { selectedViloyat, selectedTuman } = useLocation();
+  const { selectedViloyat, selectedTuman, selectedMfy } = useLocation();
   const { showSuccess, showError } = useSnackbar();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,8 +66,9 @@ export default function HomeScreen() {
   const [featuredContragents, setFeaturedContragents] = useState<FeaturedContragent[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [currentFeaturedIndex, setCurrentFeaturedIndex] = useState(0);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'tuman' | 'maxalla'>('tuman');
+  const [storeModalVisible, setStoreModalVisible] = useState(false);
+  const [selectedProductForStore, setSelectedProductForStore] = useState<Product | null>(null);
 
   const loadProducts = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     try {
@@ -76,39 +78,58 @@ export default function HomeScreen() {
         setLoadingMore(true);
       }
 
-      const response = await apiService.getProducts({
-        page: pageNum,
-        limit: 20,
-        status: 'active',
-      });
-
-      // Filter products by selected tuman
-      let filteredProducts = response.data;
-      if (selectedTuman) {
-        filteredProducts = response.data.filter((product) => {
-          if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
-            // Show products without delivery regions if no tuman is selected
-            return false;
-          }
-          // Check if product is deliverable to selected tuman
-          const matches = product.deliveryRegions.some((region) => {
-            // If region has tuman, check if it matches selected tuman
-            if (region.tuman) {
-              return region.tuman._id === selectedTuman._id;
-            }
-            // If region has viloyat but no tuman, check if viloyat matches selected viloyat
-            if (region.viloyat && selectedViloyat) {
-              return region.viloyat._id === selectedViloyat._id;
-            }
-            return false;
-          });
-          if (!matches) {
-            console.log('HomeScreen: Product filtered out:', product.name, 'deliveryRegions:', product.deliveryRegions.map(r => `${r.viloyat?.name || 'no viloyat'}${r.tuman ? `, ${r.tuman.name}` : ''}`).join(' | '));
-          }
-          return matches;
+      let response;
+      if (activeTab === 'maxalla') {
+        // Load maxalla products
+        response = await apiService.getMaxallaProducts({
+          page: pageNum,
+          limit: 20,
+          status: 'active',
         });
       } else {
-        console.log('HomeScreen: No tuman selected, showing all products');
+        // Load tuman products
+        response = await apiService.getProducts({
+          page: pageNum,
+          limit: 20,
+          status: 'active',
+        });
+      }
+
+      // Filter products by selected location
+      let filteredProducts = response.data;
+      
+      if (activeTab === 'maxalla') {
+        // For maxalla products, filter by selected MFY
+        if (selectedMfy) {
+          filteredProducts = response.data.filter((product) => {
+            // Maxalla products are only available in their own MFY
+            return product.contragent?.mfy?._id === selectedMfy._id;
+          });
+        } else {
+          // If no MFY selected, show no maxalla products
+          filteredProducts = [];
+        }
+      } else {
+        // For tuman products, filter by selected tuman
+        if (selectedTuman) {
+          filteredProducts = response.data.filter((product) => {
+            if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
+              return false;
+            }
+            const matches = product.deliveryRegions.some((region) => {
+              if (region.tuman) {
+                return region.tuman._id === selectedTuman._id;
+              }
+              if (region.viloyat && selectedViloyat) {
+                return region.viloyat._id === selectedViloyat._id;
+              }
+              return false;
+            });
+            return matches;
+          });
+        } else {
+          console.log('HomeScreen: No tuman selected, showing all products');
+        }
       }
 
       // Filter censored products for users under 18
@@ -122,6 +143,12 @@ export default function HomeScreen() {
           return true;
         });
       }
+
+      // Add productType to products
+      filteredProducts = filteredProducts.map((product) => ({
+        ...product,
+        productType: activeTab,
+      }));
 
       if (append) {
         setProducts((prev) => [...prev, ...filteredProducts]);
@@ -139,7 +166,7 @@ export default function HomeScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [selectedTuman, user?.birthDate]);
+  }, [activeTab, selectedTuman, selectedViloyat, selectedMfy, user?.birthDate, showError]);
 
   const loadFeaturedContragents = useCallback(async () => {
     try {
@@ -159,37 +186,6 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const loadCategories = useCallback(async () => {
-    try {
-      setCategoriesLoading(true);
-      const userAge = calculateAge(user?.birthDate);
-      
-      const response = await apiService.getCategories({
-        status: 'active',
-        includeSubcategories: true,
-        page: 1,
-        limit: 20,
-      });
-      
-      if (response.success && Array.isArray(response.data)) {
-        // Filter censored categories for users under 18
-        let filteredCategories = response.data;
-        if (userAge !== null && userAge < 18) {
-          filteredCategories = response.data.filter((category) => {
-            return category.censored !== true;
-          });
-        }
-        setCategories(filteredCategories);
-      } else {
-        setCategories([]);
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      setCategories([]);
-    } finally {
-      setCategoriesLoading(false);
-    }
-  }, [user?.birthDate]);
 
   // Autoplay carousel
   useEffect(() => {
@@ -213,17 +209,14 @@ export default function HomeScreen() {
   useEffect(() => {
     loadProducts(1, false);
     loadFeaturedContragents();
-    loadCategories();
-  }, [loadProducts, loadFeaturedContragents, loadCategories]);
+  }, [loadProducts, loadFeaturedContragents]);
 
-  // Reload products when location changes
+  // Reload products when location or tab changes
   useEffect(() => {
-    if (selectedTuman) {
     setPage(1);
     setHasMore(true);
     loadProducts(1, false);
-    }
-  }, [selectedTuman?._id, loadProducts]);
+  }, [selectedTuman?._id, selectedMfy?._id, activeTab, loadProducts]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -231,8 +224,7 @@ export default function HomeScreen() {
     setHasMore(true);
     loadProducts(1, false);
     loadFeaturedContragents();
-    loadCategories();
-  }, [loadProducts, loadFeaturedContragents, loadCategories]);
+  }, [loadProducts, loadFeaturedContragents]);
 
   const handleLoadMore = useCallback(() => {
     if (!loadingMore && hasMore) {
@@ -256,9 +248,38 @@ export default function HomeScreen() {
       return;
     }
 
+    const productType = product.productType || activeTab;
+    
+    // For maxalla products, show store selection modal
+    if (productType === 'maxalla') {
+      // Check if user has selected MFY
+      if (!selectedMfy) {
+        showError('Maxalla mahsulotlarini qo\'shish uchun MFY tanlang');
+        return;
+      }
+      setSelectedProductForStore(product);
+      setStoreModalVisible(true);
+      return;
+    }
+
+    // For tuman products, add directly to cart
     try {
-      await addToCart(product._id, 1);
+      await addToCart(product._id, 1, productType);
       showSuccess(`${product.name} korzinkaga qo'shildi`);
+    } catch (error) {
+      // Error is already shown in context
+    }
+  };
+
+  const handleStoreSelect = async (store: MaxallaStore) => {
+    if (!selectedProductForStore) return;
+
+    try {
+      // Add the selected store's product to maxalla cart
+      await addToCart(store.product._id, 1, 'maxalla');
+      showSuccess(`${selectedProductForStore.name} ${store.contragent.name} dokonidan korzinkaga qo'shildi`);
+      setStoreModalVisible(false);
+      setSelectedProductForStore(null);
     } catch (error) {
       // Error is already shown in context
     }
@@ -292,18 +313,10 @@ export default function HomeScreen() {
     );
   };
 
-  const handleCategoryPress = (category: Category) => {
-    router.push({
-      pathname: '/(tabs)/search',
-      params: {
-        categoryId: category._id,
-        categoryName: category.name,
-      },
-    } as any);
-  };
 
   const renderItem = ({ item }: { item: Product }) => {
-    const isInCart = getCartItemQuantity(item._id) > 0;
+    const productType = item.productType || activeTab;
+    const isInCart = getCartItemQuantity(item._id, productType) > 0;
     return (
       <ProductCard
         product={item}
@@ -332,103 +345,51 @@ export default function HomeScreen() {
     );
   };
 
-  const renderCategories = () => {
-    if (categoriesLoading && categories.length === 0) {
-      return (
-        <View style={styles.categoriesLoading}>
-          <ActivityIndicator size="small" color="#007AFF" />
-        </View>
-      );
-    }
 
-    if (!categories.length) return null;
-
+  const renderProductTabs = () => {
     return (
-      <View style={styles.categoriesContainer}>
-        <View style={styles.categoriesHeader}>
-          <Text style={styles.categoriesTitle}>Kategoriyalar</Text>
-          <Text style={styles.categoriesSubtitle}>
-            Barcha toifalar
-          </Text>
+      <View style={styles.tabsContainer}>
+        <View style={styles.tabsHeader}>
+          <Text style={styles.tabsTitle}>Mahsulotlar</Text>
         </View>
-        <FlatList
-          data={categories}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.categoryCard}
-              activeOpacity={0.85}
-              onPress={() => handleCategoryPress(item)}
-            >
-              <View style={styles.categoryImageWrapper}>
-                {item.image ? (
-                  <ImageBackground
-                    source={{ uri: item.image }}
-                    style={styles.categoryImageBackground}
-                    imageStyle={styles.categoryImageStyle}
-                    resizeMode="cover"
-                  >
-                    <View style={styles.categoryImageOverlay}>
-                      <View style={styles.categoryGradientTop} />
-                      <View style={styles.categoryGradientBottom} />
-                    </View>
-                    {item.censored && (
-                      <View style={styles.censoredBadge}>
-                        <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
-                        <Text style={styles.censoredBadgeText}>18+</Text>
-                      </View>
-                    )}
-                    <View style={styles.categoryInfoOverlay}>
-                      <Text style={styles.categoryNameOverlay} numberOfLines={2}>
-                        {item.name}
-                      </Text>
-                      {item.subcategories && item.subcategories.length > 0 && (
-                        <View style={styles.categorySubcountContainer}>
-                          <Ionicons name="layers" size={10} color="#FFFFFF" />
-                          <Text style={styles.categorySubcountOverlay}>
-                            {item.subcategories.length}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </ImageBackground>
-                ) : (
-                  <View style={styles.categoryImagePlaceholder}>
-                    <View style={styles.categoryPlaceholderIcon}>
-                      <Ionicons name="grid" size={32} color="#FFFFFF" />
-                    </View>
-                    <View style={styles.categoryImageOverlay}>
-                      <View style={styles.categoryGradientTop} />
-                      <View style={styles.categoryGradientBottom} />
-                    </View>
-                    {item.censored && (
-                      <View style={styles.censoredBadge}>
-                        <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
-                        <Text style={styles.censoredBadgeText}>18+</Text>
-                      </View>
-                    )}
-                    <View style={styles.categoryInfoOverlay}>
-                      <Text style={styles.categoryNameOverlay} numberOfLines={2}>
-                        {item.name}
-                      </Text>
-                      {item.subcategories && item.subcategories.length > 0 && (
-                        <View style={styles.categorySubcountContainer}>
-                          <Ionicons name="layers" size={10} color="#FFFFFF" />
-                          <Text style={styles.categorySubcountOverlay}>
-                            {item.subcategories.length}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
-        />
+        <View style={styles.tabsWrapper}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'tuman' && styles.tabActive]}
+            onPress={() => setActiveTab('tuman')}
+            activeOpacity={0.8}
+          >
+            <Ionicons 
+              name="storefront" 
+              size={20} 
+              color={activeTab === 'tuman' ? '#007AFF' : '#666'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'tuman' && styles.tabTextActive]}>
+              Tuman Guzari
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'maxalla' && styles.tabActive]}
+            onPress={() => setActiveTab('maxalla')}
+            activeOpacity={0.8}
+          >
+            <Ionicons 
+              name="home" 
+              size={20} 
+              color={activeTab === 'maxalla' ? '#007AFF' : '#666'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'maxalla' && styles.tabTextActive]}>
+              Maxalla Guzari
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {activeTab === 'maxalla' && !selectedMfy && (
+          <View style={styles.tabWarning}>
+            <Ionicons name="information-circle" size={16} color="#FF9500" />
+            <Text style={styles.tabWarningText}>
+              Maxalla mahsulotlarini ko'rish uchun MFY tanlang
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -552,14 +513,28 @@ export default function HomeScreen() {
           onEndReachedThreshold={0.5}
           ListHeaderComponent={
             <View>
-              {renderCategories()}
               {renderTopContragents()}
               <PartnershipBlock />
+              {renderProductTabs()}
             </View>
           }
           ListFooterComponent={renderFooter}
           ListEmptyComponent={renderEmpty}
           showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Maxalla Store Selection Modal */}
+      {selectedProductForStore && (
+        <MaxallaStoreSelectionModal
+          visible={storeModalVisible}
+          productId={selectedProductForStore._id}
+          productName={selectedProductForStore.name}
+          onClose={() => {
+            setStoreModalVisible(false);
+            setSelectedProductForStore(null);
+          }}
+          onSelectStore={handleStoreSelect}
         />
       )}
     </View>
@@ -874,5 +849,63 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  tabsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    marginTop: 8,
+  },
+  tabsHeader: {
+    marginBottom: 12,
+  },
+  tabsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  tabsWrapper: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    gap: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  tabActive: {
+    backgroundColor: '#e6f3ff',
+    borderColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#666',
+  },
+  tabTextActive: {
+    color: '#007AFF',
+  },
+  tabWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    gap: 8,
+  },
+  tabWarningText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#856404',
+    lineHeight: 18,
   },
 });

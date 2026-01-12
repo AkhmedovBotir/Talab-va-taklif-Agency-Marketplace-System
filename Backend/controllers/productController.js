@@ -1,6 +1,7 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Region = require('../models/Region');
+const Contragent = require('../models/Contragent');
 
 // Create product
 const createProduct = async (req, res) => {
@@ -20,7 +21,6 @@ const createProduct = async (req, res) => {
       width,
       weight,
       status,
-      deliveryRegions,
       kpiBonusPercent,
     } = req.body;
 
@@ -102,60 +102,9 @@ const createProduct = async (req, res) => {
       productCensored = subcategoryDoc.censored || categoryDoc.censored || false;
     }
 
-    // Validate delivery regions
-    if (deliveryRegions && Array.isArray(deliveryRegions)) {
-      if (deliveryRegions.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Kamida bitta yetkazib berish xududi kiritilishi shart',
-        });
-      }
-
-      for (let i = 0; i < deliveryRegions.length; i++) {
-        const region = deliveryRegions[i];
-        
-        if (!region.viloyat) {
-          return res.status(400).json({
-            success: false,
-            message: `${i + 1}-yetkazib berish xududida viloyat kiritilishi shart`,
-          });
-        }
-
-        const viloyatDoc = await Region.findById(region.viloyat);
-        if (!viloyatDoc || viloyatDoc.type !== 'region') {
-          return res.status(400).json({
-            success: false,
-            message: `${i + 1}-yetkazib berish xududida viloyat topilmadi yoki noto'g'ri tur`,
-          });
-        }
-
-        // Tuman null yoki ID bo'lishi mumkin
-        if (region.tuman !== null && region.tuman !== undefined && region.tuman !== '') {
-          const tumanDoc = await Region.findById(region.tuman);
-          if (!tumanDoc || tumanDoc.type !== 'district') {
-            return res.status(400).json({
-              success: false,
-              message: `${i + 1}-yetkazib berish xududida tuman topilmadi yoki noto'g'ri tur`,
-            });
-          }
-          // Check if tuman belongs to viloyat
-          if (tumanDoc.parent?.toString() !== region.viloyat.toString()) {
-            return res.status(400).json({
-              success: false,
-              message: `${i + 1}-yetkazib berish xududida tuman tanlangan viloyatga tegishli emas`,
-            });
-          }
-        } else {
-          // Ensure tuman is explicitly null
-          region.tuman = null;
-        }
-      }
-    } else if (deliveryRegions !== undefined && deliveryRegions !== null) {
-      return res.status(400).json({
-        success: false,
-        message: 'Yetkazib berish xududlari massiv ko\'rinishida bo\'lishi kerak',
-      });
-    }
+    // Get delivery regions from contragent profile
+    const contragent = await Contragent.findById(userId).select('deliveryRegions');
+    const deliveryRegions = contragent?.deliveryRegions || [];
 
     // Generate product code
     const productCode = await Product.generateProductCode(userId);
@@ -177,7 +126,8 @@ const createProduct = async (req, res) => {
       weight: weight || null,
       status: status || 'active',
       contragent: userId,
-      deliveryRegions: deliveryRegions || [],
+      // Delivery regions are automatically taken from contragent profile
+      deliveryRegions: deliveryRegions,
       kpiBonusPercent,
       productCode,
       moderationStatus: 'pending', // New products require moderation
@@ -414,7 +364,6 @@ const updateProduct = async (req, res) => {
       width,
       weight,
       status,
-      deliveryRegions,
       kpiBonusPercent,
     } = req.body;
 
@@ -517,61 +466,9 @@ const updateProduct = async (req, res) => {
       }
     }
 
-    // Validate delivery regions if provided
-    if (deliveryRegions !== undefined) {
-      if (!Array.isArray(deliveryRegions)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Yetkazib berish xududlari massiv ko\'rinishida bo\'lishi kerak',
-        });
-      }
-
-      if (deliveryRegions.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Kamida bitta yetkazib berish xududi kiritilishi shart',
-        });
-      }
-
-      for (let i = 0; i < deliveryRegions.length; i++) {
-        const region = deliveryRegions[i];
-        
-        if (!region.viloyat) {
-          return res.status(400).json({
-            success: false,
-            message: `${i + 1}-yetkazib berish xududida viloyat kiritilishi shart`,
-          });
-        }
-
-        const viloyatDoc = await Region.findById(region.viloyat);
-        if (!viloyatDoc || viloyatDoc.type !== 'region') {
-          return res.status(400).json({
-            success: false,
-            message: `${i + 1}-yetkazib berish xududida viloyat topilmadi yoki noto'g'ri tur`,
-          });
-        }
-
-        // Tuman null yoki ID bo'lishi mumkin
-        if (region.tuman !== null && region.tuman !== undefined && region.tuman !== '') {
-          const tumanDoc = await Region.findById(region.tuman);
-          if (!tumanDoc || tumanDoc.type !== 'district') {
-            return res.status(400).json({
-              success: false,
-              message: `${i + 1}-yetkazib berish xududida tuman topilmadi yoki noto'g'ri tur`,
-            });
-          }
-          if (tumanDoc.parent?.toString() !== region.viloyat.toString()) {
-            return res.status(400).json({
-              success: false,
-              message: `${i + 1}-yetkazib berish xududida tuman tanlangan viloyatga tegishli emas`,
-            });
-          }
-        } else {
-          // Ensure tuman is explicitly null
-          region.tuman = null;
-        }
-      }
-    }
+    // Get delivery regions from contragent profile (always use current contragent's deliveryRegions)
+    const contragent = await Contragent.findById(userId).select('deliveryRegions');
+    const deliveryRegions = contragent?.deliveryRegions || [];
 
     // Build update object
     const updateData = {};
@@ -589,7 +486,8 @@ const updateProduct = async (req, res) => {
     if (width !== undefined) updateData.width = width === '' ? null : width;
     if (weight !== undefined) updateData.weight = weight === '' ? null : weight;
     if (status !== undefined) updateData.status = status;
-    if (deliveryRegions !== undefined) updateData.deliveryRegions = deliveryRegions;
+    // Delivery regions are always updated from contragent profile
+    updateData.deliveryRegions = deliveryRegions;
     if (kpiBonusPercent !== undefined) updateData.kpiBonusPercent = kpiBonusPercent;
     
     // Always update censored based on category/subcategory

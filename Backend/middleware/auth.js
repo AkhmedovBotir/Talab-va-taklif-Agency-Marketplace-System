@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const Device = require('../models/Device');
+const Contragent = require('../models/Contragent');
 
 // Authentication middleware for admin
 const adminAuth = async (req, res, next) => {
@@ -256,6 +257,140 @@ const optionalContragentAuth = async (req, res, next) => {
     // On error, continue without setting req.user
     console.error('Error in optionalContragentAuth:', error);
     next();
+  }
+};
+
+// Authentication middleware for maxalla contragent (mfy level)
+const maxallaContragentAuth = async (req, res, next) => {
+  try {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token topilmadi',
+      });
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify and decode token
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+      );
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token noto\'g\'ri yoki muddati tugagan',
+      });
+    }
+
+    // Check if token is for contragent and maxalla level
+    if (decoded.type !== 'contragent' || decoded.contragentLevel !== 'mfy') {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu token Maxalla kontragent uchun emas',
+      });
+    }
+
+    // Check if contragent exists and is maxalla level
+    const contragent = await Contragent.findById(decoded.id).select('-password');
+    
+    if (!contragent) {
+      return res.status(401).json({
+        success: false,
+        message: 'Maxalla kontragent topilmadi',
+      });
+    }
+
+    if (contragent.contragentLevel !== 'mfy') {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu funksiya faqat Maxalla kontragentlar uchun',
+      });
+    }
+
+    if (contragent.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Hisobingiz faol emas',
+      });
+    }
+
+    // Check device if deviceId is in token
+    if (decoded.deviceId) {
+      const device = await Device.findOne({
+        user: decoded.id,
+        userModel: 'Contragent',
+        deviceId: decoded.deviceId,
+        isActive: true,
+      });
+
+      if (!device) {
+        // Check if device exists but is inactive
+        const inactiveDevice = await Device.findOne({
+          user: decoded.id,
+          userModel: 'Contragent',
+          deviceId: decoded.deviceId,
+          isActive: false,
+        });
+
+        if (inactiveDevice) {
+          return res.status(403).json({
+            success: false,
+            message: 'Bu qurilma nofaol. Faqat faol qurilma bilan login qilish mumkin. Iltimos, faol qurilma bilan kirish yoki yangi qurilmani tasdiqlash uchun SMS kod so\'rang',
+            requiresDeviceVerification: true,
+          });
+        }
+
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma topilmadi yoki nofaol. Iltimos, qurilmani tasdiqlang yoki faol qurilma bilan kirish',
+          requiresDeviceVerification: true,
+        });
+      }
+
+      // Update device last activity
+      device.lastActivityAt = new Date();
+      await device.save();
+    } else {
+      // If no deviceId in token, check if user has any active devices
+      const activeDevices = await Device.find({
+        user: decoded.id,
+        userModel: 'Contragent',
+        isActive: true,
+      });
+
+      if (activeDevices.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma ID topilmadi. Iltimos, qayta login qiling',
+          requiresDeviceVerification: true,
+        });
+      }
+    }
+
+    // Attach user info to request
+    req.user = {
+      userId: decoded.id,
+      userType: 'Contragent',
+      contragentLevel: 'mfy',
+      phone: decoded.phone,
+      inn: decoded.inn,
+    };
+
+    next();
+  } catch (error) {
+    console.error('Error in maxallaContragentAuth:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Autentifikatsiya xatosi',
+      error: error.message,
+    });
   }
 };
 
@@ -626,14 +761,89 @@ const agentAuth = async (req, res, next) => {
   }
 };
 
+// Authentication middleware for delivery provider
+const deliveryProviderAuth = async (req, res, next) => {
+  try {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token topilmadi',
+      });
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify and decode token
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+      );
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token noto\'g\'ri yoki muddati tugagan',
+      });
+    }
+
+    // Check if token is for delivery provider
+    if (decoded.role !== 'deliveryProvider') {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu token yetkazib beruvchi uchun emas',
+      });
+    }
+
+    const DeliveryProvider = require('../models/DeliveryProvider');
+    const deliveryProvider = await DeliveryProvider.findById(decoded.userId).select('-password');
+    
+    if (!deliveryProvider) {
+      return res.status(401).json({
+        success: false,
+        message: 'Yetkazib beruvchi topilmadi',
+      });
+    }
+
+    if (deliveryProvider.isDeleted || deliveryProvider.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Hisobingiz faol emas',
+      });
+    }
+
+    // Attach delivery provider info to request
+    req.user = {
+      userId: deliveryProvider._id,
+      userType: 'DeliveryProvider',
+      phone: deliveryProvider.phone,
+      contragentId: deliveryProvider.contragent,
+    };
+
+    next();
+  } catch (error) {
+    console.error('Error in deliveryProviderAuth:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Autentifikatsiya xatosi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   adminAuth,
   contragentAuth,
   optionalContragentAuth,
+  maxallaContragentAuth,
   marketplaceUserAuth,
   optionalMarketplaceUserAuth,
   punktAuth,
   agentAuth,
+  deliveryProviderAuth,
 };
 
 

@@ -39,7 +39,6 @@ export default function MaxsulotlarScreen() {
     try {
       const response = await apiService.getMyProducts({ limit: 1000 });
       setProducts(response.data);
-      console.log('Products response:', response.data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Maxsulotlarni yuklashda xatolik');
     } finally {

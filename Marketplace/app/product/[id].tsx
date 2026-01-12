@@ -14,9 +14,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import ImageCarousel from '../../components/ui/ImageCarousel';
 import ImageViewer from '../../components/ui/ImageViewer';
+import MaxallaStoreSelectionModal from '../../components/MaxallaStoreSelectionModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
-import apiService, { Product } from '../../services/api';
+import { useLocation } from '../../contexts/LocationContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
+import apiService, { MaxallaStore, Product } from '../../services/api';
 
 // Helper function to calculate age from birthDate
 const calculateAge = (birthDate: string | null | undefined): number | null => {
@@ -46,12 +49,15 @@ export default function ProductDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
-    const { user } = useAuth();
+    const { user, token } = useAuth();
+    const { selectedMfy } = useLocation();
+    const { showError, showSuccess } = useSnackbar();
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
     const [imageViewerVisible, setImageViewerVisible] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [webViewHeight, setWebViewHeight] = useState(200);
+    const [storeModalVisible, setStoreModalVisible] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -62,8 +68,27 @@ export default function ProductDetailScreen() {
     const loadProduct = async () => {
         setLoading(true);
         try {
-            const response = await apiService.getProductById(id!);
+            // Try to load as tuman product first
+            let response;
+            try {
+                response = await apiService.getProductById(id!);
+            } catch (error: any) {
+                // If not found, try maxalla product
+                if (error.status === 404 || error.message?.includes('topilmadi')) {
+                    response = await apiService.getMaxallaProductById(id!);
+                } else {
+                    throw error;
+                }
+            }
+            
             const loadedProduct = response.data;
+            
+            // Add productType if not present
+            if (!loadedProduct.productType) {
+                // Determine productType based on API endpoint or product properties
+                // If it has deliveryRegions, it's tuman, otherwise maxalla
+                loadedProduct.productType = loadedProduct.deliveryRegions ? 'tuman' : 'maxalla';
+            }
             
             // Check if product is censored and user is under 18
             const userAge = calculateAge(user?.birthDate);
@@ -98,7 +123,8 @@ export default function ProductDetailScreen() {
     const handleAddToCart = async () => {
         if (!product) return;
 
-        const isInCart = getCartItemQuantity(product._id) > 0;
+        const productType = product.productType || 'tuman';
+        const isInCart = getCartItemQuantity(product._id, productType) > 0;
         if (isInCart) {
             return; // Already in cart, button is disabled
         }
@@ -118,9 +144,33 @@ export default function ProductDetailScreen() {
             return;
         }
 
+        // For maxalla products, show store selection modal
+        if (productType === 'maxalla') {
+            // Check if user has selected MFY
+            if (!selectedMfy) {
+                showError('Maxalla mahsulotlarini qo\'shish uchun MFY tanlang');
+                return;
+            }
+            setStoreModalVisible(true);
+            return;
+        }
+
+        // For tuman products, add directly to cart
         try {
-            await addToCart(product._id, 1);
-            Alert.alert('Muvaffaqiyatli', `${product.name} korzinkaga qo'shildi`);
+            await addToCart(product._id, 1, productType);
+            showSuccess(`${product.name} korzinkaga qo'shildi`);
+        } catch (error) {
+            // Error is already shown in context
+        }
+    };
+
+    const handleStoreSelect = async (store: MaxallaStore) => {
+        if (!product) return;
+
+        try {
+            // Add the selected store's product to maxalla cart
+            await addToCart(store.product._id, 1, 'maxalla');
+            showSuccess(`${product.name} ${store.contragent.name} dokonidan korzinkaga qo'shildi`);
         } catch (error) {
             // Error is already shown in context
         }
@@ -155,7 +205,8 @@ export default function ProductDetailScreen() {
     }
 
     const images = product.images && product.images.length > 0 ? product.images : [];
-    const isInCart = product ? getCartItemQuantity(product._id) > 0 : false;
+    const productType = product?.productType || 'tuman';
+    const isInCart = product ? getCartItemQuantity(product._id, productType) > 0 : false;
 
     // Table data rows
     const tableRows = [
@@ -339,9 +390,17 @@ export default function ProductDetailScreen() {
                     activeOpacity={0.8}
                     disabled={isInCart}
                 >
-                    <Ionicons name={isInCart ? "checkmark" : "cart"} size={24} color="#fff" />
+                    <Ionicons 
+                        name={isInCart ? "checkmark" : (productType === 'maxalla' ? "storefront" : "cart")} 
+                        size={24} 
+                        color="#fff" 
+                    />
                     <Text style={styles.cartButtonText}>
-                        {isInCart ? 'Korzinkada' : 'Korzinkaga qo\'shish'}
+                        {isInCart 
+                            ? 'Korzinkada' 
+                            : productType === 'maxalla' 
+                                ? 'Dokon tanlash' 
+                                : 'Korzinkaga qo\'shish'}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -353,6 +412,17 @@ export default function ProductDetailScreen() {
                     images={images}
                     initialIndex={selectedImageIndex}
                     onClose={() => setImageViewerVisible(false)}
+                />
+            )}
+
+            {/* Maxalla Store Selection Modal */}
+            {product && productType === 'maxalla' && (
+                <MaxallaStoreSelectionModal
+                    visible={storeModalVisible}
+                    productId={product._id}
+                    productName={product.name}
+                    onClose={() => setStoreModalVisible(false)}
+                    onSelectStore={handleStoreSelect}
                 />
             )}
         </View>

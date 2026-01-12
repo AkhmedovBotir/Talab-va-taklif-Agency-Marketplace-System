@@ -6,8 +6,10 @@ import { useAuth } from './AuthContext';
 interface LocationContextType {
   selectedViloyat: Region | null;
   selectedTuman: Region | null;
+  selectedMfy: Region | null;
   setSelectedViloyat: (viloyat: Region | null) => void;
   setSelectedTuman: (tuman: Region | null) => void;
+  setSelectedMfy: (mfy: Region | null) => void;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
@@ -16,6 +18,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, token } = useAuth();
   const [selectedViloyat, setSelectedViloyatState] = useState<Region | null>(null);
   const [selectedTuman, setSelectedTumanState] = useState<Region | null>(null);
+  const [selectedMfy, setSelectedMfyState] = useState<Region | null>(null);
   const [hasLoadedFromAPI, setHasLoadedFromAPI] = useState(false);
 
   // Load location from API only (no localStorage)
@@ -25,6 +28,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         // Clear location if not authenticated
         setSelectedViloyatState(null);
         setSelectedTumanState(null);
+        setSelectedMfyState(null);
         setHasLoadedFromAPI(false);
         return;
       }
@@ -36,24 +40,25 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       try {
         const response = await apiService.getViloyatTuman(token);
         
-        console.log('LocationContext: GET /api/marketplace/me/viloyat-tuman Response:', JSON.stringify(response, null, 2));
         
         if (response.success && response.data) {
           // Update location from API response only
           if (response.data.viloyat && typeof response.data.viloyat === 'object') {
             setSelectedViloyatState(response.data.viloyat);
-            console.log('LocationContext: Loaded viloyat from API:', response.data.viloyat._id, response.data.viloyat.name);
           } else {
             setSelectedViloyatState(null);
-            console.log('LocationContext: Cleared viloyat (API returned null)');
-        }
+          }
           
           if (response.data.tuman && typeof response.data.tuman === 'object') {
             setSelectedTumanState(response.data.tuman);
-            console.log('LocationContext: Loaded tuman from API:', response.data.tuman._id, response.data.tuman.name);
           } else {
             setSelectedTumanState(null);
-            console.log('LocationContext: Cleared tuman (API returned null)');
+          }
+          
+          if (response.data.mfy && typeof response.data.mfy === 'object') {
+            setSelectedMfyState(response.data.mfy);
+          } else {
+            setSelectedMfyState(null);
           }
           
           setHasLoadedFromAPI(true);
@@ -76,25 +81,42 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       setHasLoadedFromAPI(false);
       setSelectedViloyatState(null);
       setSelectedTumanState(null);
+      setSelectedMfyState(null);
     }
   }, [isAuthenticated]);
 
   const setSelectedViloyat = async (viloyat: Region | null) => {
-    console.log('LocationContext.setSelectedViloyat called:', viloyat?._id || 'null', viloyat?.name || 'null');
     const currentViloyatId = selectedViloyat?._id;
     const newViloyatId = viloyat?._id;
     
     setSelectedViloyatState(viloyat);
-    // Clear tuman only when viloyat actually changes (not when same viloyat is set again)
+    // Clear tuman and mfy when viloyat changes (not when same viloyat is set again)
     if (viloyat && currentViloyatId !== newViloyatId) {
-      console.log('LocationContext: Viloyat changed, clearing tuman');
       setSelectedTumanState(null);
+      setSelectedMfyState(null);
+    } else if (!viloyat) {
+      // If viloyat is cleared, clear tuman and mfy
+      setSelectedTumanState(null);
+      setSelectedMfyState(null);
     }
   };
 
   const setSelectedTuman = async (tuman: Region | null) => {
-    console.log('LocationContext.setSelectedTuman called:', tuman?._id || 'null', tuman?.name || 'null');
+    const currentTumanId = selectedTuman?._id;
+    const newTumanId = tuman?._id;
+    
     setSelectedTumanState(tuman);
+    // Clear mfy when tuman changes (not when same tuman is set again)
+    if (tuman && currentTumanId !== newTumanId) {
+      setSelectedMfyState(null);
+    } else if (!tuman) {
+      // If tuman is cleared, clear mfy
+      setSelectedMfyState(null);
+    }
+  };
+
+  const setSelectedMfy = async (mfy: Region | null) => {
+    setSelectedMfyState(mfy);
   };
 
   return (
@@ -102,8 +124,10 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       value={{
         selectedViloyat,
         selectedTuman,
+        selectedMfy,
         setSelectedViloyat,
         setSelectedTuman,
+        setSelectedMfy,
       }}
     >
       {children}

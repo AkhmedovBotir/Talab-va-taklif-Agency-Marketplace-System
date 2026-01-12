@@ -10,6 +10,8 @@ const {
   getMe,
   updateMyProfile,
   updateMyLogo,
+  getMyDeliveryRegions,
+  updateMyDeliveryRegions,
 } = require('../controllers/contragentController');
 const {
   passwordSetupStep1,
@@ -51,6 +53,12 @@ router.put('/me', contragentAuth, validate(contragentValidationSchemas.updatePro
 
 // Update only logo
 router.patch('/me/logo', contragentAuth, validate(contragentValidationSchemas.updateLogo), updateMyLogo);
+
+// Get delivery regions
+router.get('/me/delivery-regions', contragentAuth, getMyDeliveryRegions);
+
+// Update delivery regions
+router.patch('/me/delivery-regions', contragentAuth, validate(contragentValidationSchemas.updateDeliveryRegions), updateMyDeliveryRegions);
 
 // Create contragent
 router.post('/', validate(contragentValidationSchemas.create), createContragent);

@@ -324,3 +324,4 @@ const ViewCertificateModal = ({ open, onClose, certificateCode, onAssign }) => {
 
 export default ViewCertificateModal;
 
+

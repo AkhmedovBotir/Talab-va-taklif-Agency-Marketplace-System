@@ -19,6 +19,7 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
     password: '',
     logo: '',
     activityType: '',
+    contragentLevel: 'tuman',
     status: 'active',
   });
   const [loading, setLoading] = useState(false);
@@ -36,6 +37,7 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
         password: '', // Password is optional in update
         logo: contragent.logo || '', // Logo from existing data
         activityType: contragent.activityType?._id || contragent.activityType || '',
+        contragentLevel: contragent.contragentLevel || 'tuman',
         status: contragent.status || 'active',
       });
       setShowPassword(false);
@@ -71,10 +73,26 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    // Validate INN if provided (for MFY contragents) or required (for tuman contragents)
+    if (formData.contragentLevel === 'tuman' && (!formData.inn || formData.inn.trim() === '')) {
+      setError('INN kiritilishi shart (Tuman kontragentlar uchun)');
+      return;
+    }
+    
+    // Validate INN format if provided
+    if (formData.inn && formData.inn.trim() !== '') {
+      const innPattern = /^\d{9}$|^\d{12}$/;
+      if (!innPattern.test(formData.inn.trim())) {
+        setError('INN 9 yoki 12 ta raqamdan iborat bo\'lishi kerak');
+        return;
+      }
+    }
+    
     setLoading(true);
 
     try {
-      // Prepare data - only include password and logo if provided
+      // Prepare data - only include password, logo, and inn if provided
       const updateData = { ...formData };
       if (!updateData.password || updateData.password.trim() === '') {
         delete updateData.password;
@@ -84,6 +102,10 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
       // For simplicity, we'll send it if it exists and is different from original
       if (!updateData.logo || updateData.logo.trim() === '') {
         delete updateData.logo;
+      }
+      // For MFY contragents, if INN is empty, don't send it
+      if (updateData.contragentLevel === 'mfy' && (!updateData.inn || updateData.inn.trim() === '')) {
+        delete updateData.inn;
       }
 
       const response = await contragentAPI.updateContragent(contragent._id, updateData);
@@ -168,17 +190,23 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
                     {/* INN */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        INN
+                        INN {formData.contragentLevel === 'tuman' ? '*' : '(ixtiyoriy)'}
                       </label>
                       <input
                         type="text"
                         name="inn"
                         value={formData.inn}
                         onChange={handleChange}
+                        required={formData.contragentLevel === 'tuman'}
                         pattern="^\d{9}$|^\d{12}$"
                         placeholder="9 yoki 12 ta raqam"
                         className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formData.contragentLevel === 'tuman' 
+                          ? '9 yoki 12 ta raqam (majburiy)' 
+                          : '9 yoki 12 ta raqam (ixtiyoriy - faqat MFY kontragentlar uchun)'}
+                      </p>
                     </div>
                   </div>
 
@@ -279,6 +307,26 @@ const EditContragentModal = ({ open, onClose, onSuccess, contragent }) => {
                         label="Faoliyat turi"
                         status="active"
                       />
+                    </div>
+
+                    {/* Contragent Level */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Kontragent Darajasi
+                      </label>
+                      <select
+                        name="contragentLevel"
+                        value={formData.contragentLevel}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="tuman">Tuman Kontragenti</option>
+                        <option value="mfy">MFY Kontragenti</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Tuman kontragenti - barcha tuman bo'yicha buyurtmalarni qabul qiladi<br />
+                        MFY kontragenti - faqat o'z MFYsi bo'yicha buyurtmalarni qabul qiladi
+                      </p>
                     </div>
 
                     {/* Status */}

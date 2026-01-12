@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { useAuth } from '../../contexts/AuthContext';
-import { apiService } from '../../services/api';
+import { apiService, DeliveryRegion } from '../../services/api';
 
 const isValidImage = (value?: string) =>
   !!value && /^data:image\/(jpeg|png|jpg);base64,/.test(value);
@@ -26,6 +26,11 @@ export default function ProfileScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | undefined>(undefined);
+  const [deliveryRegions, setDeliveryRegions] = useState<Array<{
+    viloyat: { _id: string; name: string; type: string; code: string };
+    tuman: { _id: string; name: string; type: string; code: string } | null;
+  }>>([]);
+  const [loadingRegions, setLoadingRegions] = useState(false);
 
   const fetchUnreadCount = async () => {
     try {
@@ -40,7 +45,36 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchUnreadCount();
+    loadDeliveryRegions();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Check if we're returning from region selection
+      const checkForRegionUpdate = async () => {
+        // Regions will be loaded automatically via loadDeliveryRegions
+        await loadDeliveryRegions();
+      };
+      checkForRegionUpdate();
+    }, [])
+  );
+
+  const loadDeliveryRegions = async () => {
+    try {
+      setLoadingRegions(true);
+      const response = await apiService.getDeliveryRegions();
+      if (response.success) {
+        setDeliveryRegions(response.data.deliveryRegions || []);
+      }
+    } catch (error: any) {
+      // If 404, it means no regions set yet, which is fine
+      if (error.status !== 404) {
+        console.error('Error loading delivery regions:', error);
+      }
+    } finally {
+      setLoadingRegions(false);
+    }
+  };
 
   useEffect(() => {
     if (contragent && isValidImage(contragent.logo)) {
@@ -53,7 +87,7 @@ export default function ProfileScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refreshContragent(), fetchUnreadCount()]);
+      await Promise.all([refreshContragent(), fetchUnreadCount(), loadDeliveryRegions()]);
     } catch (error: any) {
       Alert.alert('Xatolik', 'Ma\'lumotlarni yangilashda xatolik yuz berdi');
     } finally {
@@ -111,6 +145,21 @@ export default function ProfileScreen() {
 
   const handleChangeLogo = () => {
     uploadLogo();
+  };
+
+  const handleSelectDeliveryRegions = () => {
+    router.push({
+      pathname: '/(tabs)/ombor/product/select-regions' as any,
+      params: {
+        selectedRegions: JSON.stringify(
+          deliveryRegions.map((dr) => ({
+            viloyat: dr.viloyat._id,
+            tuman: dr.tuman?._id || null,
+          }))
+        ),
+        returnPath: '/(tabs)/profile',
+      },
+    });
   };
 
   const handleLogout = () => {
@@ -207,6 +256,45 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        <View style={styles.detailsCard}>
+          <Text style={styles.sectionTitle}>Yetkazib berish hududlari</Text>
+          
+          {loadingRegions ? (
+            <ActivityIndicator size="small" color="#007AFF" style={{ marginVertical: 16 }} />
+          ) : (
+            <>
+              {deliveryRegions.length > 0 ? (
+                <View style={styles.regionsList}>
+                  {deliveryRegions.map((region, index) => (
+                    <View key={index} style={styles.regionItem}>
+                      <Ionicons name="location" size={16} color="#007AFF" />
+                      <Text style={styles.regionText}>
+                        {region.viloyat.name}
+                        {region.tuman && `, ${region.tuman.name}`}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.noRegionsText}>
+                  Hozircha yetkazib berish hududlari tanlanmagan
+                </Text>
+              )}
+              
+              <TouchableOpacity
+                style={styles.editRegionsButton}
+                onPress={handleSelectDeliveryRegions}
+              >
+                <Ionicons name="location-outline" size={20} color="#007AFF" />
+                <Text style={styles.editRegionsButtonText}>
+                  {deliveryRegions.length > 0 ? 'Hududlarni yangilash' : 'Hududlarni tanlash'}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         <View style={styles.actionsCard}>
@@ -443,6 +531,49 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  regionsList: {
+    marginBottom: 12,
+  },
+  regionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  regionText: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
+    flex: 1,
+  },
+  noRegionsText: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
+    marginBottom: 12,
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+  editRegionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  editRegionsButtonText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 12,
+    fontWeight: '500',
   },
 });
 

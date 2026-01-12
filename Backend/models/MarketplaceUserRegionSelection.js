@@ -17,6 +17,11 @@ const marketplaceUserRegionSelectionSchema = new mongoose.Schema(
       ref: 'Region',
       default: null,
     },
+    mfy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Region',
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -27,6 +32,7 @@ const marketplaceUserRegionSelectionSchema = new mongoose.Schema(
 marketplaceUserRegionSelectionSchema.index({ user: 1 }, { unique: true });
 marketplaceUserRegionSelectionSchema.index({ viloyat: 1 });
 marketplaceUserRegionSelectionSchema.index({ tuman: 1 });
+marketplaceUserRegionSelectionSchema.index({ mfy: 1 });
 
 const MarketplaceUserRegionSelection = mongoose.model(
   'MarketplaceUserRegionSelection',

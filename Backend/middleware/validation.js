@@ -2,6 +2,12 @@ const Joi = require('joi');
 
 const validate = (schema) => {
   return (req, res, next) => {
+    if (!schema || typeof schema.validate !== 'function') {
+      return res.status(500).json({
+        success: false,
+        message: 'Validatsiya schemasi noto\'g\'ri',
+      });
+    }
     const { error } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
@@ -25,6 +31,111 @@ const validate = (schema) => {
 };
 
 const adminValidationSchemas = {
+  // Base Product validation schemas
+  createBaseProduct: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(500)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Maxsulot nomi kiritilishi shart',
+        'string.min': 'Maxsulot nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Maxsulot nomi 500 ta belgidan oshmasligi kerak',
+        'any.required': 'Maxsulot nomi kiritilishi shart',
+      }),
+    description: Joi.alternatives().try(
+      Joi.string().allow(''),
+      Joi.object(),
+      Joi.valid(null)
+    ),
+    images: Joi.array()
+      .items(Joi.string().pattern(/^data:image\/(png|jpg|jpeg|gif|webp);base64,/))
+      .max(5)
+      .messages({
+        'array.max': 'Maksimal 5 ta rasm yuklash mumkin',
+        'string.pattern.base': 'Rasmlar base64 formatida bo\'lishi kerak (data:image/png;base64,... yoki data:image/jpeg;base64,...)',
+      }),
+    category: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Kategoriya kiritilishi shart',
+        'any.required': 'Kategoriya kiritilishi shart',
+      }),
+    subcategory: Joi.string()
+      .allow(null, '')
+      .messages({
+        'string.base': 'Sub kategoriya ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    unit: Joi.string()
+      .valid('dona', 'litr', 'kg')
+      .required()
+      .messages({
+        'any.only': 'Birlik "dona", "litr" yoki "kg" bo\'lishi kerak',
+        'any.required': 'Birlik kiritilishi shart',
+      }),
+    unitSize: Joi.number()
+      .min(0)
+      .allow(null)
+      .messages({
+        'number.min': 'Birlik o\'lchami 0 dan kichik bo\'la olmaydi',
+        'number.base': 'Birlik o\'lchami raqam bo\'lishi kerak',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .default('active')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+  updateBaseProduct: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(500)
+      .trim()
+      .messages({
+        'string.min': 'Maxsulot nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Maxsulot nomi 500 ta belgidan oshmasligi kerak',
+      }),
+    description: Joi.alternatives().try(
+      Joi.string().allow(''),
+      Joi.object(),
+      Joi.valid(null)
+    ),
+    images: Joi.array()
+      .items(Joi.string().pattern(/^data:image\/(png|jpg|jpeg|gif|webp);base64,/))
+      .max(5)
+      .messages({
+        'array.max': 'Maksimal 5 ta rasm yuklash mumkin',
+        'string.pattern.base': 'Rasmlar base64 formatida bo\'lishi kerak',
+      }),
+    category: Joi.string()
+      .messages({
+        'string.base': 'Kategoriya ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    subcategory: Joi.string()
+      .allow(null, '')
+      .messages({
+        'string.base': 'Sub kategoriya ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    unit: Joi.string()
+      .valid('dona', 'litr', 'kg')
+      .messages({
+        'any.only': 'Birlik "dona", "litr" yoki "kg" bo\'lishi kerak',
+      }),
+    unitSize: Joi.number()
+      .min(0)
+      .allow(null)
+      .messages({
+        'number.min': 'Birlik o\'lchami 0 dan kichik bo\'la olmaydi',
+        'number.base': 'Birlik o\'lchami raqam bo\'lishi kerak',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
   create: Joi.object({
     name: Joi.string()
       .min(2)
@@ -127,6 +238,65 @@ const adminValidationSchemas = {
         'string.empty': 'Parol kiritilishi shart',
       }),
   }),
+
+  // Maxalla Product validation schemas
+  createMaxallaProduct: Joi.object({
+    baseProductId: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Asosiy maxsulot ID kiritilishi shart',
+        'any.required': 'Asosiy maxsulot ID kiritilishi shart',
+      }),
+    quantity: Joi.number()
+      .min(0)
+      .required()
+      .messages({
+        'number.min': 'Miqdor 0 dan kichik bo\'la olmaydi',
+        'any.required': 'Miqdor kiritilishi shart',
+      }),
+    price: Joi.number()
+      .min(0)
+      .required()
+      .messages({
+        'number.min': 'Narx 0 dan kichik bo\'la olmaydi',
+        'any.required': 'Narx kiritilishi shart',
+      }),
+    originalPrice: Joi.number()
+      .min(0)
+      .required()
+      .messages({
+        'number.min': 'Asl narx 0 dan kichik bo\'la olmaydi',
+        'any.required': 'Asl narx kiritilishi shart',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .default('active')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+  updateMaxallaProduct: Joi.object({
+    quantity: Joi.number()
+      .min(0)
+      .messages({
+        'number.min': 'Miqdor 0 dan kichik bo\'la olmaydi',
+      }),
+    price: Joi.number()
+      .min(0)
+      .messages({
+        'number.min': 'Narx 0 dan kichik bo\'la olmaydi',
+      }),
+    originalPrice: Joi.number()
+      .min(0)
+      .messages({
+        'number.min': 'Asl narx 0 dan kichik bo\'la olmaydi',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
 };
 
 const regionValidationSchemas = {
@@ -205,7 +375,11 @@ const contragentValidationSchemas = {
       }),
     inn: Joi.string()
       .pattern(/^\d{9}$|^\d{12}$/)
-      .required()
+      .when('contragentLevel', {
+        is: Joi.string().valid('mfy'),
+        then: Joi.optional().allow(null, ''),
+        otherwise: Joi.required(),
+      })
       .messages({
         'string.empty': 'INN kiritilishi shart',
         'string.pattern.base': 'INN 9 yoki 12 ta raqamdan iborat bo\'lishi kerak',
@@ -245,6 +419,12 @@ const contragentValidationSchemas = {
       .messages({
         'string.pattern.base': 'Logo base64 formatida bo\'lishi kerak (data:image/png;base64,... yoki data:image/jpeg;base64,...)',
       }),
+    contragentLevel: Joi.string()
+      .valid('tuman', 'mfy')
+      .default('tuman')
+      .messages({
+        'any.only': 'Kontragent darajasi "tuman" yoki "mfy" bo\'lishi kerak',
+      }),
     status: Joi.string()
       .valid('active', 'inactive')
       .default('active')
@@ -264,6 +444,7 @@ const contragentValidationSchemas = {
       }),
     inn: Joi.string()
       .pattern(/^\d{9}$|^\d{12}$/)
+      .allow(null, '')
       .messages({
         'string.pattern.base': 'INN 9 yoki 12 ta raqamdan iborat bo\'lishi kerak',
       }),
@@ -298,6 +479,11 @@ const contragentValidationSchemas = {
     activityType: Joi.string()
       .messages({
         'string.base': 'Faoliyat turi ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    contragentLevel: Joi.string()
+      .valid('tuman', 'mfy')
+      .messages({
+        'any.only': 'Kontragent darajasi "tuman" yoki "mfy" bo\'lishi kerak',
       }),
     status: Joi.string()
       .valid('active', 'inactive')
@@ -335,6 +521,7 @@ const contragentValidationSchemas = {
       }),
     inn: Joi.string()
       .pattern(/^\d{9}$|^\d{12}$/)
+      .allow(null, '')
       .messages({
         'string.pattern.base': 'INN 9 yoki 12 ta raqamdan iborat bo\'lishi kerak',
       }),
@@ -362,6 +549,59 @@ const contragentValidationSchemas = {
       .messages({
         'any.required': 'Logo kiritilishi shart',
         'string.pattern.base': 'Logo base64 formatida bo\'lishi kerak (data:image/png;base64,... yoki data:image/jpeg;base64,...)',
+      }),
+  }),
+
+  updateDeliveryRegions: Joi.object({
+    deliveryRegions: Joi.array()
+      .items(
+        Joi.object({
+          viloyat: Joi.string()
+            .required()
+            .messages({
+              'any.required': 'Viloyat kiritilishi shart',
+              'string.base': 'Viloyat ID to\'g\'ri formatda bo\'lishi kerak',
+            }),
+          tuman: Joi.string()
+            .allow(null, '')
+            .messages({
+              'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
+            }),
+        })
+      )
+      .required()
+      .messages({
+        'any.required': 'Yetkazib berish hududlari kiritilishi shart',
+        'array.base': 'Yetkazib berish hududlari array bo\'lishi kerak',
+      }),
+  }),
+
+  updateWorkingHours: Joi.object({
+    open: Joi.string()
+      .pattern(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/)
+      .messages({
+        'string.pattern.base': 'Ochilish vaqti noto\'g\'ri format (HH:MM)',
+      }),
+    close: Joi.string()
+      .pattern(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/)
+      .messages({
+        'string.pattern.base': 'Yopilish vaqti noto\'g\'ri format (HH:MM)',
+      }),
+  }).or('open', 'close').messages({
+    'object.missing': 'Kamida bitta vaqt (open yoki close) kiritilishi kerak',
+  }),
+
+  updateServiceAreas: Joi.object({
+    tuman: Joi.string()
+      .messages({
+        'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    mfys: Joi.array()
+      .items(Joi.string())
+      .min(1)
+      .messages({
+        'array.min': 'Kamida bitta MFY tanlanishi kerak',
+        'array.base': 'MFYlar array formatida bo\'lishi kerak',
       }),
   }),
 
@@ -411,6 +651,114 @@ const contragentValidationSchemas = {
         'string.empty': 'Parol kiritilishi shart',
         'string.min': 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
         'any.required': 'Parol kiritilishi shart',
+      }),
+  }),
+
+  // Delivery Provider CRUD
+  createDeliveryProvider: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(200)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Yetkazib beruvchi nomi kiritilishi shart',
+        'string.min': 'Yetkazib beruvchi nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Yetkazib beruvchi nomi 200 ta belgidan oshmasligi kerak',
+        'any.required': 'Yetkazib beruvchi nomi kiritilishi shart',
+      }),
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+        'any.required': 'Telefon raqami kiritilishi shart',
+      }),
+    password: Joi.string()
+      .min(6)
+      .required()
+      .messages({
+        'string.empty': 'Parol kiritilishi shart',
+        'string.min': 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+        'any.required': 'Parol kiritilishi shart',
+      }),
+    notes: Joi.string()
+      .max(1000)
+      .allow(null, '')
+      .trim()
+      .messages({
+        'string.max': 'Eslatmalar 1000 ta belgidan oshmasligi kerak',
+      }),
+  }),
+
+  updateDeliveryProvider: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(200)
+      .trim()
+      .messages({
+        'string.min': 'Yetkazib beruvchi nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Yetkazib beruvchi nomi 200 ta belgidan oshmasligi kerak',
+      }),
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .messages({
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+      }),
+    password: Joi.string()
+      .min(6)
+      .messages({
+        'string.min': 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+    notes: Joi.string()
+      .max(1000)
+      .allow(null, '')
+      .trim()
+      .messages({
+        'string.max': 'Eslatmalar 1000 ta belgidan oshmasligi kerak',
+      }),
+  }),
+
+  respondToOrderRequest: Joi.object({
+    response: Joi.string()
+      .valid('accepted', 'rejected')
+      .required()
+      .messages({
+        'any.only': 'Javob "accepted" yoki "rejected" bo\'lishi kerak',
+        'any.required': 'Javob kiritilishi shart',
+        'string.empty': 'Javob kiritilishi shart',
+      }),
+  }),
+
+  sendOrderToDeliveryProvider: Joi.object({
+    deliveryProviderId: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Yetkazib beruvchi ID kiritilishi shart',
+        'any.required': 'Yetkazib beruvchi ID kiritilishi shart',
+      }),
+  }),
+
+  changePassword: Joi.object({
+    currentPassword: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Joriy parol kiritilishi shart',
+        'any.required': 'Joriy parol kiritilishi shart',
+      }),
+    newPassword: Joi.string()
+      .min(6)
+      .required()
+      .messages({
+        'string.empty': 'Yangi parol kiritilishi shart',
+        'string.min': 'Yangi parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+        'any.required': 'Yangi parol kiritilishi shart',
       }),
   }),
 };
@@ -1009,8 +1357,8 @@ const productValidationSchemas = {
       .messages({
         'any.only': 'Status "active", "inactive" yoki "archived" bo\'lishi kerak',
       }),
+    // deliveryRegions is not required - it's automatically taken from contragent profile
     deliveryRegions: Joi.array()
-      .min(1)
       .items(
         Joi.object({
           viloyat: Joi.string()
@@ -1025,16 +1373,10 @@ const productValidationSchemas = {
               'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
             }),
         })
-          .required()
-          .messages({
-            'any.required': 'Yetkazib berish xududi obyekti kiritilishi shart',
-          })
       )
-      .required()
+      .allow(null)
       .messages({
         'array.base': 'Yetkazib berish xududlari massiv bo\'lishi kerak',
-        'array.min': 'Kamida bitta yetkazib berish xududi kiritilishi shart',
-        'any.required': 'Yetkazib berish xududlari kiritilishi shart',
       }),
     kpiBonusPercent: Joi.number()
       .min(0)
@@ -1137,8 +1479,8 @@ const productValidationSchemas = {
       .messages({
         'any.only': 'Status "active", "inactive" yoki "archived" bo\'lishi kerak',
       }),
+    // deliveryRegions is not required - it's automatically taken from contragent profile
     deliveryRegions: Joi.array()
-      .min(1)
       .items(
         Joi.object({
           viloyat: Joi.string()
@@ -1153,16 +1495,10 @@ const productValidationSchemas = {
               'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
             }),
         })
-          .required()
-          .messages({
-            'any.required': 'Yetkazib berish xududi obyekti kiritilishi shart',
-          })
       )
-      .required()
+      .allow(null)
       .messages({
         'array.base': 'Yetkazib berish xududlari massiv bo\'lishi kerak',
-        'array.min': 'Kamida bitta yetkazib berish xududi kiritilishi shart',
-        'any.required': 'Yetkazib berish xududlari kiritilishi shart',
       }),
     kpiBonusPercent: Joi.number()
       .min(0)
@@ -1529,6 +1865,7 @@ const marketplaceProfileValidationSchemas = {
 
   updateViloyatTuman: Joi.object({
     viloyat: Joi.string()
+      .allow(null, '')
       .messages({
         'string.base': 'Viloyat ID to\'g\'ri formatda bo\'lishi kerak',
       }),
@@ -1536,6 +1873,11 @@ const marketplaceProfileValidationSchemas = {
       .allow(null, '')
       .messages({
         'string.base': 'Tuman ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    mfy: Joi.string()
+      .allow(null, '')
+      .messages({
+        'string.base': 'MFY ID to\'g\'ri formatda bo\'lishi kerak',
       }),
   }),
 };
@@ -1969,6 +2311,10 @@ module.exports = {
   regionValidationSchemas,
   contragentValidationSchemas,
   contragentTypeValidationSchemas,
+  deliveryProviderValidationSchemas: {
+    create: contragentValidationSchemas.createDeliveryProvider,
+    update: contragentValidationSchemas.updateDeliveryProvider,
+  },
   agentValidationSchemas,
   punktValidationSchemas,
   categoryValidationSchemas,

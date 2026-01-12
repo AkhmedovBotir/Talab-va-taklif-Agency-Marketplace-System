@@ -17,12 +17,11 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QuillEditor, { QuillEditorRef } from '../../../../components/QuillEditor';
-import { apiService, Category, DeliveryRegion, DeltaFormat, Product } from '../../../../services/api';
+import { apiService, Category, DeltaFormat, Product } from '../../../../services/api';
 import { formatNumberInput, unformatNumber } from '../../../../utils/formatNumber';
 
 export default function ProductEditScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>();
-  const params = useLocalSearchParams<{ selectedRegions?: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Category[]>([]);
@@ -51,7 +50,7 @@ export default function ProductEditScreen() {
   const [width, setWidth] = useState('');
   const [weight, setWeight] = useState('');
   const [kpiBonusPercent, setKpiBonusPercent] = useState('');
-  const [deliveryRegions, setDeliveryRegions] = useState<DeliveryRegion[]>([]);
+  const isModalOpen = useRef(false);
   const quillRef = useRef<QuillEditorRef>(null);
 
   const loadProduct = useCallback(async () => {
@@ -75,15 +74,6 @@ export default function ProductEditScreen() {
       setWidth(prod.width?.toString() || '');
       setWeight(prod.weight?.toString() || '');
       setKpiBonusPercent(prod.kpiBonusPercent?.toString() || '0');
-      
-      // Load delivery regions
-      if (prod.deliveryRegions && prod.deliveryRegions.length > 0) {
-        const regions: DeliveryRegion[] = prod.deliveryRegions.map((dr: any) => ({
-          viloyat: typeof dr.viloyat === 'string' ? dr.viloyat : dr.viloyat._id,
-          tuman: dr.tuman ? (typeof dr.tuman === 'string' ? dr.tuman : dr.tuman._id) : null,
-        }));
-        setDeliveryRegions(regions);
-      }
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Maxsulotni yuklashda xatolik');
       router.push('/(tabs)/ombor/' as any);
@@ -185,19 +175,6 @@ export default function ProductEditScreen() {
     }
   }, [product]);
 
-  useFocusEffect(
-    useCallback(() => {
-      // Get selected regions from params if coming back from region selection
-      if (params?.selectedRegions) {
-        try {
-          const regions = JSON.parse(params.selectedRegions);
-          setDeliveryRegions(regions);
-        } catch (e) {
-          console.error('Error parsing regions:', e);
-        }
-      }
-    }, [params?.selectedRegions])
-  );
 
   const pickImage = async () => {
     if (images.length >= 5) {
@@ -244,16 +221,6 @@ export default function ProductEditScreen() {
     setImages(images.filter((_, i) => i !== index));
   };
 
-  const handleSelectRegions = () => {
-    router.push({
-      pathname: '/(tabs)/ombor/product/select-regions' as any,
-      params: {
-        selectedRegions: JSON.stringify(deliveryRegions),
-        returnPath: `/(tabs)/ombor/product/edit?productId=${productId}`,
-      },
-    });
-  };
-
   const handleUpdate = async () => {
     if (!product || !name.trim() || !price || !originalPrice || !quantity || !kpiBonusPercent) {
       Alert.alert('Xatolik', 'Barcha majburiy maydonlarni to\'ldiring');
@@ -297,7 +264,6 @@ export default function ProductEditScreen() {
         width: width ? parseFloat(width) : null,
         weight: weight ? parseFloat(weight) : null,
         kpiBonusPercent: parseFloat(kpiBonusPercent),
-        deliveryRegions: deliveryRegions.length > 0 ? deliveryRegions : undefined,
       });
       Alert.alert('Muvaffaqiyat', 'Maxsulot muvaffaqiyatli yangilandi', [
         {
@@ -408,6 +374,7 @@ export default function ProductEditScreen() {
                   },
                 ]);
               } else {
+                isModalOpen.current = true;
                 setShowCategoryModal(true);
               }
             }}
@@ -424,7 +391,10 @@ export default function ProductEditScreen() {
               <Text style={styles.label}>Sub kategoriya (ixtiyoriy)</Text>
               <TouchableOpacity
                 style={styles.selectButton}
-                onPress={() => setShowSubcategoryModal(true)}
+                onPress={() => {
+                  isModalOpen.current = true;
+                  setShowSubcategoryModal(true);
+                }}
                 disabled={loadingSubcategories}
               >
                 {loadingSubcategories ? (
@@ -447,7 +417,10 @@ export default function ProductEditScreen() {
           visible={showCategoryModal}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowCategoryModal(false)}
+          onRequestClose={() => {
+            isModalOpen.current = false;
+            setShowCategoryModal(false);
+          }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -455,6 +428,7 @@ export default function ProductEditScreen() {
                 <Text style={styles.modalTitle}>Kategoriyani tanlang</Text>
                 <TouchableOpacity
                   onPress={() => {
+                    isModalOpen.current = false;
                     setShowCategoryModal(false);
                     setCategorySearchQuery('');
                   }}
@@ -496,6 +470,7 @@ export default function ProductEditScreen() {
                       categoryId === item._id && styles.modalItemActive,
                     ]}
                     onPress={() => {
+                      isModalOpen.current = false;
                       setCategoryId(item._id);
                       setSubcategoryId(null);
                       setShowCategoryModal(false);
@@ -551,7 +526,10 @@ export default function ProductEditScreen() {
           visible={showSubcategoryModal}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowSubcategoryModal(false)}
+          onRequestClose={() => {
+            isModalOpen.current = false;
+            setShowSubcategoryModal(false);
+          }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -559,6 +537,7 @@ export default function ProductEditScreen() {
                 <Text style={styles.modalTitle}>Sub kategoriyani tanlang</Text>
                 <TouchableOpacity
                   onPress={() => {
+                    isModalOpen.current = false;
                     setShowSubcategoryModal(false);
                     setSubcategorySearchQuery('');
                   }}
@@ -600,6 +579,7 @@ export default function ProductEditScreen() {
                       (subcategoryId === item._id || (item._id === 'none' && subcategoryId === null)) && styles.modalItemActive,
                     ]}
                     onPress={() => {
+                      isModalOpen.current = false;
                       setSubcategoryId(item._id === 'none' ? null : item._id);
                       setShowSubcategoryModal(false);
                       setSubcategorySearchQuery('');
@@ -782,27 +762,6 @@ export default function ProductEditScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </View>
-
-        {/* Yetkazib berish hududlari blok */}
-        <View style={styles.block}>
-          <Text style={styles.blockTitle}>Yetkazib berish hududlari</Text>
-          <TouchableOpacity style={styles.regionButton} onPress={handleSelectRegions}>
-            <Ionicons name="location-outline" size={24} color="#007AFF" />
-            <View style={styles.regionButtonTextContainer}>
-              <Text style={styles.regionButtonText}>
-                {deliveryRegions.length > 0
-                  ? `${deliveryRegions.length} ta hudud tanlangan`
-                  : 'Hududlarni tanlash'}
-              </Text>
-              {deliveryRegions.length > 0 && (
-                <Text style={styles.regionButtonSubtext} numberOfLines={2}>
-                  {deliveryRegions.length} ta hudud
-                </Text>
-              )}
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
-          </TouchableOpacity>
         </View>
 
         {/* Save Button */}

@@ -96,3 +96,4 @@ const SelectAssignmentTypeModal = ({ open, onClose, onSelectPunkt, onSelectAgent
 
 export default SelectAssignmentTypeModal;
 
+

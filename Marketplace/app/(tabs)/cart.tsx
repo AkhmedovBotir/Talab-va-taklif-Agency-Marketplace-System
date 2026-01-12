@@ -23,21 +23,42 @@ export default function CartScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
-  const { cart, isLoading, refreshCart, updateCartItem, removeFromCart, clearCart } = useCart();
+  const { 
+    tumanCart, 
+    maxallaCart, 
+    isLoading, 
+    activeCartType, 
+    setActiveCartType,
+    refreshCart, 
+    updateCartItem, 
+    removeFromCart, 
+    clearCart,
+    getCart
+  } = useCart();
   const { unreadCount } = useNotification();
   const [refreshing, setRefreshing] = React.useState(false);
 
+  const cart = getCart(activeCartType);
+
   useEffect(() => {
     if (isAuthenticated) {
-      refreshCart();
+      refreshCart('tuman');
+      refreshCart('maxalla');
     }
   }, [isAuthenticated, refreshCart]);
 
+  // Refresh cart when switching tabs
+  useEffect(() => {
+    if (isAuthenticated && activeCartType) {
+      refreshCart(activeCartType);
+    }
+  }, [activeCartType, isAuthenticated, refreshCart]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshCart();
+    await refreshCart(activeCartType);
     setRefreshing(false);
-  }, [refreshCart]);
+  }, [refreshCart, activeCartType]);
 
   const handleQuantityChange = async (item: CartItem, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -50,7 +71,7 @@ export default function CartScreen() {
     }
 
     try {
-      await updateCartItem(item.product._id, newQuantity);
+      await updateCartItem(item.product._id, newQuantity, activeCartType);
     } catch (error) {
       // Error is already shown in context
     }
@@ -67,7 +88,7 @@ export default function CartScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeFromCart(item.product._id);
+              await removeFromCart(item.product._id, activeCartType);
             } catch (error) {
               // Error is already shown in context
             }
@@ -92,7 +113,7 @@ export default function CartScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await clearCart();
+              await clearCart(activeCartType);
             } catch (error) {
               // Error is already shown in context
             }
@@ -110,6 +131,51 @@ export default function CartScreen() {
     router.push('/notifications' as any);
   };
 
+  const renderTabs = () => {
+    return (
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeCartType === 'tuman' && styles.tabActive]}
+          onPress={() => setActiveCartType('tuman')}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="storefront" 
+            size={20} 
+            color={activeCartType === 'tuman' ? '#007AFF' : '#666'} 
+          />
+          <Text style={[styles.tabText, activeCartType === 'tuman' && styles.tabTextActive]}>
+            Tuman Korzinkasi
+          </Text>
+          {tumanCart && tumanCart.items && tumanCart.items.length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{tumanCart.totalItems}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeCartType === 'maxalla' && styles.tabActive]}
+          onPress={() => setActiveCartType('maxalla')}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="home" 
+            size={20} 
+            color={activeCartType === 'maxalla' ? '#007AFF' : '#666'} 
+          />
+          <Text style={[styles.tabText, activeCartType === 'maxalla' && styles.tabTextActive]}>
+            Maxalla Korzinkasi
+          </Text>
+          {maxallaCart && maxallaCart.items && maxallaCart.items.length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{maxallaCart.totalItems}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
@@ -118,6 +184,7 @@ export default function CartScreen() {
           onNotificationPress={handleNotificationPress}
           unreadCount={unreadCount}
         />
+        {renderTabs()}
         <View style={styles.emptyContainer}>
           <Ionicons name="cart-outline" size={64} color="#ccc" />
           <Text style={styles.emptyText}>Korzinkaga qo'shish uchun tizimga kiring</Text>
@@ -140,6 +207,7 @@ export default function CartScreen() {
           onNotificationPress={handleNotificationPress}
           unreadCount={unreadCount}
         />
+        {renderTabs()}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
         </View>
@@ -147,7 +215,7 @@ export default function CartScreen() {
     );
   }
 
-  if (!cart || cart.items.length === 0) {
+  if (!cart || !cart.items || cart.items.length === 0) {
     return (
       <View style={styles.container}>
         <Header
@@ -155,9 +223,12 @@ export default function CartScreen() {
           onNotificationPress={handleNotificationPress}
           unreadCount={unreadCount}
         />
+        {renderTabs()}
         <View style={styles.emptyContainer}>
           <Ionicons name="cart-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>Korzinka bo'sh</Text>
+          <Text style={styles.emptyText}>
+            {activeCartType === 'tuman' ? 'Tuman korzinkasi bo\'sh' : 'Maxalla korzinkasi bo\'sh'}
+          </Text>
           <TouchableOpacity
             style={styles.shopButton}
             onPress={() => router.push('/(tabs)' as any)}
@@ -250,12 +321,13 @@ export default function CartScreen() {
     );
   };
 
+
   return (
     <View style={styles.container}>
       <Header
         title="Korzinka"
         rightButton={
-          cart.items.length > 0 ? (
+          cart && cart.items && cart.items.length > 0 ? (
             <TouchableOpacity
               style={styles.headerClearButton}
               onPress={handleClearCart}
@@ -274,9 +346,10 @@ export default function CartScreen() {
           )
         }
       />
+      {renderTabs()}
 
       <FlatList
-        data={cart.items}
+        data={cart?.items || []}
         renderItem={renderItem}
         keyExtractor={(item) => item.product._id}
         contentContainerStyle={[
@@ -299,9 +372,9 @@ export default function CartScreen() {
         <View style={styles.summaryContent}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Jami mahsulotlar:</Text>
-            <Text style={styles.summaryValue}>{cart.totalItems} ta</Text>
+            <Text style={styles.summaryValue}>{cart?.totalItems || 0} ta</Text>
           </View>
-          {cart.totalDiscount > 0 && (
+          {cart && cart.totalDiscount > 0 && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Chegirma:</Text>
               <Text style={styles.discountValue}>
@@ -311,12 +384,15 @@ export default function CartScreen() {
           )}
           <View style={styles.summaryRow}>
             <Text style={styles.totalLabel}>Umumiy:</Text>
-            <Text style={styles.totalValue}>{formatPrice(cart.totalPrice)}</Text>
+            <Text style={styles.totalValue}>{formatPrice(cart?.totalPrice || 0)}</Text>
           </View>
         </View>
         <TouchableOpacity
           style={styles.checkoutButton}
-          onPress={() => router.push('/checkout' as any)}
+          onPress={() => router.push({
+            pathname: '/checkout',
+            params: { productType: activeCartType }
+          } as any)}
         >
           <Text style={styles.checkoutButtonText}>Buyurtma berish</Text>
         </TouchableOpacity>
@@ -542,6 +618,54 @@ const styles = StyleSheet.create({
   checkoutButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e7',
+    gap: 12,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#f5f5f5',
+    gap: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  tabActive: {
+    backgroundColor: '#e6f3ff',
+    borderColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  tabTextActive: {
+    color: '#007AFF',
+  },
+  tabBadge: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
     color: '#fff',
   },
 });

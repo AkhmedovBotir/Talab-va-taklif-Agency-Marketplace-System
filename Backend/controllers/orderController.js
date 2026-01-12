@@ -1,8 +1,77 @@
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const MaxallaProduct = require('../models/MaxallaProduct');
+const BaseProduct = require('../models/BaseProduct');
 const MarketplaceUser = require('../models/MarketplaceUser');
 const Region = require('../models/Region');
+
+// Helper function to populate order item product based on type
+const populateOrderItemProduct = async (item) => {
+  if (item.productType === 'maxalla') {
+    const maxallaProduct = await MaxallaProduct.findById(item.product)
+      .populate({
+        path: 'baseProduct',
+        select: 'name description images category subcategory unit unitSize status',
+        populate: [
+          { path: 'category', select: 'name slug status' },
+          { path: 'subcategory', select: 'name slug status' },
+        ],
+      })
+      .populate({
+        path: 'contragent',
+        select: 'name phone viloyat tuman mfy status',
+        populate: [
+          { path: 'viloyat', select: 'name type code' },
+          { path: 'tuman', select: 'name type code' },
+          { path: 'mfy', select: 'name type code' },
+        ],
+      });
+
+    if (!maxallaProduct) return null;
+
+    // Transform to marketplace format
+    const bp = maxallaProduct.baseProduct;
+    return {
+      _id: maxallaProduct._id,
+      name: bp.name,
+      description: bp.description,
+      images: bp.images,
+      price: maxallaProduct.price,
+      originalPrice: maxallaProduct.originalPrice,
+      quantity: maxallaProduct.quantity,
+      unit: bp.unit,
+      unitSize: bp.unitSize,
+      category: bp.category,
+      subcategory: bp.subcategory,
+      contragent: maxallaProduct.contragent,
+      status: maxallaProduct.status,
+      productType: 'maxalla',
+    };
+  } else {
+    const product = await Product.findById(item.product)
+      .populate('category', 'name slug status')
+      .populate('subcategory', 'name slug status')
+      .populate({
+        path: 'contragent',
+        select: 'name phone viloyat tuman mfy status',
+        populate: [
+          { path: 'viloyat', select: 'name type code' },
+          { path: 'tuman', select: 'name type code' },
+          { path: 'mfy', select: 'name type code' },
+        ],
+      })
+      .populate('deliveryRegions.viloyat', 'name type code')
+      .populate('deliveryRegions.tuman', 'name type code');
+
+    if (!product) return null;
+
+    const productObj = product.toObject();
+    delete productObj.kpiBonusPercent;
+    productObj.productType = 'tuman';
+    return productObj;
+  }
+};
 
 // Create order from cart
 const createOrder = async (req, res) => {
@@ -130,11 +199,8 @@ const createOrder = async (req, res) => {
       throw regionError; // Re-throw if it's a different error
     }
 
-    // Get user's cart
-    const cart = await Cart.findOne({ user: userId }).populate({
-      path: 'items.product',
-      select: 'name price originalPrice kpiBonusPercent quantity status',
-    });
+    // Get user's tuman cart (without populate - we'll handle it manually)
+    const cart = await Cart.findOne({ user: userId, cartType: 'tuman' });
 
     if (!cart || !cart.items || cart.items.length === 0) {
       return res.status(400).json({
@@ -160,17 +226,41 @@ const createOrder = async (req, res) => {
     let itemCount = 0;
 
     for (const cartItem of cart.items) {
-      const product = cartItem.product;
+      const productType = cartItem.productType || 'tuman';
+      let product;
+
+      // Get product based on type
+      if (productType === 'maxalla') {
+        product = await MaxallaProduct.findById(cartItem.product);
+        if (!product) {
+          return res.status(400).json({
+            success: false,
+            message: 'Ba\'zi maxalla maxsulotlar topilmadi',
+          });
+        }
+      } else {
+        product = await Product.findById(cartItem.product);
+        if (!product) {
+          return res.status(400).json({
+            success: false,
+            message: 'Ba\'zi maxsulotlar topilmadi',
+          });
+        }
+      }
 
       // Check if product exists and is active
-      if (!product) {
+      if (product.status !== 'active') {
+        const productName = productType === 'maxalla' 
+          ? (product.baseProduct?.name || 'Maxalla maxsulot')
+          : product.name;
         return res.status(400).json({
           success: false,
-          message: 'Ba\'zi maxsulotlar topilmadi',
+          message: `Maxsulot "${productName}" hozir mavjud emas`,
         });
       }
 
-      if (product.status !== 'active') {
+      // For tuman products, also check moderationStatus
+      if (productType === 'tuman' && product.moderationStatus !== 'approved') {
         return res.status(400).json({
           success: false,
           message: `Maxsulot "${product.name}" hozir mavjud emas`,
@@ -179,23 +269,30 @@ const createOrder = async (req, res) => {
 
       // Check if product has enough quantity
       if (product.quantity < cartItem.quantity) {
+        const productName = productType === 'maxalla' 
+          ? (product.baseProduct?.name || 'Maxalla maxsulot')
+          : product.name;
         return res.status(400).json({
           success: false,
-          message: `Maxsulot "${product.name}" uchun mavjud miqdor: ${product.quantity}. Siz ${cartItem.quantity} ta so\'rayapsiz`,
+          message: `Maxsulot "${productName}" uchun mavjud miqdor: ${product.quantity}. Siz ${cartItem.quantity} ta so\'rayapsiz`,
         });
       }
 
       // Calculate prices
       const itemPrice = product.price * cartItem.quantity;
       const itemOriginalPrice = product.originalPrice * cartItem.quantity;
-      const itemKpiPrice = (itemPrice * product.kpiBonusPercent) / 100;
+      const itemKpiPrice = productType === 'tuman' && product.kpiBonusPercent
+        ? (itemPrice * product.kpiBonusPercent) / 100
+        : 0;
 
       orderItems.push({
         product: product._id,
+        productType,
+        productModel: productType === 'maxalla' ? 'MaxallaProduct' : 'Product',
         quantity: cartItem.quantity,
         price: product.price,
         originalPrice: product.originalPrice,
-        kpiBonusPercent: product.kpiBonusPercent,
+        kpiBonusPercent: productType === 'tuman' ? (product.kpiBonusPercent || 0) : null,
       });
 
       totalPrice += itemPrice;
@@ -212,9 +309,15 @@ const createOrder = async (req, res) => {
 
     // Decrease product quantities (reserve products for order)
     for (const item of orderItems) {
-      await Product.findByIdAndUpdate(item.product, {
-        $inc: { quantity: -item.quantity },
-      });
+      if (item.productType === 'maxalla') {
+        await MaxallaProduct.findByIdAndUpdate(item.product, {
+          $inc: { quantity: -item.quantity },
+        });
+      } else {
+        await Product.findByIdAndUpdate(item.product, {
+          $inc: { quantity: -item.quantity },
+        });
+      }
     }
 
     // Find punkt in customer's district to automatically assign order
@@ -264,39 +367,6 @@ const createOrder = async (req, res) => {
       await cart.save();
     }
 
-    // Populate order items and delivery regions
-    await order.populate({
-      path: 'items.product',
-      select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-      populate: [
-        {
-          path: 'category',
-          select: 'name slug status',
-        },
-        {
-          path: 'subcategory',
-          select: 'name slug status',
-        },
-        {
-          path: 'contragent',
-          select: 'name phone viloyat tuman mfy status',
-          populate: [
-            { path: 'viloyat', select: 'name type code' },
-            { path: 'tuman', select: 'name type code' },
-            { path: 'mfy', select: 'name type code' },
-          ],
-        },
-        {
-          path: 'deliveryRegions.viloyat',
-          select: 'name type code',
-        },
-        {
-          path: 'deliveryRegions.tuman',
-          select: 'name type code',
-        },
-      ],
-    });
-
     // Populate delivery regions
     await order.populate([
       { path: 'deliveryViloyat', select: 'name type code' },
@@ -304,20 +374,19 @@ const createOrder = async (req, res) => {
       { path: 'deliveryMfy', select: 'name type code' },
     ]);
 
-    // Remove kpiBonusPercent from product objects in response
+    // Populate order items manually (supports both product types)
     const orderObj = order.toObject();
-    orderObj.items = orderObj.items.map((item) => {
-      if (item.product) {
-        // Check if product is a Mongoose document or already an object
-        const productObj = item.product.toObject ? item.product.toObject() : item.product;
-        delete productObj.kpiBonusPercent;
-        return {
+    const populatedItems = [];
+    for (const item of orderObj.items) {
+      const populatedProduct = await populateOrderItemProduct(item);
+      if (populatedProduct) {
+        populatedItems.push({
           ...item,
-          product: productObj,
-        };
+          product: populatedProduct,
+        });
       }
-      return item;
-    });
+    }
+    orderObj.items = populatedItems;
 
     // Invalidate cache
 
@@ -401,29 +470,6 @@ const getOrders = async (req, res) => {
     const total = await Order.countDocuments(filter);
 
     const orders = await Order.find(filter)
-      .populate({
-        path: 'items.product',
-        select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-        populate: [
-          {
-            path: 'category',
-            select: 'name slug status',
-          },
-          {
-            path: 'subcategory',
-            select: 'name slug status',
-          },
-          {
-            path: 'contragent',
-            select: 'name phone viloyat tuman mfy status',
-            populate: [
-              { path: 'viloyat', select: 'name type code' },
-              { path: 'tuman', select: 'name type code' },
-              { path: 'mfy', select: 'name type code' },
-            ],
-          },
-        ],
-      })
       .populate([
         { path: 'deliveryViloyat', select: 'name type code' },
         { path: 'deliveryTuman', select: 'name type code' },
@@ -433,23 +479,23 @@ const getOrders = async (req, res) => {
       .skip(skip)
       .limit(limitNum);
 
-    // Remove kpiBonusPercent from product objects
-    const ordersWithoutKpi = orders.map((order) => {
+    // Populate order items manually (supports both product types)
+    const ordersWithoutKpi = [];
+    for (const order of orders) {
       const orderObj = order.toObject();
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product) {
-          // Check if product is a Mongoose document or already an object
-          const productObj = item.product.toObject ? item.product.toObject() : item.product;
-          delete productObj.kpiBonusPercent;
-          return {
+      const populatedItems = [];
+      for (const item of orderObj.items) {
+        const populatedProduct = await populateOrderItemProduct(item);
+        if (populatedProduct) {
+          populatedItems.push({
             ...item,
-            product: productObj,
-          };
+            product: populatedProduct,
+          });
         }
-        return item;
-      });
-      return orderObj;
-    });
+      }
+      orderObj.items = populatedItems;
+      ordersWithoutKpi.push(orderObj);
+    }
 
     res.status(200).json({
       success: true,
@@ -486,37 +532,6 @@ const getOrderById = async (req, res) => {
     const { id } = req.params;
 
     const order = await Order.findOne({ _id: id, user: userId })
-      .populate({
-      path: 'items.product',
-      select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-      populate: [
-        {
-          path: 'category',
-          select: 'name slug status',
-        },
-        {
-          path: 'subcategory',
-          select: 'name slug status',
-        },
-        {
-          path: 'contragent',
-          select: 'name phone viloyat tuman mfy status',
-          populate: [
-            { path: 'viloyat', select: 'name type code' },
-            { path: 'tuman', select: 'name type code' },
-            { path: 'mfy', select: 'name type code' },
-          ],
-        },
-        {
-          path: 'deliveryRegions.viloyat',
-          select: 'name type code',
-        },
-        {
-          path: 'deliveryRegions.tuman',
-          select: 'name type code',
-        },
-      ],
-      })
       .populate([
         { path: 'deliveryViloyat', select: 'name type code' },
         { path: 'deliveryTuman', select: 'name type code' },
@@ -530,20 +545,19 @@ const getOrderById = async (req, res) => {
       });
     }
 
-    // Remove kpiBonusPercent from product objects
+    // Populate order items manually (supports both product types)
     const orderObj = order.toObject();
-    orderObj.items = orderObj.items.map((item) => {
-      if (item.product) {
-        // Check if product is a Mongoose document or already an object
-        const productObj = item.product.toObject ? item.product.toObject() : item.product;
-        delete productObj.kpiBonusPercent;
-        return {
+    const populatedItems = [];
+    for (const item of orderObj.items) {
+      const populatedProduct = await populateOrderItemProduct(item);
+      if (populatedProduct) {
+        populatedItems.push({
           ...item,
-          product: productObj,
-        };
+          product: populatedProduct,
+        });
       }
-      return item;
-    });
+    }
+    orderObj.items = populatedItems;
 
     res.status(200).json({
       success: true,
@@ -590,62 +604,43 @@ const cancelOrder = async (req, res) => {
       });
     }
 
-    // Return products to inventory
+    // Return products to inventory (supports both types)
     for (const item of order.items) {
-      await Product.findByIdAndUpdate(item.product, {
-        $inc: { quantity: item.quantity },
-      });
+      if (item.productType === 'maxalla') {
+        await MaxallaProduct.findByIdAndUpdate(item.product, {
+          $inc: { quantity: item.quantity },
+        });
+      } else {
+        await Product.findByIdAndUpdate(item.product, {
+          $inc: { quantity: item.quantity },
+        });
+      }
     }
 
     // Update order status to cancelled
     order.status = 'cancelled';
     await order.save();
 
-    // Populate order items and delivery regions
-    await order.populate({
-      path: 'items.product',
-      select: 'name price originalPrice images category subcategory contragent quantity unit unitSize status deliveryRegions productCode',
-      populate: [
-        {
-          path: 'category',
-          select: 'name slug status',
-        },
-        {
-          path: 'subcategory',
-          select: 'name slug status',
-        },
-        {
-          path: 'contragent',
-          select: 'name phone viloyat tuman mfy status',
-          populate: [
-            { path: 'viloyat', select: 'name type code' },
-            { path: 'tuman', select: 'name type code' },
-            { path: 'mfy', select: 'name type code' },
-          ],
-        },
-      ],
-    });
-
+    // Populate delivery regions
     await order.populate([
       { path: 'deliveryViloyat', select: 'name type code' },
       { path: 'deliveryTuman', select: 'name type code' },
       { path: 'deliveryMfy', select: 'name type code' },
     ]);
 
-    // Remove kpiBonusPercent from product objects
+    // Populate order items manually (supports both product types)
     const orderObj = order.toObject();
-    orderObj.items = orderObj.items.map((item) => {
-      if (item.product) {
-        // Check if product is a Mongoose document or already an object
-        const productObj = item.product.toObject ? item.product.toObject() : item.product;
-        delete productObj.kpiBonusPercent;
-        return {
+    const populatedItems = [];
+    for (const item of orderObj.items) {
+      const populatedProduct = await populateOrderItemProduct(item);
+      if (populatedProduct) {
+        populatedItems.push({
           ...item,
-          product: productObj,
-        };
+          product: populatedProduct,
+        });
       }
-      return item;
-    });
+    }
+    orderObj.items = populatedItems;
 
     // Invalidate cache
 
@@ -804,8 +799,354 @@ const confirmDelivery = async (req, res) => {
   }
 };
 
+// Create order from maxalla cart
+const createMaxallaOrder = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const {
+      paymentMethod,
+      deliveryViloyat,
+      deliveryTuman,
+      deliveryMfy,
+      deliveryNote,
+      phoneNumber,
+      clearCart = true,
+    } = req.body;
+
+    // Validate required fields
+    if (!paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'To\'lov usuli kiritilishi shart',
+        errors: [
+          {
+            field: 'paymentMethod',
+            message: 'To\'lov usuli kiritilishi shart',
+          },
+        ],
+      });
+    }
+
+    if (!deliveryViloyat) {
+      return res.status(400).json({
+        success: false,
+        message: 'Yetkazib berish viloyati kiritilishi shart',
+        errors: [
+          {
+            field: 'deliveryViloyat',
+            message: 'Yetkazib berish viloyati kiritilishi shart',
+          },
+        ],
+      });
+    }
+
+    // Validate region IDs
+    try {
+      const viloyat = await Region.findById(deliveryViloyat);
+      if (!viloyat) {
+        return res.status(400).json({
+          success: false,
+          message: 'Viloyat topilmadi',
+        });
+      }
+      if (viloyat.type !== 'region') {
+        return res.status(400).json({
+          success: false,
+          message: 'Noto\'g\'ri viloyat ID - bu region emas',
+        });
+      }
+
+      if (deliveryTuman) {
+        const tuman = await Region.findById(deliveryTuman).populate('parent');
+        if (!tuman) {
+          return res.status(400).json({
+            success: false,
+            message: 'Tuman topilmadi',
+          });
+        }
+        if (tuman.type !== 'district') {
+          return res.status(400).json({
+            success: false,
+            message: 'Noto\'g\'ri tuman ID - bu district emas',
+          });
+        }
+        if (tuman.parent && tuman.parent._id.toString() !== deliveryViloyat.toString()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Tuman viloyatga tegishli emas',
+          });
+        }
+      }
+
+      if (deliveryMfy) {
+        const mfy = await Region.findById(deliveryMfy).populate('parent');
+        if (!mfy) {
+          return res.status(400).json({
+            success: false,
+            message: 'MFY topilmadi',
+          });
+        }
+        if (mfy.type !== 'mfy') {
+          return res.status(400).json({
+            success: false,
+            message: 'Noto\'g\'ri MFY ID - bu MFY emas',
+          });
+        }
+        if (deliveryTuman && mfy.parent && mfy.parent._id.toString() !== deliveryTuman.toString()) {
+          return res.status(400).json({
+            success: false,
+            message: 'MFY tumanaga tegishli emas',
+          });
+        }
+      }
+    } catch (regionError) {
+      if (regionError.name === 'CastError') {
+        return res.status(400).json({
+          success: false,
+          message: 'Noto\'g\'ri region ID formati',
+        });
+      }
+      throw regionError;
+    }
+
+    // Get user's maxalla cart
+    const cart = await Cart.findOne({ user: userId, cartType: 'maxalla' });
+
+    if (!cart || !cart.items || cart.items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maxalla korzinka bo\'sh',
+      });
+    }
+
+    // Get user for default phone number
+    const user = await MarketplaceUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Foydalanuvchi topilmadi',
+      });
+    }
+
+    // Validate and prepare order items
+    const orderItems = [];
+    let totalPrice = 0;
+    let totalOriginalPrice = 0;
+    let totalKpiPrice = 0; // Maxalla products don't have KPI
+    let itemCount = 0;
+
+    for (const cartItem of cart.items) {
+      // Only process maxalla products
+      if (cartItem.productType !== 'maxalla') continue;
+
+      const product = await MaxallaProduct.findById(cartItem.product)
+        .populate('baseProduct', 'name');
+
+      // Check if product exists and is active
+      if (!product) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ba\'zi maxalla maxsulotlar topilmadi',
+        });
+      }
+
+      if (product.status !== 'active') {
+        const productName = product.baseProduct?.name || 'Maxalla maxsulot';
+        return res.status(400).json({
+          success: false,
+          message: `Maxalla maxsuloti "${productName}" hozir mavjud emas`,
+        });
+      }
+
+      // Check if product has enough quantity
+      if (product.quantity < cartItem.quantity) {
+        const productName = product.baseProduct?.name || 'Maxalla maxsulot';
+        return res.status(400).json({
+          success: false,
+          message: `Maxalla maxsuloti "${productName}" uchun mavjud miqdor: ${product.quantity}. Siz ${cartItem.quantity} ta so\'rayapsiz`,
+        });
+      }
+
+      // Calculate prices
+      const itemPrice = product.price * cartItem.quantity;
+      const itemOriginalPrice = product.originalPrice * cartItem.quantity;
+
+      orderItems.push({
+        product: product._id,
+        productType: 'maxalla',
+        productModel: 'MaxallaProduct',
+        quantity: cartItem.quantity,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        kpiBonusPercent: null, // Maxalla products don't have KPI
+      });
+
+      totalPrice += itemPrice;
+      totalOriginalPrice += itemOriginalPrice;
+      totalKpiPrice += 0; // No KPI for maxalla products
+      itemCount += cartItem.quantity;
+    }
+
+    if (orderItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maxalla korzinkada maxalla maxsulotlari yo\'q',
+      });
+    }
+
+    // Generate order number
+    const orderNumber = await Order.generateOrderNumber();
+
+    // Use provided phone number or user's default phone
+    const orderPhoneNumber = phoneNumber || user.phone;
+
+    // Decrease product quantities (reserve products for order)
+    const Contragent = require('../models/Contragent');
+    const contragentMap = new Map(); // Track contragents and their item indices
+    
+    for (let i = 0; i < orderItems.length; i++) {
+      const item = orderItems[i];
+      await MaxallaProduct.findByIdAndUpdate(item.product, {
+        $inc: { quantity: -item.quantity },
+      });
+      
+      // Get maxalla product with contragent
+      const maxallaProduct = await MaxallaProduct.findById(item.product)
+        .populate('contragent', '_id');
+      
+      if (maxallaProduct && maxallaProduct.contragent) {
+        const contragentId = maxallaProduct.contragent._id.toString();
+        if (!contragentMap.has(contragentId)) {
+          contragentMap.set(contragentId, []);
+        }
+        contragentMap.get(contragentId).push(i);
+      }
+    }
+
+    // Create order
+    const order = await Order.create({
+      user: userId,
+      orderNumber,
+      items: orderItems,
+      totalPrice,
+      totalOriginalPrice,
+      totalKpiPrice,
+      itemCount,
+      status: 'requested_to_contragent', // Maxalla orders go directly to contragent
+      paymentStatus: 'pending',
+      paymentMethod,
+      deliveryViloyat,
+      deliveryTuman: deliveryTuman || null,
+      deliveryMfy: deliveryMfy || null,
+      deliveryNote: deliveryNote || '',
+      phoneNumber: orderPhoneNumber,
+      currentPunkt: null, // Maxalla orders don't go through punkt
+      contragentRequests: [], // Will be populated below
+    });
+
+    // Send requests directly to maxalla contragents
+    const contragentRequests = [];
+    for (const [contragentId, itemIndices] of contragentMap.entries()) {
+      // Verify contragent is maxalla level
+      const contragent = await Contragent.findById(contragentId);
+      if (contragent && contragent.contragentLevel === 'mfy' && contragent.status === 'active') {
+        contragentRequests.push({
+          contragentId: contragent._id,
+          itemIds: itemIndices,
+          status: 'pending',
+          requestedAt: new Date(),
+        });
+      }
+    }
+
+    // Update order with contragent requests
+    if (contragentRequests.length > 0) {
+      order.contragentRequests = contragentRequests;
+      await order.save();
+    }
+
+    // Clear cart if requested
+    if (clearCart) {
+      cart.items = [];
+      await cart.save();
+    }
+
+    // Populate delivery regions
+    await order.populate([
+      { path: 'deliveryViloyat', select: 'name type code' },
+      { path: 'deliveryTuman', select: 'name type code' },
+      { path: 'deliveryMfy', select: 'name type code' },
+    ]);
+
+    // Populate order items manually (maxalla products)
+    const orderObj = order.toObject();
+    const populatedItems = [];
+    for (const item of orderObj.items) {
+      const populatedProduct = await populateOrderItemProduct(item);
+      if (populatedProduct) {
+        populatedItems.push({
+          ...item,
+          product: populatedProduct,
+        });
+      }
+    }
+    orderObj.items = populatedItems;
+
+    res.status(201).json({
+      success: true,
+      message: 'Maxalla buyurtmasi muvaffaqiyatli yaratildi',
+      data: orderObj,
+    });
+  } catch (error) {
+    console.error('Error creating maxalla order:', error);
+
+    if (error.name === 'ValidationError') {
+      const errors = [];
+      if (error.errors && Object.keys(error.errors).length > 0) {
+        Object.keys(error.errors).forEach((key) => {
+          errors.push({
+            field: key,
+            message: error.errors[key].message || error.errors[key].toString(),
+          });
+        });
+      } else {
+        errors.push({
+          field: 'general',
+          message: error.message || 'Validatsiya xatosi',
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: 'Validatsiya xatosi',
+        errors: errors,
+      });
+    }
+
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: `Noto'g'ri ${error.path} ID formati`,
+      });
+    }
+
+    if (error.code === 11000) {
+      return res.status(500).json({
+        success: false,
+        message: 'Buyurtma raqami yaratishda xatolik yuz berdi. Qayta urinib ko\'ring',
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Maxalla buyurtmasi yaratishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createOrder,
+  createMaxallaOrder,
   getOrders,
   getOrderById,
   cancelOrder,

@@ -20,6 +20,9 @@ const {
   getContragentById,
   search,
   filterProducts,
+  getAllMaxallaProducts,
+  getMaxallaProductById,
+  getMaxallaStoresForProduct,
 } = require('../controllers/marketplaceController');
 const {
   getCart,
@@ -27,9 +30,15 @@ const {
   updateCartItem,
   removeFromCart,
   clearCart,
+  getMaxallaCart,
+  addToMaxallaCart,
+  updateMaxallaCartItem,
+  removeFromMaxallaCart,
+  clearMaxallaCart,
 } = require('../controllers/cartController');
 const {
   createOrder,
+  createMaxallaOrder,
   getOrders,
   getOrderById,
   cancelOrder,
@@ -83,9 +92,15 @@ router.post('/resend-code', validate(marketplaceValidationSchemas.resendSMSCode)
 router.get('/search', search);
 router.get('/filter', filterProducts);
 
-// Products
+// Products (Tuman products)
 router.get('/products', getAllProducts);
 router.get('/products/:id', getProductById);
+
+// Maxalla Products
+router.get('/maxalla-products', getAllMaxallaProducts);
+// Specific routes before generic :id route
+router.get('/maxalla-products/:productId/stores', optionalMarketplaceUserAuth, getMaxallaStoresForProduct);
+router.get('/maxalla-products/:id', getMaxallaProductById);
 
 // Categories (specific routes before generic ones)
 router.get('/categories', getAllCategories);
@@ -96,19 +111,35 @@ router.get('/categories/:id', getCategoryById);
 router.get('/contragents', getAllContragents);
 router.get('/contragents/:id', getContragentById);
 
-// Cart routes (require authentication)
+// Cart routes - Tuman products (require authentication)
 router.get('/cart', marketplaceUserAuth, getCart);
 router.post('/cart', marketplaceUserAuth, validate(cartValidationSchemas.addToCart), addToCart);
 router.put('/cart/:productId', marketplaceUserAuth, validate(cartValidationSchemas.updateCartItem), updateCartItem);
 router.delete('/cart/:productId', marketplaceUserAuth, removeFromCart);
 router.delete('/cart', marketplaceUserAuth, clearCart);
 
-// Order routes (require authentication)
+// Maxalla Cart routes (require authentication)
+router.get('/maxalla-cart', marketplaceUserAuth, getMaxallaCart);
+router.post('/maxalla-cart', marketplaceUserAuth, validate(cartValidationSchemas.addToCart), addToMaxallaCart);
+router.put('/maxalla-cart/:productId', marketplaceUserAuth, validate(cartValidationSchemas.updateCartItem), updateMaxallaCartItem);
+router.delete('/maxalla-cart/:productId', marketplaceUserAuth, removeFromMaxallaCart);
+router.delete('/maxalla-cart', marketplaceUserAuth, clearMaxallaCart);
+
+// Order routes - Tuman products (require authentication)
 router.post('/orders', marketplaceUserAuth, validate(orderValidationSchemas.create), createOrder);
 router.get('/orders', marketplaceUserAuth, getOrders);
 router.get('/orders/:id', marketplaceUserAuth, getOrderById);
 router.delete('/orders/:id', marketplaceUserAuth, cancelOrder);
 router.post('/orders/:id/confirm-delivery', marketplaceUserAuth, confirmDelivery);
+
+// Maxalla Order routes (require authentication)
+// Note: getOrders, getOrderById, cancelOrder, confirmDelivery work for both tuman and maxalla orders
+router.post('/maxalla-orders', marketplaceUserAuth, validate(orderValidationSchemas.create), createMaxallaOrder);
+// Maxalla orders can be accessed via /orders endpoints as well, but we provide separate routes for clarity
+router.get('/maxalla-orders', marketplaceUserAuth, getOrders);
+router.get('/maxalla-orders/:id', marketplaceUserAuth, getOrderById);
+router.delete('/maxalla-orders/:id', marketplaceUserAuth, cancelOrder);
+router.post('/maxalla-orders/:id/confirm-delivery', marketplaceUserAuth, confirmDelivery);
 
 // Profile routes (require authentication)
 router.get('/me', marketplaceUserAuth, getMe);

@@ -1,5 +1,5 @@
 const API_BASE_URL = 'http://localhost:5000/api';
-const PUBLIC_API_BASE_URL = 'http://localhost:3000/api';
+const PUBLIC_API_BASE_URL = 'https://api.milliycrm.uz/api';
 
 // Helper function to get token from localStorage
 const getToken = () => {
@@ -829,6 +829,78 @@ export const categoryManagementAPI = {
   },
 };
 
+// Base Products API functions (Templates/Shablonlar)
+export const baseProductAPI = {
+  // Get all base products
+  getAllBaseProducts: async (params = {}) => {
+    const { page = 1, limit = 20, status, category, subcategory, search } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) queryParams.append('status', status);
+    if (category) queryParams.append('category', category);
+    if (subcategory) queryParams.append('subcategory', subcategory);
+    if (search) queryParams.append('search', search);
+    
+    return apiRequest(`/admins/base-products?${queryParams.toString()}`);
+  },
+
+  // Get base product by ID
+  getBaseProductById: async (id) => {
+    return apiRequest(`/admins/base-products/${id}`);
+  },
+
+  // Create base product
+  createBaseProduct: async (productData) => {
+    return apiRequest('/admins/base-products', {
+      method: 'POST',
+      body: JSON.stringify(productData),
+    });
+  },
+
+  // Update base product
+  updateBaseProduct: async (id, productData) => {
+    return apiRequest(`/admins/base-products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(productData),
+    });
+  },
+
+  // Delete base product
+  deleteBaseProduct: async (id) => {
+    return apiRequest(`/admins/base-products/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Admin Maxalla Products API functions (Read-only)
+export const maxallaProductsAPI = {
+  // Get all maxalla products with pagination and filters
+  getAllMaxallaProducts: async (params = {}) => {
+    const { page = 1, limit = 20, status, category, subcategory, contragent, search } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) queryParams.append('status', status);
+    if (category) queryParams.append('category', category);
+    if (subcategory) queryParams.append('subcategory', subcategory);
+    if (contragent) queryParams.append('contragent', contragent);
+    if (search) queryParams.append('search', search);
+    
+    return apiRequest(`/admins/maxalla-products?${queryParams.toString()}`);
+  },
+  
+  // Get maxalla product by ID
+  getMaxallaProductById: async (id) => {
+    return apiRequest(`/admins/maxalla-products/${id}`);
+  },
+};
+
 // Admin Product Moderation API functions
 export const productModerationAPI = {
   // Get pending products
@@ -1453,7 +1525,7 @@ export const contragentAPI = {
 
   // Get all contragents with pagination and filters
   getAllContragents: async (params = {}) => {
-    const { page = 1, limit = 10, status, viloyat, tuman, mfy } = params;
+    const { page = 1, limit = 10, status, viloyat, tuman, mfy, contragentLevel } = params;
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -1463,6 +1535,7 @@ export const contragentAPI = {
     if (viloyat) queryParams.append('viloyat', viloyat);
     if (tuman) queryParams.append('tuman', tuman);
     if (mfy) queryParams.append('mfy', mfy);
+    if (contragentLevel) queryParams.append('contragentLevel', contragentLevel);
     
     return apiRequest(`/contragents?${queryParams.toString()}`);
   },

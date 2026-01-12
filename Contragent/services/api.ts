@@ -276,7 +276,6 @@ export interface ProductCreateRequest {
   width?: number | null;
   weight?: number | null;
   status?: 'active' | 'inactive' | 'archived';
-  deliveryRegions?: DeliveryRegion[];
   kpiBonusPercent: number;
 }
 
@@ -295,7 +294,6 @@ export interface ProductUpdateRequest {
   width?: number | null;
   weight?: number | null;
   status?: 'active' | 'inactive' | 'archived';
-  deliveryRegions?: DeliveryRegion[];
   kpiBonusPercent?: number;
 }
 
@@ -732,6 +730,58 @@ class ApiService {
 
   async updateLogo(data: { logo: string }): Promise<ContragentResponse> {
     return this.request<ContragentResponse>('/api/contragents/me/logo', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getDeliveryRegions(): Promise<{
+    success: boolean;
+    data: {
+      deliveryRegions: Array<{
+        viloyat: {
+          _id: string;
+          name: string;
+          type: string;
+          code: string;
+        };
+        tuman: {
+          _id: string;
+          name: string;
+          type: string;
+          code: string;
+        } | null;
+      }>;
+    };
+  }> {
+    return this.request('/api/contragents/me/delivery-regions', {
+      method: 'GET',
+    });
+  }
+
+  async updateDeliveryRegions(data: {
+    deliveryRegions: DeliveryRegion[];
+  }): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      deliveryRegions: Array<{
+        viloyat: {
+          _id: string;
+          name: string;
+          type: string;
+          code: string;
+        };
+        tuman: {
+          _id: string;
+          name: string;
+          type: string;
+          code: string;
+        } | null;
+      }>;
+    };
+  }> {
+    return this.request('/api/contragents/me/delivery-regions', {
       method: 'PATCH',
       body: JSON.stringify(data),
     });

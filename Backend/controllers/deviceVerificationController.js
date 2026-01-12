@@ -62,10 +62,15 @@ const requestDeviceVerificationCode = async (req, res) => {
             message: 'Telefon raqami kiritilishi shart',
           });
         }
+        // Only find tuman contragents (not maxalla)
         user = await UserModel.findOne({
           [phoneField]: phone,
           status: 'active',
           isDeleted: { $ne: true },
+          $or: [
+            { contragentLevel: 'tuman' },
+            { contragentLevel: { $exists: false } }, // Legacy: if contragentLevel doesn't exist, treat as tuman
+          ],
         });
         break;
       case 'Punkt':
@@ -267,10 +272,15 @@ const verifyDevice = async (req, res) => {
             message: 'Telefon raqami kiritilishi shart',
           });
         }
+        // Only find tuman contragents (not maxalla)
         user = await UserModel.findOne({
           [phoneField]: phone,
           status: 'active',
           isDeleted: { $ne: true },
+          $or: [
+            { contragentLevel: 'tuman' },
+            { contragentLevel: { $exists: false } }, // Legacy: if contragentLevel doesn't exist, treat as tuman
+          ],
         });
         break;
       case 'Punkt':
@@ -484,10 +494,15 @@ const resendDeviceVerificationCode = async (req, res) => {
             message: 'Telefon raqami kiritilishi shart',
           });
         }
+        // Only find tuman contragents (not maxalla)
         user = await UserModel.findOne({
           [phoneField]: phone,
           status: 'active',
           isDeleted: { $ne: true },
+          $or: [
+            { contragentLevel: 'tuman' },
+            { contragentLevel: { $exists: false } }, // Legacy: if contragentLevel doesn't exist, treat as tuman
+          ],
         });
         break;
       case 'Punkt':

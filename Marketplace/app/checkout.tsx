@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,9 +24,13 @@ import apiService, { Region } from '../services/api';
 export default function CheckoutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { productType } = useLocalSearchParams<{ productType?: string }>();
   const { token, user, logout } = useAuth();
-  const { cart, refreshCart } = useCart();
+  const { getCart, refreshCart } = useCart();
   const { showSuccess, showError } = useSnackbar();
+  
+  const activeProductType = (productType as 'tuman' | 'maxalla') || 'tuman';
+  const cart = getCart(activeProductType);
 
   const [profile, setProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -82,7 +86,7 @@ export default function CheckoutScreen() {
         setProfile(response.data);
       }
     } catch (error: any) {
-      console.error('Error loading profile:', error);
+      // Error loading profile
     } finally {
       setLoadingProfile(false);
     }
@@ -104,10 +108,6 @@ export default function CheckoutScreen() {
     const tumanId = formData.deliveryTumanId || profile?.tuman?._id || '';
     const mfyId = formData.deliveryMfyId || profile?.mfy?._id || '';
 
-    console.log('Viloyat ID', viloyatId);
-    console.log('Tuman ID', tumanId);
-    console.log('MFY ID', mfyId);
-
     if (!viloyatId) {
       newErrors.deliveryViloyat = 'Viloyat tanlanishi shart';
     }
@@ -118,33 +118,18 @@ export default function CheckoutScreen() {
 
     setErrors(newErrors);
     
-    console.log('Validatsiya xatosi', newErrors);
-
-    
     return Object.keys(newErrors).length === 0;
   };
 
-  console.log('Errors', errors);
-
   const handleCreateOrder = async () => {
-    console.log('handleCreateOrder called');
-    console.log('Token:', token ? 'exists' : 'missing');
-    console.log('Cart:', cart ? 'exists' : 'missing');
-
     if (!token || !cart) {
-      console.log('Missing token or cart');
       return;
     }
 
     const isValid = validateForm();
-    console.log('Validation result:', isValid);
     if (!isValid) {
-      console.log('Validation failed');
-      // Scroll to first error
       return;
     }
-
-    console.log('Starting order creation...');
 
     try {
       setLoading(true);
@@ -169,15 +154,11 @@ export default function CheckoutScreen() {
         orderData.deliveryMfy = mfyId;
       }
 
-      console.log('Order Data:', JSON.stringify(orderData, null, 2));
-
-      const response = await apiService.createOrder(orderData, token);
-
-      console.log('Order Response:', JSON.stringify(response, null, 2));
+      const response = await apiService.createOrder(orderData, token, activeProductType);
 
       if (response.success) {
         setOrderCreated(true);
-        await refreshCart();
+        await refreshCart(activeProductType);
         showSuccess('Buyurtma muvaffaqiyatli yaratildi', 2000, {
           label: 'Ko\'rish',
           onPress: () => {
@@ -188,17 +169,9 @@ export default function CheckoutScreen() {
           router.replace(`/order/${response.data._id}` as any);
         }, 2000);
       } else {
-        console.error('Order creation failed:', response);
         showError(response.message || 'Buyurtma yaratishda xatolik yuz berdi');
       }
     } catch (error: any) {
-      console.error('Order creation error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-      });
-      
       // 401 error is handled globally in API service and layout
       // Just show error message
       showError(error.message || 'Buyurtma yaratishda xatolik yuz berdi');

@@ -103,6 +103,7 @@ const productSchema = new mongoose.Schema(
     deliveryRegions: {
       type: [deliveryRegionSchema],
       default: [],
+      required: false, // Optional - kontragent profilidan olinadi
     },
     kpiBonusPercent: {
       type: Number,
@@ -160,11 +161,11 @@ productSchema.index({ createdAt: -1 });
 // Method to generate product code (global sequence for all products)
 productSchema.statics.generateProductCode = async function (contragentId) {
   const Counter = require('./Counter');
-  
+
   // Validate contragent exists
   const Contragent = mongoose.model('Contragent');
   const contragent = await Contragent.findById(contragentId);
-  
+
   if (!contragent) {
     throw new Error('Contragent topilmadi');
   }

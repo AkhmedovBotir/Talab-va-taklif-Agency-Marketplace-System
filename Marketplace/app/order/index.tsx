@@ -32,6 +32,7 @@ export default function OrdersScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [paymentStatuses, setPaymentStatuses] = useState<Record<string, PaymentTransaction | null>>({});
   const [payingOrders, setPayingOrders] = useState<Record<string, boolean>>({});
+  const [activeOrderType, setActiveOrderType] = useState<'tuman' | 'maxalla'>('tuman');
 
   const checkPaymentStatus = useCallback(async (orderId: string) => {
     if (!token) return;
@@ -51,7 +52,6 @@ export default function OrdersScreen() {
         }));
       }
     } catch (error: any) {
-      console.error('Error checking payment status:', error);
       // If payment not found, it's okay - order hasn't been paid yet
       setPaymentStatuses((prev) => ({
         ...prev,
@@ -70,19 +70,106 @@ export default function OrdersScreen() {
         setLoadingMore(true);
       }
 
-      const response = await apiService.getOrders(
-        {
-          page: pageNum,
-          limit: 20,
-        },
-        token
-      );
+      let response;
+      if (activeOrderType === 'maxalla') {
+        try {
+          response = await apiService.getMaxallaOrders(
+            {
+              page: pageNum,
+              limit: 20,
+            },
+            token
+          );
+        } catch (error: any) {
+          // If maxalla orders endpoint doesn't exist, show empty list
+          if (error.message && error.message.includes('Route topilmadi')) {
+            response = {
+              success: true,
+              data: [],
+              count: 0,
+              total: 0,
+              page: 1,
+              limit: 20,
+              totalPages: 0,
+            };
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        response = await apiService.getOrders(
+          {
+            page: pageNum,
+            limit: 20,
+          },
+          token
+        );
+      }
+
+      // Filter orders by productType to ensure correct separation
+      let filteredOrders = response.data;
+      if (activeOrderType === 'maxalla') {
+        // Only show maxalla orders
+        // Maxalla orders have: productType === 'maxalla', productModel === 'MaxallaProduct', totalKpiPrice === 0
+        filteredOrders = response.data.filter((order: Order) => {
+          if (!order.items || order.items.length === 0) return false;
+          
+          // Check if all items are maxalla type
+          const allItemsAreMaxalla = order.items.every((item: any) => 
+            item.productType === 'maxalla' || item.productModel === 'MaxallaProduct'
+          );
+          
+          // Also check by KPI (maxalla orders have totalKpiPrice === 0)
+          const hasNoKpi = order.totalKpiPrice === 0;
+          
+          return allItemsAreMaxalla && hasNoKpi;
+        });
+      } else {
+        // Only show tuman orders
+        // Tuman orders have: productType === 'tuman', productModel === 'Product', totalKpiPrice > 0 (or status is not 'requested_to_contragent')
+        filteredOrders = response.data.filter((order: Order) => {
+          if (!order.items || order.items.length === 0) return false;
+          
+          // Check if all items are tuman type
+          const allItemsAreTuman = order.items.every((item: any) => 
+            (item.productType === 'tuman' || item.productModel === 'Product') && 
+            item.productType !== 'maxalla' && 
+            item.productModel !== 'MaxallaProduct'
+          );
+          
+          // Also check by KPI (tuman orders usually have totalKpiPrice > 0) or status
+          const hasKpi = order.totalKpiPrice > 0;
+          const isNotMaxallaStatus = order.status !== 'requested_to_contragent' || hasKpi;
+          
+          return allItemsAreTuman && isNotMaxallaStatus;
+        });
+      }
 
       if (append) {
-        setOrders((prev) => [...prev, ...response.data]);
+        setOrders((prev) => [...prev, ...filteredOrders]);
       } else {
-        setOrders(response.data);
+        setOrders(filteredOrders);
       }
+
+      // Log all orders to console with details
+      console.log(`${activeOrderType === 'maxalla' ? 'Maxalla' : 'Tuman'} Buyurtmalar:`, filteredOrders);
+      console.log('Buyurtmalar soni:', filteredOrders.length);
+      console.log('Jami buyurtmalar:', response.total);
+      console.log('Sahifa:', response.page, '/', response.totalPages);
+      
+      // Log each order's productType details
+      filteredOrders.forEach((order: Order, index: number) => {
+        console.log(`Buyurtma ${index + 1}:`, {
+          orderNumber: order.orderNumber,
+          status: order.status,
+          totalKpiPrice: order.totalKpiPrice,
+          items: order.items?.map((item: any) => ({
+            productType: item.productType,
+            productModel: item.productModel,
+            productName: item.product?.name || 'N/A'
+          }))
+        });
+      });
 
       setPage(response.page);
       setHasMore(response.page < response.totalPages);
@@ -98,14 +185,13 @@ export default function OrdersScreen() {
         }
       }
     } catch (error: any) {
-      console.error('Error loading orders:', error);
       showError(error.message || 'Buyurtmalarni yuklashda xatolik yuz berdi');
     } finally {
       setLoading(false);
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [token, checkPaymentStatus]);
+  }, [token, activeOrderType, checkPaymentStatus, showError]);
 
   const handlePayment = useCallback(async (order: Order) => {
     if (!token) return;
@@ -150,7 +236,6 @@ export default function OrdersScreen() {
                 loadOrders(page, false);
               }
             } catch (error: any) {
-              console.error('Error making payment:', error);
               showError(error.message || 'To\'lov qilishda xatolik yuz berdi');
             } finally {
               setPayingOrders((prev) => {
@@ -167,9 +252,11 @@ export default function OrdersScreen() {
 
   useEffect(() => {
     if (token) {
+      setPage(1);
+      setHasMore(true);
       loadOrders(1, false);
     }
-  }, [token, loadOrders]);
+  }, [token, activeOrderType, loadOrders]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -376,8 +463,45 @@ export default function OrdersScreen() {
         <Ionicons name="receipt-outline" size={64} color="#ccc" />
         <Text style={styles.emptyText}>Buyurtmalar topilmadi</Text>
         <Text style={styles.emptySubtext}>
-          Siz hali hech qanday buyurtma bermadingiz
+          {activeOrderType === 'tuman' 
+            ? 'Siz hali tuman buyurtmasi bermadingiz'
+            : 'Siz hali maxalla buyurtmasi bermadingiz'}
         </Text>
+      </View>
+    );
+  };
+
+  const renderTabs = () => {
+    return (
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeOrderType === 'tuman' && styles.tabActive]}
+          onPress={() => setActiveOrderType('tuman')}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="storefront" 
+            size={20} 
+            color={activeOrderType === 'tuman' ? '#007AFF' : '#666'} 
+          />
+          <Text style={[styles.tabText, activeOrderType === 'tuman' && styles.tabTextActive]}>
+            Tuman Buyurtmalari
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeOrderType === 'maxalla' && styles.tabActive]}
+          onPress={() => setActiveOrderType('maxalla')}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="home" 
+            size={20} 
+            color={activeOrderType === 'maxalla' ? '#007AFF' : '#666'} 
+          />
+          <Text style={[styles.tabText, activeOrderType === 'maxalla' && styles.tabTextActive]}>
+            Maxalla Buyurtmalari
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -391,6 +515,7 @@ export default function OrdersScreen() {
         onNotificationPress={handleNotificationPress}
         unreadCount={unreadCount}
       />
+      {renderTabs()}
 
       {loading && orders.length === 0 ? (
         <View style={styles.loadingContainer}>
@@ -569,6 +694,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 4,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e7',
+    gap: 12,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#f5f5f5',
+    gap: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  tabActive: {
+    backgroundColor: '#e6f3ff',
+    borderColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  tabTextActive: {
+    color: '#007AFF',
   },
 });
 

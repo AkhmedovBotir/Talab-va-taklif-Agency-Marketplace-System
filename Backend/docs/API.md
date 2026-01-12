@@ -1690,9 +1690,17 @@ POST /api/contragents
   "phone": "string (required, phone format)",
   "password": "string (required, min: 6)",
   "logo": "string (optional, base64 image)",
+  "activityType": "string (required, contragent type ID)",
+  "contragentLevel": "tuman|mfy (default: tuman)",
   "status": "active|inactive (default: active)"
 }
 ```
+
+**Notes:**
+- `contragentLevel`: Kontragent darajasi - "tuman" (tuman kontragenti) yoki "mfy" (maxalla kontragenti)
+- Tuman kontragentlari: Tuman darajasida ishlaydi
+- Maxalla kontragentlari: MFY darajasida ishlaydi
+- Har ikkala tur uchun ham viloyat, tuman va MFY maydonlari required
 
 #### Get All Contragents
 ```
@@ -1701,8 +1709,10 @@ GET /api/contragents
 
 **Query Parameters:**
 - `status` - Filter by status
-- `address` - Filter by region ID (viloyat/tuman/mfy)
-- `search` - Search by name or INN
+- `viloyat` - Filter by viloyat ID
+- `tuman` - Filter by tuman ID
+- `mfy` - Filter by MFY ID
+- `contragentLevel` - Filter by contragent level (tuman|mfy)
 - `page` - Page number
 - `limit` - Items per page
 

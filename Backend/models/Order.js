@@ -4,8 +4,20 @@ const orderItemSchema = new mongoose.Schema(
   {
     product: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
+      refPath: 'productModel', // Dynamic reference based on productType
       required: [true, 'Maxsulot kiritilishi shart'],
+    },
+    productType: {
+      type: String,
+      enum: ['tuman', 'maxalla'],
+      default: 'tuman',
+      required: true,
+    },
+    productModel: {
+      type: String,
+      enum: ['Product', 'MaxallaProduct'],
+      default: 'Product',
+      required: true,
     },
     quantity: {
       type: Number,
@@ -24,9 +36,13 @@ const orderItemSchema = new mongoose.Schema(
     },
     kpiBonusPercent: {
       type: Number,
-      required: [true, 'KPI bonus foizi kiritilishi shart'],
+      required: function() {
+        // Only required for tuman products
+        return this.productType === 'tuman';
+      },
       min: [0, 'KPI bonus foizi 0 dan kichik bo\'la olmaydi'],
       max: [100, 'KPI bonus foizi 100 dan katta bo\'la olmaydi'],
+      default: null,
     },
   },
   { _id: false }
@@ -212,6 +228,16 @@ const orderSchema = new mongoose.Schema(
           default: null,
         },
         deliveredToPunktAt: {
+          type: Date,
+          default: null,
+        },
+        // Maxalla kontragentlar uchun yetkazib beruvchiga yuborish
+        deliveryProvider: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'DeliveryProvider',
+          default: null,
+        },
+        sentToDeliveryProviderAt: {
           type: Date,
           default: null,
         },
