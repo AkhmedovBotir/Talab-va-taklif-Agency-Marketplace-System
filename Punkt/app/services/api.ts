@@ -125,9 +125,9 @@ export interface Agent {
   _id: string;
   name: string;
   phone: string;
-  viloyat: Region;
-  tuman: Region | null;
-  mfy: Region | null;
+  viloyat?: Region;
+  tuman?: Region | null;
+  mfy?: Region | null;
   status: string;
 }
 
@@ -135,11 +135,10 @@ export interface AgentSelection {
   _id: string;
   name: string;
   phone: string;
-  viloyat: Region;
-  tuman: Region | null;
-  mfy: Region | null;
+  viloyat?: Region;
+  tuman?: Region | null;
+  mfy?: Region | null;
   status: 'active' | 'inactive';
-  agentType: 'viloyat' | 'tuman' | 'mfy';
 }
 
 export interface Region {
@@ -193,6 +192,18 @@ export interface OrderItem {
     name: string;
     price: number;
     originalPrice: number;
+    contragent?: {
+      _id: string;
+      name: string;
+      inn?: string;
+      phone?: string;
+      status?: string;
+      contragentLevel?: string;
+      logo?: string;
+      viloyat?: Region;
+      tuman?: Region | null;
+      mfy?: Region | null;
+    };
     category?: {
       _id: string;
       name: string;
@@ -202,10 +213,12 @@ export interface OrderItem {
       viloyat: Region;
       tuman: Region;
     }>;
-  };
+  } | string; // Product object yoki ID (string) bo'lishi mumkin (backward compatibility)
   quantity: number;
   price: number;
   originalPrice: number;
+  productModel?: string; // Agar product string bo'lsa (backward compatibility)
+  productType?: string; // Agar product string bo'lsa (backward compatibility)
 }
 
 export interface PunktRequest {
@@ -604,6 +617,7 @@ class ApiService {
   private token: string | null = null;
   private onDeviceErrorCallback: (() => void) | null = null;
   private isLoggingOut: boolean = false;
+  private isValidatingToken: boolean = false;
 
   setOnDeviceError(callback: () => void) {
     this.onDeviceErrorCallback = callback;
@@ -645,12 +659,6 @@ class ApiService {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('❌ Response not OK:', {
-          status: response.status,
-          statusText: response.statusText,
-          data,
-        });
-        
         const errorMessage = data.message || data.data?.message || '';
         
         // Check if it's a device-related error (403 with device message)
@@ -663,7 +671,6 @@ class ApiService {
                                   endpoint.includes('/password-setup') ||
                                   endpoint.includes('/device-verification');
           if (!isLoginEndpoint && this.onDeviceErrorCallback && !this.isLoggingOut) {
-            console.log('🔴 Device error detected, triggering logout...');
             this.isLoggingOut = true;
             // Trigger logout callback immediately (synchronously if possible)
             try {
@@ -684,8 +691,10 @@ class ApiService {
           const isAuthEndpoint = endpoint.includes('/login') || 
                                  endpoint.includes('/password-setup') ||
                                  endpoint.includes('/device-verification');
-          if (!isAuthEndpoint && this.onDeviceErrorCallback && !this.isLoggingOut) {
-            console.log('🔴 Authentication error (401) detected, triggering logout...');
+          
+          // Don't trigger logout during token validation (app startup)
+          // This allows token validation during app startup without triggering logout
+          if (!isAuthEndpoint && !this.isValidatingToken && this.onDeviceErrorCallback && !this.isLoggingOut) {
             this.isLoggingOut = true;
             // Trigger logout callback immediately (synchronously if possible)
             try {
@@ -943,10 +952,6 @@ class ApiService {
 
   async getAgentsForSelection(params?: {
     status?: 'active' | 'inactive';
-    viloyat?: string;
-    tuman?: string;
-    mfy?: string;
-    agentType?: 'viloyat' | 'tuman' | 'mfy';
     search?: string;
     page?: number;
     limit?: number;
@@ -1001,11 +1006,6 @@ class ApiService {
     data: RequestToContragentRequest
   ): Promise<RequestToContragentResponse> {
     const endpoint = `/punkt/orders/${id}/request-to-contragent`;
-    console.log('🔵 API: requestToContragent called');
-    console.log('Endpoint:', endpoint);
-    console.log('Order ID:', id);
-    console.log('Request Data:', data);
-    console.log('Full URL will be:', `${BASE_URL}${endpoint}`);
     
     try {
       const response = await this.request<RequestToContragentResponse>(
@@ -1015,10 +1015,9 @@ class ApiService {
           body: JSON.stringify(data),
         }
       );
-      console.log('✅ API Response:', response);
       return response;
     } catch (error) {
-      console.error('❌ API Error in requestToContragent:', error);
+      console.error('API Error in requestToContragent:', error);
       throw error;
     }
   }
@@ -1195,6 +1194,10 @@ class ApiService {
     if (token) {
       this.isLoggingOut = false;
     }
+  }
+
+  setValidatingToken(isValidating: boolean) {
+    this.isValidatingToken = isValidating;
   }
 }
 

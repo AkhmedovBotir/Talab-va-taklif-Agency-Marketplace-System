@@ -84,7 +84,6 @@ export default function ProductCreateScreen() {
           const allResponse = await apiService.getCategories({ limit: 1000 });
           if (allResponse && allResponse.success && allResponse.data) {
             const activeCategories = allResponse.data.filter((cat) => cat.status === 'active');
-            console.log('Active categories from all:', activeCategories.length);
             setCategories(activeCategories);
             if (activeCategories.length === 0) {
               Alert.alert('Ogohlantirish', 'Faol kategoriyalar mavjud emas. Iltimos, admin bilan bog\'laning.');
@@ -96,13 +95,11 @@ export default function ProductCreateScreen() {
         } else {
           setCategories(response.data);
         }
-      } else {
-        console.error('Invalid response format:', response);
-        Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
+        } else {
+          Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
         setCategories([]);
       }
     } catch (error: any) {
-      console.error('Error loading categories:', error);
       const errorMessage = error?.message || error?.status || 'Kategoriyalarni yuklashda xatolik yuz berdi';
       Alert.alert('Xatolik', `Kategoriyalarni yuklashda xatolik: ${errorMessage}`);
       setCategories([]);
@@ -146,7 +143,6 @@ export default function ProductCreateScreen() {
         setSubcategories([]);
       }
     } catch (error: any) {
-      console.error('Error loading subcategories:', error);
       setSubcategories([]);
     } finally {
       setLoadingSubcategories(false);
@@ -193,7 +189,6 @@ export default function ProductCreateScreen() {
         }
       }
     } catch (error: any) {
-      console.error('Error picking image:', error);
       Alert.alert('Xatolik', error.message || 'Rasm tanlashda xatolik yuz berdi');
     }
   };
@@ -219,6 +214,22 @@ export default function ProductCreateScreen() {
     }, [resetForm])
   );
 
+  // Save QuillEditor content before modal opens
+  useEffect(() => {
+    if (showCategoryModal || showSubcategoryModal) {
+      // Save current content before modal opens
+      if (quillRef.current) {
+        quillRef.current.getContents().then((delta) => {
+          if (delta) {
+            setDescription(delta);
+          }
+        }).catch(() => {
+          // Ignore errors
+        });
+      }
+    }
+  }, [showCategoryModal, showSubcategoryModal]);
+
   const handleCreate = async () => {
     if (!name.trim() || !price || !originalPrice || !categoryId || !quantity || !kpiBonusPercent) {
       Alert.alert('Xatolik', 'Barcha majburiy maydonlarni to\'ldiring');
@@ -243,7 +254,7 @@ export default function ProductCreateScreen() {
             }
           }
         } catch (error) {
-          console.error('Error getting Quill content:', error);
+          // Ignore Quill content errors
         }
       }
 
@@ -349,9 +360,11 @@ export default function ProductCreateScreen() {
 
           <Text style={styles.label}>Tavsif (ixtiyoriy)</Text>
           <QuillEditor
+            key={`quill-${categoryId}`}
             ref={quillRef}
             placeholder="Maxsulot tavsifini kiriting..."
             style={styles.quillEditor}
+            initialDelta={description}
             onContentChange={(delta) => setDescription(delta)}
           />
         </View>

@@ -8,6 +8,7 @@ const {
   deleteAgent,
   loginAgent,
   getAgentsForSelection,
+  getMyProfile,
 } = require('../controllers/agentController');
 const {
   passwordSetupStep1,
@@ -37,7 +38,7 @@ router.post('/', validate(agentValidationSchemas.create), createAgent);
 // Get agents for selection (agent ID tanlash uchun, public endpoint)
 router.get('/selection', getAgentsForSelection);
 
-// Get all agents (with optional filters: ?status=active&viloyat=regionId&tuman=districtId&mfy=mfyId&agentType=viloyat|tuman|mfy&page=1&limit=10)
+// Get all agents (with optional filters: ?status=active&viloyat=regionId&tuman=districtId&mfy=mfyId&page=1&limit=10)
 router.get('/', getAllAgents);
 
 // Get agent by ID
@@ -48,6 +49,9 @@ router.put('/:id', validate(agentValidationSchemas.update), updateAgent);
 
 // Delete agent
 router.delete('/:id', deleteAgent);
+
+// Get current agent profile
+router.get('/profile/me', agentAuth, getMyProfile);
 
 // Notification routes for Agent (viloyat/tuman/mfy)
 router.get('/notifications/list', agentAuth, getAgentNotifications);

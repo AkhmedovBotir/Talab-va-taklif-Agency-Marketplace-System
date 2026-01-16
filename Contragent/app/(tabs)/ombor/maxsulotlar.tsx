@@ -66,7 +66,6 @@ export default function MaxsulotlarScreen() {
         setCategories([]);
       }
     } catch (error: any) {
-      console.error('Error loading categories:', error);
       setCategories([]);
     }
   }, []);

@@ -11,6 +11,7 @@ import Regions from './pages/Regions/Regions';
 import Contragents from './pages/Contragents/Contragents';
 import Agents from './pages/Agents/Agents';
 import Punkts from './pages/Punkts/Punkts';
+import Managers from './pages/Managers/Managers';
 import SMSVerifications from './pages/SMSVerifications/SMSVerifications';
 import MarketplaceUsers from './pages/MarketplaceUsers/MarketplaceUsers';
 import OrdersMain from './pages/Orders/OrdersMain';
@@ -51,6 +52,7 @@ function App() {
               <Route path="contragents" element={<Contragents />} />
               <Route path="agents" element={<Agents />} />
               <Route path="punkts" element={<Punkts />} />
+              <Route path="managers" element={<Managers />} />
               <Route path="ombor" element={<OmborMain />} />
               <Route path="sms-verifications" element={<SMSVerifications />} />
               <Route path="marketplace-users" element={<MarketplaceUsers />} />

@@ -1,77 +1,31 @@
 const express = require('express');
 const router = express.Router();
 const {
-  // MFY Agent
-  getMfyDailyReport,
-  getMfyPendingPayments,
-  collectPayment,
-  submitToDistrict,
-  getMfyStatistics,
-  // Tuman Agent
-  getDistrictReport,
-  getDistrictSubmissions,
-  confirmDistrictSubmission,
-  submitToProvince,
-  getDistrictStatistics,
-  // Viloyat Agent
-  getProvinceReport,
-  getProvinceSubmissions,
-  confirmProvinceSubmission,
-  submitToFinance,
-  getProvinceStatistics,
+  // Agent functions (formerly MFY Agent)
+  getDailyReport,
+  // getPendingPayments, - REMOVED: Payment collection removed
+  // collectPayment, - REMOVED: Payment collection removed
+  // submitToFinance, - REMOVED: Payment collection removed
+  getStatistics,
 } = require('../controllers/agentFinanceController');
 const { agentAuth } = require('../middleware/auth');
 
-// ==================== MFY AGENT ROUTES ====================
+// ==================== AGENT ROUTES ====================
 
 // Kunlik hisobot
-router.get('/mfy/daily-report', agentAuth, getMfyDailyReport);
+router.get('/daily-report', agentAuth, getDailyReport);
 
-// Kutilayotgan to'lovlar
-router.get('/mfy/pending-payments', agentAuth, getMfyPendingPayments);
+// Kutilayotgan to'lovlar - REMOVED (payment collection removed)
+// router.get('/pending-payments', agentAuth, getPendingPayments);
 
-// To'lovni qabul qilish
-router.post('/mfy/collect-payment/:transactionId', agentAuth, collectPayment);
+// To'lovni qabul qilish - REMOVED: Payment collection removed
+// router.post('/collect-payment/:transactionId', agentAuth, collectPayment);
 
-// Tuman agentga topshirish
-router.post('/mfy/submit-to-district', agentAuth, submitToDistrict);
-
-// Statistika
-router.get('/mfy/statistics', agentAuth, getMfyStatistics);
-
-// ==================== TUMAN AGENT ROUTES ====================
-
-// Tuman hisoboti
-router.get('/district/report', agentAuth, getDistrictReport);
-
-// MFY agentlardan kelgan topshiruvlar
-router.get('/district/submissions', agentAuth, getDistrictSubmissions);
-
-// Topshiruvni tasdiqlash
-router.post('/district/confirm-submission/:submissionId', agentAuth, confirmDistrictSubmission);
-
-// Viloyat agentga topshirish
-router.post('/district/submit-to-province', agentAuth, submitToProvince);
+// Moliya bo'limiga topshirish - REMOVED: Payment collection removed
+// router.post('/submit-to-finance', agentAuth, submitToFinance);
 
 // Statistika
-router.get('/district/statistics', agentAuth, getDistrictStatistics);
-
-// ==================== VILOYAT AGENT ROUTES ====================
-
-// Viloyat hisoboti
-router.get('/province/report', agentAuth, getProvinceReport);
-
-// Tuman agentlardan kelgan topshiruvlar
-router.get('/province/submissions', agentAuth, getProvinceSubmissions);
-
-// Topshiruvni tasdiqlash
-router.post('/province/confirm-submission/:submissionId', agentAuth, confirmProvinceSubmission);
-
-// Moliya bo'limiga topshirish
-router.post('/province/submit-to-finance', agentAuth, submitToFinance);
-
-// Statistika
-router.get('/province/statistics', agentAuth, getProvinceStatistics);
+router.get('/statistics', agentAuth, getStatistics);
 
 module.exports = router;
 

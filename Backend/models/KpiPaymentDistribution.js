@@ -2,10 +2,10 @@ const mongoose = require('mongoose');
 
 const kpiPaymentDistributionSchema = new mongoose.Schema(
   {
-    // Kimga to'lov (agent yoki punkt)
+    // Kimga to'lov (agent, punkt yoki manager)
     recipientType: {
       type: String,
-      enum: ['agent', 'punkt'],
+      enum: ['agent', 'punkt', 'manager'],
       required: [true, 'Qabul qiluvchi turi kiritilishi shart'],
     },
     recipient: {
@@ -16,13 +16,7 @@ const kpiPaymentDistributionSchema = new mongoose.Schema(
     recipientModel: {
       type: String,
       required: true,
-      enum: ['Agent', 'Punkt'],
-    },
-    // Agent bo'lsa, uning turi
-    agentType: {
-      type: String,
-      enum: ['viloyat', 'tuman', 'mfy'],
-      default: null,
+      enum: ['Agent', 'Punkt', 'ViloyatManager'],
     },
     // To'lov summasi
     amount: {
@@ -74,7 +68,6 @@ const kpiPaymentDistributionSchema = new mongoose.Schema(
 // Indexes
 kpiPaymentDistributionSchema.index({ recipientType: 1, recipient: 1 });
 kpiPaymentDistributionSchema.index({ status: 1 });
-kpiPaymentDistributionSchema.index({ agentType: 1 });
 kpiPaymentDistributionSchema.index({ createdAt: -1 });
 kpiPaymentDistributionSchema.index({ paidAt: -1 });
 

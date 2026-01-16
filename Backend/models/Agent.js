@@ -13,7 +13,7 @@ const agentSchema = new mongoose.Schema(
     viloyat: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Region',
-      required: [true, 'Viloyat is required'],
+      default: null,
     },
     tuman: {
       type: mongoose.Schema.Types.ObjectId,
@@ -62,16 +62,7 @@ const agentSchema = new mongoose.Schema(
   }
 );
 
-// Virtual field for agent type based on selected regions
-agentSchema.virtual('agentType').get(function () {
-  if (this.mfy) {
-    return 'mfy'; // MFY agent
-  } else if (this.tuman) {
-    return 'tuman'; // Tuman agent
-  } else {
-    return 'viloyat'; // Viloyat agent
-  }
-});
+// Virtual field removed - all agents are the same, no type distinction needed
 
 // Hash password before saving
 agentSchema.pre('save', async function (next) {

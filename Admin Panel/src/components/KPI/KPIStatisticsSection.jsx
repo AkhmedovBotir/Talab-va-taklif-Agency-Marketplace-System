@@ -9,8 +9,6 @@ import {
   PendingActions,
   Store,
   LocationCity,
-  Business,
-  Home,
   SwapHoriz,
 } from '@mui/icons-material';
 
@@ -158,7 +156,7 @@ const KPIStatisticsSection = () => {
       {/* Distribution Stats */}
       <div>
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Taqsimlash bo'yicha</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             icon={Store}
             label="Punktlar"
@@ -167,21 +165,9 @@ const KPIStatisticsSection = () => {
           />
           <StatCard
             icon={LocationCity}
-            label="Viloyat agentlari"
-            value={`${formatNumber(statistics?.totalViloyatAgent)} so'm`}
+            label="Agentlar"
+            value={`${formatNumber(statistics?.totalAgent || statistics?.totalViloyatAgent || statistics?.totalTumanAgent || statistics?.totalMfyAgent)} so'm`}
             color="bg-indigo-100 text-indigo-600"
-          />
-          <StatCard
-            icon={Business}
-            label="Tuman agentlari"
-            value={`${formatNumber(statistics?.totalTumanAgent)} so'm`}
-            color="bg-cyan-100 text-cyan-600"
-          />
-          <StatCard
-            icon={Home}
-            label="MFY agentlari"
-            value={`${formatNumber(statistics?.totalMfyAgent)} so'm`}
-            color="bg-teal-100 text-teal-600"
           />
           <StatCard
             icon={AccountBalance}

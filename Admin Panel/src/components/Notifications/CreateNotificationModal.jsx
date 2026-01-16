@@ -7,9 +7,7 @@ import { useSnackbar } from '../../contexts/SnackbarContext';
 const targetTypes = [
   { value: 'all', label: 'Barchaga' },
   { value: 'punkts', label: 'Punktlar' },
-  { value: 'viloyat_agents', label: 'Viloyat agentlari' },
-  { value: 'tuman_agents', label: 'Tuman agentlari' },
-  { value: 'mfy_agents', label: 'MFY agentlari' },
+  { value: 'agents', label: 'Agentlar' },
   { value: 'marketplace_users', label: 'Marketplace foydalanuvchilari' },
   { value: 'contragents', label: 'Kontragentlar' },
 ];

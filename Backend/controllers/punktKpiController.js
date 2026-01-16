@@ -4,11 +4,7 @@ const CUSTOMER_CONFIRMED_STATUS = 'confirmed_by_customer';
 
 const buildPunktBaseFilter = (punktId) => ({
   orderStatus: CUSTOMER_CONFIRMED_STATUS,
-  $or: [
-    { 'recipients.punkt': punktId },
-    { 'recipients.fromPunkt': punktId },
-    { 'recipients.toPunkt': punktId },
-  ],
+  'recipients.punkt': punktId,
 });
 
 const calculatePunktAmountForTransaction = (transaction, punktId) => {
@@ -20,20 +16,6 @@ const calculatePunktAmountForTransaction = (transaction, punktId) => {
     transaction.recipients.punkt.toString() === punktIdStr
   ) {
     amount += transaction.amounts.punkt || 0;
-  }
-
-  if (
-    transaction.recipients.fromPunkt &&
-    transaction.recipients.fromPunkt.toString() === punktIdStr
-  ) {
-    amount += transaction.recipients.fromPunktAmount || 0;
-  }
-
-  if (
-    transaction.recipients.toPunkt &&
-    transaction.recipients.toPunkt.toString() === punktIdStr
-  ) {
-    amount += transaction.recipients.toPunktAmount || 0;
   }
 
   return amount;
@@ -206,8 +188,7 @@ const getMyKpiTransactions = async (req, res) => {
       .populate('order', 'orderNumber status totalPrice')
       .populate('orderItem.product', 'name price productCode')
       .populate('distributionConfig', 'name')
-      .populate('recipients.fromPunkt', 'name phone')
-      .populate('recipients.toPunkt', 'name phone')
+      .populate('recipients.punkt', 'name phone')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -216,7 +197,6 @@ const getMyKpiTransactions = async (req, res) => {
     const transactionsWithAmount = transactions.map((transaction) => {
       const transactionObj = transaction.toObject();
       let punktAmount = 0;
-      let bonusType = '';
 
       // Regular punkt bonus
       if (
@@ -224,29 +204,9 @@ const getMyKpiTransactions = async (req, res) => {
         transaction.recipients.punkt.toString() === punkt._id.toString()
       ) {
         punktAmount += transaction.amounts.punkt || 0;
-        bonusType = 'regular';
-      }
-
-      // From punkt transfer bonus
-      if (
-        transaction.recipients.fromPunkt &&
-        transaction.recipients.fromPunkt.toString() === punkt._id.toString()
-      ) {
-        punktAmount += transaction.recipients.fromPunktAmount || 0;
-        bonusType = 'from_punkt';
-      }
-
-      // To punkt transfer bonus
-      if (
-        transaction.recipients.toPunkt &&
-        transaction.recipients.toPunkt.toString() === punkt._id.toString()
-      ) {
-        punktAmount += transaction.recipients.toPunktAmount || 0;
-        bonusType = 'to_punkt';
       }
 
       transactionObj.punktAmount = punktAmount;
-      transactionObj.bonusType = bonusType;
       return transactionObj;
     });
 

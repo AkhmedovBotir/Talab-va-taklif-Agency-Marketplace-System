@@ -20,6 +20,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [punkt, setPunkt] = useState<Punkt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // isAuthenticated ni computed property sifatida emas, balki to'g'ridan-to'g'ri hisoblaymiz
+  const isAuthenticated = !!token;
 
 
   const loadStoredAuth = async () => {
@@ -30,12 +33,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]);
 
       if (storedToken && storedPunkt) {
-        setToken(storedToken);
-        setPunkt(JSON.parse(storedPunkt));
-        apiService.setToken(storedToken);
+        try {
+          // Punkt ma'lumotlarini parse qilish
+          const parsedPunkt = JSON.parse(storedPunkt);
+          
+          // Token va punkt ma'lumotlarini restore qilish
+          // Avval apiService ga token o'rnatamiz
+          apiService.setToken(storedToken);
+          
+          // Keyin state ga o'rnatamiz - bu asinxron, lekin darhol ishlaydi
+          // React state updates asinxron, shuning uchun biz state ni darhol yangilaymiz
+          setToken(storedToken);
+          setPunkt(parsedPunkt);
+          
+          // Token validation - biror API so'rovi yuborib token yaroqliligini tekshirish
+          // Agar token yaroqsiz bo'lsa, faqat clear qilamiz, logout emas
+          apiService.setValidatingToken(true);
+          
+          try {
+            // Minimal API so'rovi yuborib token yaroqliligini tekshirish
+            // Masalan, notifications count so'rovi
+            // Timeout qo'shamiz - 5 soniyadan keyin timeout bo'ladi
+            const validationPromise = apiService.getUnreadNotificationsCount();
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Validation timeout')), 5000);
+            });
+            
+            await Promise.race([
+              validationPromise,
+              timeoutPromise,
+            ]);
+            
+            // Validation muvaffaqiyatli bo'lsa, token va punkt to'g'ri o'rnatilgan
+            // State yangilanishini kutmaysiz, chunki React buni o'zi boshqaradi
+            // Lekin biz token va punkt ni to'g'ri o'rnatganimizga ishonch hosil qilamiz
+          } catch (error: any) {
+            // Faqat 401 xatosi bo'lsa, token yaroqsiz deb hisoblaymiz
+            // Boshqa xatolar (network, timeout, va h.k.) uchun token saqlanadi
+            if (error.status === 401) {
+              // Token yaroqsiz bo'lsa, faqat clear qilamiz, logout emas
+              setToken(null);
+              setPunkt(null);
+              apiService.setToken(null);
+              await Promise.all([
+                AsyncStorage.removeItem(TOKEN_KEY),
+                AsyncStorage.removeItem(PUNKT_KEY),
+              ]);
+            }
+            // Token saqlanadi, chunki bu network yoki timeout xatosi
+          } finally {
+            apiService.setValidatingToken(false);
+          }
+        } catch (parseError) {
+          console.error('Error parsing punkt data:', parseError);
+          // Parse xatosi bo'lsa, ma'lumotlarni tozalaymiz
+          setToken(null);
+          setPunkt(null);
+          apiService.setToken(null);
+          await Promise.all([
+            AsyncStorage.removeItem(TOKEN_KEY),
+            AsyncStorage.removeItem(PUNKT_KEY),
+          ]);
+        }
       }
     } catch (error) {
       console.error('Error loading stored auth:', error);
+      // Xatolik bo'lsa, ma'lumotlarni tozalaymiz
+      setToken(null);
+      setPunkt(null);
+      apiService.setToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -56,23 +122,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Check if response has data with token and punkt
       if (response.data && 'token' in response.data && 'punkt' in response.data) {
         const { token: newToken, punkt: newPunkt } = response.data;
+        
+        console.log('✅ Token topildi:', newToken ? 'Mavjud' : 'Yo\'q');
+        console.log('✅ Punkt topildi:', newPunkt ? 'Mavjud' : 'Yo\'q');
+        console.log('📦 Punkt data:', JSON.stringify(newPunkt, null, 2));
 
         if (newToken && newPunkt) {
+          console.log('💾 Token va Punkt saqlanmoqda...');
+          console.log('📦 Token uzunligi:', newToken.length);
+          console.log('📦 Punkt name:', newPunkt.name);
+          
+          // Avval state ga o'rnatamiz
           setToken(newToken);
           setPunkt(newPunkt);
           apiService.setToken(newToken);
-
-          await Promise.all([
-            AsyncStorage.setItem(TOKEN_KEY, newToken),
-            AsyncStorage.setItem(PUNKT_KEY, JSON.stringify(newPunkt)),
-          ]);
+          
+          console.log('✅ State ga o\'rnatildi');
+          
+          // Keyin AsyncStorage ga saqlaymiz
+          try {
+            await Promise.all([
+              AsyncStorage.setItem(TOKEN_KEY, newToken),
+              AsyncStorage.setItem(PUNKT_KEY, JSON.stringify(newPunkt)),
+            ]);
+            
+            console.log('✅ AsyncStorage ga saqlandi');
+            
+            // Saqlangan ma'lumotlarni tekshirib ko'ramiz
+            const [savedToken, savedPunkt] = await Promise.all([
+              AsyncStorage.getItem(TOKEN_KEY),
+              AsyncStorage.getItem(PUNKT_KEY),
+            ]);
+            
+            if (savedToken === newToken) {
+              console.log('✅ Token to\'g\'ri saqlandi');
+            } else {
+              console.error('❌ Token saqlashda muammo - tokenlar mos kelmaydi');
+            }
+            
+            if (savedPunkt) {
+              const savedPunktParsed = JSON.parse(savedPunkt);
+              if (savedPunktParsed._id === newPunkt._id) {
+                console.log('✅ Punkt to\'g\'ri saqlandi');
+              } else {
+                console.error('❌ Punkt saqlashda muammo - punktlar mos kelmaydi');
+              }
+            }
+            
+            console.log('✅ Token va Punkt muvaffaqiyatli saqlandi va tekshirildi');
+          } catch (storageError) {
+            console.error('❌ AsyncStorage ga saqlashda xatolik:', storageError);
+            throw storageError;
+          }
         } else {
+          console.error('❌ Token yoki Punkt yo\'q');
           throw new Error('Invalid login response: missing token or punkt');
         }
       } else {
+        console.error('❌ Response.data yoki token/punkt yo\'q');
+        console.error('❌ Response structure:', JSON.stringify(response, null, 2));
         throw new Error('Invalid login response');
       }
     } catch (error) {
+      console.error('❌ Login xatosi:', error);
       throw error;
     }
   };
@@ -105,13 +217,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadStoredAuth();
-    
+  }, []);
+
+  // Set device error callback separately to avoid dependency issues
+  useEffect(() => {
     // Set device error callback to logout user
+    // This callback should only be set once, not re-set when logout changes
     apiService.setOnDeviceError(() => {
       logout();
     });
   }, [logout]);
-
+  
+  console.log('🔄 AuthProvider render - token:', token ? 'Mavjud' : 'Yo\'q', 'isAuthenticated:', isAuthenticated);
+  
   return (
     <AuthContext.Provider
       value={{
@@ -120,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         logout,
-        isAuthenticated: !!token,
+        isAuthenticated,
       }}
     >
       {children}

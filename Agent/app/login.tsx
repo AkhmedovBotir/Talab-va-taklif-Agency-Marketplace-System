@@ -157,19 +157,8 @@ export default function LoginScreen() {
         errorMessage.toLowerCase().includes('tasdiqlash');
       const statusCode = error.response?.status || error.status || 0;
       
-      // Debug log
-      console.log('Login error:', {
-        statusCode,
-        requiresVerification,
-        responseData,
-        errorMessage,
-        fullError: error,
-      });
-      
       if ((statusCode === 403 || statusCode === 400) && requiresVerification) {
         // Device verification required - don't show error, open modal
-        console.log('Opening device verification modal');
-        console.log('Error response data:', responseData);
         
         // Use phone and deviceId from error response if available
         const errorData = responseData.data || {};
@@ -233,16 +222,6 @@ export default function LoginScreen() {
 
     setDeviceVerificationLoading(true);
     try {
-      console.log('Requesting device verification code:', {
-        phone: getFullPhoneNumber(phone),
-        deviceId: deviceInfo.deviceId,
-        deviceName: deviceInfo.deviceName,
-        deviceType: deviceInfo.deviceType,
-        platform: deviceInfo.platform,
-        os: deviceInfo.os,
-        browser: deviceInfo.browser,
-      });
-
       const response = await apiService.requestDeviceVerificationCode({
         phone: getFullPhoneNumber(phone),
         deviceId: deviceInfo.deviceId,
@@ -253,8 +232,6 @@ export default function LoginScreen() {
         browser: deviceInfo.browser,
         userAgent: getUserAgent(),
       });
-
-      console.log('Device verification code response:', response);
 
       if (response.success) {
         // Don't show alert, just move to verify step
@@ -288,11 +265,6 @@ export default function LoginScreen() {
       console.error('Device verification code error:', error);
       const errorData = error.response?.data || {};
       const errorMessage = errorData.message || error.message || 'Kod yuborishda xatolik yuz berdi';
-      console.log('Error details:', {
-        status: error.response?.status,
-        data: errorData,
-        message: errorMessage,
-      });
       
       // Check if device not found error
       const isDeviceNotFound = errorMessage.toLowerCase().includes('qurilma topilmadi') ||

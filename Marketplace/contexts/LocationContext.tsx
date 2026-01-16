@@ -47,7 +47,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
             setSelectedViloyatState(response.data.viloyat);
           } else {
             setSelectedViloyatState(null);
-          }
+        }
           
           if (response.data.tuman && typeof response.data.tuman === 'object') {
             setSelectedTumanState(response.data.tuman);

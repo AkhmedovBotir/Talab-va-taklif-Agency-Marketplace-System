@@ -13,11 +13,13 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiService } from '../../services/api';
-import type { KPISummary } from '../../types/api';
+import type { Agent, KPISummary } from '../../types/api';
 
 export default function ProfileScreen() {
-  const { agent, role, logout } = useAuth();
+  const { logout } = useAuth();
   const router = useRouter();
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [kpiSummary, setKpiSummary] = useState<KPISummary | null>(null);
   const [loadingKPI, setLoadingKPI] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -41,9 +43,24 @@ export default function ProfileScreen() {
   };
 
   useEffect(() => {
+    loadProfile();
     loadKPISummary();
     loadUnreadCount();
   }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoadingProfile(true);
+      const response = await apiService.getAgentProfile();
+      if (response.success && response.data) {
+        setAgent(response.data);
+      }
+    } catch (error: any) {
+      console.error('Profile load error:', error);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
 
   const loadUnreadCount = async () => {
     try {
@@ -58,24 +75,24 @@ export default function ProfileScreen() {
     try {
       const response = await apiService.getKPISummary();
       if (response.success) {
-        setKpiSummary(response.data.summary);
+        setKpiSummary(response.data);
       }
     } catch (error: any) {
       // Silently fail - KPI is optional
-      console.log('KPI summary load error:', error);
     } finally {
       setLoadingKPI(false);
     }
   };
 
-  const getRoleText = (role: string | null) => {
-    const roleMap: Record<string, string> = {
-      viloyat: 'Viloyat agenti',
-      tuman: 'Tuman agenti',
-      mfy: 'MFY agenti',
-    };
-    return roleMap[role || ''] || role || 'Noma\'lum';
-  };
+
+  if (loadingProfile) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Ma'lumotlar yuklanmoqda...</Text>
+      </View>
+    );
+  }
 
   if (!agent) {
     return (
@@ -87,12 +104,70 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={48} color="#007AFF" />
+      <View style={styles.headerCard}>
+        <View style={styles.headerTop}>
+          <View style={styles.headerTitleSection}>
+            <Text style={styles.name}>{agent.name}</Text>
+            <View style={styles.roleBadge}>
+              <Ionicons name="person-circle" size={14} color="#007AFF" />
+              <Text style={styles.role}>Agent</Text>
+            </View>
+          </View>
+          {agent.status === 'active' && (
+            <View style={styles.statusBadge}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>Faol</Text>
+            </View>
+          )}
         </View>
-        <Text style={styles.name}>{agent.name}</Text>
-        <Text style={styles.role}>{getRoleText(role)}</Text>
+
+        <View style={styles.infoGrid}>
+          <View style={styles.infoItem}>
+            <View style={styles.infoIconWrapper}>
+              <Ionicons name="call" size={18} color="#007AFF" />
+            </View>
+            <View style={styles.infoTextWrapper}>
+              <Text style={styles.infoLabel}>Telefon</Text>
+              <Text style={styles.infoValue}>{agent.phone}</Text>
+            </View>
+          </View>
+
+          {agent.viloyat && (
+            <View style={styles.infoItem}>
+              <View style={styles.infoIconWrapper}>
+                <Ionicons name="location" size={18} color="#007AFF" />
+              </View>
+              <View style={styles.infoTextWrapper}>
+                <Text style={styles.infoLabel}>Viloyat</Text>
+                <Text style={styles.infoValue}>{agent.viloyat.name}</Text>
+              </View>
+            </View>
+          )}
+
+          {agent.tuman && (
+            <View style={styles.infoItem}>
+              <View style={styles.infoIconWrapper}>
+                <Ionicons name="location" size={18} color="#007AFF" />
+              </View>
+              <View style={styles.infoTextWrapper}>
+                <Text style={styles.infoLabel}>Tuman</Text>
+                <Text style={styles.infoValue}>{agent.tuman.name}</Text>
+              </View>
+            </View>
+          )}
+
+          {agent.mfy && (
+            <View style={styles.infoItem}>
+              <View style={styles.infoIconWrapper}>
+                <Ionicons name="location" size={18} color="#007AFF" />
+              </View>
+              <View style={styles.infoTextWrapper}>
+                <Text style={styles.infoLabel}>MFY</Text>
+                <Text style={styles.infoValue}>{agent.mfy.name}</Text>
+              </View>
+            </View>
+          )}
+        </View>
       </View>
 
       {!loadingKPI && kpiSummary && (
@@ -104,7 +179,7 @@ export default function ProfileScreen() {
                 <Ionicons name="wallet" size={24} color="#007AFF" />
                 <Text style={styles.kpiLabel}>Jami bonus</Text>
                 <Text style={styles.kpiValue}>
-                  {kpiSummary.totalAmount.toLocaleString()} so'm
+                  {(kpiSummary.totalAmount || 0).toLocaleString()} so'm
                 </Text>
               </View>
             </View>
@@ -113,20 +188,20 @@ export default function ProfileScreen() {
                 <Ionicons name="checkmark-circle" size={20} color="#34C759" />
                 <Text style={styles.kpiLabel}>To'langan</Text>
                 <Text style={[styles.kpiValue, styles.kpiValuePaid]}>
-                  {kpiSummary.paidAmount.toLocaleString()} so'm
+                  {(kpiSummary.paidAmount || 0).toLocaleString()} so'm
                 </Text>
               </View>
               <View style={[styles.kpiItem, styles.kpiItemHalf]}>
                 <Ionicons name="time" size={20} color="#FF9500" />
                 <Text style={styles.kpiLabel}>To'lanmagan</Text>
                 <Text style={[styles.kpiValue, styles.kpiValueUnpaid]}>
-                  {kpiSummary.unpaidAmount.toLocaleString()} so'm
+                  {(kpiSummary.unpaidAmount || 0).toLocaleString()} so'm
                 </Text>
               </View>
             </View>
             <View style={styles.kpiFooter}>
               <Text style={styles.kpiTransactions}>
-                Jami transaksiyalar: {kpiSummary.totalTransactions}
+                Jami transaksiyalar: {kpiSummary.totalTransactions || 0}
               </Text>
             </View>
           </View>
@@ -169,43 +244,6 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Shaxsiy ma'lumotlar</Text>
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Ionicons name="call" size={20} color="#007AFF" />
-            <Text style={styles.infoLabel}>Telefon:</Text>
-            <Text style={styles.infoValue}>{agent.phone}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="location" size={20} color="#007AFF" />
-            <Text style={styles.infoLabel}>Viloyat:</Text>
-            <Text style={styles.infoValue}>{agent.viloyat.name}</Text>
-          </View>
-          {agent.tuman && (
-            <View style={styles.infoRow}>
-              <Ionicons name="location" size={20} color="#007AFF" />
-              <Text style={styles.infoLabel}>Tuman:</Text>
-              <Text style={styles.infoValue}>{agent.tuman.name}</Text>
-            </View>
-          )}
-          {agent.mfy && (
-            <View style={styles.infoRow}>
-              <Ionicons name="location" size={20} color="#007AFF" />
-              <Text style={styles.infoLabel}>MFY:</Text>
-              <Text style={styles.infoValue}>{agent.mfy.name}</Text>
-            </View>
-          )}
-          <View style={styles.infoRow}>
-            <Ionicons name="shield-checkmark" size={20} color="#007AFF" />
-            <Text style={styles.infoLabel}>Holat:</Text>
-            <Text style={[styles.infoValue, styles.statusActive]}>
-              {agent.status === 'active' ? 'Faol' : agent.status}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
           <Text style={styles.logoutButtonText}>Hisobdan chiqish</Text>
@@ -231,67 +269,119 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
   },
-  header: {
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    paddingVertical: 32,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 12,
   },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
+  headerCard: {
+    backgroundColor: '#fff',
+    margin: 16,
+    marginBottom: 0,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  headerTitleSection: {
+    flex: 1,
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    color: '#1a1a1a',
+    marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#F0F7FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   role: {
-    fontSize: 16,
-    color: '#666',
-  },
-  section: {
-    marginTop: 16,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
+    fontSize: 13,
+    color: '#007AFF',
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
   },
-  infoCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#34C759',
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#34C759',
+    fontWeight: '600',
+  },
+  infoGrid: {
     gap: 16,
   },
-  infoRow: {
+  infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '600',
-    minWidth: 80,
+  infoIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F0F7FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  infoValue: {
-    fontSize: 14,
-    color: '#333',
+  infoTextWrapper: {
     flex: 1,
   },
-  statusActive: {
-    color: '#34C759',
+  infoLabel: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '500',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  infoValue: {
+    fontSize: 16,
+    color: '#1a1a1a',
     fontWeight: '600',
+  },
+  section: {
+    marginTop: 20,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
+    letterSpacing: 0.3,
   },
   logoutButton: {
     flexDirection: 'row',

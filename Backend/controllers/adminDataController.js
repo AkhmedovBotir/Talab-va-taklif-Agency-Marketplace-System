@@ -639,8 +639,16 @@ const getMarketplaceUserByIdForAdmin = async (req, res) => {
 
 // Helper function to calculate order statistics
 const calculateOrderStatistics = async (filter) => {
+  // Ensure only tuman orders are included (and old orders without orderType)
+  const finalFilter = {
+    ...filter,
+    $or: [
+      { orderType: 'tuman' },
+      { orderType: { $exists: false } }, // Old orders without orderType field
+    ],
+  };
   const stats = await Order.aggregate([
-    { $match: filter },
+    { $match: finalFilter },
     {
       $group: {
         _id: null,
@@ -964,6 +972,28 @@ const getAllOrdersForAdmin = async (req, res) => {
       ];
     }
 
+    // Add orderType filter (includes old orders without orderType field)
+    // Use $and to combine with existing $or if present
+    const orderTypeCondition = {
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
+    };
+    
+    if (filter.$or) {
+      // If $or already exists, use $and to combine
+      const existingOr = filter.$or;
+      delete filter.$or;
+      filter.$and = [
+        { $or: existingOr },
+        orderTypeCondition,
+      ];
+    } else {
+      // If no $or, add orderType condition directly
+      filter.$or = orderTypeCondition.$or;
+    }
+
     // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -1051,66 +1081,138 @@ const getOrderByIdForAdmin = async (req, res) => {
   }
 };
 
-// Get marketplace orders (yangi buyurtmalar)
-const getMarketplaceOrdersForAdmin = async (req, res) => {
+// ==================== TUMAN KONTRAGENTLARI SOTUVI ====================
+
+// Helper function to build base filter for tuman orders
+const buildTumanOrderFilter = (additionalFilter = {}) => {
+  return {
+    ...additionalFilter,
+    $or: [
+      { orderType: 'tuman' },
+      { orderType: { $exists: false } }, // Old orders without orderType field
+    ],
+    // Exclude MaxallaProduct orders
+    items: { $not: { $elemMatch: { productType: 'maxalla' } } },
+  };
+};
+
+// Helper function to add common filters to order filter
+const addCommonFilters = (filter, query) => {
+  const {
+    status,
+    paymentStatus,
+    paymentMethod,
+    orderNumber,
+    user,
+    startDate,
+    endDate,
+    minTotalPrice,
+    maxTotalPrice,
+    search,
+  } = query;
+
+  if (status) filter.status = status;
+  if (paymentStatus) filter.paymentStatus = paymentStatus;
+  if (paymentMethod) filter.paymentMethod = paymentMethod;
+  if (user) filter.user = user;
+  if (orderNumber) filter.orderNumber = { $regex: orderNumber, $options: 'i' };
+
+  if (startDate || endDate) {
+    filter.createdAt = filter.createdAt || {};
+    if (startDate) filter.createdAt.$gte = new Date(startDate);
+    if (endDate) filter.createdAt.$lte = new Date(endDate);
+  }
+
+  if (minTotalPrice || maxTotalPrice) {
+    filter.totalPrice = filter.totalPrice || {};
+    if (minTotalPrice) filter.totalPrice.$gte = parseFloat(minTotalPrice);
+    if (maxTotalPrice) filter.totalPrice.$lte = parseFloat(maxTotalPrice);
+  }
+
+  if (search) {
+    const searchCondition = {
+      $or: [
+        { orderNumber: { $regex: search, $options: 'i' } },
+        { phoneNumber: { $regex: search, $options: 'i' } },
+      ],
+    };
+    if (filter.$and) {
+      filter.$and.push(searchCondition);
+    } else {
+      filter.$and = [searchCondition];
+    }
+  }
+
+  return filter;
+};
+
+// Get all tuman orders (barcha tuman buyurtmalari)
+const getAllTumanOrdersForAdmin = async (req, res) => {
   try {
     const {
       status,
       paymentStatus,
       paymentMethod,
+      user,
+      orderNumber,
       startDate,
       endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
       page = 1,
       limit = 50,
     } = req.query;
 
-    const filter = {
-      status: { $ne: 'cancelled' }, // Cancelled buyurtmalar kiritilmaydi
-      confirmedByPunkt: null, // Punkt qabul qilmagan buyurtmalar
-    };
+    const filter = buildTumanOrderFilter();
 
     // Additional filters
-    if (status) {
-      filter.status = status;
-    }
-
-    if (paymentStatus) {
-      filter.paymentStatus = paymentStatus;
-    }
-
-    if (paymentMethod) {
-      filter.paymentMethod = paymentMethod;
-    }
+    if (status) filter.status = status;
+    if (paymentStatus) filter.paymentStatus = paymentStatus;
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
+    if (user) filter.user = user;
+    if (orderNumber) filter.orderNumber = { $regex: orderNumber, $options: 'i' };
 
     // Date range filter
     if (startDate || endDate) {
       filter.createdAt = {};
-      if (startDate) {
-        filter.createdAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter.createdAt.$lte = new Date(endDate);
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    // Total price range filter
+    if (minTotalPrice || maxTotalPrice) {
+      filter.totalPrice = {};
+      if (minTotalPrice) filter.totalPrice.$gte = parseFloat(minTotalPrice);
+      if (maxTotalPrice) filter.totalPrice.$lte = parseFloat(maxTotalPrice);
+    }
+
+    // Search filter
+    if (search) {
+      const searchCondition = {
+        $or: [
+          { orderNumber: { $regex: search, $options: 'i' } },
+          { phoneNumber: { $regex: search, $options: 'i' } },
+        ],
+      };
+      if (filter.$and) {
+        filter.$and.push(searchCondition);
+      } else {
+        filter.$and = [searchCondition];
       }
     }
 
-    // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get total count
     const total = await Order.countDocuments(filter);
-
-    // Calculate statistics
     const statistics = await calculateOrderStatistics(filter);
-
-    // Get orders with pagination and full population
     const orders = await populateOrderDetails(Order.find(filter))
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    // Remove kpiBonusPercent from product objects
     const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
@@ -1131,7 +1233,7 @@ const getMarketplaceOrdersForAdmin = async (req, res) => {
       data: ordersWithoutKpi,
     });
   } catch (error) {
-    console.error('Error fetching marketplace orders for admin:', error);
+    console.error('Error fetching all tuman orders:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -1140,64 +1242,51 @@ const getMarketplaceOrdersForAdmin = async (req, res) => {
   }
 };
 
-// Get orders delivered to punkt (punktga yuborilgan)
-const getOrdersDeliveredToPunktForAdmin = async (req, res) => {
+// Get tuman orders from marketplace (marketplace dan buyurilgan)
+const getTumanOrdersFromMarketplaceForAdmin = async (req, res) => {
   try {
     const {
       status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
       startDate,
       endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
       page = 1,
       limit = 50,
     } = req.query;
 
-    const filter = {
-      'contragentRequests.status': 'delivered_to_punkt',
-    };
+    const filter = buildTumanOrderFilter({
+      status: { $ne: 'cancelled' },
+      confirmedByPunkt: null, // Punkt qabul qilmagan
+    });
 
-    if (status) {
-      filter.status = status;
-    }
+    if (status) filter.status = status;
+    if (paymentStatus) filter.paymentStatus = paymentStatus;
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
 
-    // Date range filter
     if (startDate || endDate) {
-      filter['contragentRequests.deliveredToPunktAt'] = {};
-      if (startDate) {
-        filter['contragentRequests.deliveredToPunktAt'].$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter['contragentRequests.deliveredToPunktAt'].$lte = new Date(endDate);
-      }
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
     }
 
-    // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get total count
     const total = await Order.countDocuments(filter);
-
-    // Calculate statistics
     const statistics = await calculateOrderStatistics(filter);
-
-    // Get orders
     const orders = await populateOrderDetails(Order.find(filter))
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    // Filter and format contragentRequests
-    const formattedOrders = orders.map((order) => {
-      const orderObj = order.toObject();
-      orderObj.contragentRequests = orderObj.contragentRequests.filter(
-        (req) => req.status === 'delivered_to_punkt'
-      );
-      return orderObj;
-    });
-
-    // Remove kpiBonusPercent
-    const ordersWithoutKpi = removeKpiFromOrders(formattedOrders);
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
       success: true,
@@ -1217,7 +1306,7 @@ const getOrdersDeliveredToPunktForAdmin = async (req, res) => {
       data: ordersWithoutKpi,
     });
   } catch (error) {
-    console.error('Error fetching orders delivered to punkt:', error);
+    console.error('Error fetching tuman orders from marketplace:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -1226,80 +1315,58 @@ const getOrdersDeliveredToPunktForAdmin = async (req, res) => {
   }
 };
 
-// Get orders confirmed by punkt but nothing done yet (punkt qabul qilgan, lekin hech narsa qilinmagan)
-const getOrdersConfirmedByPunktForAdmin = async (req, res) => {
+// Get tuman orders confirmed by punkt (punkt qabul qilgan)
+const getTumanOrdersConfirmedByPunktForAdmin = async (req, res) => {
   try {
     const {
       status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
       startDate,
       endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
       page = 1,
       limit = 50,
     } = req.query;
 
-    // Punkt qabul qilgan, lekin hech narsa qilinmagan buyurtmalar
-    // Shartlar:
-    // 1. confirmedByPunkt bor
-    // 2. contragentRequests bo'sh YOKI hammasi pending/rejected (hech biri accepted yoki delivered_to_punkt emas)
-    // 3. assignedToAgent null
-    const filter = {
+    const filter = buildTumanOrderFilter({
       confirmedByPunkt: { $ne: null },
       assignedToAgent: null,
-    };
-    
-    // Contragent so'rovlari bo'sh yoki faqat pending/rejected bo'lishi kerak
-    // Bu MongoDB'da murakkab, shuning uchun keyinroq filter qilamiz
+    });
 
-    if (status) {
-      filter.status = status;
-    }
+    addCommonFilters(filter, req.query);
 
-    // Date range filter
-    if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) {
-        filter.createdAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter.createdAt.$lte = new Date(endDate);
-      }
-    }
-
-    // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get all matching orders first (for filtering)
+    // Get all matching orders first (for filtering contragentRequests)
     let allOrders = await Order.find(filter).lean();
     
     // Filter: contragentRequests bo'sh yoki hammasi pending/rejected
     allOrders = allOrders.filter((order) => {
       if (!order.contragentRequests || order.contragentRequests.length === 0) {
-        return true; // Hech qanday so'rov yo'q
+        return true;
       }
-      // Hammasi pending yoki rejected bo'lishi kerak
       return order.contragentRequests.every(
         (req) => req.status === 'pending' || req.status === 'rejected'
       );
     });
 
     const total = allOrders.length;
-    
-    // Get order IDs for statistics
     const orderIds = allOrders.map(o => o._id);
     const statistics = orderIds.length > 0 
       ? await calculateOrderStatistics({ _id: { $in: orderIds } })
       : await calculateOrderStatistics({ _id: { $in: [] } });
 
-    // Paginate filtered orders
     const paginatedOrderIds = orderIds.slice(skip, skip + limitNum);
-
-    // Get orders with full details
     const orders = await populateOrderDetails(Order.find({ _id: { $in: paginatedOrderIds } }))
       .sort({ createdAt: -1 });
 
-    // Remove kpiBonusPercent
     const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
@@ -1320,7 +1387,7 @@ const getOrdersConfirmedByPunktForAdmin = async (req, res) => {
       data: ordersWithoutKpi,
     });
   } catch (error) {
-    console.error('Error fetching orders confirmed by punkt:', error);
+    console.error('Error fetching tuman orders confirmed by punkt:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -1329,54 +1396,50 @@ const getOrdersConfirmedByPunktForAdmin = async (req, res) => {
   }
 };
 
-// Get orders requested to contragents (kontragentlarga yuborilgan)
-const getOrdersRequestedToContragentsForAdmin = async (req, res) => {
+// Get tuman orders requested to contragents (kontragentlarga yuborilgan)
+const getTumanOrdersRequestedToContragentsForAdmin = async (req, res) => {
   try {
     const {
       status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
       startDate,
       endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
       page = 1,
       limit = 50,
     } = req.query;
 
-    const filter = {
+    const filter = buildTumanOrderFilter({
       'contragentRequests.status': { $in: ['pending', 'accepted'] },
-    };
+    });
 
-    if (status) {
-      filter.status = status;
-    }
+    addCommonFilters(filter, req.query);
 
-    // Date range filter
+    // Override date filter for contragentRequests
     if (startDate || endDate) {
       filter['contragentRequests.requestedAt'] = {};
-      if (startDate) {
-        filter['contragentRequests.requestedAt'].$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter['contragentRequests.requestedAt'].$lte = new Date(endDate);
-      }
+      if (startDate) filter['contragentRequests.requestedAt'].$gte = new Date(startDate);
+      if (endDate) filter['contragentRequests.requestedAt'].$lte = new Date(endDate);
+      // Remove createdAt if it was added by addCommonFilters
+      delete filter.createdAt;
     }
 
-    // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get total count
     const total = await Order.countDocuments(filter);
-
-    // Calculate statistics
     const statistics = await calculateOrderStatistics(filter);
-
-    // Get orders
     const orders = await populateOrderDetails(Order.find(filter))
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    // Filter and format contragentRequests
     const formattedOrders = orders.map((order) => {
       const orderObj = order.toObject();
       orderObj.contragentRequests = orderObj.contragentRequests.filter(
@@ -1385,7 +1448,6 @@ const getOrdersRequestedToContragentsForAdmin = async (req, res) => {
       return orderObj;
     });
 
-    // Remove kpiBonusPercent
     const ordersWithoutKpi = removeKpiFromOrders(formattedOrders);
 
     res.status(200).json({
@@ -1406,7 +1468,7 @@ const getOrdersRequestedToContragentsForAdmin = async (req, res) => {
       data: ordersWithoutKpi,
     });
   } catch (error) {
-    console.error('Error fetching orders requested to contragents:', error);
+    console.error('Error fetching tuman orders requested to contragents:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -1415,54 +1477,123 @@ const getOrdersRequestedToContragentsForAdmin = async (req, res) => {
   }
 };
 
-// Get orders assigned to agents (agentga yuborilgan)
-const getOrdersAssignedToAgentsForAdmin = async (req, res) => {
+// Get tuman orders delivered to punkt (punktga yetkazilgan)
+const getTumanOrdersDeliveredToPunktForAdmin = async (req, res) => {
   try {
     const {
       status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
       startDate,
       endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
       page = 1,
       limit = 50,
     } = req.query;
 
-    const filter = {
-      assignedToAgent: { $ne: null },
-    };
+    const filter = buildTumanOrderFilter({
+      'contragentRequests.status': 'delivered_to_punkt',
+    });
 
-    if (status) {
-      filter.status = status;
-    }
+    addCommonFilters(filter, req.query);
 
-    // Date range filter
+    // Override date filter for contragentRequests
     if (startDate || endDate) {
-      filter.assignedAt = {};
-      if (startDate) {
-        filter.assignedAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter.assignedAt.$lte = new Date(endDate);
-      }
+      filter['contragentRequests.deliveredToPunktAt'] = {};
+      if (startDate) filter['contragentRequests.deliveredToPunktAt'].$gte = new Date(startDate);
+      if (endDate) filter['contragentRequests.deliveredToPunktAt'].$lte = new Date(endDate);
+      // Remove createdAt if it was added by addCommonFilters
+      delete filter.createdAt;
     }
 
-    // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get total count
     const total = await Order.countDocuments(filter);
-
-    // Calculate statistics
     const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
 
-    // Get orders
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching tuman orders delivered to punkt:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get tuman orders assigned to agents (agentga yuborilgan)
+const getTumanOrdersAssignedToAgentsForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildTumanOrderFilter({
+      assignedToAgent: { $ne: null },
+    });
+
+    addCommonFilters(filter, req.query);
+
+    // Override date filter for assignedAt
+    if (startDate || endDate) {
+      filter.assignedAt = {};
+      if (startDate) filter.assignedAt.$gte = new Date(startDate);
+      if (endDate) filter.assignedAt.$lte = new Date(endDate);
+      // Remove createdAt if it was added by addCommonFilters
+      delete filter.createdAt;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
     const orders = await populateOrderDetails(Order.find(filter))
       .sort({ assignedAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    // Remove kpiBonusPercent
     const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
@@ -1483,7 +1614,7 @@ const getOrdersAssignedToAgentsForAdmin = async (req, res) => {
       data: ordersWithoutKpi,
     });
   } catch (error) {
-    console.error('Error fetching orders assigned to agents:', error);
+    console.error('Error fetching tuman orders assigned to agents:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -1492,54 +1623,50 @@ const getOrdersAssignedToAgentsForAdmin = async (req, res) => {
   }
 };
 
-// Get orders confirmed by agents (agent topshirgan buyurtmalar)
-const getOrdersConfirmedByAgentsForAdmin = async (req, res) => {
+// Get tuman orders confirmed by agents (agent topshirgan)
+const getTumanOrdersConfirmedByAgentsForAdmin = async (req, res) => {
   try {
     const {
       status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
       startDate,
       endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
       page = 1,
       limit = 50,
     } = req.query;
 
-    const filter = {
+    const filter = buildTumanOrderFilter({
       confirmedByAgent: { $ne: null },
-    };
+    });
 
-    if (status) {
-      filter.status = status;
-    }
+    addCommonFilters(filter, req.query);
 
-    // Date range filter
+    // Override date filter for agentConfirmedAt
     if (startDate || endDate) {
       filter.agentConfirmedAt = {};
-      if (startDate) {
-        filter.agentConfirmedAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter.agentConfirmedAt.$lte = new Date(endDate);
-      }
+      if (startDate) filter.agentConfirmedAt.$gte = new Date(startDate);
+      if (endDate) filter.agentConfirmedAt.$lte = new Date(endDate);
+      // Remove createdAt if it was added by addCommonFilters
+      delete filter.createdAt;
     }
 
-    // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get total count
     const total = await Order.countDocuments(filter);
-
-    // Calculate statistics
     const statistics = await calculateOrderStatistics(filter);
-
-    // Get orders
     const orders = await populateOrderDetails(Order.find(filter))
       .sort({ agentConfirmedAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    // Remove kpiBonusPercent
     const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
@@ -1560,7 +1687,7 @@ const getOrdersConfirmedByAgentsForAdmin = async (req, res) => {
       data: ordersWithoutKpi,
     });
   } catch (error) {
-    console.error('Error fetching orders confirmed by agents:', error);
+    console.error('Error fetching tuman orders confirmed by agents:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -1569,54 +1696,50 @@ const getOrdersConfirmedByAgentsForAdmin = async (req, res) => {
   }
 };
 
-// Get orders confirmed by customers (foydalanuvchi qabul qilgan buyurtmalar)
-const getOrdersConfirmedByCustomersForAdmin = async (req, res) => {
+// Get tuman orders confirmed by customers (mijoz qabul qilgan)
+const getTumanOrdersConfirmedByCustomersForAdmin = async (req, res) => {
   try {
     const {
       status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
       startDate,
       endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
       page = 1,
       limit = 50,
     } = req.query;
 
-    const filter = {
+    const filter = buildTumanOrderFilter({
       customerConfirmed: true,
-    };
+    });
 
-    if (status) {
-      filter.status = status;
-    }
+    addCommonFilters(filter, req.query);
 
-    // Date range filter
+    // Override date filter for customerConfirmedAt
     if (startDate || endDate) {
       filter.customerConfirmedAt = {};
-      if (startDate) {
-        filter.customerConfirmedAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter.customerConfirmedAt.$lte = new Date(endDate);
-      }
+      if (startDate) filter.customerConfirmedAt.$gte = new Date(startDate);
+      if (endDate) filter.customerConfirmedAt.$lte = new Date(endDate);
+      // Remove createdAt if it was added by addCommonFilters
+      delete filter.createdAt;
     }
 
-    // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get total count
     const total = await Order.countDocuments(filter);
-
-    // Calculate statistics
     const statistics = await calculateOrderStatistics(filter);
-
-    // Get orders
     const orders = await populateOrderDetails(Order.find(filter))
       .sort({ customerConfirmedAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    // Remove kpiBonusPercent
     const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
@@ -1637,7 +1760,7 @@ const getOrdersConfirmedByCustomersForAdmin = async (req, res) => {
       data: ordersWithoutKpi,
     });
   } catch (error) {
-    console.error('Error fetching orders confirmed by customers:', error);
+    console.error('Error fetching tuman orders confirmed by customers:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -1646,49 +1769,49 @@ const getOrdersConfirmedByCustomersForAdmin = async (req, res) => {
   }
 };
 
-// Get cancelled orders (qaytarilgan buyurtmalar)
-const getCancelledOrdersForAdmin = async (req, res) => {
+// Get cancelled tuman orders (qaytarilgan)
+const getCancelledTumanOrdersForAdmin = async (req, res) => {
   try {
     const {
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
       startDate,
       endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
       page = 1,
       limit = 50,
     } = req.query;
 
-    const filter = {
+    const filter = buildTumanOrderFilter({
       status: 'cancelled',
-    };
+    });
 
-    // Date range filter
+    addCommonFilters(filter, req.query);
+
+    // Override date filter for updatedAt
     if (startDate || endDate) {
       filter.updatedAt = {};
-      if (startDate) {
-        filter.updatedAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        filter.updatedAt.$lte = new Date(endDate);
-      }
+      if (startDate) filter.updatedAt.$gte = new Date(startDate);
+      if (endDate) filter.updatedAt.$lte = new Date(endDate);
+      // Remove createdAt if it was added by addCommonFilters
+      delete filter.createdAt;
     }
 
-    // Pagination
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get total count
     const total = await Order.countDocuments(filter);
-
-    // Calculate statistics
     const statistics = await calculateOrderStatistics(filter);
-
-    // Get orders
     const orders = await populateOrderDetails(Order.find(filter))
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    // Remove kpiBonusPercent
     const ordersWithoutKpi = removeKpiFromOrders(orders);
 
     res.status(200).json({
@@ -1698,10 +1821,631 @@ const getCancelledOrdersForAdmin = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
       data: ordersWithoutKpi,
     });
   } catch (error) {
-    console.error('Error fetching cancelled orders:', error);
+    console.error('Error fetching cancelled tuman orders:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// ==================== MAXALLA DO'KONLARI SOTUVI ====================
+
+// Helper function to build base filter for maxalla/dokon orders
+const buildMaxallaOrderFilter = (additionalFilter = {}) => {
+  return {
+    ...additionalFilter,
+    $or: [
+      { orderType: 'dokon' },
+      { items: { $elemMatch: { productType: 'maxalla' } } }, // Orders with maxalla products
+    ],
+  };
+};
+
+// Get all maxalla orders (barcha maxalla buyurtmalari)
+const getAllMaxallaOrdersForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      paymentStatus,
+      paymentMethod,
+      user,
+      orderNumber,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildMaxallaOrderFilter();
+
+    // Additional filters
+    if (status) filter.status = status;
+    if (paymentStatus) filter.paymentStatus = paymentStatus;
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
+    if (user) filter.user = user;
+    if (orderNumber) filter.orderNumber = { $regex: orderNumber, $options: 'i' };
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    // Total price range filter
+    if (minTotalPrice || maxTotalPrice) {
+      filter.totalPrice = {};
+      if (minTotalPrice) filter.totalPrice.$gte = parseFloat(minTotalPrice);
+      if (maxTotalPrice) filter.totalPrice.$lte = parseFloat(maxTotalPrice);
+    }
+
+    // Search filter
+    if (search) {
+      const searchCondition = {
+        $or: [
+          { orderNumber: { $regex: search, $options: 'i' } },
+          { phoneNumber: { $regex: search, $options: 'i' } },
+        ],
+      };
+      if (filter.$and) {
+        filter.$and.push(searchCondition);
+      } else {
+        filter.$and = [searchCondition];
+      }
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching all maxalla orders:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get maxalla orders from marketplace (marketplace dan buyurilgan)
+const getMaxallaOrdersFromMarketplaceForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildMaxallaOrderFilter({
+      status: { $ne: 'cancelled' },
+      confirmedByPunkt: null, // Punkt qabul qilmagan
+    });
+
+    addCommonFilters(filter, req.query);
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching maxalla orders from marketplace:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get maxalla orders requested to contragents (kontragentlarga yuborilgan)
+const getMaxallaOrdersRequestedToContragentsForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildMaxallaOrderFilter({
+      'contragentRequests.status': { $in: ['pending', 'accepted'] },
+    });
+
+    addCommonFilters(filter, req.query);
+
+    // Override date filter for contragentRequests
+    if (startDate || endDate) {
+      filter['contragentRequests.requestedAt'] = {};
+      if (startDate) filter['contragentRequests.requestedAt'].$gte = new Date(startDate);
+      if (endDate) filter['contragentRequests.requestedAt'].$lte = new Date(endDate);
+      delete filter.createdAt;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const formattedOrders = orders.map((order) => {
+      const orderObj = order.toObject();
+      orderObj.contragentRequests = orderObj.contragentRequests.filter(
+        (req) => req.status === 'pending' || req.status === 'accepted'
+      );
+      return orderObj;
+    });
+
+    const ordersWithoutKpi = removeKpiFromOrders(formattedOrders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching maxalla orders requested to contragents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get maxalla orders delivered to punkt (punktga yetkazilgan)
+const getMaxallaOrdersDeliveredToPunktForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildMaxallaOrderFilter({
+      'contragentRequests.status': 'delivered_to_punkt',
+    });
+
+    addCommonFilters(filter, req.query);
+
+    // Override date filter for contragentRequests
+    if (startDate || endDate) {
+      filter['contragentRequests.deliveredToPunktAt'] = {};
+      if (startDate) filter['contragentRequests.deliveredToPunktAt'].$gte = new Date(startDate);
+      if (endDate) filter['contragentRequests.deliveredToPunktAt'].$lte = new Date(endDate);
+      delete filter.createdAt;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching maxalla orders delivered to punkt:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get maxalla orders assigned to agents (agentga yuborilgan)
+const getMaxallaOrdersAssignedToAgentsForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildMaxallaOrderFilter({
+      assignedToAgent: { $ne: null },
+    });
+
+    addCommonFilters(filter, req.query);
+
+    // Override date filter for assignedAt
+    if (startDate || endDate) {
+      filter.assignedAt = {};
+      if (startDate) filter.assignedAt.$gte = new Date(startDate);
+      if (endDate) filter.assignedAt.$lte = new Date(endDate);
+      delete filter.createdAt;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ assignedAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching maxalla orders assigned to agents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get maxalla orders confirmed by agents (agent topshirgan)
+const getMaxallaOrdersConfirmedByAgentsForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildMaxallaOrderFilter({
+      confirmedByAgent: { $ne: null },
+    });
+
+    addCommonFilters(filter, req.query);
+
+    // Override date filter for agentConfirmedAt
+    if (startDate || endDate) {
+      filter.agentConfirmedAt = {};
+      if (startDate) filter.agentConfirmedAt.$gte = new Date(startDate);
+      if (endDate) filter.agentConfirmedAt.$lte = new Date(endDate);
+      delete filter.createdAt;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ agentConfirmedAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching maxalla orders confirmed by agents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get maxalla orders confirmed by customers (mijoz qabul qilgan)
+const getMaxallaOrdersConfirmedByCustomersForAdmin = async (req, res) => {
+  try {
+    const {
+      status,
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildMaxallaOrderFilter({
+      customerConfirmed: true,
+    });
+
+    addCommonFilters(filter, req.query);
+
+    // Override date filter for customerConfirmedAt
+    if (startDate || endDate) {
+      filter.customerConfirmedAt = {};
+      if (startDate) filter.customerConfirmedAt.$gte = new Date(startDate);
+      if (endDate) filter.customerConfirmedAt.$lte = new Date(endDate);
+      delete filter.createdAt;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ customerConfirmedAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching maxalla orders confirmed by customers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Buyurtmalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get cancelled maxalla orders (qaytarilgan)
+const getCancelledMaxallaOrdersForAdmin = async (req, res) => {
+  try {
+    const {
+      paymentStatus,
+      paymentMethod,
+      orderNumber,
+      user,
+      startDate,
+      endDate,
+      minTotalPrice,
+      maxTotalPrice,
+      search,
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    const filter = buildMaxallaOrderFilter({
+      status: 'cancelled',
+    });
+
+    addCommonFilters(filter, req.query);
+
+    // Override date filter for updatedAt
+    if (startDate || endDate) {
+      filter.updatedAt = {};
+      if (startDate) filter.updatedAt.$gte = new Date(startDate);
+      if (endDate) filter.updatedAt.$lte = new Date(endDate);
+      delete filter.createdAt;
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Order.countDocuments(filter);
+    const statistics = await calculateOrderStatistics(filter);
+    const orders = await populateOrderDetails(Order.find(filter))
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const ordersWithoutKpi = removeKpiFromOrders(orders);
+
+    res.status(200).json({
+      success: true,
+      count: ordersWithoutKpi.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      statistics: {
+        totalOrders: statistics.totalOrders,
+        totalPrice: statistics.totalPrice,
+        totalOriginalPrice: statistics.totalOriginalPrice,
+        totalKpiPrice: statistics.totalKpiPrice,
+        totalItems: statistics.totalItems,
+        avgOrderValue: Math.round(statistics.avgOrderValue * 100) / 100,
+      },
+      data: ordersWithoutKpi,
+    });
+  } catch (error) {
+    console.error('Error fetching cancelled maxalla orders:', error);
     res.status(500).json({
       success: false,
       message: 'Buyurtmalarni olishda xatolik yuz berdi',
@@ -2266,19 +3010,8 @@ const getAgentsInRegion = async (req, res) => {
       filter.tuman = tuman;
     }
 
-    // Filter by agent type
-    if (agentType) {
-      if (agentType === 'mfy') {
-        filter.mfy = { $exists: true, $ne: null };
-      } else if (agentType === 'tuman') {
-        filter.tuman = { $exists: true, $ne: null };
-        filter.mfy = null;
-      } else if (agentType === 'viloyat') {
-        filter.viloyat = { $exists: true, $ne: null };
-        filter.tuman = null;
-        filter.mfy = null;
-      }
-    }
+    // Filter by agent type (deprecated - all agents are now the same)
+    // agentType filter is ignored - all agents are treated the same
 
     // Filter by status
     if (status) {
@@ -2465,18 +3198,8 @@ const getArchivedAgents = async (req, res) => {
       filter.mfy = mfy;
     }
 
-    // Filter by agent type
-    if (agentType) {
-      if (agentType === 'viloyat') {
-        filter.tuman = null;
-        filter.mfy = null;
-      } else if (agentType === 'tuman') {
-        filter.tuman = { $ne: null };
-        filter.mfy = null;
-      } else if (agentType === 'mfy') {
-        filter.mfy = { $ne: null };
-      }
-    }
+    // Filter by agent type (deprecated - all agents are the same now)
+    // agentType filter is ignored
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -2493,21 +3216,14 @@ const getArchivedAgents = async (req, res) => {
       .skip(skip)
       .limit(limitNum);
 
-    // Add agentType to each agent
-    const agentsWithType = agents.map((agent) => {
-      const agentObj = agent.toObject();
-      agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-      return agentObj;
-    });
-
     res.status(200).json({
       success: true,
-      count: agentsWithType.length,
+      count: agents.length,
       total,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
-      data: agentsWithType,
+      data: agents,
     });
   } catch (error) {
     console.error('Error fetching archived agents:', error);
@@ -2606,9 +3322,6 @@ const getArchivedAgentWithWork = async (req, res) => {
       });
     }
 
-    // Add agentType
-    const agentObj = agent.toObject();
-    agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
 
     const Order = require('../models/Order');
 
@@ -2634,7 +3347,7 @@ const getArchivedAgentWithWork = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      agent: agentObj,
+      agent: agent,
       statistics: {
         totalOrders: statistics.totalOrders,
         totalPrice: statistics.totalPrice,
@@ -2671,16 +3384,27 @@ module.exports = {
   getMarketplaceUserByIdForAdmin,
   getAllOrdersForAdmin,
   getOrderByIdForAdmin,
-  getMarketplaceOrdersForAdmin,
-  getOrdersConfirmedByPunktForAdmin,
-  getOrdersRequestedToContragentsForAdmin,
-  getOrdersDeliveredToPunktForAdmin,
-  getOrdersAssignedToAgentsForAdmin,
+  // Tuman kontragentlari sotuvi
+  getAllTumanOrdersForAdmin,
+  getTumanOrdersFromMarketplaceForAdmin,
+  getTumanOrdersConfirmedByPunktForAdmin,
+  getTumanOrdersRequestedToContragentsForAdmin,
+  getTumanOrdersDeliveredToPunktForAdmin,
+  getTumanOrdersAssignedToAgentsForAdmin,
+  getTumanOrdersConfirmedByAgentsForAdmin,
+  getTumanOrdersConfirmedByCustomersForAdmin,
+  getCancelledTumanOrdersForAdmin,
+  // Maxalla do'konlari sotuvi
+  getAllMaxallaOrdersForAdmin,
+  getMaxallaOrdersFromMarketplaceForAdmin,
+  getMaxallaOrdersRequestedToContragentsForAdmin,
+  getMaxallaOrdersDeliveredToPunktForAdmin,
+  getMaxallaOrdersAssignedToAgentsForAdmin,
+  getMaxallaOrdersConfirmedByAgentsForAdmin,
+  getMaxallaOrdersConfirmedByCustomersForAdmin,
+  getCancelledMaxallaOrdersForAdmin,
   getAgentsInRegion,
   getPunktsInRegion,
-  getOrdersConfirmedByAgentsForAdmin,
-  getOrdersConfirmedByCustomersForAdmin,
-  getCancelledOrdersForAdmin,
   // Sales Statistics
   getSalesStatsByViloyats,
   getSalesStatsByViloyatId,

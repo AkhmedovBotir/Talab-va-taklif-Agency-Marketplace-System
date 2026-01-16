@@ -31,10 +31,10 @@ router.get('/orders/history', getOrderHistory);
 // Get order by ID
 router.get('/orders/:id', getOrderById);
 
-// Confirm order by agent (MFY agentlari mijozga borib tasdiqlash)
+// Confirm order by agent (Agent mijozga borib tasdiqlash)
 router.post('/orders/:id/confirm', confirmOrderByAgent);
 
-// Mark order as delivered (MFY agentlari mijozga yetkazib berganini belgilash)
+// Mark order as delivered (Agent mijozga yetkazib berganini belgilash)
 router.post('/orders/:id/delivered', markOrderAsDelivered);
 
 // KPI Bonus endpoints

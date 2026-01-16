@@ -105,7 +105,7 @@ export default function PaymentsScreen() {
       const response = await apiService.getPaymentStatistics();
       setStatistics(response.data);
     } catch (err: any) {
-      console.error('Error fetching payment statistics:', err);
+      // Ignore payment statistics errors
     }
   };
 

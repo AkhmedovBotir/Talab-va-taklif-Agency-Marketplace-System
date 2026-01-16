@@ -207,9 +207,6 @@ const EditAgentModal = ({ open, onClose, onSuccess, agent }) => {
                         />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Agent turi avtomatik aniqlanadi: faqat viloyat → Viloyat Agent, viloyat + tuman → Tuman Agent, viloyat + tuman + MFY → MFY Agent
-                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

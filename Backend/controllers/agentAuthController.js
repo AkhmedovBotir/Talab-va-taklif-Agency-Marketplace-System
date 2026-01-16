@@ -254,7 +254,7 @@ const loginAgent = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: agent._id.toString(), phone: agent.phone, role: 'agent' },
+      { userId: agent._id.toString(), phone: agent.phone, type: 'agent' },
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -268,9 +268,6 @@ const loginAgent = async (req, res) => {
       await agent.populate('mfy', 'name type code');
     }
 
-    // Determine agent type
-    const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-
     res.status(200).json({
       success: true,
       message: 'Muvaffaqiyatli kirildi',
@@ -283,7 +280,6 @@ const loginAgent = async (req, res) => {
           viloyat: agent.viloyat,
           tuman: agent.tuman,
           mfy: agent.mfy,
-          agentType,
           status: agent.status,
           createdAt: agent.createdAt,
           updatedAt: agent.updatedAt,

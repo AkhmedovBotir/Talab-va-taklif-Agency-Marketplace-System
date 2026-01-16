@@ -628,9 +628,9 @@ export const agentAPI = {
     });
   },
 
-  // Get all agents with pagination and filters
+  // Get all agents with pagination and filters (admin endpoint)
   getAllAgents: async (params = {}) => {
-    const { page = 1, limit = 10, status, viloyat, tuman, mfy, agentType } = params;
+    const { page = 1, limit = 10, status, viloyat, tuman, mfy } = params;
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -640,9 +640,25 @@ export const agentAPI = {
     if (viloyat) queryParams.append('viloyat', viloyat);
     if (tuman) queryParams.append('tuman', tuman);
     if (mfy) queryParams.append('mfy', mfy);
-    if (agentType) queryParams.append('agentType', agentType);
     
-    return apiRequest(`/agents?${queryParams.toString()}`);
+    return apiRequest(`/admins/data/agents?${queryParams.toString()}`);
+  },
+
+  // Get agents for selection (public endpoint)
+  getAgentsForSelection: async (params = {}) => {
+    const { page = 1, limit = 100, status, viloyat, tuman, mfy, search } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (status) queryParams.append('status', status);
+    if (viloyat) queryParams.append('viloyat', viloyat);
+    if (tuman) queryParams.append('tuman', tuman);
+    if (mfy) queryParams.append('mfy', mfy);
+    if (search) queryParams.append('search', search);
+    
+    return apiRequest(`/agents/selection?${queryParams.toString()}`, {}, false);
   },
 
   // Get agent by ID
@@ -1323,6 +1339,150 @@ export const adminDataAPI = {
   },
 };
 
+// Helper function to build order query parameters
+const buildOrderQueryParams = (params = {}) => {
+  const {
+    page = 1,
+    limit = 50,
+    status,
+    paymentStatus,
+    paymentMethod,
+    orderNumber,
+    user,
+    startDate,
+    endDate,
+    minTotalPrice,
+    maxTotalPrice,
+    search,
+  } = params;
+
+  const queryParams = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  if (status) queryParams.append('status', status);
+  if (paymentStatus) queryParams.append('paymentStatus', paymentStatus);
+  if (paymentMethod) queryParams.append('paymentMethod', paymentMethod);
+  if (orderNumber) queryParams.append('orderNumber', orderNumber);
+  if (user) queryParams.append('user', user);
+  if (startDate) queryParams.append('startDate', startDate);
+  if (endDate) queryParams.append('endDate', endDate);
+  if (minTotalPrice) queryParams.append('minTotalPrice', minTotalPrice.toString());
+  if (maxTotalPrice) queryParams.append('maxTotalPrice', maxTotalPrice.toString());
+  if (search) queryParams.append('search', search);
+
+  return queryParams;
+};
+
+// Tuman Buyurtmalari API
+export const tumanOrdersAPI = {
+  // Barcha tuman buyurtmalari
+  getAllOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders?${queryParams.toString()}`);
+  },
+
+  // Marketplace dan buyurilgan
+  getMarketplaceOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders/marketplace?${queryParams.toString()}`);
+  },
+
+  // Punkt qabul qilgan
+  getConfirmedByPunktOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders/confirmed-by-punkt?${queryParams.toString()}`);
+  },
+
+  // Kontragentlarga yuborilgan
+  getRequestedToContragentsOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders/requested-to-contragents?${queryParams.toString()}`);
+  },
+
+  // Punktga yetkazilgan
+  getDeliveredToPunktOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders/delivered-to-punkt?${queryParams.toString()}`);
+  },
+
+  // Agentga yuborilgan
+  getAssignedToAgentsOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders/assigned-to-agents?${queryParams.toString()}`);
+  },
+
+  // Agent topshirgan
+  getConfirmedByAgentsOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders/confirmed-by-agents?${queryParams.toString()}`);
+  },
+
+  // Mijoz qabul qilgan
+  getConfirmedByCustomersOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders/confirmed-by-customers?${queryParams.toString()}`);
+  },
+
+  // Qaytarilgan
+  getCancelledOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/tuman/orders/cancelled?${queryParams.toString()}`);
+  },
+};
+
+// Maxalla Buyurtmalari API
+export const maxallaOrdersAPI = {
+  // Barcha maxalla buyurtmalari
+  getAllOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/maxalla/orders?${queryParams.toString()}`);
+  },
+
+  // Marketplace dan buyurilgan
+  getMarketplaceOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/maxalla/orders/marketplace?${queryParams.toString()}`);
+  },
+
+  // Kontragentlarga yuborilgan
+  getRequestedToContragentsOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/maxalla/orders/requested-to-contragents?${queryParams.toString()}`);
+  },
+
+  // Punktga yetkazilgan
+  getDeliveredToPunktOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/maxalla/orders/delivered-to-punkt?${queryParams.toString()}`);
+  },
+
+  // Agentga yuborilgan
+  getAssignedToAgentsOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/maxalla/orders/assigned-to-agents?${queryParams.toString()}`);
+  },
+
+  // Agent topshirgan
+  getConfirmedByAgentsOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/maxalla/orders/confirmed-by-agents?${queryParams.toString()}`);
+  },
+
+  // Mijoz qabul qilgan
+  getConfirmedByCustomersOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/maxalla/orders/confirmed-by-customers?${queryParams.toString()}`);
+  },
+
+  // Qaytarilgan
+  getCancelledOrders: async (params = {}) => {
+    const queryParams = buildOrderQueryParams(params);
+    return apiRequest(`/admins/sales/maxalla/orders/cancelled?${queryParams.toString()}`);
+  },
+};
+
 // Archive API functions
 export const archiveAPI = {
   // Get all archived punkts
@@ -1359,8 +1519,7 @@ export const archiveAPI = {
       search,
       viloyat,
       tuman,
-      mfy,
-      agentType
+      mfy
     } = params;
     const queryParams = new URLSearchParams({
       page: page.toString(),
@@ -1371,7 +1530,6 @@ export const archiveAPI = {
     if (viloyat) queryParams.append('viloyat', viloyat);
     if (tuman) queryParams.append('tuman', tuman);
     if (mfy) queryParams.append('mfy', mfy);
-    if (agentType) queryParams.append('agentType', agentType);
     
     return apiRequest(`/admins/archive/agents?${queryParams.toString()}`);
   },
@@ -1744,43 +1902,9 @@ export const kpiAPI = {
     return apiRequest(`/admins/kpi/statistics${queryString ? `?${queryString}` : ''}`);
   },
 
-  // Get viloyat agents KPI
-  getViloyatAgentsKPI: async (params = {}) => {
-    const { page = 1, limit = 50, viloyatId, agentId, isPaid, startDate, endDate } = params;
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-    
-    if (viloyatId) queryParams.append('viloyatId', viloyatId);
-    if (agentId) queryParams.append('agentId', agentId);
-    if (isPaid !== undefined) queryParams.append('isPaid', isPaid.toString());
-    if (startDate) queryParams.append('startDate', startDate);
-    if (endDate) queryParams.append('endDate', endDate);
-    
-    return apiRequest(`/admins/kpi/data/viloyat-agents?${queryParams.toString()}`);
-  },
-
-  // Get tuman agents KPI
-  getTumanAgentsKPI: async (params = {}) => {
-    const { page = 1, limit = 50, viloyatId, tumanId, agentId, isPaid, startDate, endDate } = params;
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-    
-    if (viloyatId) queryParams.append('viloyatId', viloyatId);
-    if (tumanId) queryParams.append('tumanId', tumanId);
-    if (agentId) queryParams.append('agentId', agentId);
-    if (isPaid !== undefined) queryParams.append('isPaid', isPaid.toString());
-    if (startDate) queryParams.append('startDate', startDate);
-    if (endDate) queryParams.append('endDate', endDate);
-    
-    return apiRequest(`/admins/kpi/data/tuman-agents?${queryParams.toString()}`);
-  },
-
-  // Get MFY agents KPI
-  getMfyAgentsKPI: async (params = {}) => {
+  // Get all agents KPI (barcha agentlar bir xil - viloyat, tuman, MFY farqi yo'q)
+  // Backward compatibility uchun barcha uchta endpoint bir xil ishlaydi
+  getAgentsKPI: async (params = {}) => {
     const { page = 1, limit = 50, viloyatId, tumanId, mfyId, agentId, isPaid, startDate, endDate } = params;
     const queryParams = new URLSearchParams({
       page: page.toString(),
@@ -1795,7 +1919,21 @@ export const kpiAPI = {
     if (startDate) queryParams.append('startDate', startDate);
     if (endDate) queryParams.append('endDate', endDate);
     
-    return apiRequest(`/admins/kpi/data/mfy-agents?${queryParams.toString()}`);
+    // Barcha uchta endpoint bir xil ishlaydi, viloyat-agents endpoint'ini ishlatamiz
+    return apiRequest(`/admins/kpi/data/viloyat-agents?${queryParams.toString()}`);
+  },
+
+  // Backward compatibility - eski funksiyalar
+  getViloyatAgentsKPI: async (params = {}) => {
+    return kpiAPI.getAgentsKPI(params);
+  },
+
+  getTumanAgentsKPI: async (params = {}) => {
+    return kpiAPI.getAgentsKPI(params);
+  },
+
+  getMfyAgentsKPI: async (params = {}) => {
+    return kpiAPI.getAgentsKPI(params);
   },
 
   // Get punkts KPI
@@ -1816,15 +1954,31 @@ export const kpiAPI = {
     return apiRequest(`/admins/kpi/data/punkts?${queryParams.toString()}`);
   },
 
-  // Get agent KPI details
-  getAgentKPIDetails: async (agentId, params = {}) => {
-    const { role, isPaid, startDate, endDate, page = 1, limit = 50 } = params;
+  // Get managers KPI
+  getManagersKPI: async (params = {}) => {
+    const { page = 1, limit = 50, viloyatId, managerId, isPaid, startDate, endDate } = params;
     const queryParams = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
     
-    if (role) queryParams.append('role', role);
+    if (viloyatId) queryParams.append('viloyatId', viloyatId);
+    if (managerId) queryParams.append('managerId', managerId);
+    if (isPaid !== undefined) queryParams.append('isPaid', isPaid.toString());
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    return apiRequest(`/admins/kpi/data/managers?${queryParams.toString()}`);
+  },
+
+  // Get agent KPI details
+  getAgentKPIDetails: async (agentId, params = {}) => {
+    const { isPaid, startDate, endDate, page = 1, limit = 50 } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
     if (isPaid !== undefined) queryParams.append('isPaid', isPaid.toString());
     if (startDate) queryParams.append('startDate', startDate);
     if (endDate) queryParams.append('endDate', endDate);
@@ -1845,6 +1999,21 @@ export const kpiAPI = {
     if (endDate) queryParams.append('endDate', endDate);
     
     return apiRequest(`/admins/kpi/data/punkts/${punktId}?${queryParams.toString()}`);
+  },
+
+  // Get manager KPI details
+  getManagerKPIDetails: async (managerId, params = {}) => {
+    const { isPaid, startDate, endDate, page = 1, limit = 50 } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (isPaid !== undefined) queryParams.append('isPaid', isPaid.toString());
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    return apiRequest(`/admins/kpi/data/managers/${managerId}?${queryParams.toString()}`);
   },
 };
 
@@ -2258,27 +2427,6 @@ export const financeAPI = {
     
     const queryString = queryParams.toString();
     return apiRequest(`/admin-finance/reports/custom${queryString ? `?${queryString}` : ''}`);
-  },
-
-  // Submissions
-  // Get pending submissions
-  getPendingSubmissions: async () => {
-    return apiRequest('/admin-finance/submissions/pending');
-  },
-
-  // Confirm submission
-  confirmSubmission: async (submissionId) => {
-    return apiRequest(`/admin-finance/submissions/${submissionId}/confirm`, {
-      method: 'POST',
-    });
-  },
-
-  // Reject submission
-  rejectSubmission: async (submissionId, rejectionReason) => {
-    return apiRequest(`/admin-finance/submissions/${submissionId}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ rejectionReason }),
-    });
   },
 
   // Transactions
@@ -2710,6 +2858,76 @@ const publicApiRequest = async (endpoint, options = {}) => {
 };
 
 // Certificate Integration API functions
+// Viloyat Manager API functions
+export const viloyatManagerAPI = {
+  // Get all viloyat managers
+  getAllViloyatManagers: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.status) queryParams.append('status', params.status);
+    if (params.viloyat) queryParams.append('viloyat', params.viloyat);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    
+    const queryString = queryParams.toString();
+    const endpoint = `/viloyat-managers${queryString ? `?${queryString}` : ''}`;
+    
+    return apiRequest(endpoint);
+  },
+
+  // Get viloyat manager by ID
+  getViloyatManagerById: async (id) => {
+    return apiRequest(`/viloyat-managers/${id}`);
+  },
+
+  // Create new viloyat manager
+  createViloyatManager: async (managerData) => {
+    const apiData = {
+      name: managerData.name,
+      phone: managerData.phone,
+      password: managerData.password,
+      viloyat: managerData.viloyat,
+      status: managerData.status || 'active',
+    };
+    
+    return apiRequest('/viloyat-managers', {
+      method: 'POST',
+      body: JSON.stringify(apiData),
+    });
+  },
+
+  // Update viloyat manager
+  updateViloyatManager: async (id, managerData) => {
+    const apiData = {};
+    if (managerData.name !== undefined) apiData.name = managerData.name;
+    if (managerData.phone !== undefined) apiData.phone = managerData.phone;
+    if (managerData.password !== undefined && managerData.password.trim() !== '') {
+      apiData.password = managerData.password;
+    }
+    if (managerData.viloyat !== undefined) apiData.viloyat = managerData.viloyat;
+    if (managerData.status !== undefined) apiData.status = managerData.status;
+    
+    return apiRequest(`/viloyat-managers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(apiData),
+    });
+  },
+
+  // Update viloyat manager status
+  updateViloyatManagerStatus: async (id, status) => {
+    return apiRequest(`/viloyat-managers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  // Delete viloyat manager
+  deleteViloyatManager: async (id) => {
+    return apiRequest(`/viloyat-managers/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 export const certificateAPI = {
   // Public API - Get candidate data by certificate ID (no auth required)
   getCandidateByCertificateId: async (certificateId) => {

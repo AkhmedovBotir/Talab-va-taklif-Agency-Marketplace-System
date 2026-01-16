@@ -11,7 +11,7 @@ const deviceSchema = new mongoose.Schema(
     userModel: {
       type: String,
       required: [true, 'Foydalanuvchi modeli kiritilishi shart'],
-      enum: ['Admin', 'Contragent', 'Punkt', 'Agent'],
+      enum: ['Admin', 'Contragent', 'Punkt', 'Agent', 'ViloyatManager'],
     },
     // Device information
     deviceId: {

@@ -86,6 +86,29 @@ export default function HomeScreen() {
           limit: 20,
           status: 'active',
         });
+        
+        // Log maxalla products data to console
+        console.log('=== MAXALLA GUZARI MA\'LUMOTLARI ===');
+        console.log('Total products:', response.count);
+        console.log('Total pages:', response.totalPages);
+        console.log('Current page:', response.page);
+        console.log('Products count:', response.data?.length || 0);
+        
+        // Log products with shortened base64 images
+        const productsWithShortImages = response.data?.map((product: Product) => {
+          const shortImages = product.images?.map((img: string) => {
+            if (img && img.length > 100) {
+              return `${img.substring(0, 50)}... (${img.length} chars)`;
+            }
+            return img;
+          });
+          return {
+            ...product,
+            images: shortImages,
+          };
+        });
+        console.log('Products data (with shortened images):');
+        console.log(JSON.stringify(productsWithShortImages, null, 2));
       } else {
         // Load tuman products
         response = await apiService.getProducts({
@@ -94,6 +117,7 @@ export default function HomeScreen() {
           status: 'active',
         });
       }
+
 
       // Filter products by selected location
       let filteredProducts = response.data;
@@ -109,13 +133,51 @@ export default function HomeScreen() {
           // If no MFY selected, show no maxalla products
           filteredProducts = [];
         }
+        
+        // Log filtered maxalla products to console
+        console.log('=== FILTRLANGAN MAXALLA MAHSULOTLARI ===');
+        console.log('Filtered products count:', filteredProducts.length);
+        console.log('Selected MFY:', selectedMfy?.name || 'Tanlanmagan', selectedMfy?._id || '');
+        console.log('Selected tuman:', selectedTuman?.name || 'Tanlanmagan');
+        console.log('Selected viloyat:', selectedViloyat?.name || 'Tanlanmagan');
+        
+        // Log filtered products with shortened base64 images
+        const filteredWithShortImages = filteredProducts.map((product: Product) => {
+          const shortImages = product.images?.map((img: string) => {
+            if (img && img.length > 100) {
+              return `${img.substring(0, 50)}... (${img.length} chars)`;
+            }
+            return img;
+          });
+          return {
+            _id: product._id,
+            name: product.name,
+            price: product.price,
+            quantity: product.quantity,
+            images: shortImages,
+            imagesCount: product.images?.length || 0,
+            category: product.category?.name,
+            contragent: product.contragent?.name,
+            contragentMfy: product.contragent?.mfy?.name,
+            contragentMfyId: product.contragent?.mfy?._id,
+          };
+        });
+        console.log('Filtered products (with shortened images):');
+        console.log(JSON.stringify(filteredWithShortImages, null, 2));
       } else {
         // For tuman products, filter by selected tuman
         if (selectedTuman) {
           filteredProducts = response.data.filter((product) => {
+            // If deliveryRegions is empty, check if product's contragent is in selected tuman
             if (!product.deliveryRegions || product.deliveryRegions.length === 0) {
+              // If deliveryRegions is empty, show product if contragent's tuman matches selected tuman
+              if (product.contragent?.tuman?._id === selectedTuman._id) {
+                return true;
+              }
               return false;
             }
+            
+            // Check if product is available in selected tuman through deliveryRegions
             const matches = product.deliveryRegions.some((region) => {
               if (region.tuman) {
                 return region.tuman._id === selectedTuman._id;
@@ -126,10 +188,8 @@ export default function HomeScreen() {
               return false;
             });
             return matches;
-          });
-        } else {
-          console.log('HomeScreen: No tuman selected, showing all products');
-        }
+        });
+      }
       }
 
       // Filter censored products for users under 18
@@ -137,7 +197,6 @@ export default function HomeScreen() {
       if (userAge !== null && userAge < 18) {
         filteredProducts = filteredProducts.filter((product) => {
           if (product.censored === true) {
-            console.log('HomeScreen: Censored product filtered out for user under 18:', product.name);
             return false;
           }
           return true;
@@ -149,6 +208,7 @@ export default function HomeScreen() {
         ...product,
         productType: activeTab,
       }));
+
 
       if (append) {
         setProducts((prev) => [...prev, ...filteredProducts]);
@@ -215,6 +275,7 @@ export default function HomeScreen() {
   useEffect(() => {
     setPage(1);
     setHasMore(true);
+    setProducts([]); // Clear products before loading new ones
     loadProducts(1, false);
   }, [selectedTuman?._id, selectedMfy?._id, activeTab, loadProducts]);
 
@@ -353,9 +414,15 @@ export default function HomeScreen() {
           <Text style={styles.tabsTitle}>Mahsulotlar</Text>
         </View>
         <View style={styles.tabsWrapper}>
-          <TouchableOpacity
+            <TouchableOpacity
             style={[styles.tab, activeTab === 'tuman' && styles.tabActive]}
-            onPress={() => setActiveTab('tuman')}
+            onPress={() => {
+              setActiveTab('tuman');
+              setPage(1);
+              setHasMore(true);
+              setProducts([]);
+              loadProducts(1, false);
+            }}
             activeOpacity={0.8}
           >
             <Ionicons 
@@ -369,7 +436,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'maxalla' && styles.tabActive]}
-            onPress={() => setActiveTab('maxalla')}
+            onPress={() => {
+              setActiveTab('maxalla');
+              setPage(1);
+              setHasMore(true);
+              setProducts([]);
+              loadProducts(1, false);
+            }}
             activeOpacity={0.8}
           >
             <Ionicons 
@@ -379,17 +452,17 @@ export default function HomeScreen() {
             />
             <Text style={[styles.tabText, activeTab === 'maxalla' && styles.tabTextActive]}>
               Maxalla Guzari
-            </Text>
+                      </Text>
           </TouchableOpacity>
-        </View>
+                        </View>
         {activeTab === 'maxalla' && !selectedMfy && (
           <View style={styles.tabWarning}>
             <Ionicons name="information-circle" size={16} color="#FF9500" />
             <Text style={styles.tabWarningText}>
               Maxalla mahsulotlarini ko'rish uchun MFY tanlang
-            </Text>
-          </View>
-        )}
+                          </Text>
+                        </View>
+                      )}
       </View>
     );
   };

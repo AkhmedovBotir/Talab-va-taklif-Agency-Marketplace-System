@@ -79,6 +79,19 @@ const CategoryTable = ({ categories, loading, onView, onEdit, onDelete, onCreate
                           <div className="w-5 h-5" />
                         )}
                       </button>
+                      {/* Category Image */}
+                      {category.image && (
+                        <div className="flex-shrink-0">
+                          <img
+                            src={category.image}
+                            alt={category.name}
+                            className="w-12 h-12 object-cover rounded-md border border-gray-200"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
                       <div className="flex-1">
                         <div className="flex items-center gap-3 flex-wrap">
                           <h3 className="text-sm font-medium text-gray-900">{category.name}</h3>
@@ -168,6 +181,19 @@ const CategoryTable = ({ categories, loading, onView, onEdit, onDelete, onCreate
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1">
+                                {/* Subcategory Image */}
+                                {subcategory.image && (
+                                  <div className="flex-shrink-0">
+                                    <img
+                                      src={subcategory.image}
+                                      alt={subcategory.name}
+                                      className="w-10 h-10 object-cover rounded-md border border-gray-200"
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                      }}
+                                    />
+                                  </div>
+                                )}
                                 <div className="flex-1">
                                   <div className="flex items-center gap-3 flex-wrap">
                                     <h4 className="text-sm font-medium text-gray-900">

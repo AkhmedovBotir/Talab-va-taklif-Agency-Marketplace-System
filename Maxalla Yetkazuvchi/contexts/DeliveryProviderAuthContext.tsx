@@ -27,7 +27,6 @@ const storage = {
     try {
       return await AsyncStorage.getItem(key);
     } catch (error) {
-      console.error('Error getting item from storage:', error);
       return null;
     }
   },
@@ -39,7 +38,7 @@ const storage = {
     try {
       await AsyncStorage.setItem(key, value);
     } catch (error) {
-      console.error('Error setting item in storage:', error);
+      // Silent fail
     }
   },
   removeItem: async (key: string): Promise<void> => {
@@ -50,7 +49,7 @@ const storage = {
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.error('Error removing item from storage:', error);
+      // Silent fail
     }
   },
 };
@@ -80,7 +79,7 @@ export function DeliveryProviderAuthProvider({ children }: DeliveryProviderAuthP
         setDeliveryProvider(JSON.parse(storedProfile));
       }
     } catch (error) {
-      console.error('Error loading stored auth:', error);
+      // Silent fail
     } finally {
       setLoading(false);
     }
@@ -133,7 +132,7 @@ export function DeliveryProviderAuthProvider({ children }: DeliveryProviderAuthP
         await storage.setItem(PROFILE_KEY, JSON.stringify(response.data));
       }
     } catch (error) {
-      console.error('Error refreshing profile:', error);
+      // Silent fail
     }
   };
 

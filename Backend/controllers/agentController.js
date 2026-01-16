@@ -20,15 +20,17 @@ const createAgent = async (req, res) => {
       });
     }
 
-    // Validate regions exist and have correct types
+    // Validate regions exist and have correct types (optional)
     const Region = require('../models/Region');
-    const viloyatRegion = await Region.findById(viloyat);
-
-    if (!viloyatRegion || viloyatRegion.type !== 'region') {
-      return res.status(400).json({
-        success: false,
-        message: 'Viloyat topilmadi yoki noto\'g\'ri tur',
-      });
+    
+    if (viloyat) {
+      const viloyatRegion = await Region.findById(viloyat);
+      if (!viloyatRegion || viloyatRegion.type !== 'region') {
+        return res.status(400).json({
+          success: false,
+          message: 'Viloyat topilmadi yoki noto\'g\'ri tur',
+        });
+      }
     }
 
     // If tuman is provided, validate it
@@ -40,8 +42,8 @@ const createAgent = async (req, res) => {
           message: 'Tuman topilmadi yoki noto\'g\'ri tur',
         });
       }
-      // Validate tuman is child of viloyat
-      if (tumanRegion.parent?.toString() !== viloyat.toString()) {
+      // Validate tuman is child of viloyat if viloyat is provided
+      if (viloyat && tumanRegion.parent?.toString() !== viloyat.toString()) {
         return res.status(400).json({
           success: false,
           message: 'Tuman tanlangan viloyatga tegishli emas',
@@ -51,12 +53,6 @@ const createAgent = async (req, res) => {
 
     // If mfy is provided, validate it
     if (mfy) {
-      if (!tuman) {
-        return res.status(400).json({
-          success: false,
-          message: 'MFY tanlash uchun tuman ham tanlanishi kerak',
-        });
-      }
       const mfyRegion = await Region.findById(mfy);
       if (!mfyRegion || mfyRegion.type !== 'mfy') {
         return res.status(400).json({
@@ -64,50 +60,13 @@ const createAgent = async (req, res) => {
           message: 'MFY topilmadi yoki noto\'g\'ri tur',
         });
       }
-      // Validate mfy is child of tuman
-      if (mfyRegion.parent?.toString() !== tuman.toString()) {
+      // Validate mfy is child of tuman if tuman is provided
+      if (tuman && mfyRegion.parent?.toString() !== tuman.toString()) {
         return res.status(400).json({
           success: false,
           message: 'MFY tanlangan tumanga tegishli emas',
         });
       }
-    }
-
-    // Check if there's already an active agent in this position
-    // Position is determined by: viloyat + tuman + mfy (if provided)
-    const positionFilter = {
-      viloyat,
-      isDeleted: { $ne: true },
-      status: 'active',
-    };
-
-    // Add tuman to filter if provided
-    if (tuman) {
-      positionFilter.tuman = tuman;
-    } else {
-      positionFilter.tuman = null;
-    }
-
-    // Add mfy to filter if provided
-    if (mfy) {
-      positionFilter.mfy = mfy;
-    } else {
-      positionFilter.mfy = null;
-    }
-
-    const existingAgentInPosition = await Agent.findOne(positionFilter);
-    if (existingAgentInPosition) {
-      let positionName = 'Bu viloyat';
-      if (tuman) {
-        positionName += ' va tuman';
-      }
-      if (mfy) {
-        positionName += ' va MFY';
-      }
-      return res.status(400).json({
-        success: false,
-        message: `${positionName} uchun allaqachon faol agent mavjud`,
-      });
     }
 
     try {
@@ -130,9 +89,6 @@ const createAgent = async (req, res) => {
         await agent.populate('mfy', 'name type code');
       }
 
-      // Determine agent type
-      const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-
       // Invalidate cache
 
       res.status(201).json({
@@ -140,7 +96,6 @@ const createAgent = async (req, res) => {
         message: 'Agent muvaffaqiyatli yaratildi',
         data: {
           ...agent.toObject(),
-          agentType,
         },
       });
     } catch (createError) {
@@ -166,7 +121,7 @@ const createAgent = async (req, res) => {
 // Get all agents
 const getAllAgents = async (req, res) => {
   try {
-    const { status, viloyat, tuman, mfy, agentType, page = 1, limit = 10 } = req.query;
+    const { status, viloyat, tuman, mfy, page = 1, limit = 10 } = req.query;
     const filter = {};
 
     if (status) {
@@ -183,19 +138,6 @@ const getAllAgents = async (req, res) => {
 
     if (mfy) {
       filter.mfy = mfy;
-    }
-
-    // Filter by agent type
-    if (agentType) {
-      if (agentType === 'viloyat') {
-        filter.tuman = null;
-        filter.mfy = null;
-      } else if (agentType === 'tuman') {
-        filter.tuman = { $ne: null };
-        filter.mfy = null;
-      } else if (agentType === 'mfy') {
-        filter.mfy = { $ne: null };
-      }
     }
 
     // Pagination
@@ -219,21 +161,14 @@ const getAllAgents = async (req, res) => {
       .skip(skip)
       .limit(limitNum);
 
-    // Add agentType to each agent
-    const agentsWithType = agents.map(agent => {
-      const agentObj = agent.toObject();
-      agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-      return agentObj;
-    });
-
     res.status(200).json({
       success: true,
-      count: agentsWithType.length,
+      count: agents.length,
       total,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
-      data: agentsWithType,
+      data: agents,
     });
   } catch (error) {
     console.error('Error fetching agents:', error);
@@ -266,13 +201,9 @@ const getAgentById = async (req, res) => {
       });
     }
 
-    // Add agentType
-    const agentObj = agent.toObject();
-    agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-
     res.status(200).json({
       success: true,
-      data: agentObj,
+      data: agent,
     });
   } catch (error) {
     console.error('Error fetching agent:', error);
@@ -447,10 +378,9 @@ const updateAgent = async (req, res) => {
     await agent.populate('tuman', 'name type code');
     await agent.populate('mfy', 'name type code');
     
-    // Remove password from response and add agentType
+    // Remove password from response
     const agentObj = agent.toObject();
     delete agentObj.password;
-    agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
 
     // Invalidate cache
 
@@ -639,15 +569,11 @@ const loginAgent = async (req, res) => {
       });
     }
 
-    // Determine agent type
-    const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-
     // Generate JWT token (24 hours)
     const token = jwt.sign(
       {
         id: agent._id,
         phone: agent.phone,
-        agentType,
         type: 'agent',
         deviceId: device.deviceId,
       },
@@ -666,17 +592,12 @@ const loginAgent = async (req, res) => {
       await agent.populate('mfy', 'name type code');
     }
 
-    // Add agentType to response
-    const agentObj = agent.toObject();
-    agentObj.agentType = agentType;
-
     res.status(200).json({
       success: true,
       message: 'Muvaffaqiyatli kirildi',
       data: {
         token,
-        role: agentType, // role field qo'shildi
-        agent: agentObj,
+        agent: agent,
         device: {
           deviceId: device.deviceId,
           deviceName: device.deviceName,
@@ -697,7 +618,7 @@ const loginAgent = async (req, res) => {
 // Get agents for selection (agent ID tanlash uchun)
 const getAgentsForSelection = async (req, res) => {
   try {
-    const { status, viloyat, tuman, mfy, agentType, search, page = 1, limit = 100 } = req.query;
+    const { status, viloyat, tuman, mfy, search, page = 1, limit = 100 } = req.query;
     const filter = {};
 
     // Only show non-deleted agents (include those without isDeleted field for backward compatibility)
@@ -720,19 +641,6 @@ const getAgentsForSelection = async (req, res) => {
 
     if (mfy) {
       filter.mfy = mfy;
-    }
-
-    // Filter by agent type
-    if (agentType) {
-      if (agentType === 'viloyat') {
-        filter.tuman = null;
-        filter.mfy = null;
-      } else if (agentType === 'tuman') {
-        filter.tuman = { $ne: null };
-        filter.mfy = null;
-      } else if (agentType === 'mfy') {
-        filter.mfy = { $ne: null };
-      }
     }
 
     // Search by name or phone
@@ -761,27 +669,52 @@ const getAgentsForSelection = async (req, res) => {
       .skip(skip)
       .limit(limitNum);
 
-    // Add agentType to each agent
-    const agentsWithType = agents.map((agent) => {
-      const agentObj = agent.toObject();
-      agentObj.agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-      return agentObj;
-    });
-
     res.status(200).json({
       success: true,
-      count: agentsWithType.length,
+      count: agents.length,
       total,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
-      data: agentsWithType,
+      data: agents,
     });
   } catch (error) {
     console.error('Error fetching agents for selection:', error);
     res.status(500).json({
       success: false,
       message: 'Agentlarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Get current agent profile (me)
+const getMyProfile = async (req, res) => {
+  try {
+    const agentId = req.user.userId;
+
+    const agent = await Agent.findById(agentId)
+      .populate('viloyat', 'name type code')
+      .populate('tuman', 'name type code')
+      .populate('mfy', 'name type code')
+      .select('-password');
+
+    if (!agent) {
+      return res.status(404).json({
+        success: false,
+        message: 'Agent topilmadi',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: agent,
+    });
+  } catch (error) {
+    console.error('Error fetching agent profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ma\'lumotlarni olishda xatolik yuz berdi',
       error: error.message,
     });
   }
@@ -795,6 +728,7 @@ module.exports = {
   deleteAgent,
   loginAgent,
   getAgentsForSelection,
+  getMyProfile,
 };
 
 

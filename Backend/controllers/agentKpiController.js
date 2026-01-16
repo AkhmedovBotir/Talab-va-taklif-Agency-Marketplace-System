@@ -3,31 +3,25 @@ const mongoose = require('mongoose');
 
 const CUSTOMER_CONFIRMED_STATUS = 'confirmed_by_customer';
 
-const getAgentAmountField = (role) => {
-  if (role === 'mfy') return '$amounts.mfyAgent';
-  if (role === 'tuman') return '$amounts.tumanAgent';
-  return '$amounts.viloyatAgent';
+// All agents now use the same field - agent
+const getAgentAmountField = () => {
+  return {
+    $ifNull: ['$amounts.agent', 0]
+  };
 };
 
-const getAgentAmountExpression = (role) => ({
-  $ifNull: [getAgentAmountField(role), 0],
-});
+const getAgentAmountExpression = () => getAgentAmountField();
 
-const buildAgentBaseFilter = (agentId, role) => {
+const buildAgentBaseFilter = (agentId) => {
   // Ensure agentId is ObjectId
   const agentObjectId = mongoose.Types.ObjectId.isValid(agentId) 
     ? (agentId instanceof mongoose.Types.ObjectId ? agentId : new mongoose.Types.ObjectId(agentId))
     : agentId;
 
-  const filter = { orderStatus: CUSTOMER_CONFIRMED_STATUS };
-
-  if (role === 'mfy') {
-    filter['recipients.mfyAgent'] = agentObjectId;
-  } else if (role === 'tuman') {
-    filter['recipients.tumanAgent'] = agentObjectId;
-  } else {
-    filter['recipients.viloyatAgent'] = agentObjectId;
-  }
+  const filter = { 
+    orderStatus: CUSTOMER_CONFIRMED_STATUS,
+    'recipients.agent': agentObjectId
+  };
 
   return filter;
 };
@@ -95,10 +89,10 @@ const getDefaultReportRange = () => {
 // Get agent's KPI bonus summary
 const getMyKpiSummary = async (req, res) => {
   try {
-    const { agent, role } = req.user;
+    const { agent } = req.user;
     const { startDate, endDate, isPaid } = req.query;
 
-    const filter = buildAgentBaseFilter(agent._id, role);
+    const filter = buildAgentBaseFilter(agent._id);
 
     if (isPaid !== undefined) {
       filter.isPaid = isPaid === 'true';
@@ -109,7 +103,7 @@ const getMyKpiSummary = async (req, res) => {
       filter.createdAt = rangeFilter;
     }
 
-    const amountExpr = getAgentAmountExpression(role);
+    const amountExpr = getAgentAmountExpression();
 
     // Get total amounts
     const summary = await KpiBonusTransaction.aggregate([
@@ -123,7 +117,7 @@ const getMyKpiSummary = async (req, res) => {
             $sum: {
               $cond: [
                 { $eq: ['$isPaid', true] },
-                getAgentAmountExpression(role),
+                amountExpr,
                 0,
               ],
             },
@@ -132,7 +126,7 @@ const getMyKpiSummary = async (req, res) => {
             $sum: {
               $cond: [
                 { $eq: ['$isPaid', false] },
-                getAgentAmountExpression(role),
+                amountExpr,
                 0,
               ],
             },
@@ -155,7 +149,6 @@ const getMyKpiSummary = async (req, res) => {
           _id: agent._id,
           name: agent.name,
           phone: agent.phone,
-          role,
         },
         summary: result,
       },
@@ -173,10 +166,10 @@ const getMyKpiSummary = async (req, res) => {
 // Get agent's KPI transactions
 const getMyKpiTransactions = async (req, res) => {
   try {
-    const { agent, role } = req.user;
+    const { agent } = req.user;
     const { startDate, endDate, isPaid, page = 1, limit = 50 } = req.query;
 
-    const filter = buildAgentBaseFilter(agent._id, role);
+    const filter = buildAgentBaseFilter(agent._id);
 
     if (isPaid !== undefined) {
       filter.isPaid = isPaid === 'true';
@@ -204,17 +197,7 @@ const getMyKpiTransactions = async (req, res) => {
     // Add agent-specific amount to each transaction
     const transactionsWithAmount = transactions.map((transaction) => {
       const transactionObj = transaction.toObject();
-      let agentAmount = 0;
-
-      if (role === 'mfy') {
-        agentAmount = transaction.amounts.mfyAgent || 0;
-      } else if (role === 'tuman') {
-        agentAmount = transaction.amounts.tumanAgent || 0;
-      } else if (role === 'viloyat') {
-        agentAmount = transaction.amounts.viloyatAgent || 0;
-      }
-
-      transactionObj.agentAmount = agentAmount;
+      transactionObj.agentAmount = transaction.amounts.agent || 0;
       return transactionObj;
     });
 
@@ -240,11 +223,11 @@ const getMyKpiTransactions = async (req, res) => {
 // Get agent's daily KPI balance (00:00 - 23:59)
 const getMyKpiDailyBalance = async (req, res) => {
   try {
-    const { agent, role } = req.user;
+    const { agent } = req.user;
     const { date } = req.query;
 
     const { startOfDay, endOfDay, label } = getDayRange(date);
-    const filter = buildAgentBaseFilter(agent._id, role);
+    const filter = buildAgentBaseFilter(agent._id);
     filter.createdAt = { $gte: startOfDay, $lte: endOfDay };
 
     const summary = await KpiBonusTransaction.aggregate([
@@ -253,12 +236,12 @@ const getMyKpiDailyBalance = async (req, res) => {
         $group: {
           _id: null,
           totalTransactions: { $sum: 1 },
-          totalAmount: { $sum: getAgentAmountExpression(role) },
+          totalAmount: { $sum: getAgentAmountExpression() },
           paidAmount: {
             $sum: {
               $cond: [
                 { $eq: ['$isPaid', true] },
-                getAgentAmountExpression(role),
+                getAgentAmountExpression(),
                 0,
               ],
             },
@@ -267,7 +250,7 @@ const getMyKpiDailyBalance = async (req, res) => {
             $sum: {
               $cond: [
                 { $eq: ['$isPaid', false] },
-                getAgentAmountExpression(role),
+                getAgentAmountExpression(),
                 0,
               ],
             },
@@ -315,10 +298,10 @@ const getMyKpiDailyBalance = async (req, res) => {
 // Get agent's daily KPI report (aggregated by day)
 const getMyKpiDailyReport = async (req, res) => {
   try {
-    const { agent, role } = req.user;
+    const { agent } = req.user;
     const { startDate, endDate } = req.query;
 
-    const filter = buildAgentBaseFilter(agent._id, role);
+    const filter = buildAgentBaseFilter(agent._id);
 
     let rangeFilter = parseDateRange(startDate, endDate);
     if (!rangeFilter) {
@@ -335,12 +318,12 @@ const getMyKpiDailyReport = async (req, res) => {
             $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
           },
           totalTransactions: { $sum: 1 },
-          totalAmount: { $sum: getAgentAmountExpression(role) },
+          totalAmount: { $sum: getAgentAmountExpression() },
           paidAmount: {
             $sum: {
               $cond: [
                 { $eq: ['$isPaid', true] },
-                getAgentAmountExpression(role),
+                getAgentAmountExpression(),
                 0,
               ],
             },
@@ -349,7 +332,7 @@ const getMyKpiDailyReport = async (req, res) => {
             $sum: {
               $cond: [
                 { $eq: ['$isPaid', false] },
-                getAgentAmountExpression(role),
+                getAgentAmountExpression(),
                 0,
               ],
             },

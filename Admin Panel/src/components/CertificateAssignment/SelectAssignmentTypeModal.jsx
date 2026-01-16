@@ -71,7 +71,7 @@ const SelectAssignmentTypeModal = ({ open, onClose, onSelectPunkt, onSelectAgent
                       Agentga Tayinlash
                     </h3>
                     <p className="text-sm text-gray-600 mt-1">
-                      Sertifikat egasini agent lavozimiga tayinlash (Viloyat/Tuman/MFY Agent)
+                      Sertifikat egasini agent lavozimiga tayinlash
                     </p>
                   </div>
                 </button>

@@ -4,12 +4,14 @@ import { useAuth } from "./contexts/AuthContext";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 
 export default function Index() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, token } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading) {
+      return;
+    }
 
     const currentRoute = segments[0];
     
@@ -24,7 +26,7 @@ export default function Index() {
         router.replace("/(tabs)/orders");
       }
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, segments, router, token]);
 
   return <LoadingSpinner />;
 }

@@ -29,7 +29,6 @@ const storage = {
     try {
       return await AsyncStorage.getItem(key);
     } catch (error) {
-      console.error('Error getting item from storage:', error);
       return null;
     }
   },
@@ -42,7 +41,7 @@ const storage = {
     try {
       await AsyncStorage.setItem(key, value);
     } catch (error) {
-      console.error('Error setting item in storage:', error);
+      // Ignore storage errors
     }
   },
   removeItem: async (key: string): Promise<void> => {
@@ -54,7 +53,7 @@ const storage = {
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.error('Error removing item from storage:', error);
+      // Ignore storage errors
     }
   },
 };
@@ -84,7 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(JSON.parse(storedUser));
       }
     } catch (error) {
-      console.error('Error loading stored auth:', error);
+      // Ignore loading errors
     } finally {
       setLoading(false);
     }
@@ -122,7 +121,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           await apiService.logout(token, deviceId);
         } catch (error) {
           // Continue with logout even if API call fails
-          console.error('Error calling logout API:', error);
         }
       }
 
@@ -135,7 +133,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         storage.removeItem(USER_KEY),
       ]);
     } catch (error) {
-      console.error('Error logging out:', error);
+      // Ignore logout errors
     }
   };
 
@@ -149,7 +147,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await storage.setItem(USER_KEY, JSON.stringify(response.data));
       }
     } catch (error) {
-      console.error('Error refreshing user:', error);
+      // Ignore refresh errors
     }
   };
 

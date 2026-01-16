@@ -55,32 +55,6 @@ const ViewAgentModal = ({ open, onClose, agent }) => {
     return `${baseClasses} bg-red-100 text-red-800`;
   };
 
-  const getAgentTypeBadge = (agentType) => {
-    const baseClasses = 'px-3 py-1 rounded-full text-sm font-medium';
-    switch (agentType) {
-      case 'viloyat':
-        return `${baseClasses} bg-blue-100 text-blue-800`;
-      case 'tuman':
-        return `${baseClasses} bg-green-100 text-green-800`;
-      case 'mfy':
-        return `${baseClasses} bg-purple-100 text-purple-800`;
-      default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
-    }
-  };
-
-  const getAgentTypeLabel = (agentType) => {
-    switch (agentType) {
-      case 'viloyat':
-        return 'Viloyat Agent';
-      case 'tuman':
-        return 'Tuman Agent';
-      case 'mfy':
-        return 'MFY Agent';
-      default:
-        return agentType;
-    }
-  };
 
   if (!agent) return null;
 
@@ -145,14 +119,6 @@ const ViewAgentModal = ({ open, onClose, agent }) => {
                             Telefon raqami
                           </label>
                           <p className="text-gray-900">{agentData.phone || '-'}</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Agent turi
-                          </label>
-                          <span className={getAgentTypeBadge(agentData.agentType)}>
-                            {getAgentTypeLabel(agentData.agentType)}
-                          </span>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">

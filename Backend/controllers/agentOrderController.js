@@ -1,12 +1,56 @@
 const Order = require('../models/Order');
+const Product = require('../models/Product');
 const Agent = require('../models/Agent');
 const Punkt = require('../models/Punkt');
 const Region = require('../models/Region');
 
+// Helper function to manually populate order items with Product model only
+const populateOrderItemsProducts = async (orders) => {
+  if (!orders || (Array.isArray(orders) && orders.length === 0)) {
+    return;
+  }
+
+  const ordersArray = Array.isArray(orders) ? orders : [orders];
+
+  for (const order of ordersArray) {
+    if (order.items && order.items.length > 0) {
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        const productId = typeof item.product === 'string' ? item.product : (item.product?._id || item.product);
+        
+        if (!productId) continue;
+        
+        // Only populate Product model (not MaxallaProduct)
+        if (item.productType === 'tuman' || !item.productType) {
+          try {
+            item.product = await Product.findById(productId)
+              .populate('category', 'name slug')
+              .populate('subcategory', 'name slug')
+              .populate({
+                path: 'contragent',
+                select: 'name inn phone',
+              })
+              .populate({
+                path: 'deliveryRegions.viloyat',
+                select: 'name type code',
+              })
+              .populate({
+                path: 'deliveryRegions.tuman',
+                select: 'name type code',
+              });
+          } catch (error) {
+            console.error(`Error populating product ${productId}:`, error);
+          }
+        }
+      }
+    }
+  }
+};
+
 // Get orders for agent (agent type'ga qarab buyurtmalarni ko'rish)
 const getMyOrders = async (req, res) => {
   try {
-    const { agent, role } = req.user;
+    const { agent } = req.user;
     const {
       status,
       paymentStatus,
@@ -21,29 +65,14 @@ const getMyOrders = async (req, res) => {
       limit = 50,
     } = req.query;
 
-    // Build filter based on agent type
-    const filter = {};
-
-    // Filter based on agent type
-    if (role === 'mfy') {
-      // MFY agent - only orders assigned to this agent
-      filter.assignedToAgent = agent._id;
-    } else if (role === 'tuman') {
-      // Tuman agent - orders in tuman and orders assigned to tuman agents
-      const tumanAgents = await Agent.find({
-        tuman: agent.tuman._id,
-        status: 'active',
-      }).select('_id');
-      
-      const tumanAgentIds = tumanAgents.map((a) => a._id);
-      filter.$or = [
-        { deliveryTuman: agent.tuman._id },
-        { assignedToAgent: { $in: tumanAgentIds } },
-      ];
-    } else if (role === 'viloyat') {
-      // Viloyat agent - orders in viloyat
-      filter.deliveryViloyat = agent.viloyat._id;
-    }
+    // Build filter - all agents see only orders assigned to them
+    const filter = {
+      assignedToAgent: agent._id,
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
+    };
 
     // Additional filters
     if (status) {
@@ -98,7 +127,7 @@ const getMyOrders = async (req, res) => {
       };
       
       if (filter.$or) {
-        // If $or already exists (for tuman agent), combine with $and
+        // If $or already exists, combine with $and
         filter.$and = [
           { $or: filter.$or },
           searchFilter,
@@ -120,22 +149,6 @@ const getMyOrders = async (req, res) => {
     // Get orders with pagination and populate
     const orders = await Order.find(filter)
       .populate('user', 'name phone')
-      .populate({
-        path: 'items.product',
-        populate: [
-          { path: 'category', select: 'name slug' },
-          { path: 'subcategory', select: 'name slug' },
-          { path: 'contragent', select: 'name inn phone' },
-          {
-            path: 'deliveryRegions.viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'deliveryRegions.tuman',
-            select: 'name type code',
-          },
-        ],
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
@@ -146,6 +159,9 @@ const getMyOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
+
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(orders);
 
     // Remove kpiBonusPercent from products
     const ordersWithoutKpi = orders.map((order) => {
@@ -184,26 +200,10 @@ const getMyOrders = async (req, res) => {
 const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { agent, role } = req.user;
+    const { agent } = req.user;
 
     const order = await Order.findById(id)
       .populate('user', 'name phone')
-      .populate({
-        path: 'items.product',
-        populate: [
-          { path: 'category', select: 'name slug' },
-          { path: 'subcategory', select: 'name slug' },
-          { path: 'contragent', select: 'name inn phone' },
-          {
-            path: 'deliveryRegions.viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'deliveryRegions.tuman',
-            select: 'name type code',
-          },
-        ],
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
@@ -219,28 +219,11 @@ const getOrderById = async (req, res) => {
       });
     }
 
-    // Check if agent can access this order based on role
-    let canAccess = false;
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(order);
 
-    if (role === 'mfy') {
-      // MFY agent - only orders assigned to this agent
-      canAccess = order.assignedToAgent && order.assignedToAgent._id.toString() === agent._id.toString();
-    } else if (role === 'tuman') {
-      // Tuman agent - orders in tuman or assigned to tuman agents
-      if (order.deliveryTuman && order.deliveryTuman._id.toString() === agent.tuman._id.toString()) {
-        canAccess = true;
-      } else if (order.assignedToAgent) {
-        const assignedAgent = await Agent.findById(order.assignedToAgent._id);
-        if (assignedAgent && assignedAgent.tuman && assignedAgent.tuman.toString() === agent.tuman._id.toString()) {
-          canAccess = true;
-        }
-      }
-    } else if (role === 'viloyat') {
-      // Viloyat agent - orders in viloyat
-      canAccess = order.deliveryViloyat && order.deliveryViloyat._id.toString() === agent.viloyat._id.toString();
-    }
-
-    if (!canAccess) {
+    // Check if agent can access this order - only orders assigned to this agent
+    if (!order.assignedToAgent || order.assignedToAgent._id.toString() !== agent._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Bu buyurtmani ko\'rish huquqiga ega emassiz',
@@ -280,19 +263,11 @@ const getOrderById = async (req, res) => {
   }
 };
 
-// Confirm order by agent (MFY agentlari mijozga borib tasdiqlash)
+// Confirm order by agent (agent mijozga borib tasdiqlash)
 const confirmOrderByAgent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { agent, role } = req.user;
-
-    // Only MFY agents can confirm orders
-    if (role !== 'mfy') {
-      return res.status(403).json({
-        success: false,
-        message: 'Faqat MFY agentlari buyurtmalarni tasdiqlay olishadi',
-      });
-    }
+    const { agent } = req.user;
 
     const order = await Order.findById(id)
       .populate('assignedToAgent', 'name phone viloyat tuman mfy')
@@ -379,19 +354,11 @@ const confirmOrderByAgent = async (req, res) => {
   }
 };
 
-// Mark order as delivered (MFY agentlari mijozga yetkazib berganini belgilash)
+// Mark order as delivered (agent mijozga yetkazib berganini belgilash)
 const markOrderAsDelivered = async (req, res) => {
   try {
     const { id } = req.params;
-    const { agent, role } = req.user;
-
-    // Only MFY agents can mark orders as delivered
-    if (role !== 'mfy') {
-      return res.status(403).json({
-        success: false,
-        message: 'Faqat MFY agentlari buyurtmalarni yetkazilgan deb belgilay olishadi',
-      });
-    }
+    const { agent } = req.user;
 
     const order = await Order.findById(id)
       .populate('assignedToAgent', 'name phone viloyat tuman mfy')
@@ -436,15 +403,8 @@ const markOrderAsDelivered = async (req, res) => {
     
     await order.save();
 
-    // Populate for response
-    await order.populate({
-      path: 'items.product',
-      populate: [
-        { path: 'category', select: 'name slug' },
-        { path: 'subcategory', select: 'name slug' },
-        { path: 'contragent', select: 'name inn phone' },
-      ],
-    });
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(order);
 
     // Remove kpiBonusPercent from products
     const orderObj = order.toObject();
@@ -483,7 +443,7 @@ const markOrderAsDelivered = async (req, res) => {
 // Get today's orders for agent (bugungi buyurtmalar)
 const getTodayOrders = async (req, res) => {
   try {
-    const { agent, role } = req.user;
+    const { agent } = req.user;
     const { status, page = 1, limit = 50 } = req.query;
 
     // Today's date range (00:00 - 23:59)
@@ -493,20 +453,14 @@ const getTodayOrders = async (req, res) => {
 
     const filter = {
       createdAt: { $gte: startOfDay, $lte: endOfDay },
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
     };
 
-    if (role === 'mfy') {
-      filter.assignedToAgent = agent._id;
-    } else if (role === 'tuman') {
-      const tumanAgents = await Agent.find({ tuman: agent.tuman._id, status: 'active' }).select('_id');
-      const tumanAgentIds = tumanAgents.map((a) => a._id);
-      filter.$or = [
-        { deliveryTuman: agent.tuman._id },
-        { assignedToAgent: { $in: tumanAgentIds } },
-      ];
-    } else if (role === 'viloyat') {
-      filter.deliveryViloyat = agent.viloyat._id;
-    }
+    // All agents see only orders assigned to them
+    filter.assignedToAgent = agent._id;
 
     if (status) {
       filter.status = status;
@@ -520,14 +474,6 @@ const getTodayOrders = async (req, res) => {
 
     const orders = await Order.find(filter)
       .populate('user', 'name phone')
-      .populate({
-        path: 'items.product',
-        populate: [
-          { path: 'category', select: 'name slug' },
-          { path: 'subcategory', select: 'name slug' },
-          { path: 'contragent', select: 'name inn phone' },
-        ],
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
@@ -535,6 +481,9 @@ const getTodayOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
+
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(orders);
 
     const ordersWithoutKpi = orders.map((order) => {
       const orderObj = order.toObject();
@@ -571,7 +520,7 @@ const getTodayOrders = async (req, res) => {
 // Get order history for agent (tarix - o'tgan kunlar)
 const getOrderHistory = async (req, res) => {
   try {
-    const { agent, role } = req.user;
+    const { agent } = req.user;
     const { status, startDate, endDate, page = 1, limit = 50 } = req.query;
 
     // Exclude today
@@ -580,6 +529,10 @@ const getOrderHistory = async (req, res) => {
 
     const filter = {
       createdAt: { $lt: startOfToday },
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
     };
 
     if (startDate) {
@@ -593,18 +546,8 @@ const getOrderHistory = async (req, res) => {
       }
     }
 
-    if (role === 'mfy') {
-      filter.assignedToAgent = agent._id;
-    } else if (role === 'tuman') {
-      const tumanAgents = await Agent.find({ tuman: agent.tuman._id, status: 'active' }).select('_id');
-      const tumanAgentIds = tumanAgents.map((a) => a._id);
-      filter.$or = [
-        { deliveryTuman: agent.tuman._id },
-        { assignedToAgent: { $in: tumanAgentIds } },
-      ];
-    } else if (role === 'viloyat') {
-      filter.deliveryViloyat = agent.viloyat._id;
-    }
+    // All agents see only orders assigned to them
+    filter.assignedToAgent = agent._id;
 
     if (status) {
       filter.status = status;
@@ -618,14 +561,6 @@ const getOrderHistory = async (req, res) => {
 
     const orders = await Order.find(filter)
       .populate('user', 'name phone')
-      .populate({
-        path: 'items.product',
-        populate: [
-          { path: 'category', select: 'name slug' },
-          { path: 'subcategory', select: 'name slug' },
-          { path: 'contragent', select: 'name inn phone' },
-        ],
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
@@ -633,6 +568,9 @@ const getOrderHistory = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
+
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(orders);
 
     const ordersWithoutKpi = orders.map((order) => {
       const orderObj = order.toObject();

@@ -28,7 +28,7 @@ const paymentTransactionSchema = new mongoose.Schema(
       default: 'pending',
       required: true,
     },
-    // MFY Agent
+    // Agent (all agents are the same now)
     collectedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Agent',
@@ -38,7 +38,7 @@ const paymentTransactionSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    // Tuman Agent
+    // Deprecated: Tuman Agent fields (kept for backward compatibility with old data)
     submittedToDistrict: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Agent',
@@ -57,7 +57,7 @@ const paymentTransactionSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    // Viloyat Agent
+    // Deprecated: Viloyat Agent fields (kept for backward compatibility with old data)
     submittedToProvince: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Agent',
@@ -101,7 +101,7 @@ const paymentTransactionSchema = new mongoose.Schema(
     // Hozirgi egasi
     currentHolder: {
       type: String,
-      enum: ['user', 'mfy_agent', 'district_agent', 'province_agent', 'finance'],
+      enum: ['user', 'agent', 'finance'],
       default: 'user',
     },
     currentHolderId: {
@@ -113,7 +113,7 @@ const paymentTransactionSchema = new mongoose.Schema(
       {
         holder: {
           type: String,
-          enum: ['user', 'mfy_agent', 'district_agent', 'province_agent', 'finance'],
+          enum: ['user', 'agent', 'finance'],
         },
         holderId: {
           type: mongoose.Schema.Types.ObjectId,

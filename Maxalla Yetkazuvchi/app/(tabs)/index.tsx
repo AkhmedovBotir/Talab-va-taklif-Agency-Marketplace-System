@@ -51,12 +51,8 @@ export default function OrdersScreen() {
         setOrders(ordersData);
       } else {
         setOrders([]);
-        if (response.message) {
-          console.log('API Message:', response.message);
-        }
       }
     } catch (error: any) {
-      console.error('Orders loading error:', error);
       setOrders([]);
       // Faqat xatolik bo'lsa alert ko'rsatish
       if (error.message && !error.message.includes('Network')) {

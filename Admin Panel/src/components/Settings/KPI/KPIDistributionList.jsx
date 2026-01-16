@@ -115,7 +115,7 @@ const KPIDistributionList = ({
                       <div className="space-y-2">
                         {/* Asosiy taqsimlashlar */}
                         <div className="flex flex-wrap gap-2">
-                          {['punkt', 'viloyatAgent', 'tumanAgent', 'mfyAgent', 'finance', 'deliveryService'].map(
+                          {['punkt', 'agent', 'manager', 'finance', 'deliveryService'].map(
                             (key) => (
                               <span
                                 key={key}
@@ -124,12 +124,10 @@ const KPIDistributionList = ({
                                 <span className="font-medium text-indigo-700">
                                   {key === 'punkt'
                                     ? 'Punkt'
-                                    : key === 'viloyatAgent'
-                                    ? 'Viloyat'
-                                    : key === 'tumanAgent'
-                                    ? 'Tuman'
-                                    : key === 'mfyAgent'
-                                    ? 'MFY'
+                                    : key === 'agent'
+                                    ? 'Agent'
+                                    : key === 'manager'
+                                    ? 'Menejer'
                                     : key === 'finance'
                                     ? 'Moliya'
                                     : 'Yetkazib Berish'}
@@ -142,17 +140,6 @@ const KPIDistributionList = ({
                             ),
                           )}
                         </div>
-                        {/* Punkt Transfer (qo'shimcha) */}
-                        {distribution.distribution?.punktTransfer > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-blue-200 bg-blue-50 text-xs">
-                              <span className="font-medium text-blue-700">Transfer:</span>
-                              <span className="text-blue-900 font-semibold">
-                                {distribution.distribution.punktTransfer}%
-                              </span>
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">

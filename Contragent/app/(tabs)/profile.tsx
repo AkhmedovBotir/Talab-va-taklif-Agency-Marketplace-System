@@ -39,7 +39,7 @@ export default function ProfileScreen() {
         setUnreadCount(response.data.unreadCount);
       }
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      // Ignore unread count errors
     }
   };
 
@@ -68,9 +68,7 @@ export default function ProfileScreen() {
       }
     } catch (error: any) {
       // If 404, it means no regions set yet, which is fine
-      if (error.status !== 404) {
-        console.error('Error loading delivery regions:', error);
-      }
+      // Ignore other errors silently
     } finally {
       setLoadingRegions(false);
     }

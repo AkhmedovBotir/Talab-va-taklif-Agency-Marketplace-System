@@ -30,7 +30,7 @@ export default function TabLayout() {
           setUnreadCount(response.data.unreadCount);
         }
       } catch (error) {
-        console.error('Error fetching unread count:', error);
+        // Ignore unread count errors
       }
     };
 

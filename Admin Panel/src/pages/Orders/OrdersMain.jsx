@@ -1,54 +1,57 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { adminDataAPI } from '../../services/api';
+import { tumanOrdersAPI, maxallaOrdersAPI, adminDataAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
-import Orders from './Orders';
-import MarketplaceOrders from './MarketplaceOrders';
-import ConfirmedByPunktOrders from './ConfirmedByPunktOrders';
-import RequestedToContragentsOrders from './RequestedToContragentsOrders';
-import DeliveredToPunktOrders from './DeliveredToPunktOrders';
-import AssignedToAgentsOrders from './AssignedToAgentsOrders';
-import ConfirmedByAgentsOrders from './ConfirmedByAgentsOrders';
-import ConfirmedByCustomersOrders from './ConfirmedByCustomersOrders';
-import CancelledOrders from './CancelledOrders';
+import TumanOrders from './TumanOrders';
+import MaxallaOrders from './MaxallaOrders';
 
-const TABS = [
+const TUMAN_TABS = [
   { id: 'all', label: 'Barcha', apiMethod: 'getAllOrders' },
   { id: 'marketplace', label: 'Marketplace', apiMethod: 'getMarketplaceOrders' },
-  { id: 'confirmed-by-punkt', label: 'Punkt Qabul Qilgan', apiMethod: 'getOrdersConfirmedByPunkt' },
-  { id: 'requested-to-contragents', label: 'Kontragentlarga', apiMethod: 'getOrdersRequestedToContragents' },
-  { id: 'delivered-to-punkt', label: 'Punktga Yetkazilgan', apiMethod: 'getOrdersDeliveredToPunkt' },
-  { id: 'assigned-to-agents', label: 'Agentga', apiMethod: 'getOrdersAssignedToAgents' },
-  { id: 'confirmed-by-agents', label: 'Agent Topshirgan', apiMethod: 'getOrdersConfirmedByAgents' },
-  { id: 'confirmed-by-customers', label: 'Mijoz Qabul Qilgan', apiMethod: 'getOrdersConfirmedByCustomers' },
+  { id: 'confirmed-by-punkt', label: 'Punkt Qabul Qilgan', apiMethod: 'getConfirmedByPunktOrders' },
+  { id: 'requested-to-contragents', label: 'Kontragentlarga', apiMethod: 'getRequestedToContragentsOrders' },
+  { id: 'delivered-to-punkt', label: 'Punktga Yetkazilgan', apiMethod: 'getDeliveredToPunktOrders' },
+  { id: 'assigned-to-agents', label: 'Agentga', apiMethod: 'getAssignedToAgentsOrders' },
+  { id: 'confirmed-by-agents', label: 'Agent Topshirgan', apiMethod: 'getConfirmedByAgentsOrders' },
+  { id: 'confirmed-by-customers', label: 'Mijoz Qabul Qilgan', apiMethod: 'getConfirmedByCustomersOrders' },
   { id: 'cancelled', label: 'Qaytarilgan', apiMethod: 'getCancelledOrders' },
 ];
 
-const COMPONENTS = {
-  'all': Orders,
-  'marketplace': MarketplaceOrders,
-  'confirmed-by-punkt': ConfirmedByPunktOrders,
-  'requested-to-contragents': RequestedToContragentsOrders,
-  'delivered-to-punkt': DeliveredToPunktOrders,
-  'assigned-to-agents': AssignedToAgentsOrders,
-  'confirmed-by-agents': ConfirmedByAgentsOrders,
-  'confirmed-by-customers': ConfirmedByCustomersOrders,
-  'cancelled': CancelledOrders,
-};
+const MAXALLA_TABS = [
+  { id: 'all', label: 'Barcha', apiMethod: 'getAllOrders' },
+  { id: 'marketplace', label: 'Marketplace', apiMethod: 'getMarketplaceOrders' },
+  { id: 'requested-to-contragents', label: 'Kontragentlarga', apiMethod: 'getRequestedToContragentsOrders' },
+  { id: 'delivered-to-punkt', label: 'Punktga Yetkazilgan', apiMethod: 'getDeliveredToPunktOrders' },
+  { id: 'assigned-to-agents', label: 'Agentga', apiMethod: 'getAssignedToAgentsOrders' },
+  { id: 'confirmed-by-agents', label: 'Agent Topshirgan', apiMethod: 'getConfirmedByAgentsOrders' },
+  { id: 'confirmed-by-customers', label: 'Mijoz Qabul Qilgan', apiMethod: 'getConfirmedByCustomersOrders' },
+  { id: 'cancelled', label: 'Qaytarilgan', apiMethod: 'getCancelledOrders' },
+];
 
 const OrdersMain = () => {
   const { showError } = useSnackbar();
+  const [orderType, setOrderType] = useState('tuman'); // 'tuman' or 'maxalla'
   const [activeTab, setActiveTab] = useState('all');
   const [statistics, setStatistics] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
 
-  const activeTabConfig = useMemo(() => {
-    return TABS.find(tab => tab.id === activeTab);
-  }, [activeTab]);
+  const currentTabs = useMemo(() => {
+    return orderType === 'tuman' ? TUMAN_TABS : MAXALLA_TABS;
+  }, [orderType]);
 
-  const ActiveComponent = useMemo(() => {
-    return COMPONENTS[activeTab] || Orders;
-  }, [activeTab]);
+  const currentAPI = useMemo(() => {
+    return orderType === 'tuman' ? tumanOrdersAPI : maxallaOrdersAPI;
+  }, [orderType]);
+
+  const activeTabConfig = useMemo(() => {
+    return currentTabs.find(tab => tab.id === activeTab);
+  }, [activeTab, currentTabs]);
+
+  // Reset active tab when order type changes
+  useEffect(() => {
+    setActiveTab('all');
+    setStatistics(null);
+  }, [orderType]);
 
   // Fetch statistics for active tab
   useEffect(() => {
@@ -56,10 +59,10 @@ const OrdersMain = () => {
       if (!activeTabConfig?.apiMethod) return;
       
       setLoadingStats(true);
-      setStatistics(null); // Clear previous statistics to show loading
+      setStatistics(null);
       
       try {
-        const apiMethod = adminDataAPI[activeTabConfig.apiMethod];
+        const apiMethod = currentAPI[activeTabConfig.apiMethod];
         if (apiMethod) {
           const response = await apiMethod({ page: 1, limit: 1 });
           if (response.success && response.statistics) {
@@ -67,7 +70,6 @@ const OrdersMain = () => {
           }
         }
       } catch (err) {
-        // Silently fail for statistics
         console.error('Failed to load statistics:', err);
         setStatistics(null);
       } finally {
@@ -76,7 +78,7 @@ const OrdersMain = () => {
     };
 
     fetchStatistics();
-  }, [activeTab]); // Only depend on activeTab, not activeTabConfig
+  }, [activeTab, orderType, activeTabConfig, currentAPI]);
 
   const formatPrice = (price) => {
     if (!price) return '0';
@@ -91,9 +93,35 @@ const OrdersMain = () => {
         animate={{ opacity: 1, y: 0 }}
         className="mb-6"
       >
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Buyurtmalar</h1>
-          <p className="text-gray-600">Barcha buyurtmalarni boshqarish va monitoring qilish</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Buyurtmalar</h1>
+            <p className="text-gray-600">Barcha buyurtmalarni boshqarish va monitoring qilish</p>
+          </div>
+          
+          {/* Order Type Tabs */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setOrderType('tuman')}
+              className={`px-6 py-3 text-sm font-medium rounded-lg transition-all ${
+                orderType === 'tuman'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Tuman
+            </button>
+            <button
+              onClick={() => setOrderType('maxalla')}
+              className={`px-6 py-3 text-sm font-medium rounded-lg transition-all ${
+                orderType === 'maxalla'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Maxalla
+            </button>
+          </div>
         </div>
       </motion.div>
 
@@ -135,16 +163,18 @@ const OrdersMain = () => {
               )}
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="text-sm text-gray-600 mb-1">KPI Summa</div>
-            <div className="text-2xl font-bold text-green-600">
-              {loadingStats ? (
-                <div className="h-7 w-24 bg-gray-200 animate-pulse rounded"></div>
-              ) : (
-                `${formatPrice(statistics.totalKpiPrice || 0)} so'm`
-              )}
+          {orderType === 'tuman' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div className="text-sm text-gray-600 mb-1">KPI Summa</div>
+              <div className="text-2xl font-bold text-green-600">
+                {loadingStats ? (
+                  <div className="h-7 w-24 bg-gray-200 animate-pulse rounded"></div>
+                ) : (
+                  `${formatPrice(statistics.totalKpiPrice || 0)} so'm`
+                )}
+              </div>
             </div>
-          </div>
+          )}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="text-sm text-gray-600 mb-1">Jami Mahsulotlar</div>
             <div className="text-2xl font-bold text-purple-600">
@@ -168,7 +198,7 @@ const OrdersMain = () => {
         </motion.div>
       )}
 
-      {/* Tabs */}
+      {/* Tabs Navigation */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -178,7 +208,7 @@ const OrdersMain = () => {
         <div className="border-b border-gray-200">
           <nav className="flex overflow-x-auto scrollbar-hide" aria-label="Tabs">
             <div className="flex min-w-max">
-              {TABS.map((tab) => (
+              {currentTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -201,16 +231,27 @@ const OrdersMain = () => {
 
       {/* Tab Content */}
       <motion.div
-        key={activeTab}
+        key={`${orderType}-${activeTab}`}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
       >
-        <ActiveComponent hideHeader={true} />
+        {orderType === 'tuman' ? (
+          <TumanOrders
+            activeTab={activeTab}
+            activeTabConfig={activeTabConfig}
+            hideHeader={true}
+          />
+        ) : (
+          <MaxallaOrders
+            activeTab={activeTab}
+            activeTabConfig={activeTabConfig}
+            hideHeader={true}
+          />
+        )}
       </motion.div>
     </div>
   );
 };
 
 export default OrdersMain;
-

@@ -1,6 +1,6 @@
 // API Types and Interfaces
 
-export type AgentRole = 'viloyat' | 'tuman' | 'mfy';
+export type AgentRole = 'agent';
 
 export type OrderStatus = 
   | 'pending' 
@@ -32,11 +32,11 @@ export interface Agent {
   _id: string;
   name: string;
   phone: string;
-  viloyat: Region;
+  viloyat: Region | null;
   tuman: Region | null;
   mfy: Region | null;
   status: string;
-  agentType: AgentRole;
+  agentType: 'agent';
   createdAt: string;
   updatedAt: string;
 }
@@ -72,7 +72,7 @@ export interface PunktToPunktRequest {
 
 export interface User {
   _id: string;
-  name: string;
+  name?: string; // Optional, chunki ba'zida faqat phone keladi
   phone: string;
 }
 
@@ -84,7 +84,10 @@ export interface Product {
 }
 
 export interface OrderItem {
-  product: Product;
+  product: Product | string; // Product object yoki ID string bo'lishi mumkin
+  productType?: string;
+  productModel?: string;
+  kpiBonusPercent?: number;
   quantity: number;
   price: number;
   originalPrice?: number;
@@ -120,7 +123,7 @@ export interface Order {
   punktToPunktRequests?: PunktToPunktRequest[];
   customerConfirmed: boolean;
   customerConfirmedAt: string | null;
-  currentPunkt: Punkt | null;
+  currentPunkt: Punkt | string | null; // Object yoki string ID bo'lishi mumkin
   createdAt: string;
   updatedAt: string;
 }
@@ -135,8 +138,12 @@ export interface LoginResponse {
   message: string;
   data: {
     token: string;
-    role: AgentRole;
     agent: Agent;
+    device?: {
+      deviceId: string;
+      deviceName?: string;
+      isPrimary: boolean;
+    };
   };
 }
 
@@ -196,18 +203,17 @@ export interface GetOrdersHistoryParams {
 }
 
 // KPI Bonus Types
-export interface KPISummary {
-  totalTransactions: number;
-  totalAmount: number;
-  paidAmount: number;
-  unpaidAmount: number;
-}
+export type KPISummary = KPISummaryResponse['data'];
 
 export interface KPISummaryResponse {
   success: boolean;
   data: {
-    agent: Agent;
-    summary: KPISummary;
+    totalTransactions: number;
+    totalAmount: number;
+    paidAmount: number;
+    unpaidAmount: number;
+    startDate?: string;
+    endDate?: string;
   };
 }
 
@@ -216,22 +222,9 @@ export interface KPITransaction {
   order: {
     _id: string;
     orderNumber: string;
-    status: OrderStatus;
-    totalPrice: number;
   };
-  orderItem: {
-    product: Product;
-    quantity: number;
-    price: number;
-    kpiBonusPercent: number;
-  };
-  distributionConfig: {
-    _id: string;
-    name: string;
-  };
-  orderStatus: OrderStatus;
+  amount: number;
   isPaid: boolean;
-  agentAmount: number;
   createdAt: string;
 }
 
@@ -245,41 +238,29 @@ export interface KPITransactionsResponse {
   data: KPITransaction[];
 }
 
-export interface KPIDailyBalance {
-  date: string;
-  totals: {
-    totalTransactions: number;
+export interface KPIDailyBalanceResponse {
+  success: boolean;
+  data: {
+    date: string;
     totalAmount: number;
     paidAmount: number;
     unpaidAmount: number;
-    paidTransactions: number;
-    unpaidTransactions: number;
   };
-}
-
-export interface KPIDailyBalanceResponse {
-  success: boolean;
-  data: KPIDailyBalance;
-}
-
-export interface KPIDailyReportItem {
-  date: string;
-  totalTransactions: number;
-  totalAmount: number;
-  paidAmount: number;
-  unpaidAmount: number;
-  paidTransactions: number;
-  unpaidTransactions: number;
 }
 
 export interface KPIDailyReportResponse {
   success: boolean;
-  data: {
-    range: {
-      startDate: string;
-      endDate: string;
-    };
-    report: KPIDailyReportItem[];
+  report: {
+    id: string;
+    date: string;
+    totalAmount: number;
+    paidAmount: number;
+    unpaidAmount: number;
+    transactions: Array<{
+      _id: string;
+      orderNumber: string;
+      amount: number;
+    }>;
   };
 }
 
@@ -292,259 +273,8 @@ export interface GetKPIParams {
   date?: string; // For daily balance (YYYY-MM-DD format)
 }
 
-// Agent Finance Types
-export type PaymentTransactionStatus = 'pending' | 'collected' | 'submitted' | 'received' | 'confirmed' | 'rejected';
-export type TransactionHolder = 'user' | 'mfy_agent' | 'district_agent' | 'province_agent' | 'finance';
-export type FinanceSubmissionStatus = 'pending' | 'confirmed' | 'rejected';
-
-export interface PaymentTransaction {
-  _id: string;
-  order: string | {
-    _id: string;
-    orderNumber: string;
-    totalPrice: number;
-    status?: OrderStatus;
-    deliveryMfy?: string;
-  };
-  user: string | {
-    _id: string;
-    name: string;
-    phone: string;
-  };
-  amount: number;
-  paymentMethod: PaymentMethod;
-  status: PaymentTransactionStatus;
-  collectedBy?: Agent | string;
-  collectedAt?: string;
-  currentHolder: TransactionHolder;
-  currentHolderId?: string;
-  transactionPath: any[];
-  createdAt: string;
-  updatedAt?: string;
-  // Additional fields from API
-  submittedToDistrict?: string | null;
-  submittedToDistrictAt?: string | null;
-  receivedByDistrict?: string | null;
-  receivedByDistrictAt?: string | null;
-  submittedToProvince?: string | null;
-  submittedToProvinceAt?: string | null;
-  receivedByProvince?: string | null;
-  receivedByProvinceAt?: string | null;
-  submittedToFinance?: string | null;
-  receivedByFinance?: boolean;
-  receivedByFinanceAt?: string | null;
-  confirmedByFinance?: string | null;
-  confirmedByFinanceAt?: string | null;
-  rejectionReason?: string | null;
-  rejectedAt?: string | null;
-  rejectedBy?: string | null;
-}
-
-export interface AgentDailyReport {
-  _id?: string;
-  id?: string;
-  date: string;
-  ordersCount: number;
-  totalAmount: number;
-  collectedAmount: number;
-  submittedAmount: number;
-  pendingAmount: number;
-  cashAmount: number;
-  cardAmount: number;
-  isSubmitted?: boolean;
-  submittedAt?: string | null;
-  transactions?: PaymentTransaction[];
-}
-
-export interface FinanceSubmission {
-  _id: string;
-  id?: string;
-  fromAgent: Agent;
-  fromAgentType: AgentRole;
-  toAgent?: Agent;
-  toAgentType: 'tuman' | 'viloyat' | 'finance';
-  amount: number;
-  submissionDate: string;
-  status: FinanceSubmissionStatus;
-  transactions: string[] | PaymentTransaction[];
-  cashAmount: number;
-  cardAmount: number;
-  transactionsCount: number;
-  confirmedAt?: string;
-  createdAt?: string;
-}
-
-// MFY Agent Finance Responses
-export interface MFYDailyReportResponse {
+export interface AgentProfileResponse {
   success: boolean;
-  report: AgentDailyReport;
-}
-
-export interface MFYPendingPaymentsResponse {
-  success: boolean;
-  count: number;
-  transactions: PaymentTransaction[];
-}
-
-export interface MFYCollectPaymentResponse {
-  success: boolean;
-  message: string;
-  transaction: {
-    id: string;
-    status: PaymentTransactionStatus;
-    collectedAt: string;
-  };
-}
-
-export interface MFYSubmitToDistrictRequest {
-  transactionIds: string[];
-  notes?: string;
-}
-
-export interface MFYSubmitToDistrictResponse {
-  success: boolean;
-  message: string;
-  submission: {
-    id: string;
-    amount: number;
-    transactionsCount: number;
-    submittedAt: string;
-  };
-}
-
-export interface MFYStatisticsResponse {
-  success: boolean;
-  statistics: {
-    period: {
-      startDate: string;
-      endDate: string;
-    };
-    totalOrders: number;
-    totalAmount: number;
-    collectedAmount: number;
-    submittedAmount: number;
-    pendingAmount: number;
-    cashAmount: number;
-    cardAmount: number;
-  };
-}
-
-// Tuman Agent Finance Responses
-export interface DistrictReportResponse {
-  success: boolean;
-  report: {
-    date: string;
-    submissionsCount: number;
-    totalReceived: number;
-    pendingAmount: number;
-    submissions: FinanceSubmission[];
-  };
-}
-
-export interface DistrictSubmissionsResponse {
-  success: boolean;
-  count: number;
-  submissions: FinanceSubmission[];
-}
-
-export interface DistrictConfirmSubmissionResponse {
-  success: boolean;
-  message: string;
-  submission: {
-    id: string;
-    status: FinanceSubmissionStatus;
-    confirmedAt: string;
-  };
-}
-
-export interface DistrictSubmitToProvinceRequest {
-  transactionIds: string[];
-  notes?: string;
-}
-
-export interface DistrictSubmitToProvinceResponse {
-  success: boolean;
-  message: string;
-  submission: {
-    id: string;
-    amount: number;
-    transactionsCount: number;
-    submittedAt: string;
-  };
-}
-
-export interface DistrictStatisticsResponse {
-  success: boolean;
-  statistics: {
-    period: {
-      startDate: string;
-      endDate: string;
-    };
-    submissionsCount: number;
-    totalReceived: number;
-    pendingAmount: number;
-  };
-}
-
-// Viloyat Agent Finance Responses
-export interface ProvinceReportResponse {
-  success: boolean;
-  report: {
-    date: string;
-    submissionsCount: number;
-    totalReceived: number;
-    pendingAmount: number;
-    submissions: FinanceSubmission[];
-  };
-}
-
-export interface ProvinceSubmissionsResponse {
-  success: boolean;
-  count: number;
-  submissions: FinanceSubmission[];
-}
-
-export interface ProvinceConfirmSubmissionResponse {
-  success: boolean;
-  message: string;
-  submission: {
-    id: string;
-    status: FinanceSubmissionStatus;
-    confirmedAt: string;
-  };
-}
-
-export interface ProvinceSubmitToFinanceRequest {
-  transactionIds: string[];
-  notes?: string;
-}
-
-export interface ProvinceSubmitToFinanceResponse {
-  success: boolean;
-  message: string;
-  submission: {
-    id: string;
-    amount: number;
-    transactionsCount: number;
-    submittedAt: string;
-  };
-}
-
-export interface ProvinceStatisticsResponse {
-  success: boolean;
-  statistics: {
-    period: {
-      startDate: string;
-      endDate: string;
-    };
-    submissionsCount: number;
-    totalReceived: number;
-    pendingAmount: number;
-  };
-}
-
-export interface GetFinanceStatisticsParams {
-  startDate?: string;
-  endDate?: string;
+  data: Agent;
 }
 

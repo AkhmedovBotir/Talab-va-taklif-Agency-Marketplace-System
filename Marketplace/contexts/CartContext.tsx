@@ -44,7 +44,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const response = await apiService.getMaxallaCart(token);
         setMaxallaCart(response.data);
       } else {
-        const response = await apiService.getCart(token);
+      const response = await apiService.getCart(token);
         setTumanCart(response.data);
       }
     } catch (error: any) {

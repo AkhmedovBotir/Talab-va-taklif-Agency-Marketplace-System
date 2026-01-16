@@ -43,14 +43,25 @@ const {
   getMarketplaceUserByIdForAdmin,
   getAllOrdersForAdmin,
   getOrderByIdForAdmin,
-  getMarketplaceOrdersForAdmin,
-  getOrdersConfirmedByPunktForAdmin,
-  getOrdersRequestedToContragentsForAdmin,
-  getOrdersDeliveredToPunktForAdmin,
-  getOrdersAssignedToAgentsForAdmin,
-  getOrdersConfirmedByAgentsForAdmin,
-  getOrdersConfirmedByCustomersForAdmin,
-  getCancelledOrdersForAdmin,
+  // Tuman kontragentlari sotuvi
+  getAllTumanOrdersForAdmin,
+  getTumanOrdersFromMarketplaceForAdmin,
+  getTumanOrdersConfirmedByPunktForAdmin,
+  getTumanOrdersRequestedToContragentsForAdmin,
+  getTumanOrdersDeliveredToPunktForAdmin,
+  getTumanOrdersAssignedToAgentsForAdmin,
+  getTumanOrdersConfirmedByAgentsForAdmin,
+  getTumanOrdersConfirmedByCustomersForAdmin,
+  getCancelledTumanOrdersForAdmin,
+  // Maxalla do'konlari sotuvi
+  getAllMaxallaOrdersForAdmin,
+  getMaxallaOrdersFromMarketplaceForAdmin,
+  getMaxallaOrdersRequestedToContragentsForAdmin,
+  getMaxallaOrdersDeliveredToPunktForAdmin,
+  getMaxallaOrdersAssignedToAgentsForAdmin,
+  getMaxallaOrdersConfirmedByAgentsForAdmin,
+  getMaxallaOrdersConfirmedByCustomersForAdmin,
+  getCancelledMaxallaOrdersForAdmin,
   getSalesStatsByViloyats,
   getSalesStatsByTumans,
   getSalesStatsByMfys,
@@ -76,9 +87,7 @@ const {
   getKpiTransactionById,
   getKpiStatistics,
   getInitialKpiDistribution,
-  getViloyatAgentsKpi,
-  getTumanAgentsKpi,
-  getMfyAgentsKpi,
+  getAgentsKpi,
   getPunktsKpi,
   getAgentKpiDetails,
   getPunktKpiDetails,
@@ -239,32 +248,63 @@ router.get('/data/marketplace-users', adminAuth, getAllMarketplaceUsersForAdmin)
 // Get marketplace user by ID (for admin)
 router.get('/data/marketplace-users/:id', adminAuth, getMarketplaceUserByIdForAdmin);
 
-// Get all orders (for admin) - Barcha buyurtmalar
+// ==================== TUMAN KONTRAGENTLARI SOTUVI ====================
+
+// Get all tuman orders (Barcha tuman buyurtmalari)
+router.get('/sales/tuman/orders', adminAuth, getAllTumanOrdersForAdmin);
+
+// Get tuman orders from marketplace (Marketplace dan buyurilgan)
+router.get('/sales/tuman/orders/marketplace', adminAuth, getTumanOrdersFromMarketplaceForAdmin);
+
+// Get tuman orders confirmed by punkt (Punkt qabul qilgan)
+router.get('/sales/tuman/orders/confirmed-by-punkt', adminAuth, getTumanOrdersConfirmedByPunktForAdmin);
+
+// Get tuman orders requested to contragents (Kontragentlarga yuborilgan)
+router.get('/sales/tuman/orders/requested-to-contragents', adminAuth, getTumanOrdersRequestedToContragentsForAdmin);
+
+// Get tuman orders delivered to punkt (Punktga yetkazilgan)
+router.get('/sales/tuman/orders/delivered-to-punkt', adminAuth, getTumanOrdersDeliveredToPunktForAdmin);
+
+// Get tuman orders assigned to agents (Agentga yuborilgan)
+router.get('/sales/tuman/orders/assigned-to-agents', adminAuth, getTumanOrdersAssignedToAgentsForAdmin);
+
+// Get tuman orders confirmed by agents (Agent topshirgan)
+router.get('/sales/tuman/orders/confirmed-by-agents', adminAuth, getTumanOrdersConfirmedByAgentsForAdmin);
+
+// Get tuman orders confirmed by customers (Mijoz qabul qilgan)
+router.get('/sales/tuman/orders/confirmed-by-customers', adminAuth, getTumanOrdersConfirmedByCustomersForAdmin);
+
+// Get cancelled tuman orders (Qaytarilgan)
+router.get('/sales/tuman/orders/cancelled', adminAuth, getCancelledTumanOrdersForAdmin);
+
+// ==================== MAXALLA DO'KONLARI SOTUVI ====================
+
+// Get all maxalla orders (Barcha maxalla buyurtmalari)
+router.get('/sales/maxalla/orders', adminAuth, getAllMaxallaOrdersForAdmin);
+
+// Get maxalla orders from marketplace (Marketplace dan buyurilgan)
+router.get('/sales/maxalla/orders/marketplace', adminAuth, getMaxallaOrdersFromMarketplaceForAdmin);
+
+// Get maxalla orders requested to contragents (Kontragentlarga yuborilgan)
+router.get('/sales/maxalla/orders/requested-to-contragents', adminAuth, getMaxallaOrdersRequestedToContragentsForAdmin);
+
+// Get maxalla orders delivered to punkt (Punktga yetkazilgan)
+router.get('/sales/maxalla/orders/delivered-to-punkt', adminAuth, getMaxallaOrdersDeliveredToPunktForAdmin);
+
+// Get maxalla orders assigned to agents (Agentga yuborilgan)
+router.get('/sales/maxalla/orders/assigned-to-agents', adminAuth, getMaxallaOrdersAssignedToAgentsForAdmin);
+
+// Get maxalla orders confirmed by agents (Agent topshirgan)
+router.get('/sales/maxalla/orders/confirmed-by-agents', adminAuth, getMaxallaOrdersConfirmedByAgentsForAdmin);
+
+// Get maxalla orders confirmed by customers (Mijoz qabul qilgan)
+router.get('/sales/maxalla/orders/confirmed-by-customers', adminAuth, getMaxallaOrdersConfirmedByCustomersForAdmin);
+
+// Get cancelled maxalla orders (Qaytarilgan)
+router.get('/sales/maxalla/orders/cancelled', adminAuth, getCancelledMaxallaOrdersForAdmin);
+
+// Get all orders (for admin) - Barcha buyurtmalar (umumiy)
 router.get('/data/orders', adminAuth, getAllOrdersForAdmin);
-
-// Get marketplace orders (Marketplace buyurtmalari) - MUST be before /:id route
-router.get('/data/orders/marketplace', adminAuth, getMarketplaceOrdersForAdmin);
-
-// Get orders confirmed by punkt but nothing done (Punkt qabul qilgan) - MUST be before /:id route
-router.get('/data/orders/confirmed-by-punkt', adminAuth, getOrdersConfirmedByPunktForAdmin);
-
-// Get orders requested to contragents (Kontragentlarga yuborilgan) - MUST be before /:id route
-router.get('/data/orders/requested-to-contragents', adminAuth, getOrdersRequestedToContragentsForAdmin);
-
-// Get orders delivered to punkt (Kontragent punktga yetkazgan) - MUST be before /:id route
-router.get('/data/orders/delivered-to-punkt', adminAuth, getOrdersDeliveredToPunktForAdmin);
-
-// Get orders assigned to agents (Agentga yuborilgan) - MUST be before /:id route
-router.get('/data/orders/assigned-to-agents', adminAuth, getOrdersAssignedToAgentsForAdmin);
-
-// Get orders confirmed by agents (Agent topshirgan buyurtmalar) - MUST be before /:id route
-router.get('/data/orders/confirmed-by-agents', adminAuth, getOrdersConfirmedByAgentsForAdmin);
-
-// Get orders confirmed by customers (Foydalanuvchi qabul qilgan buyurtmalar) - MUST be before /:id route
-router.get('/data/orders/confirmed-by-customers', adminAuth, getOrdersConfirmedByCustomersForAdmin);
-
-// Get cancelled orders (Qaytarilgan buyurtmalar) - MUST be before /:id route
-router.get('/data/orders/cancelled', adminAuth, getCancelledOrdersForAdmin);
 
 // Get order by ID (for admin) - MUST be last to avoid conflicts with specific routes
 router.get('/data/orders/:id', adminAuth, getOrderByIdForAdmin);
@@ -304,9 +344,7 @@ router.get('/kpi/transactions/:id', adminAuth, getKpiTransactionById);
 router.get('/kpi/statistics', adminAuth, getKpiStatistics);
 
 // KPI Data endpoints - Agents and Punkts KPI
-router.get('/kpi/data/viloyat-agents', adminAuth, getViloyatAgentsKpi);
-router.get('/kpi/data/tuman-agents', adminAuth, getTumanAgentsKpi);
-router.get('/kpi/data/mfy-agents', adminAuth, getMfyAgentsKpi);
+router.get('/kpi/data/agents', adminAuth, getAgentsKpi);
 router.get('/kpi/data/punkts', adminAuth, getPunktsKpi);
 router.get('/kpi/data/agents/:agentId', adminAuth, getAgentKpiDetails);
 router.get('/kpi/data/punkts/:punktId', adminAuth, getPunktKpiDetails);

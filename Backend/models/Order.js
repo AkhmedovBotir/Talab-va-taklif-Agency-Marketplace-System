@@ -89,6 +89,12 @@ const orderSchema = new mongoose.Schema(
       required: [true, 'Mahsulotlar soni kiritilishi shart'],
       min: [1, 'Mahsulotlar soni kamida 1 bo\'lishi kerak'],
     },
+    orderType: {
+      type: String,
+      enum: ['tuman', 'dokon'],
+      default: 'tuman',
+      required: true,
+    },
     status: {
       type: String,
       enum: [
@@ -317,6 +323,7 @@ orderSchema.index({ 'punktToPunktRequests.toPunktId': 1 });
 orderSchema.index({ 'punktToPunktRequests.status': 1 });
 orderSchema.index({ currentPunkt: 1 });
 orderSchema.index({ customerConfirmed: 1 });
+orderSchema.index({ orderType: 1 });
 
 // Method to generate order number
 orderSchema.statics.generateOrderNumber = async function () {

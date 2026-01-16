@@ -182,7 +182,7 @@ export default function OrdersHistoryScreen() {
         <View style={styles.infoRow}>
           <Ionicons name="cash" size={16} color="#666" />
           <Text style={styles.infoText}>
-            {item.totalPrice.toLocaleString()} so'm
+            {(item.totalPrice || 0).toLocaleString()} so'm
           </Text>
         </View>
       </View>

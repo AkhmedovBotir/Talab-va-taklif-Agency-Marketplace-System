@@ -114,7 +114,6 @@ const financeReportSchema = new mongoose.Schema(
           ref: 'Agent',
         },
         agentName: String,
-        agentType: String,
         totalAmount: {
           type: Number,
           default: 0,

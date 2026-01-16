@@ -153,6 +153,7 @@ const UnpaidPaymentsTab = () => {
                 <option value="">Barchasi</option>
                 <option value="agent">Agent</option>
                 <option value="punkt">Punkt</option>
+                <option value="manager">Menejer</option>
               </select>
             </div>
             {filters.recipientType === 'agent' && (
@@ -286,7 +287,7 @@ const UnpaidPaymentsTab = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                          {payment.recipientType === 'agent' ? 'Agent' : 'Punkt'}
+                          {payment.recipientType === 'agent' ? 'Agent' : payment.recipientType === 'manager' ? 'Menejer' : 'Punkt'}
                           {payment.agentType && ` (${payment.agentType})`}
                         </span>
                       </td>
@@ -372,7 +373,7 @@ const UnpaidPaymentsTab = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                            {payment.recipientType === 'agent' ? 'Agent' : 'Punkt'}
+                            {payment.recipientType === 'agent' ? 'Agent' : payment.recipientType === 'manager' ? 'Menejer' : 'Punkt'}
                             {payment.agentType && ` (${payment.agentType})`}
                           </span>
                         </td>

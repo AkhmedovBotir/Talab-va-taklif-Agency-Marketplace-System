@@ -5,36 +5,9 @@ import { agentAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { formatTableDate } from '../../utils/dateFormatter';
 
-const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onPageChange, onStatusChange, activeTab }) => {
+const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onPageChange, onStatusChange }) => {
   const [updatingStatus, setUpdatingStatus] = useState({});
   const { showSuccess, showError } = useSnackbar();
-
-  const getAgentTypeLabel = (agentType) => {
-    switch (agentType) {
-      case 'viloyat':
-        return 'Viloyat Agent';
-      case 'tuman':
-        return 'Tuman Agent';
-      case 'mfy':
-        return 'MFY Agent';
-      default:
-        return agentType;
-    }
-  };
-
-  const getAgentTypeBadge = (agentType) => {
-    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
-    switch (agentType) {
-      case 'viloyat':
-        return `${baseClasses} bg-blue-100 text-blue-800`;
-      case 'tuman':
-        return `${baseClasses} bg-green-100 text-green-800`;
-      case 'mfy':
-        return `${baseClasses} bg-purple-100 text-purple-800`;
-      default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
-    }
-  };
 
   const handleStatusToggle = async (agent, newStatus) => {
     setUpdatingStatus({ ...updatingStatus, [agent._id]: true });
@@ -84,36 +57,14 @@ const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onP
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Telefon
               </th>
-              {activeTab === 'viloyat' && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Viloyat
-                </th>
-              )}
-              {activeTab === 'tuman' && (
-                <>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Viloyat
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tuman
-                  </th>
-                </>
-              )}
-              {activeTab === 'mfy' && (
-                <>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Viloyat
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tuman
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    MFY
-                  </th>
-                </>
-              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Agent turi
+                Viloyat
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tuman
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                MFY
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
@@ -141,53 +92,20 @@ const AgentTable = ({ agents, loading, onEdit, onDelete, onView, pagination, onP
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{agent.phone || '-'}</div>
                 </td>
-                {activeTab === 'viloyat' && (
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {agent.viloyat?.name || '-'}
-                    </div>
-                  </td>
-                )}
-                {activeTab === 'tuman' && (
-                  <>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {agent.viloyat?.name || '-'}
-                        
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {agent.tuman?.name || '-'}
-                      </div>
-                    </td>
-                  </>
-                )}
-                {activeTab === 'mfy' && (
-                  <>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {agent.viloyat?.name || '-'}
-                        
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {agent.tuman?.name || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {agent.mfy?.name || '-'}
-                        
-                      </div>
-                    </td>
-                  </>
-                )}
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={getAgentTypeBadge(agent.agentType)}>
-                    {getAgentTypeLabel(agent.agentType)}
-                  </span>
+                  <div className="text-sm text-gray-900">
+                    {agent.viloyat?.name || '-'}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">
+                    {agent.tuman?.name || '-'}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">
+                    {agent.mfy?.name || '-'}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <label className="relative inline-flex items-center cursor-pointer">

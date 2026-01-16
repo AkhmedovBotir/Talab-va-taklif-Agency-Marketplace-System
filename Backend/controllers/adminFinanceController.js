@@ -862,18 +862,7 @@ const getAgentPerformance = async (req, res) => {
     const { agentType, startDate, endDate } = req.query;
 
     const query = {};
-    if (agentType) {
-      if (agentType === 'mfy') {
-        query.mfy = { $exists: true, $ne: null };
-      } else if (agentType === 'tuman') {
-        query.tuman = { $exists: true, $ne: null };
-        query.mfy = null;
-      } else if (agentType === 'viloyat') {
-        query.viloyat = { $exists: true, $ne: null };
-        query.tuman = null;
-        query.mfy = null;
-      }
-    }
+    // agentType filter is deprecated - all agents are the same now
 
     const agents = await Agent.find(query).populate('viloyat tuman mfy', 'name');
 
@@ -904,7 +893,6 @@ const getAgentPerformance = async (req, res) => {
             viloyat: agent.viloyat,
             tuman: agent.tuman,
             mfy: agent.mfy,
-            agentType: agent.agentType,
           },
           ordersCount: transactions.length,
           totalAmount,
@@ -998,10 +986,8 @@ const getFinanceBalance = async (req, res) => {
       return (
         sum +
         (t.amounts.punkt || 0) +
-        (t.amounts.viloyatAgent || 0) +
-        (t.amounts.tumanAgent || 0) +
-        (t.amounts.mfyAgent || 0) +
-        (t.amounts.punktTransfer || 0) +
+        (t.amounts.agent || 0) +
+        (t.amounts.manager || 0) +
         (t.amounts.deliveryService || 0)
       );
     }, 0);
@@ -1050,10 +1036,8 @@ const getFinanceBalance = async (req, res) => {
     const details = {
       kpiDistribution: {
         punkt: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punkt || 0), 0),
-        viloyatAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.viloyatAgent || 0), 0),
-        tumanAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.tumanAgent || 0), 0),
-        mfyAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.mfyAgent || 0), 0),
-        punktTransfer: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punktTransfer || 0), 0),
+        agent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.agent || 0), 0),
+        manager: kpiTransactions.reduce((sum, t) => sum + (t.amounts.manager || 0), 0),
         deliveryService: totalDeliveryServiceKpi,
         finance: totalFinanceKpi,
         total: totalKpiExpenses, // Barcha KPI bonuslar jami (xarajat)
@@ -1080,10 +1064,8 @@ const getFinanceBalance = async (req, res) => {
         totalKpiExpenses, // Barcha KPI bonuslar jami (xarajat)
         kpiDistribution: {
           punkt: details.kpiDistribution.punkt,
-          viloyatAgent: details.kpiDistribution.viloyatAgent,
-          tumanAgent: details.kpiDistribution.tumanAgent,
-          mfyAgent: details.kpiDistribution.mfyAgent,
-          punktTransfer: details.kpiDistribution.punktTransfer,
+          agent: details.kpiDistribution.agent,
+          manager: details.kpiDistribution.manager,
           deliveryService: details.kpiDistribution.deliveryService,
           finance: details.kpiDistribution.finance, // Moliya bo'limi uchun KPI (ichki daromad, lekin umumiy tizim uchun xarajat)
         },
@@ -1194,19 +1176,15 @@ const getTotalDistributed = async (req, res) => {
       return (
         sum +
         (t.amounts.punkt || 0) +
-        (t.amounts.viloyatAgent || 0) +
-        (t.amounts.tumanAgent || 0) +
-        (t.amounts.mfyAgent || 0) +
-        (t.amounts.punktTransfer || 0) +
+        (t.amounts.agent || 0) +
+        (t.amounts.manager || 0) +
         (t.amounts.deliveryService || 0)
       );
     }, 0);
 
     const details = {
       punkt: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punkt || 0), 0),
-      viloyatAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.viloyatAgent || 0), 0),
-      tumanAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.tumanAgent || 0), 0),
-      mfyAgent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.mfyAgent || 0), 0),
+      agent: kpiTransactions.reduce((sum, t) => sum + (t.amounts.agent || 0), 0),
       punktTransfer: kpiTransactions.reduce((sum, t) => sum + (t.amounts.punktTransfer || 0), 0),
       deliveryService: kpiTransactions.reduce((sum, t) => sum + (t.amounts.deliveryService || 0), 0),
     };
@@ -1387,10 +1365,8 @@ const getTotalBalance = async (req, res) => {
       return (
         sum +
         (t.amounts.punkt || 0) +
-        (t.amounts.viloyatAgent || 0) +
-        (t.amounts.tumanAgent || 0) +
-        (t.amounts.mfyAgent || 0) +
-        (t.amounts.punktTransfer || 0) +
+        (t.amounts.agent || 0) +
+        (t.amounts.manager || 0) +
         (t.amounts.deliveryService || 0)
       );
     }, 0);

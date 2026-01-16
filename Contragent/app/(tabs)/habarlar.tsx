@@ -47,7 +47,7 @@ export default function HabarlarScreen() {
         setPage(pageNum);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      // Ignore notification fetching errors
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -82,7 +82,7 @@ export default function HabarlarScreen() {
           prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n)
         );
       } catch (error) {
-        console.error('Error marking notification read:', error);
+        // Ignore marking notification read errors
       }
     }
   };
@@ -92,7 +92,7 @@ export default function HabarlarScreen() {
       await apiService.markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     } catch (error) {
-      console.error('Error marking all read:', error);
+      // Ignore marking all read errors
     }
   };
 

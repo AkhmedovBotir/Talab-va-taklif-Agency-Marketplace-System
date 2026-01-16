@@ -39,11 +39,12 @@ router.get('/orders/today', getTodayOrders);
 // Get order history (tarix - o'tgan kunlar)
 router.get('/orders/history', getOrderHistory);
 
+// Get contragent IDs from order products (buyurtmadagi maxsulotlarning contragent ID'larini olish)
+// MUST be before /orders/:id route to avoid route conflict
+router.get('/orders/:id/contragents', getOrderContragentIds);
+
 // Get order by ID
 router.get('/orders/:id', getOrderById);
-
-// Get contragent IDs from order products (buyurtmadagi maxsulotlarning contragent ID'larini olish)
-router.get('/orders/:id/contragents', getOrderContragentIds);
 
 // Confirm order (buyurtmani tasdiqlash)
 router.post('/orders/:id/confirm', confirmOrder);

@@ -98,12 +98,12 @@ export default function OrdersScreen() {
         }
       } else {
         response = await apiService.getOrders(
-          {
-            page: pageNum,
-            limit: 20,
-          },
-          token
-        );
+        {
+          page: pageNum,
+          limit: 20,
+        },
+        token
+      );
       }
 
       // Filter orders by productType to ensure correct separation
@@ -151,25 +151,6 @@ export default function OrdersScreen() {
         setOrders(filteredOrders);
       }
 
-      // Log all orders to console with details
-      console.log(`${activeOrderType === 'maxalla' ? 'Maxalla' : 'Tuman'} Buyurtmalar:`, filteredOrders);
-      console.log('Buyurtmalar soni:', filteredOrders.length);
-      console.log('Jami buyurtmalar:', response.total);
-      console.log('Sahifa:', response.page, '/', response.totalPages);
-      
-      // Log each order's productType details
-      filteredOrders.forEach((order: Order, index: number) => {
-        console.log(`Buyurtma ${index + 1}:`, {
-          orderNumber: order.orderNumber,
-          status: order.status,
-          totalKpiPrice: order.totalKpiPrice,
-          items: order.items?.map((item: any) => ({
-            productType: item.productType,
-            productModel: item.productModel,
-            productName: item.product?.name || 'N/A'
-          }))
-        });
-      });
 
       setPage(response.page);
       setHasMore(response.page < response.totalPages);

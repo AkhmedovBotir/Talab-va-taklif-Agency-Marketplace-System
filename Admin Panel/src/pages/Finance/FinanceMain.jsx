@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { 
   AccountBalance, 
   Assessment, 
-  PendingActions, 
   CreditCard, 
   History, 
   TrendingUp,
@@ -11,7 +10,6 @@ import {
 } from '@mui/icons-material';
 import Balance from './Balance';
 import Reports from './Reports';
-import Submissions from './Submissions';
 import KPIPayments from './KPIPayments';
 import Transactions from './Transactions';
 import Statistics from './Statistics';
@@ -29,12 +27,6 @@ const TABS = [
     label: 'Hisobotlar',
     icon: Assessment,
     component: Reports,
-  },
-  {
-    id: 'submissions',
-    label: 'Topshiruvlar',
-    icon: PendingActions,
-    component: Submissions,
   },
   {
     id: 'kpi-payments',

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { KeyboardArrowDown, KeyboardArrowUp, CheckCircle } from '@mui/icons-material';
 import { regionAPI } from '../../services/api';
 
-const RegionSelect = ({ value, onChange, disabled, label, required, name, type, parentId }) => {
+const RegionSelect = ({ value, onChange, disabled, label, required, name, type, parentId, isFilter }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [allRegions, setAllRegions] = useState([]);
   const [filteredRegions, setFilteredRegions] = useState([]);
@@ -228,9 +228,16 @@ const RegionSelect = ({ value, onChange, disabled, label, required, name, type, 
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
+      {!isFilter && label && (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
+      {isFilter && label && (
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label}
+        </label>
+      )}
       <div className="relative">
         <div className="relative">
           <input
@@ -262,7 +269,7 @@ const RegionSelect = ({ value, onChange, disabled, label, required, name, type, 
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden flex flex-col">
+        <div className="absolute z-[9999] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden flex flex-col">
           {/* List */}
           <div className="overflow-y-auto flex-1">
             {loading ? (

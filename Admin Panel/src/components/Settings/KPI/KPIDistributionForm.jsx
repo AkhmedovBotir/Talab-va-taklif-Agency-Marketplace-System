@@ -7,23 +7,19 @@ import {
   Warning,
   Store,
   LocationCity,
-  Business,
-  Home,
   AttachMoney,
   LocalShipping,
-  SwapHoriz,
   AutoAwesome,
-  Percent
+  Percent,
+  People
 } from '@mui/icons-material';
 
 const initialDistribution = {
   punkt: 0,
-  viloyatAgent: 0,
-  tumanAgent: 0,
-  mfyAgent: 0,
+  agent: 0,
+  manager: 0,
   finance: 0,
   deliveryService: 0,
-  punktTransfer: 0,
 };
 
 const KPIDistributionForm = ({
@@ -45,12 +41,11 @@ const KPIDistributionForm = ({
   const notes = defaults?.notes || [];
 
   const sumOfBasePercents = useMemo(() => {
-    const { punkt, viloyatAgent, tumanAgent, mfyAgent, finance, deliveryService } = formState.distribution;
+    const { punkt, agent, manager, finance, deliveryService } = formState.distribution;
     return (
       Number(punkt || 0) +
-      Number(viloyatAgent || 0) +
-      Number(tumanAgent || 0) +
-      Number(mfyAgent || 0) +
+      Number(agent || 0) +
+      Number(manager || 0) +
       Number(finance || 0) +
       Number(deliveryService || 0)
     );
@@ -69,8 +64,8 @@ const KPIDistributionForm = ({
       focusRing: 'focus:ring-indigo-500',
       gradient: 'from-indigo-500 to-indigo-600'
     },
-    viloyatAgent: { 
-      label: 'Viloyat Agent', 
+    agent: { 
+      label: 'Agent', 
       icon: LocationCity, 
       bgColor: 'bg-blue-50', 
       borderColor: 'border-blue-200', 
@@ -78,18 +73,9 @@ const KPIDistributionForm = ({
       focusRing: 'focus:ring-blue-500',
       gradient: 'from-blue-500 to-blue-600'
     },
-    tumanAgent: { 
-      label: 'Tuman Agent', 
-      icon: Business, 
-      bgColor: 'bg-green-50', 
-      borderColor: 'border-green-200', 
-      textColor: 'text-green-700',
-      focusRing: 'focus:ring-green-500',
-      gradient: 'from-green-500 to-green-600'
-    },
-    mfyAgent: { 
-      label: 'MFY Agent', 
-      icon: Home, 
+    manager: { 
+      label: 'Menejer', 
+      icon: People, 
       bgColor: 'bg-purple-50', 
       borderColor: 'border-purple-200', 
       textColor: 'text-purple-700',
@@ -118,19 +104,25 @@ const KPIDistributionForm = ({
 
   useEffect(() => {
     if (editingDistribution) {
+      const dist = editingDistribution.distribution || {};
+      
       setFormState({
         name: editingDistribution.name || '',
         description: editingDistribution.description || '',
         isActive: !!editingDistribution.isActive,
         distribution: {
           ...initialDistribution,
-          ...editingDistribution.distribution,
-          deliveryService: editingDistribution.distribution?.deliveryService || 0,
-          punktTransfer: editingDistribution.distribution?.punktTransfer || 0,
+          punkt: dist.punkt || 0,
+          agent: dist.agent || 0,
+          manager: dist.manager || 0,
+          finance: dist.finance || 0,
+          deliveryService: dist.deliveryService || 0,
         },
       });
       setLocalError('');
     } else if (defaults) {
+      const dist = defaults.distribution || {};
+      
       setFormState((prev) => ({
         ...prev,
         name: '',
@@ -138,9 +130,11 @@ const KPIDistributionForm = ({
         isActive: true,
         distribution: {
           ...initialDistribution,
-          ...defaults.distribution,
-          deliveryService: defaults.distribution?.deliveryService || 0,
-          punktTransfer: defaults.distribution?.punktTransfer || 0,
+          punkt: dist.punkt || 0,
+          agent: dist.agent || 0,
+          manager: dist.manager || 0,
+          finance: dist.finance || 0,
+          deliveryService: dist.deliveryService || 0,
         },
       }));
       setLocalError('');
@@ -183,30 +177,43 @@ const KPIDistributionForm = ({
     event.preventDefault();
     if (sumOfBasePercents !== 100) {
       setLocalError(
-        `Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance, deliveryService) yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: ${sumOfBasePercents || 0}%`,
+        `Asosiy taqsimlashlar (punkt, agent, manager, finance, deliveryService) yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: ${sumOfBasePercents || 0}%`,
       );
       return;
     }
     setLocalError('');
+    // Prepare distribution object with only new format fields
+    const distribution = {
+      punkt: Number(formState.distribution.punkt || 0),
+      agent: Number(formState.distribution.agent || 0),
+      manager: Number(formState.distribution.manager || 0),
+      finance: Number(formState.distribution.finance || 0),
+      deliveryService: Number(formState.distribution.deliveryService || 0),
+    };
+    
     onSubmit({
       name: formState.name,
       description: formState.description,
       isActive: formState.isActive,
-      distribution: {
-        ...formState.distribution,
-      },
+      distribution,
     });
   };
 
   const handlePrefillDefaults = () => {
     if (!defaults) return;
+    const dist = defaults.distribution || {};
+    
     setFormState((prev) => ({
       ...prev,
       name: defaults.name || '',
       description: defaults.description || '',
       distribution: {
         ...initialDistribution,
-        ...defaults.distribution,
+        punkt: dist.punkt || 0,
+        agent: dist.agent || 0,
+        manager: dist.manager || 0,
+        finance: dist.finance || 0,
+        deliveryService: dist.deliveryService || 0,
       },
     }));
   };
@@ -321,8 +328,8 @@ const KPIDistributionForm = ({
           </div>
 
           {/* Distribution Fields Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {['punkt', 'viloyatAgent', 'tumanAgent', 'mfyAgent', 'finance', 'deliveryService'].map((field) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
+            {['punkt', 'agent', 'manager', 'finance', 'deliveryService'].map((field) => {
               const config = fieldConfig[field];
               const Icon = config.icon;
               return (
@@ -354,48 +361,6 @@ const KPIDistributionForm = ({
           </div>
         </div>
 
-        {/* Punkt Transfer */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm p-3">
-          <div className="mb-3">
-            <h4 className="text-sm font-semibold text-gray-800 mb-1 flex items-center gap-1.5">
-              <SwapHoriz className="w-4 h-4 text-blue-600" />
-              Punkt Transfer (Qo'shimcha)
-            </h4>
-            <p className="text-xs text-gray-600">
-              Bu qo'shimcha bonus bo'lib, asosiy yig'indiga kirmaydi
-            </p>
-          </div>
-          <div className="max-w-md">
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Punkt Transfer (%)
-              </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={formState.distribution.punktTransfer || 0}
-                onChange={(e) => handleDistributionChange('punktTransfer', e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent transition-all font-semibold text-blue-700 bg-white"
-              />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-700 font-semibold text-xs pointer-events-none">
-                %
-              </span>
-            </div>
-            <p className="text-xs text-gray-600 mt-1.5 flex items-center gap-1">
-              <InfoOutlined className="w-3 h-3" />
-              Agar &gt; 0 bo'lsa, avtomatik 50/50 ga bo'linadi (fromPunkt/toPunkt)
-            </p>
-            {formState.distribution.punktTransfer > 0 && (
-              <div className="mt-2 p-2 bg-blue-100 rounded-md border border-blue-200">
-                <p className="text-xs text-blue-800 font-medium">
-                  Punkt Transfer: {formState.distribution.punktTransfer}% (avtomatik 50/50 bo'linadi)
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Status and Summary Card */}

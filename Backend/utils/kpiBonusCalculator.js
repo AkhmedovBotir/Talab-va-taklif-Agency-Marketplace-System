@@ -3,6 +3,7 @@ const KpiBonusTransaction = require('../models/KpiBonusTransaction');
 const Order = require('../models/Order');
 const Agent = require('../models/Agent');
 const Punkt = require('../models/Punkt');
+const ViloyatManager = require('../models/ViloyatManager');
 
 /**
  * Calculate and create KPI bonus transactions for an order
@@ -54,32 +55,22 @@ const calculateAndCreateKpiBonus = async (orderId, status) => {
     for (const item of order.items) {
       // Calculate total KPI amount for this item
       // Formula: (price - originalPrice) * quantity * kpiBonusPercent / 100
+      // Masalan: originalPrice = 5000, price = 6000, kpiBonusPercent = 50%
+      // Foyda = 6000 - 5000 = 1000 so'm
+      // KPI miqdori = 1000 * 50 / 100 = 500 so'm
+      // Bu 500 so'm 100% sifatida olinadi va taqsimlanadi
       const profitPerUnit = item.price - item.originalPrice;
       const totalKpiAmount = (profitPerUnit * item.quantity * item.kpiBonusPercent) / 100;
 
       // Calculate amounts for each recipient
+      // totalKpiAmount 100% sifatida olinadi va admin belgilagan foizlar asosida taqsimlanadi
       const amounts = {
         punkt: (totalKpiAmount * distribution.distribution.punkt) / 100,
-        viloyatAgent: (totalKpiAmount * distribution.distribution.viloyatAgent) / 100,
-        tumanAgent: (totalKpiAmount * distribution.distribution.tumanAgent) / 100,
-        mfyAgent: (totalKpiAmount * distribution.distribution.mfyAgent) / 100,
+        agent: (totalKpiAmount * distribution.distribution.agent) / 100,
+        manager: (totalKpiAmount * distribution.distribution.manager) / 100,
         finance: (totalKpiAmount * distribution.distribution.finance) / 100,
         deliveryService: (totalKpiAmount * distribution.distribution.deliveryService) / 100,
-        punktTransfer: 0,
       };
-
-      // Calculate punkt transfer amounts if applicable
-      // Punkt transfer foizining yarmi fromPunkt ga, yarmi toPunkt ga
-      let fromPunktAmount = 0;
-      let toPunktAmount = 0;
-
-      if (order.punktToPunktRequests && order.punktToPunktRequests.length > 0 && distribution.distribution.punktTransfer > 0) {
-        const transferAmount = (totalKpiAmount * distribution.distribution.punktTransfer) / 100;
-        // Yarmi fromPunkt ga, yarmi toPunkt ga
-        fromPunktAmount = transferAmount / 2;
-        toPunktAmount = transferAmount / 2;
-        amounts.punktTransfer = transferAmount;
-      }
 
       const transaction = new KpiBonusTransaction({
         order: orderId,
@@ -95,13 +86,8 @@ const calculateAndCreateKpiBonus = async (orderId, status) => {
         amounts,
         recipients: {
           punkt: recipients.punkt,
-          viloyatAgent: recipients.viloyatAgent,
-          tumanAgent: recipients.tumanAgent,
-          mfyAgent: recipients.mfyAgent,
-          fromPunkt: recipients.fromPunkt,
-          toPunkt: recipients.toPunkt,
-          fromPunktAmount,
-          toPunktAmount,
+          agent: recipients.agent,
+          manager: recipients.manager,
         },
         orderStatus: status,
         isPaid: false,
@@ -124,11 +110,8 @@ const calculateAndCreateKpiBonus = async (orderId, status) => {
 const getRecipients = async (order) => {
   const recipients = {
     punkt: null,
-    viloyatAgent: null,
-    tumanAgent: null,
-    mfyAgent: null,
-    fromPunkt: null,
-    toPunkt: null,
+    agent: null,
+    manager: null,
   };
 
   // Get punkt
@@ -138,46 +121,20 @@ const getRecipients = async (order) => {
     recipients.punkt = order.currentPunkt._id;
   }
 
-  // Get agents
+  // Get agent (assigned agent)
   if (order.assignedToAgent) {
-    const agent = await Agent.findById(order.assignedToAgent._id);
-    if (agent) {
-      if (agent.mfy) {
-        recipients.mfyAgent = agent._id;
-        // Get tuman agent for this tuman
-        const tumanAgent = await Agent.findOne({
-          tuman: agent.tuman,
-          mfy: null,
-          status: 'active',
-        });
-        if (tumanAgent) {
-          recipients.tumanAgent = tumanAgent._id;
-        }
-      } else if (agent.tuman) {
-        recipients.tumanAgent = agent._id;
-      }
-    }
-
-    // Get viloyat agent
-    const viloyatAgent = await Agent.findOne({
-      viloyat: order.deliveryViloyat._id,
-      tuman: null,
-      mfy: null,
-      status: 'active',
-    });
-    if (viloyatAgent) {
-      recipients.viloyatAgent = viloyatAgent._id;
-    }
+    recipients.agent = order.assignedToAgent._id;
   }
 
-  // Get punkt transfer recipients
-  if (order.punktToPunktRequests && order.punktToPunktRequests.length > 0) {
-    const acceptedRequest = order.punktToPunktRequests.find(
-      (req) => req.status === 'accepted' || req.status === 'delivered'
-    );
-    if (acceptedRequest) {
-      recipients.fromPunkt = acceptedRequest.fromPunktId._id || acceptedRequest.fromPunktId;
-      recipients.toPunkt = acceptedRequest.toPunktId._id || acceptedRequest.toPunktId;
+  // Get viloyat manager based on delivery viloyat
+  if (order.deliveryViloyat) {
+    const viloyatId = order.deliveryViloyat._id || order.deliveryViloyat;
+    const manager = await ViloyatManager.findOne({
+      viloyat: viloyatId,
+      status: 'active',
+    });
+    if (manager) {
+      recipients.manager = manager._id;
     }
   }
 

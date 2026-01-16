@@ -104,6 +104,9 @@ const ProductTable = ({ products, loading, onView, onApprove, onReject, onEdit, 
                 #
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Rasm
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Nomi
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -143,6 +146,22 @@ const ProductTable = ({ products, loading, onView, onApprove, onReject, onEdit, 
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {(pagination.page - 1) * pagination.limit + index + 1}
+                </td>
+                <td className="px-6 py-4">
+                  {(product.images && product.images.length > 0) || product.image ? (
+                    <img
+                      src={product.images?.[0] || product.image}
+                      alt={product.name}
+                      className="w-12 h-12 object-cover rounded-md border border-gray-200"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-gray-100 rounded-md border border-gray-200 flex items-center justify-center">
+                      <span className="text-xs text-gray-400">Rasm yo'q</span>
+                    </div>
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm font-medium text-gray-900">{product.name || '-'}</div>

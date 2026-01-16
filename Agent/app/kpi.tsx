@@ -16,13 +16,13 @@ import {
   View,
 } from 'react-native';
 import { apiService } from '../services/api';
-import type { GetKPIParams, KPISummary, KPITransaction } from '../types/api';
+import type { GetKPIParams, KPISummaryResponse, KPITransaction } from '../types/api';
 
 type PaymentFilter = 'all' | 'paid' | 'unpaid';
 
 export default function KPIScreen() {
   const [transactions, setTransactions] = useState<KPITransaction[]>([]);
-  const [summary, setSummary] = useState<KPISummary | null>(null);
+  const [summary, setSummary] = useState<KPISummaryResponse['data'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filters, setFilters] = useState<GetKPIParams>({
@@ -90,7 +90,7 @@ export default function KPIScreen() {
 
       const response = await apiService.getKPISummary(params);
       if (response.success) {
-        setSummary(response.data.summary);
+        setSummary(response.data);
       }
     } catch (error) {
       console.log('Summary error:', error);
@@ -158,12 +158,11 @@ export default function KPIScreen() {
           />
           <View style={styles.transactionInfo}>
             <Text style={styles.orderNumber}>#{item.order.orderNumber}</Text>
-            <Text style={styles.productName}>{item.orderItem.product.name}</Text>
           </View>
         </View>
         <View style={styles.amountContainer}>
           <Text style={[styles.amount, item.isPaid && styles.amountPaid]}>
-            {item.agentAmount.toLocaleString()} so'm
+            {(item.amount || 0).toLocaleString()} so'm
           </Text>
           <View style={[styles.statusBadge, item.isPaid ? styles.statusPaid : styles.statusUnpaid]}>
             <Text style={styles.statusText}>
@@ -174,21 +173,6 @@ export default function KPIScreen() {
       </View>
 
       <View style={styles.transactionDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="cube" size={16} color="#666" />
-          <Text style={styles.detailLabel}>Miqdor:</Text>
-          <Text style={styles.detailValue}>{item.orderItem.quantity} dona</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="cash" size={16} color="#666" />
-          <Text style={styles.detailLabel}>Narx:</Text>
-          <Text style={styles.detailValue}>{item.orderItem.price.toLocaleString()} so'm</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="trending-up" size={16} color="#666" />
-          <Text style={styles.detailLabel}>KPI foizi:</Text>
-          <Text style={styles.detailValue}>%{item.orderItem.kpiBonusPercent}</Text>
-        </View>
         <View style={styles.detailRow}>
           <Ionicons name="calendar" size={16} color="#666" />
           <Text style={styles.detailLabel}>Sana:</Text>
@@ -244,15 +228,15 @@ export default function KPIScreen() {
             <View style={styles.summaryRow}>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>Jami</Text>
-                <Text style={styles.summaryValue}>{summary.totalAmount.toLocaleString()} so'm</Text>
+                <Text style={styles.summaryValue}>{(summary.totalAmount || 0).toLocaleString()} so'm</Text>
               </View>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>To'langan</Text>
-                <Text style={[styles.summaryValue, { color: '#34C759' }]}>{summary.paidAmount.toLocaleString()} so'm</Text>
+                <Text style={[styles.summaryValue, { color: '#34C759' }]}>{(summary.paidAmount || 0).toLocaleString()} so'm</Text>
               </View>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>To'lanmagan</Text>
-                <Text style={[styles.summaryValue, { color: '#FF9500' }]}>{summary.unpaidAmount.toLocaleString()} so'm</Text>
+                <Text style={[styles.summaryValue, { color: '#FF9500' }]}>{(summary.unpaidAmount || 0).toLocaleString()} so'm</Text>
               </View>
             </View>
             {hasActiveFilters && (

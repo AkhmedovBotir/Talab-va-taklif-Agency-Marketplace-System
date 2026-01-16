@@ -93,7 +93,6 @@ export default function ProductEditScreen() {
           const allResponse = await apiService.getCategories({ limit: 1000 });
           if (allResponse && allResponse.success && allResponse.data) {
             const activeCategories = allResponse.data.filter((cat) => cat.status === 'active');
-            console.log('Active categories from all:', activeCategories.length);
             setCategories(activeCategories);
             if (activeCategories.length === 0) {
               Alert.alert('Ogohlantirish', 'Faol kategoriyalar mavjud emas. Iltimos, admin bilan bog\'laning.');
@@ -105,13 +104,11 @@ export default function ProductEditScreen() {
         } else {
           setCategories(response.data);
         }
-      } else {
-        console.error('Invalid response format:', response);
-        Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
+        } else {
+          Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
         setCategories([]);
       }
     } catch (error: any) {
-      console.error('Error loading categories:', error);
       const errorMessage = error?.message || error?.status || 'Kategoriyalarni yuklashda xatolik yuz berdi';
       Alert.alert('Xatolik', `Kategoriyalarni yuklashda xatolik: ${errorMessage}`);
       setCategories([]);
@@ -153,7 +150,6 @@ export default function ProductEditScreen() {
         setSubcategories([]);
       }
     } catch (error: any) {
-      console.error('Error loading subcategories:', error);
       setSubcategories([]);
     } finally {
       setLoadingSubcategories(false);
@@ -212,7 +208,6 @@ export default function ProductEditScreen() {
         }
       }
     } catch (error: any) {
-      console.error('Error picking image:', error);
       Alert.alert('Xatolik', error.message || 'Rasm tanlashda xatolik yuz berdi');
     }
   };
@@ -245,7 +240,7 @@ export default function ProductEditScreen() {
             }
           }
         } catch (error) {
-          console.error('Error getting Quill content:', error);
+          // Ignore Quill content errors
         }
       }
 
@@ -305,6 +300,22 @@ export default function ProductEditScreen() {
     }
   }, [showSubcategoryModal, categoryId, loadSubcategories]);
 
+  // Save QuillEditor content before modal opens
+  useEffect(() => {
+    if (showCategoryModal || showSubcategoryModal) {
+      // Save current content before modal opens
+      if (quillRef.current) {
+        quillRef.current.getContents().then((delta) => {
+          if (delta) {
+            setDescription(delta);
+          }
+        }).catch(() => {
+          // Ignore errors
+        });
+      }
+    }
+  }, [showCategoryModal, showSubcategoryModal]);
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -346,6 +357,7 @@ export default function ProductEditScreen() {
 
           <Text style={styles.label}>Tavsif (ixtiyoriy)</Text>
           <QuillEditor
+            key={`quill-edit-${categoryId}`}
             ref={quillRef}
             placeholder="Maxsulot tavsifini kiriting..."
             style={styles.quillEditor}

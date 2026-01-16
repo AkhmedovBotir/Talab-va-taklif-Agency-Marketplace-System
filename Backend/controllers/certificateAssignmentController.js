@@ -18,10 +18,10 @@ const assignCertificateToPosition = async (req, res) => {
       });
     }
 
-    if (!positionType || !['punkt', 'viloyat_agent', 'tuman_agent', 'mfy_agent'].includes(positionType)) {
+    if (!positionType || !['punkt', 'agent'].includes(positionType)) {
       return res.status(400).json({
         success: false,
-        message: 'Lavozim turi noto\'g\'ri. Quyidagilardan birini tanlang: punkt, viloyat_agent, tuman_agent, mfy_agent',
+        message: 'Lavozim turi noto\'g\'ri. Quyidagilardan birini tanlang: punkt, agent',
       });
     }
 
@@ -77,27 +77,9 @@ const assignCertificateToPosition = async (req, res) => {
           message: 'Punkt uchun viloyat kiritilishi shart',
         });
       }
-    } else if (positionType === 'viloyat_agent') {
-      if (!viloyatId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Viloyat agenti uchun viloyat kiritilishi shart',
-        });
-      }
-    } else if (positionType === 'tuman_agent') {
-      if (!viloyatId || !tumanId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Tuman agenti uchun viloyat va tuman kiritilishi shart',
-        });
-      }
-    } else if (positionType === 'mfy_agent') {
-      if (!viloyatId || !tumanId || !mfyId) {
-        return res.status(400).json({
-          success: false,
-          message: 'MFY agenti uchun viloyat, tuman va MFY kiritilishi shart',
-        });
-      }
+    } else if (positionType === 'agent') {
+      // Agent uchun viloyat, tuman, mfy ixtiyoriy (optional)
+      // Lekin ular to'g'ri bo'lishi kerak
     }
 
     // Validate name and phone exist (either from request or candidate)
@@ -210,23 +192,19 @@ const assignCertificateToPosition = async (req, res) => {
         isDeleted: { $ne: true },
       });
     } else {
-      // For agents, check if phone exists in the same region and position type
+      // For agents, check if phone exists in the same region
       const agentFilter = {
         phone: finalPhone,
         viloyat: viloyatId,
         isDeleted: { $ne: true },
       };
       
-      // Also match the specific agent type (tuman/mfy requirements)
-      if (positionType === 'tuman_agent') {
+      // Optional: match tuman and mfy if provided
+      if (tumanId) {
         agentFilter.tuman = tumanId;
-      } else if (positionType === 'mfy_agent') {
-        agentFilter.tuman = tumanId;
+      }
+      if (mfyId) {
         agentFilter.mfy = mfyId;
-      } else if (positionType === 'viloyat_agent') {
-        // Viloyat agent should not have tuman or mfy
-        agentFilter.tuman = null;
-        agentFilter.mfy = null;
       }
       
       existingUser = await Agent.findOne(agentFilter);
@@ -261,29 +239,24 @@ const assignCertificateToPosition = async (req, res) => {
         isNewUser = true;
       }
     } else {
-      // Agent types
+      // Agent - all agents are the same now
       const agentData = {
         name: finalName,
         phone: finalPhone,
         viloyat: viloyatId,
+        tuman: tumanId || null,
+        mfy: mfyId || null,
         passwordSetupAllowed: true, // No password required initially
         status: 'active',
       };
-
-      if (positionType === 'tuman_agent') {
-        agentData.tuman = tumanId;
-      } else if (positionType === 'mfy_agent') {
-        agentData.tuman = tumanId;
-        agentData.mfy = mfyId;
-      }
 
       if (existingUser) {
         // Update existing agent
         existingUser.name = agentData.name;
         existingUser.phone = agentData.phone;
         existingUser.viloyat = agentData.viloyat;
-        existingUser.tuman = agentData.tuman || null;
-        existingUser.mfy = agentData.mfy || null;
+        existingUser.tuman = agentData.tuman;
+        existingUser.mfy = agentData.mfy;
         existingUser.status = agentData.status;
         existingUser.passwordSetupAllowed = true; // Allow password setup
         existingUser.isDeleted = false;

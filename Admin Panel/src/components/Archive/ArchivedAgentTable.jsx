@@ -16,32 +16,6 @@ const ArchivedAgentTable = ({ agents, loading, pagination, onPageChange, onViewW
     }
   };
 
-  const getAgentTypeBadge = (agentType) => {
-    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
-    switch (agentType) {
-      case 'viloyat':
-        return `${baseClasses} bg-blue-100 text-blue-800`;
-      case 'tuman':
-        return `${baseClasses} bg-indigo-100 text-indigo-800`;
-      case 'mfy':
-        return `${baseClasses} bg-purple-100 text-purple-800`;
-      default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
-    }
-  };
-
-  const getAgentTypeLabel = (agentType) => {
-    switch (agentType) {
-      case 'viloyat':
-        return 'Viloyat agenti';
-      case 'tuman':
-        return 'Tuman agenti';
-      case 'mfy':
-        return 'MFY agenti';
-      default:
-        return '-';
-    }
-  };
 
   if (loading) {
     return (
@@ -70,9 +44,6 @@ const ArchivedAgentTable = ({ agents, loading, pagination, onPageChange, onViewW
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Telefon
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Agent turi
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Viloyat
@@ -108,11 +79,6 @@ const ArchivedAgentTable = ({ agents, loading, pagination, onPageChange, onViewW
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-500">{agent.phone || '-'}</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className={getAgentTypeBadge(agent.agentType)}>
-                  {getAgentTypeLabel(agent.agentType)}
-                </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-500">

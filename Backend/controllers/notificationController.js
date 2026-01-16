@@ -29,7 +29,7 @@ const createNotification = async (req, res) => {
     let targetRefModel = null;
     if (targetType === 'punkts') {
       targetRefModel = 'Punkt';
-    } else if (['viloyat_agents', 'tuman_agents', 'mfy_agents'].includes(targetType)) {
+    } else if (targetType === 'mfy_agents') {
       targetRefModel = 'Agent';
     } else if (targetType === 'marketplace_users') {
       targetRefModel = 'MarketplaceUser';
@@ -68,12 +68,6 @@ const createNotification = async (req, res) => {
           break;
         case 'punkts':
           io.to('punkts').emit('notification:new', eventData);
-          break;
-        case 'viloyat_agents':
-          io.to('viloyat_agents').emit('notification:new', eventData);
-          break;
-        case 'tuman_agents':
-          io.to('tuman_agents').emit('notification:new', eventData);
           break;
         case 'mfy_agents':
           io.to('mfy_agents').emit('notification:new', eventData);
@@ -238,12 +232,8 @@ const getTargetTypes = (userType) => {
   switch (userType) {
     case 'punkt':
       return ['all', 'punkts'];
-    case 'viloyat_agent':
-      return ['all', 'viloyat_agents'];
-    case 'tuman_agent':
-      return ['all', 'tuman_agents'];
-    case 'mfy_agent':
-      return ['all', 'mfy_agents'];
+    case 'agent':
+      return ['all', 'mfy_agents']; // All agents use mfy_agents room (backward compatibility)
     case 'marketplace_user':
       return ['all', 'marketplace_users'];
     default:

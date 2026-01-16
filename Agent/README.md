@@ -299,168 +299,25 @@ Ilova uch xil agent rolini qo'llab-quvvatlaydi:
 
 ### 2. Moliya boshqaruvi
 
-#### MFY Agent moliya (`app/(tabs)/finance.tsx` - MFY uchun)
+#### ⚠️ Pul Yig'ish Funksiyalari Olib Tashlandi
 
-**Tablar:**
-1. **Kunlik hisobot:**
-   - Sana tanlash
-   - Buyurtmalar soni
-   - Jami summa
-   - Qabul qilingan summa
-   - Topshirilgan summa
-   - Kutilayotgan summa
-   - Naqd/Karta bo'limi
-   - Transaksiyalar ro'yxati
+**Status:** Barcha pul yig'ish funksiyalari olib tashlangan.
 
-2. **Kutilayotgan to'lovlar:**
-   - Barcha kutilayotgan to'lovlar ro'yxati
-   - Bitta yoki ko'p to'lovlarni tanlash
-   - "Barchasini tanlash" funksiyasi
-   - Tanlangan to'lovlarni qabul qilish
-   - Har bir to'lovni alohida qabul qilish
+**Sabab:** Agentlar endi mijozlardan pul yig'maydi va adminga pul topshirmaydi. To'lov buyurtma yaratilganda to'g'ridan-to'g'ri amalga oshiriladi.
 
-3. **Qabul qilingan to'lovlar:**
-   - Qabul qilingan lekin hali topshirilmagan to'lovlar
-   - Bitta yoki ko'p to'lovlarni tanlash
-   - Tuman agentga topshirish
-   - Tanlangan summa ko'rsatkichi
+**Olib tashlangan funksiyalar:**
+- ❌ Kutilayotgan to'lovlarni ko'rish (`GET /api/agent-finance/pending-payments`)
+- ❌ To'lovni qabul qilish (`POST /api/agent-finance/collect-payment/:transactionId`)
+- ❌ Moliya bo'limiga topshirish (`POST /api/agent-finance/submit-to-finance`)
+- ❌ Tuman agentga topshirish (`POST /api/agent-finance/mfy/submit-to-district`)
+- ❌ Viloyat agentga topshirish (`POST /api/agent-finance/district/submit-to-province`)
 
-4. **Statistika:**
-   - Sana oralig'i tanlash
-   - Jami buyurtmalar
-   - Jami summa
-   - Qabul qilingan summa
-   - Topshirilgan summa
-   - Naqd/Karta bo'limi
+**Yangi ishlash usuli:**
+- To'lov buyurtma yaratilganda to'g'ridan-to'g'ri amalga oshiriladi
+- Agentlar endi pul yig'maydi va topshirmaydi
+- Moliya sahifasi (`app/(tabs)/finance.tsx`) hozircha mavjud emas
 
-**Ish jarayoni:**
-
-**Kunlik hisobot:**
-1. Sana tanlanadi (default: bugun)
-2. Kunlik hisobot yuklanadi
-3. Barcha ko'rsatkichlar ko'rsatiladi
-4. Transaksiyalar ro'yxati ko'rsatiladi
-
-**Kutilayotgan to'lovlar:**
-1. Kutilayotgan to'lovlar yuklanadi
-2. To'lovlar ro'yxati ko'rsatiladi
-3. To'lov tanlash/bekor qilish
-4. "Qabul qilish" tugmasi bosilganda tasdiqlash dialogi
-5. Qabul qilingandan keyin "Qabul qilingan" tabiga o'tiladi
-
-**Qabul qilingan to'lovlar:**
-1. Qabul qilingan lekin topshirilmagan to'lovlar yuklanadi
-2. To'lovlar tanlash/bekor qilish
-3. "Tuman agentga topshirish" tugmasi bosilganda tasdiqlash dialogi
-4. Topshirilgandan keyin ro'yxat yangilanadi
-
-**Statistika:**
-1. Sana oralig'i tanlanadi
-2. Statistika yuklanadi
-3. Barcha ko'rsatkichlar ko'rsatiladi
-
-**API so'rovlari:**
-- `GET /agent-finance/mfy/daily-report` - Kunlik hisobot
-- `GET /agent-finance/mfy/pending-payments` - Kutilayotgan to'lovlar
-- `POST /agent-finance/mfy/collect-payment/:id` - To'lovni qabul qilish
-- `POST /agent-finance/mfy/submit-to-district` - Tuman agentga topshirish
-- `GET /agent-finance/mfy/statistics` - Statistika
-
-#### Tuman Agent moliya (`app/(tabs)/finance.tsx` - Tuman uchun)
-
-**Tablar:**
-1. **Hisobot:**
-   - Sana tanlash
-   - Topshiruvlar soni
-   - Qabul qilingan summa
-   - Kutilayotgan summa
-   - MFY agentlardan kelgan topshiruvlar ro'yxati
-
-2. **Topshiruvlar:**
-   - Kutilayotgan topshiruvlar ro'yxati
-   - Bitta yoki ko'p topshiruvlarni tanlash
-   - Topshiruvlarni tasdiqlash
-   - Tanlangan summa ko'rsatkichi
-
-3. **Qabul qilingan topshiruvlar:**
-   - Tasdiqlangan topshiruvlar ro'yxati
-   - Topshirilmagan transaksiyalarni ko'rish
-   - Viloyat agentga topshirish
-   - Topshirilgan/topshirilmagan ko'rsatkichlar
-
-4. **Statistika:**
-   - Sana oralig'i tanlash
-   - Topshiruvlar soni
-   - Qabul qilingan summa
-   - Kutilayotgan summa
-
-**Ish jarayoni:**
-
-**Hisobot:**
-1. Sana tanlanadi
-2. Hisobot yuklanadi
-3. MFY agentlardan kelgan topshiruvlar ko'rsatiladi
-
-**Topshiruvlar:**
-1. Kutilayotgan topshiruvlar yuklanadi
-2. Topshiruvlar tanlash/bekor qilish
-3. "Tasdiqlash" tugmasi bosilganda tasdiqlash dialogi
-4. Tasdiqlangandan keyin "Qabul qilingan" tabiga o'tiladi
-
-**Qabul qilingan topshiruvlar:**
-1. Tasdiqlangan topshiruvlar yuklanadi
-2. Har bir topshiruvdan transaksiyalar ajratiladi
-3. Topshirilmagan transaksiyalar tanlash
-4. "Viloyat agentga topshirish" tugmasi bosilganda tasdiqlash dialogi
-5. Topshirilgandan keyin ro'yxat yangilanadi
-
-**API so'rovlari:**
-- `GET /agent-finance/district/report` - Hisobot
-- `GET /agent-finance/district/submissions` - Topshiruvlar
-- `POST /agent-finance/district/confirm-submission/:id` - Topshiruvni tasdiqlash
-- `POST /agent-finance/district/submit-to-province` - Viloyat agentga topshirish
-- `GET /agent-finance/district/statistics` - Statistika
-
-#### Viloyat Agent moliya (`app/(tabs)/finance.tsx` - Viloyat uchun)
-
-**Tablar:**
-1. **Hisobot:**
-   - Sana tanlash
-   - Topshiruvlar soni
-   - Qabul qilingan summa
-   - Kutilayotgan summa
-   - Tuman agentlardan kelgan topshiruvlar ro'yxati
-
-2. **Topshiruvlar:**
-   - Kutilayotgan topshiruvlar ro'yxati
-   - Bitta yoki ko'p topshiruvlarni tanlash
-   - Topshiruvlarni tasdiqlash
-   - Tanlangan summa ko'rsatkichi
-
-3. **Qabul qilingan topshiruvlar:**
-   - Tasdiqlangan topshiruvlar ro'yxati
-   - Topshirilmagan transaksiyalarni ko'rish
-   - Moliya bo'limiga topshirish
-   - Topshirilgan/topshirilmagan ko'rsatkichlar
-
-4. **Statistika:**
-   - Sana oralig'i tanlash
-   - Topshiruvlar soni
-   - Qabul qilingan summa
-   - Kutilayotgan summa
-
-**Ish jarayoni:**
-
-Tuman agent bilan bir xil, lekin:
-- Tuman agentlardan kelgan topshiruvlar ko'rsatiladi
-- Viloyat agentga o'rniga moliya bo'limiga topshiriladi
-
-**API so'rovlari:**
-- `GET /agent-finance/province/report` - Hisobot
-- `GET /agent-finance/province/submissions` - Topshiruvlar
-- `POST /agent-finance/province/confirm-submission/:id` - Topshiruvni tasdiqlash
-- `POST /agent-finance/province/submit-to-finance` - Moliya bo'limiga topshirish
-- `GET /agent-finance/province/statistics` - Statistika
+**Eslatma:** KPI (Key Performance Indicator) funksiyalari hali ham ishlaydi va buyurtmalar asosida KPI bonuslari hisoblanadi.
 
 ### 3. KPI (Key Performance Indicator) boshqaruvi
 
@@ -655,26 +512,9 @@ export const API_ENDPOINTS = {
   AGENT_NOTIFICATION_READ: (id: string) => `/agents/notifications/${id}/read`,
   AGENT_NOTIFICATIONS_READ_ALL: '/agents/notifications/read-all',
   
-  // MFY Agent Moliya
-  MFY_DAILY_REPORT: '/agent-finance/mfy/daily-report',
-  MFY_PENDING_PAYMENTS: '/agent-finance/mfy/pending-payments',
-  MFY_COLLECT_PAYMENT: (id: string) => `/agent-finance/mfy/collect-payment/${id}`,
-  MFY_SUBMIT_TO_DISTRICT: '/agent-finance/mfy/submit-to-district',
-  MFY_STATISTICS: '/agent-finance/mfy/statistics',
-  
-  // Tuman Agent Moliya
-  DISTRICT_REPORT: '/agent-finance/district/report',
-  DISTRICT_SUBMISSIONS: '/agent-finance/district/submissions',
-  DISTRICT_CONFIRM_SUBMISSION: (id: string) => `/agent-finance/district/confirm-submission/${id}`,
-  DISTRICT_SUBMIT_TO_PROVINCE: '/agent-finance/district/submit-to-province',
-  DISTRICT_STATISTICS: '/agent-finance/district/statistics',
-  
-  // Viloyat Agent Moliya
-  PROVINCE_REPORT: '/agent-finance/province/report',
-  PROVINCE_SUBMISSIONS: '/agent-finance/province/submissions',
-  PROVINCE_CONFIRM_SUBMISSION: (id: string) => `/agent-finance/province/confirm-submission/${id}`,
-  PROVINCE_SUBMIT_TO_FINANCE: '/agent-finance/province/submit-to-finance',
-  PROVINCE_STATISTICS: '/agent-finance/province/statistics',
+  // ⚠️ Moliya funksiyalari olib tashlangan
+  // Pul yig'ish funksiyalari endi mavjud emas
+  // To'lov buyurtma yaratilganda to'g'ridan-to'g'ri amalga oshiriladi
 };
 ```
 
@@ -1091,96 +931,65 @@ File-based routing tizimi ishlatiladi:
 3. **failed** - Xatolik
 4. **refunded** - Qaytarilgan
 
-### Moliya transaksiya statuslari
+### ⚠️ Moliya transaksiya statuslari (Olib tashlangan)
 
-1. **pending** - Kutilmoqda
-2. **collected** - Qabul qilingan (MFY agent)
-3. **submitted** - Topshirilgan
-4. **received** - Qabul qilingan (yuqori daraja)
-5. **confirmed** - Tasdiqlangan
-6. **rejected** - Rad etilgan
+**Eslatma:** Pul yig'ish funksiyalari olib tashlangan. Quyidagi statuslar endi ishlatilmaydi:
+- ❌ `pending` - Kutilmoqda (to'lovlar)
+- ❌ `collected` - Qabul qilingan (MFY agent)
+- ❌ `submitted` - Topshirilgan
+- ❌ `received` - Qabul qilingan (yuqori daraja)
+- ❌ `confirmed` - Tasdiqlangan (to'lovlar)
+- ❌ `rejected` - Rad etilgan
 
-### Topshiruv statuslari
+**Yangi ishlash usuli:**
+- To'lov buyurtma yaratilganda to'g'ridan-to'g'ri amalga oshiriladi
+- Faqat buyurtma statuslari ishlatiladi (qarang: Buyurtma statuslari)
 
-1. **pending** - Kutilmoqda
-2. **confirmed** - Tasdiqlangan
-3. **rejected** - Rad etilgan
+## 💰 Moliya oqimi
 
-## 💰 Moliya oqimi (batafsil)
+### ⚠️ Pul Yig'ish Olib Tashlandi
 
-### MFY Agent ish jarayoni
+**Yangi ishlash usuli:**
+- To'lov buyurtma yaratilganda to'g'ridan-to'g'ri amalga oshiriladi
+- Agentlar endi mijozlardan pul yig'maydi
+- Agentlar endi adminga pul topshirmaydi
+- Barcha to'lovlar avtomatik boshqariladi
 
-1. **To'lov kutilmoqda:**
-   - Mijoz to'lov qiladi
-   - To'lov transaksiyasi yaratiladi (`pending` status)
-   - "Kutilayotgan to'lovlar" tabida ko'rsatiladi
+**Eski ishlash usuli (olib tashlangan):**
+- ❌ Mijoz agentga pul to'lash
+- ❌ Agent to'lovni qabul qilish
+- ❌ Agent adminga pul topshirish
+- ❌ Moliya bo'limi to'lovlarni qabul qilish
 
-2. **To'lovni qabul qilish:**
-   - MFY agent to'lovni ko'radi
-   - "Qabul qilish" tugmasini bosadi
-   - Tasdiqlash dialogi
-   - To'lov `collected` statusiga o'tadi
-   - "Qabul qilingan to'lovlar" tabiga o'tadi
-
-3. **Tuman agentga topshirish:**
-   - Qabul qilingan to'lovlar tanlanadi
-   - "Tuman agentga topshirish" tugmasi
-   - Tasdiqlash dialogi
-   - Topshiruv yaratiladi
-   - Transaksiyalar `submitted` statusiga o'tadi
-
-### Tuman Agent ish jarayoni
-
-1. **Topshiruvni qabul qilish:**
-   - MFY agentdan topshiruv keladi
-   - "Topshiruvlar" tabida ko'rsatiladi (`pending` status)
-   - Topshiruv tanlanadi va tasdiqlanadi
-   - Topshiruv `confirmed` statusiga o'tadi
-
-2. **Viloyat agentga topshirish:**
-   - Tasdiqlangan topshiruvlar "Qabul qilingan" tabida
-   - Topshirilmagan transaksiyalar tanlanadi
-   - "Viloyat agentga topshirish" tugmasi
-   - Topshiruv yaratiladi
-
-### Viloyat Agent ish jarayoni
-
-1. **Topshiruvni qabul qilish:**
-   - Tuman agentdan topshiruv keladi
-   - "Topshiruvlar" tabida ko'rsatiladi (`pending` status)
-   - Topshiruv tanlanadi va tasdiqlanadi
-   - Topshiruv `confirmed` statusiga o'tadi
-
-2. **Moliya bo'limiga topshirish:**
-   - Tasdiqlangan topshiruvlar "Qabul qilingan" tabida
-   - Topshirilmagan transaksiyalar tanlanadi
-   - "Moliya bo'limiga topshirish" tugmasi
-   - Topshiruv yaratiladi
+**Hozirgi holat:**
+- To'lov buyurtma yaratilganda avtomatik amalga oshiriladi
+- Agentlar faqat buyurtmalarni yetkazish bilan shug'ullanadi
+- KPI bonuslari buyurtmalar asosida avtomatik hisoblanadi
 
 ## 📊 Statistika va hisobotlar
 
-### MFY Agent statistikasi
+### ⚠️ Moliya statistikasi (Olib tashlangan)
 
+**Eslatma:** Pul yig'ish funksiyalari olib tashlangan. Quyidagi statistikalar endi mavjud emas:
+- ❌ Qabul qilingan summa
+- ❌ Topshirilgan summa
+- ❌ Kutilayotgan summa
+- ❌ Naqd/Karta bo'limi
+- ❌ Topshiruvlar soni
+- ❌ Kunlik hisobot (moliya)
+
+### Mavjud statistikalar
+
+**KPI statistikasi:**
+- **Jami buyurtmalar** - Tanlangan davr uchun
+- **Jami KPI summa** - Barcha KPI bonuslar summasi
+- **To'langan KPI** - To'langan KPI bonuslar
+- **To'lanmagan KPI** - Hali to'lanmagan KPI bonuslar
+
+**Buyurtma statistikasi:**
 - **Jami buyurtmalar** - Tanlangan davr uchun
 - **Jami summa** - Barcha buyurtmalar summasi
-- **Qabul qilingan summa** - Qabul qilingan to'lovlar
-- **Topshirilgan summa** - Tuman agentga topshirilgan
-- **Kutilayotgan summa** - Hali qabul qilinmagan
-- **Naqd/Karta bo'limi** - To'lov usullari bo'yicha
-
-### Tuman/Viloyat Agent statistikasi
-
-- **Topshiruvlar soni** - Tanlangan davr uchun
-- **Qabul qilingan summa** - Tasdiqlangan topshiruvlar
-- **Kutilayotgan summa** - Hali tasdiqlanmagan
-
-### Kunlik hisobot
-
-- **Buyurtmalar soni** - Kunlik buyurtmalar
-- **Jami summa** - Kunlik jami summa
-- **Qabul qilingan** - Kunlik qabul qilingan to'lovlar
-- **Topshirilgan** - Kunlik topshirilgan to'lovlar
-- **Transaksiyalar ro'yxati** - Barcha kunlik transaksiyalar
+- **Buyurtmalar holati** - Status bo'yicha taqsimlash
 
 ## 🔔 Xabarnomalar tizimi
 

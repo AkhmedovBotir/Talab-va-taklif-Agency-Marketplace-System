@@ -5,6 +5,70 @@ const Region = require('../models/Region');
 const Agent = require('../models/Agent');
 const Contragent = require('../models/Contragent');
 
+// Helper function to add orderType filter (includes old orders without orderType field)
+const addOrderTypeFilter = (filter) => {
+  // Include tuman orders OR orders without orderType field (old orders)
+  if (!filter.$or) {
+    filter.$or = [];
+  }
+  // Add orderType condition to existing $or or create new one
+  const existingOr = filter.$or.length > 0 ? filter.$or : [];
+  filter.$or = [
+    ...existingOr,
+    { orderType: 'tuman' },
+    { orderType: { $exists: false } }, // Old orders without orderType field
+  ];
+  return filter;
+};
+
+// Helper function to manually populate order items with Product model only
+const populateOrderItemsProducts = async (orders) => {
+  if (!orders || (Array.isArray(orders) && orders.length === 0)) {
+    return;
+  }
+
+  const ordersArray = Array.isArray(orders) ? orders : [orders];
+
+  for (const order of ordersArray) {
+    if (order.items && order.items.length > 0) {
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        const productId = typeof item.product === 'string' ? item.product : (item.product?._id || item.product);
+        
+        if (!productId) continue;
+        
+        // Only populate Product model (not MaxallaProduct)
+        if (item.productType === 'tuman' || !item.productType) {
+          try {
+            item.product = await Product.findById(productId)
+              .populate('category', 'name slug')
+              .populate('subcategory', 'name slug')
+              .populate({
+                path: 'contragent',
+                select: 'name inn phone viloyat tuman mfy status contragentLevel logo',
+                populate: [
+                  { path: 'viloyat', select: 'name type code' },
+                  { path: 'tuman', select: 'name type code' },
+                  { path: 'mfy', select: 'name type code' },
+                ],
+              })
+              .populate({
+                path: 'deliveryRegions.viloyat',
+                select: 'name type code',
+              })
+              .populate({
+                path: 'deliveryRegions.tuman',
+                select: 'name type code',
+              });
+          } catch (error) {
+            console.error(`Error populating product ${productId}:`, error);
+          }
+        }
+      }
+    }
+  }
+};
+
 // Helper function to handle deleted punkt references in order object
 // Keep deleted punkts but ensure they are properly marked
 // This function handles both populated objects and ID strings
@@ -144,8 +208,27 @@ const getMyOrders = async (req, res) => {
     // Orders where punkt has old-style requests
     orConditions.push({ 'punktRequests.punktId': punkt._id });
 
+    // Add orderType filter (includes old orders without orderType field)
+    // Exclude dokon orders, include tuman orders and old orders
+    const orderTypeCondition = {
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
+    };
+    
+    // Exclude MaxallaProduct orders (faqat dokon kontragent uchun)
+    // Buyurtmada bitta item ham maxalla bo'lsa, butun buyurtma exclude qilinadi
+    const excludeMaxallaCondition = {
+      items: { $not: { $elemMatch: { productType: 'maxalla' } } },
+    };
+    
     const filter = {
-      $or: orConditions,
+      $and: [
+        { $or: orConditions },
+        orderTypeCondition,
+        excludeMaxallaCondition,
+      ],
     };
 
     // Exclude orders where currentPunkt, confirmedByPunkt, or assignedByPunkt is a deleted punkt (and not current user)
@@ -186,7 +269,8 @@ const getMyOrders = async (req, res) => {
         ]
       });
       
-      filter.$and = andConditions;
+      // Merge with existing $and conditions
+      filter.$and = [...filter.$and, ...andConditions];
     }
 
     // Additional filters
@@ -247,22 +331,6 @@ const getMyOrders = async (req, res) => {
     // Get orders with pagination and populate
     const orders = await Order.find(filter)
       .populate('user', 'name phone')
-      .populate({
-        path: 'items.product',
-        populate: [
-          { path: 'category', select: 'name slug' },
-          { path: 'subcategory', select: 'name slug' },
-          { path: 'contragent', select: 'name inn phone' },
-          {
-            path: 'deliveryRegions.viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'deliveryRegions.tuman',
-            select: 'name type code',
-          },
-        ],
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
@@ -294,6 +362,9 @@ const getMyOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
+
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(orders);
 
     // Helper function to check if order should be excluded (belongs to deleted punkt that is not current punkt)
     const shouldExcludeOrder = (orderObj) => {
@@ -480,6 +551,9 @@ const getOrderById = async (req, res) => {
         message: 'Buyurtma topilmadi',
       });
     }
+
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(order);
 
     // Punkt bo'lsa, har qanday buyurtmani ko'ra oladi (hech qanday cheklov yo'q)
     // Faqat punkt autentifikatsiyasi o'tgan bo'lsa, buyurtmani ko'ra oladi
@@ -813,6 +887,12 @@ const getPunktRequests = async (req, res) => {
 
     const filter = {
       'punktRequests.punktId': punkt._id,
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
+      // Exclude MaxallaProduct orders (faqat dokon kontragent uchun)
+      items: { $not: { $elemMatch: { productType: 'maxalla' } } },
     };
 
     if (status) {
@@ -1010,6 +1090,7 @@ const assignOrderToAgent = async (req, res) => {
     const order = await Order.findById(id)
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
+      .populate('deliveryMfy', 'name type code')
       .populate({
         path: 'currentPunkt',
         select: '_id isDeleted',
@@ -1085,6 +1166,30 @@ const assignOrderToAgent = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Agent faol emas',
+      });
+    }
+
+    // Check if agent is in the same tuman as punkt
+    if (punkt.tuman && agent.tuman && agent.tuman._id.toString() !== punkt.tuman._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent sizning tumaningizda emas',
+      });
+    }
+
+    // Check if agent is in the same MFY as order delivery (if order has deliveryMfy)
+    if (order.deliveryMfy && agent.mfy && agent.mfy._id.toString() !== order.deliveryMfy._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent buyurtmaning yetkazib berish MFY\'sida emas',
+      });
+    }
+
+    // If order doesn't have deliveryMfy but has deliveryTuman, check if agent is in that tuman
+    if (!order.deliveryMfy && order.deliveryTuman && agent.tuman && agent.tuman._id.toString() !== order.deliveryTuman._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Agent buyurtmaning yetkazib berish tumanida emas',
       });
     }
 
@@ -1167,13 +1272,6 @@ const requestToContragent = async (req, res) => {
     }
 
     const order = await Order.findById(id)
-      .populate({
-        path: 'items.product',
-        populate: {
-          path: 'contragent',
-          select: 'name inn phone viloyat tuman mfy',
-        },
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate({
@@ -1188,11 +1286,58 @@ const requestToContragent = async (req, res) => {
       });
     }
 
+    // Manually populate products because of dynamic reference (refPath)
+    if (order && order.items && order.items.length > 0) {
+      const Product = require('../models/Product');
+      const MaxallaProduct = require('../models/MaxallaProduct');
+      
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        const productId = typeof item.product === 'string' ? item.product : (item.product?._id || item.product);
+        
+        if (!productId) continue;
+        
+        try {
+          if (item.productType === 'maxalla') {
+            item.product = await MaxallaProduct.findById(productId)
+              .populate({
+                path: 'contragent',
+                select: 'name inn phone viloyat tuman mfy',
+                populate: [
+                  { path: 'viloyat', select: 'name type code' },
+                  { path: 'tuman', select: 'name type code' },
+                  { path: 'mfy', select: 'name type code' },
+                ],
+              });
+          } else {
+            item.product = await Product.findById(productId)
+              .populate({
+                path: 'contragent',
+                select: 'name inn phone viloyat tuman mfy',
+                populate: [
+                  { path: 'viloyat', select: 'name type code' },
+                  { path: 'tuman', select: 'name type code' },
+                  { path: 'mfy', select: 'name type code' },
+                ],
+              });
+          }
+        } catch (error) {
+          console.error(`Error populating product ${productId}:`, error);
+          // Continue with next item
+        }
+      }
+    }
+
     // Check if order belongs to punkt's region OR punkt is currentPunkt
     // This allows punkt that received order from another punkt to request contragents
+    const deliveryViloyatId = order.deliveryViloyat?._id?.toString() || order.deliveryViloyat?.toString();
+    const deliveryTumanId = order.deliveryTuman?._id?.toString() || order.deliveryTuman?.toString();
+    const punktViloyatId = punkt.viloyat?._id?.toString() || punkt.viloyat?.toString();
+    const punktTumanId = punkt.tuman?._id?.toString() || punkt.tuman?.toString();
+    
     const isInRegion = 
-      order.deliveryViloyat._id.toString() === punkt.viloyat._id.toString() &&
-      (!punkt.tuman || !order.deliveryTuman || order.deliveryTuman._id.toString() === punkt.tuman._id.toString());
+      deliveryViloyatId === punktViloyatId &&
+      (!punktTumanId || !deliveryTumanId || deliveryTumanId === punktTumanId);
     
     // Check if punkt is currentPunkt (handle both populated and non-populated cases)
     const currentPunktId = order.currentPunkt 
@@ -1242,9 +1387,11 @@ const requestToContragent = async (req, res) => {
     // Filter items that belong to this contragent
     const contragentItemIndices = [];
     order.items.forEach((item, index) => {
-      if (item.product && item.product.contragent && 
-          item.product.contragent._id.toString() === contragentId.toString()) {
-        contragentItemIndices.push(index);
+      if (item.product && item.product.contragent) {
+        const contragentIdFromProduct = item.product.contragent._id?.toString() || item.product.contragent.toString();
+        if (contragentIdFromProduct === contragentId.toString()) {
+          contragentItemIndices.push(index);
+        }
       }
     });
 
@@ -1334,14 +1481,22 @@ const requestToPunkt = async (req, res) => {
       });
     }
 
-    // Check if order belongs to punkt's region
-    if (
-      order.deliveryViloyat._id.toString() !== punkt.viloyat._id.toString() ||
-      (punkt.tuman && order.deliveryTuman && order.deliveryTuman._id.toString() !== punkt.tuman._id.toString())
-    ) {
+    // Check if order belongs to punkt's region OR punkt is currentPunkt
+    // Punkt o'z tumanidagi buyurtmalar uchun boshqa tuman punktiga so'rov yuborishi mumkin
+    const isInRegion = 
+      order.deliveryViloyat._id.toString() === punkt.viloyat._id.toString() &&
+      (!punkt.tuman || !order.deliveryTuman || order.deliveryTuman._id.toString() === punkt.tuman._id.toString());
+    
+    const currentPunktId = order.currentPunkt 
+      ? (order.currentPunkt._id ? order.currentPunkt._id.toString() : order.currentPunkt.toString())
+      : null;
+    const isCurrentPunkt = currentPunktId === punkt._id.toString();
+    
+    // Allow if in region OR is current punkt
+    if (!isInRegion && !isCurrentPunkt) {
       return res.status(403).json({
         success: false,
-        message: 'Bu buyurtma sizning hududingizga tegishli emas',
+        message: 'Bu buyurtma sizning hududingizga tegishli emas yoki siz hozirgi punkt emassiz',
       });
     }
 
@@ -1361,6 +1516,14 @@ const requestToPunkt = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Punkt faol emas',
+      });
+    }
+
+    // Validate that toPunkt is in the same viloyat (punktlar faqat o'z viloyatidagi punktlarga so'rov yuborishi mumkin)
+    if (toPunkt.viloyat._id.toString() !== punkt.viloyat._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Punktlar faqat o\'z viloyatidagi punktlarga so\'rov yuborishi mumkin',
       });
     }
 
@@ -1900,6 +2063,12 @@ const getPunktToPunktRequests = async (req, res) => {
 
     const filter = {
       'punktToPunktRequests.toPunktId': punkt._id,
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
+      // Exclude MaxallaProduct orders (faqat dokon kontragent uchun)
+      items: { $not: { $elemMatch: { productType: 'maxalla' } } },
     };
 
     if (status) {
@@ -2409,18 +2578,6 @@ const getOrderContragentIds = async (req, res) => {
     const { punkt } = req.user;
 
     const order = await Order.findById(id)
-      .populate({
-        path: 'items.product',
-        populate: {
-          path: 'contragent',
-          select: '_id name inn phone viloyat tuman mfy status',
-          populate: [
-            { path: 'viloyat', select: 'name type code' },
-            { path: 'tuman', select: 'name type code' },
-            { path: 'mfy', select: 'name type code' },
-          ],
-        },
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate({
@@ -2431,6 +2588,48 @@ const getOrderContragentIds = async (req, res) => {
         path: 'confirmedByPunkt',
         select: '_id isDeleted',
       });
+    
+    // Manually populate products because of dynamic reference (refPath)
+    if (order && order.items && order.items.length > 0) {
+      const Product = require('../models/Product');
+      const MaxallaProduct = require('../models/MaxallaProduct');
+      
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        const productId = typeof item.product === 'string' ? item.product : (item.product?._id || item.product);
+        
+        if (!productId) continue;
+        
+        try {
+          if (item.productType === 'maxalla') {
+            item.product = await MaxallaProduct.findById(productId)
+              .populate({
+                path: 'contragent',
+                select: '_id name inn phone viloyat tuman mfy status',
+                populate: [
+                  { path: 'viloyat', select: 'name type code' },
+                  { path: 'tuman', select: 'name type code' },
+                  { path: 'mfy', select: 'name type code' },
+                ],
+              });
+          } else {
+            item.product = await Product.findById(productId)
+              .populate({
+                path: 'contragent',
+                select: '_id name inn phone viloyat tuman mfy status',
+                populate: [
+                  { path: 'viloyat', select: 'name type code' },
+                  { path: 'tuman', select: 'name type code' },
+                  { path: 'mfy', select: 'name type code' },
+                ],
+              });
+          }
+        } catch (error) {
+          console.error(`Error populating product ${productId}:`, error);
+          // Continue with next item
+        }
+      }
+    }
 
     if (!order) {
       return res.status(404).json({
@@ -2440,15 +2639,22 @@ const getOrderContragentIds = async (req, res) => {
     }
 
     // Check if order belongs to punkt's region OR punkt confirmed it OR punkt is currentPunkt
+    const deliveryViloyatId = order.deliveryViloyat?._id?.toString() || order.deliveryViloyat?.toString();
+    const deliveryTumanId = order.deliveryTuman?._id?.toString() || order.deliveryTuman?.toString();
+    const punktViloyatId = punkt.viloyat?._id?.toString() || punkt.viloyat?.toString();
+    const punktTumanId = punkt.tuman?._id?.toString() || punkt.tuman?.toString();
+    
     const isInRegion = 
-      order.deliveryViloyat._id.toString() === punkt.viloyat._id.toString() &&
-      (!punkt.tuman || !order.deliveryTuman || order.deliveryTuman._id.toString() === punkt.tuman._id.toString());
+      deliveryViloyatId === punktViloyatId &&
+      (!punktTumanId || !deliveryTumanId || deliveryTumanId === punktTumanId);
     
+    const confirmedByPunktId = order.confirmedByPunkt?._id?.toString() || order.confirmedByPunkt?.toString();
     const isConfirmedByThisPunkt = 
-      order.confirmedByPunkt && order.confirmedByPunkt._id.toString() === punkt._id.toString();
+      confirmedByPunktId && confirmedByPunktId === punkt._id.toString();
     
+    const currentPunktId = order.currentPunkt?._id?.toString() || order.currentPunkt?.toString();
     const isCurrentPunkt = 
-      order.currentPunkt && order.currentPunkt._id.toString() === punkt._id.toString();
+      currentPunktId && currentPunktId === punkt._id.toString();
 
     if (!isInRegion && !isConfirmedByThisPunkt && !isCurrentPunkt) {
       return res.status(403).json({
@@ -2467,9 +2673,14 @@ const getOrderContragentIds = async (req, res) => {
         
         if (!contragentMap.has(contragentId)) {
           // Check if contragent is in punkt's region
+          const contragentViloyatId = contragent.viloyat?._id?.toString() || contragent.viloyat?.toString();
+          const contragentTumanId = contragent.tuman?._id?.toString() || contragent.tuman?.toString();
+          const punktViloyatId = punkt.viloyat?._id?.toString() || punkt.viloyat?.toString();
+          const punktTumanId = punkt.tuman?._id?.toString() || punkt.tuman?.toString();
+          
           const isInRegion = 
-            contragent.viloyat._id.toString() === punkt.viloyat._id.toString() &&
-            (!punkt.tuman || contragent.tuman._id.toString() === punkt.tuman._id.toString());
+            contragentViloyatId === punktViloyatId &&
+            (!punktTumanId || !contragentTumanId || contragentTumanId === punktTumanId);
           
           contragentMap.set(contragentId, {
             _id: contragent._id,
@@ -2585,9 +2796,26 @@ const getTodayOrders = async (req, res) => {
     // Orders where punkt has old-style requests
     orConditions.push({ 'punktRequests.punktId': punkt._id });
 
+    // Add orderType filter (includes old orders without orderType field)
+    const orderTypeCondition = {
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
+    };
+    
+    // Exclude MaxallaProduct orders (faqat dokon kontragent uchun)
+    const excludeMaxallaCondition = {
+      items: { $not: { $elemMatch: { productType: 'maxalla' } } },
+    };
+    
     const filter = {
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-      $or: orConditions,
+      $and: [
+        { createdAt: { $gte: startOfDay, $lte: endOfDay } },
+        { $or: orConditions },
+        orderTypeCondition,
+        excludeMaxallaCondition,
+      ],
     };
 
     // Exclude orders where currentPunkt, confirmedByPunkt, or assignedByPunkt is a deleted punkt (and not current user)
@@ -2628,7 +2856,8 @@ const getTodayOrders = async (req, res) => {
         ]
       });
       
-      filter.$and = andConditions;
+      // Merge with existing $and conditions
+      filter.$and = [...filter.$and, ...andConditions];
     }
 
     if (status) {
@@ -2643,14 +2872,6 @@ const getTodayOrders = async (req, res) => {
 
     const orders = await Order.find(filter)
       .populate('user', 'name phone')
-      .populate({
-        path: 'items.product',
-        populate: [
-          { path: 'category', select: 'name slug' },
-          { path: 'subcategory', select: 'name slug' },
-          { path: 'contragent', select: 'name inn phone' },
-        ],
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
@@ -2683,6 +2904,9 @@ const getTodayOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
+
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(orders);
 
     // Helper function to check if order should be excluded (belongs to deleted punkt that is not current punkt)
     const shouldExcludeOrder = (orderObj) => {
@@ -2860,9 +3084,26 @@ const getOrderHistory = async (req, res) => {
     // Orders where punkt has old-style requests
     orConditions.push({ 'punktRequests.punktId': punkt._id });
 
+    // Add orderType filter (includes old orders without orderType field)
+    const orderTypeCondition = {
+      $or: [
+        { orderType: 'tuman' },
+        { orderType: { $exists: false } }, // Old orders without orderType field
+      ],
+    };
+    
+    // Exclude MaxallaProduct orders (faqat dokon kontragent uchun)
+    const excludeMaxallaCondition = {
+      items: { $not: { $elemMatch: { productType: 'maxalla' } } },
+    };
+    
     const filter = {
-      createdAt: dateFilter,
-      $or: orConditions,
+      $and: [
+        { createdAt: dateFilter },
+        { $or: orConditions },
+        orderTypeCondition,
+        excludeMaxallaCondition,
+      ],
     };
 
     // Exclude orders where currentPunkt, confirmedByPunkt, or assignedByPunkt is a deleted punkt (and not current user)
@@ -2903,7 +3144,8 @@ const getOrderHistory = async (req, res) => {
         ]
       });
       
-      filter.$and = andConditions;
+      // Merge with existing $and conditions
+      filter.$and = [...filter.$and, ...andConditions];
     }
 
     if (status) {
@@ -2918,14 +3160,6 @@ const getOrderHistory = async (req, res) => {
 
     const orders = await Order.find(filter)
       .populate('user', 'name phone')
-      .populate({
-        path: 'items.product',
-        populate: [
-          { path: 'category', select: 'name slug' },
-          { path: 'subcategory', select: 'name slug' },
-          { path: 'contragent', select: 'name inn phone' },
-        ],
-      })
       .populate('deliveryViloyat', 'name type code')
       .populate('deliveryTuman', 'name type code')
       .populate('deliveryMfy', 'name type code')
@@ -2945,6 +3179,9 @@ const getOrderHistory = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
+
+    // Manually populate products because of dynamic reference (refPath) - only Product model
+    await populateOrderItemsProducts(orders);
 
     // Helper function to check if order should be excluded (belongs to deleted punkt that is not current punkt)
     const shouldExcludeOrder = (orderObj) => {

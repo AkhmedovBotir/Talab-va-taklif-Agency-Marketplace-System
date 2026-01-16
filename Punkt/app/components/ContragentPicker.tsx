@@ -37,6 +37,7 @@ export function ContragentPicker({
     setLoading(true);
     try {
       const response = await apiService.getOrderContragents(orderId);
+      
       let filteredContragents = response.data.contragents;
 
       // Filter by search query if provided

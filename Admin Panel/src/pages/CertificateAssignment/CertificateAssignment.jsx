@@ -149,7 +149,7 @@ const CertificateAssignment = () => {
             Lavozimga Tayinlash
           </h3>
           <p className="text-sm text-green-800">
-            Sertifikat egasini punkt, viloyat agenti, tuman agenti yoki MFY agenti lavozimiga tayinlang.
+            Sertifikat egasini punkt yoki agent lavozimiga tayinlang.
             Yangi foydalanuvchi yaratiladi yoki mavjud foydalanuvchi ma'lumotlari yangilanadi.
           </p>
         </motion.div>

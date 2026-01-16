@@ -39,15 +39,13 @@ export default function BuyurtmalarScreen() {
       
       if (pageNum === 1) {
         setOrders(response.data);
-        console.log(response.data);
       } else {
         setOrders((prev) => [...prev, ...response.data]);
       }
 
       setHasMore(response.page < response.totalPages);
-    } catch (error: any) {
-      console.error('Buyurtmalarni yuklashda xatolik:', error);
-      Alert.alert('Xatolik', error.message || 'Buyurtmalarni yuklashda xatolik');
+      } catch (error: any) {
+        Alert.alert('Xatolik', error.message || 'Buyurtmalarni yuklashda xatolik');
     } finally {
       setLoading(false);
       setRefreshing(false);

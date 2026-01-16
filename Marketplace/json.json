@@ -1,0 +1,58 @@
+[
+    {
+        "__v": 0,
+        "_id": "6969ef8326435fa9476c6cb4",
+        "category": {
+            "_id": "6956a91d44cf7f7cf949eabe",
+            "id": "6956a91d44cf7f7cf949eabe",
+            "name": "Oziq-ovqat mahsulotlari",
+            "slug": "oziq-ovqat-mahsulotlari",
+            "status": "active"
+        },
+        "censored": false,
+        "contragent": {
+            "_id": "6969ec4226435fa9476c5018",
+            "mfy": [Object
+            ],
+            "name": "BOTIR",
+            "phone": "+998932281884",
+            "status": "active",
+            "tuman": [Object
+            ],
+            "viloyat": [Object
+            ]
+        },
+        "createdAt": "2026-01-16T07:57:55.173Z",
+        "deliveryRegions": [],
+        "description": {
+            "ops": [Array
+            ]
+        },
+        "images": [
+            "data:image;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHY... (208702 chars)"
+        ],
+        "length": null,
+        "moderatedAt": "2026-01-16T08:00:45.143Z",
+        "moderatedBy": "69692508cd73487441ea43f3",
+        "moderationStatus": "approved",
+        "name": "Uzum sirkasi",
+        "originalPrice": 50000,
+        "price": 65000,
+        "productCode": "001",
+        "quantity": 154,
+        "rejectionReason": null,
+        "status": "active",
+        "subcategory": {
+            "_id": "6956a95544cf7f7cf949eb36",
+            "id": "6956a95544cf7f7cf949eb36",
+            "name": "Konserva mahsulotlari",
+            "slug": "konserva-mahsulotlari",
+            "status": "active"
+        },
+        "unit": "dona",
+        "unitSize": 1,
+        "updatedAt": "2026-01-16T08:00:45.143Z",
+        "weight": null,
+        "width": null
+    }
+]

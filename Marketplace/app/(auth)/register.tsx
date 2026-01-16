@@ -51,7 +51,6 @@ export default function RegisterScreen() {
     try {
       // Check if phone exists in database
       const checkResult = await apiService.checkPhone(phoneNumber);
-      console.log('Check result:', checkResult);
       
       if (checkResult.success && checkResult.status === 'bor') {
         // Phone exists, show error and suggest to login

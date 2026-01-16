@@ -30,6 +30,7 @@ const companyIntegrationRoutes = require('./routes/companyIntegrationRoutes');
 const certificateAssignmentRoutes = require('./routes/certificateAssignmentRoutes');
 const maxallaContragentRoutes = require('./routes/maxallaContragentRoutes');
 const deliveryProviderRoutes = require('./routes/deliveryProviderRoutes');
+const viloyatManagerRoutes = require('./routes/viloyatManagerRoutes');
 
 // Initialize Express app
 const app = express();
@@ -72,6 +73,7 @@ app.use('/api/company-integration', companyIntegrationRoutes);
 app.use('/api/admin/certificate-assignment', certificateAssignmentRoutes);
 app.use('/api/maxalla-contragents', maxallaContragentRoutes);
 app.use('/api/delivery-providers', deliveryProviderRoutes);
+app.use('/api/viloyat-managers', viloyatManagerRoutes);
 // Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({

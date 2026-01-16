@@ -66,16 +66,7 @@ const ArchivedAgentWorkHistory = () => {
   };
 
   const getAgentTypeLabel = (agentType) => {
-    switch (agentType) {
-      case 'viloyat':
-        return 'Viloyat agenti';
-      case 'tuman':
-        return 'Tuman agenti';
-      case 'mfy':
-        return 'MFY agenti';
-      default:
-        return '-';
-    }
+    return 'Agent';
   };
 
   if (loading) {

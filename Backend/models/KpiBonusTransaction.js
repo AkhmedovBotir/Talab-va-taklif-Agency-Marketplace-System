@@ -44,23 +44,19 @@ const kpiBonusTransactionSchema = new mongoose.Schema(
       required: true,
     },
     // Taqsimlangan summalar
+    // KPI miqdori (foyda * kpiBonusPercent / 100) 100% sifatida olinadi va quyidagicha taqsimlanadi
     amounts: {
       punkt: {
         type: Number,
         default: 0,
         min: 0,
       },
-      viloyatAgent: {
+      agent: {
         type: Number,
         default: 0,
         min: 0,
       },
-      tumanAgent: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
-      mfyAgent: {
+      manager: {
         type: Number,
         default: 0,
         min: 0,
@@ -75,11 +71,6 @@ const kpiBonusTransactionSchema = new mongoose.Schema(
         default: 0,
         min: 0,
       },
-      punktTransfer: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
     },
     // Kimlarga ajratilgan
     recipients: {
@@ -88,41 +79,15 @@ const kpiBonusTransactionSchema = new mongoose.Schema(
         ref: 'Punkt',
         default: null,
       },
-      viloyatAgent: {
+      agent: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Agent',
         default: null,
       },
-      tumanAgent: {
+      manager: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Agent',
+        ref: 'ViloyatManager',
         default: null,
-      },
-      mfyAgent: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Agent',
-        default: null,
-      },
-      // Punkt transfer bo'lsa
-      fromPunkt: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Punkt',
-        default: null,
-      },
-      toPunkt: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Punkt',
-        default: null,
-      },
-      fromPunktAmount: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
-      toPunktAmount: {
-        type: Number,
-        default: 0,
-        min: 0,
       },
     },
     // Buyurtma holati
@@ -165,11 +130,8 @@ const kpiBonusTransactionSchema = new mongoose.Schema(
 kpiBonusTransactionSchema.index({ order: 1 });
 kpiBonusTransactionSchema.index({ 'orderItem.product': 1 });
 kpiBonusTransactionSchema.index({ 'recipients.punkt': 1 });
-kpiBonusTransactionSchema.index({ 'recipients.viloyatAgent': 1 });
-kpiBonusTransactionSchema.index({ 'recipients.tumanAgent': 1 });
-kpiBonusTransactionSchema.index({ 'recipients.mfyAgent': 1 });
-kpiBonusTransactionSchema.index({ 'recipients.fromPunkt': 1 });
-kpiBonusTransactionSchema.index({ 'recipients.toPunkt': 1 });
+kpiBonusTransactionSchema.index({ 'recipients.agent': 1 });
+kpiBonusTransactionSchema.index({ 'recipients.manager': 1 });
 kpiBonusTransactionSchema.index({ orderStatus: 1 });
 kpiBonusTransactionSchema.index({ isPaid: 1 });
 kpiBonusTransactionSchema.index({ createdAt: -1 });

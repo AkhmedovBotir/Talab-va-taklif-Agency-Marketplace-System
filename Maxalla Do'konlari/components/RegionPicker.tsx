@@ -60,7 +60,7 @@ export default function RegionPicker({
         setRegions(response.data);
       }
     } catch (error) {
-      console.error('Error loading regions:', error);
+      // Ignore loading errors
     } finally {
       setLoading(false);
     }

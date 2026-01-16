@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const Device = require('../models/Device');
 const Contragent = require('../models/Contragent');
+const ViloyatManager = require('../models/ViloyatManager');
 
 // Authentication middleware for admin
 const adminAuth = async (req, res, next) => {
@@ -735,15 +736,11 @@ const agentAuth = async (req, res, next) => {
       }
     }
 
-    // Determine agent type
-    const agentType = agent.mfy ? 'mfy' : agent.tuman ? 'tuman' : 'viloyat';
-
     // Attach agent info to request
     req.user = {
       userId: agent._id,
       userType: 'Agent',
       phone: agent.phone,
-      role: agentType, // role field
       viloyat: agent.viloyat,
       tuman: agent.tuman,
       mfy: agent.mfy,
@@ -834,6 +831,102 @@ const deliveryProviderAuth = async (req, res, next) => {
   }
 };
 
+// Authentication middleware for viloyat manager
+const viloyatManagerAuth = async (req, res, next) => {
+  try {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token topilmadi',
+      });
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify and decode token
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+      );
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token noto\'g\'ri yoki muddati tugagan',
+      });
+    }
+
+    // Check if userType is viloyatManager
+    if (decoded.userType !== 'viloyatManager') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token noto\'g\'ri',
+      });
+    }
+
+    // Check if viloyat manager exists and is active
+    const viloyatManager = await ViloyatManager.findById(decoded.userId)
+      .populate('viloyat', 'name type code');
+
+    if (!viloyatManager) {
+      return res.status(401).json({
+        success: false,
+        message: 'Viloyat menejeri topilmadi',
+      });
+    }
+
+    if (viloyatManager.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Hisobingiz faol emas',
+      });
+    }
+
+    // Check device if deviceId is in token
+    if (decoded.deviceId) {
+      const device = await Device.findOne({
+        user: viloyatManager._id,
+        userType: 'ViloyatManager',
+        deviceId: decoded.deviceId,
+        isActive: true,
+      });
+
+      if (!device) {
+        return res.status(403).json({
+          success: false,
+          message: 'Qurilma topilmadi yoki nofaol. Iltimos, qurilmani tasdiqlang yoki faol qurilma bilan kirish',
+        });
+      }
+
+      // Update device last activity
+      device.lastActivityAt = new Date();
+      await device.save();
+    }
+
+    // Attach viloyat manager info to request
+    req.user = {
+      userId: viloyatManager._id,
+      userType: 'ViloyatManager',
+      phone: viloyatManager.phone,
+      viloyat: viloyatManager.viloyat,
+      viloyatManager: viloyatManager,
+    };
+
+    next();
+  } catch (error) {
+    console.error('Error in viloyatManagerAuth:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Autentifikatsiya xatosi',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   adminAuth,
   contragentAuth,
@@ -844,6 +937,7 @@ module.exports = {
   punktAuth,
   agentAuth,
   deliveryProviderAuth,
+  viloyatManagerAuth,
 };
 
 

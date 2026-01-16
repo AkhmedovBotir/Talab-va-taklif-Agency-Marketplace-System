@@ -5,9 +5,7 @@ import { formatTableDate } from '../../utils/dateFormatter';
 const targetTypeLabels = {
   all: 'Barchaga',
   punkts: 'Punktlar',
-  viloyat_agents: 'Viloyat agentlari',
-  tuman_agents: 'Tuman agentlari',
-  mfy_agents: 'MFY agentlari',
+  agents: 'Agentlar',
   marketplace_users: 'Marketplace foydalanuvchilari',
   contragents: 'Kontragentlar',
 };

@@ -86,6 +86,7 @@ const createOrder = async (req, res) => {
       phoneNumber,
       clearCart = true,
       deliveryAddress, // Old field - will be ignored
+      orderType = 'tuman', // 'tuman' or 'dokon'
     } = req.body;
 
     // Check if old deliveryAddress is being used
@@ -281,8 +282,14 @@ const createOrder = async (req, res) => {
       // Calculate prices
       const itemPrice = product.price * cartItem.quantity;
       const itemOriginalPrice = product.originalPrice * cartItem.quantity;
+      // KPI hisoblash: foyda (price - originalPrice) asosida
+      // Formula: (price - originalPrice) * quantity * kpiBonusPercent / 100
+      // Masalan: price = 65000, originalPrice = 50000, quantity = 1, kpiBonusPercent = 30%
+      // Foyda = 65000 - 50000 = 15000 so'm
+      // KPI miqdori = 15000 * 1 * 30 / 100 = 4500 so'm
+      const profitPerUnit = product.price - product.originalPrice;
       const itemKpiPrice = productType === 'tuman' && product.kpiBonusPercent
-        ? (itemPrice * product.kpiBonusPercent) / 100
+        ? (profitPerUnit * cartItem.quantity * product.kpiBonusPercent) / 100
         : 0;
 
       orderItems.push({
@@ -341,6 +348,11 @@ const createOrder = async (req, res) => {
       });
     }
 
+    // Determine orderType if not provided
+    // If orderType is 'dokon', don't assign punkt
+    const finalOrderType = orderType === 'dokon' ? 'dokon' : 'tuman';
+    const finalAssignedPunkt = finalOrderType === 'dokon' ? null : (assignedPunkt ? assignedPunkt._id : null);
+
     // Create order
     const order = await Order.create({
       user: userId,
@@ -350,6 +362,7 @@ const createOrder = async (req, res) => {
       totalOriginalPrice,
       totalKpiPrice,
       itemCount,
+      orderType: finalOrderType,
       status: 'pending',
       paymentStatus: 'pending',
       paymentMethod,
@@ -358,7 +371,7 @@ const createOrder = async (req, res) => {
       deliveryMfy: deliveryMfy || null,
       deliveryNote: deliveryNote || '',
       phoneNumber: orderPhoneNumber,
-      currentPunkt: assignedPunkt ? assignedPunkt._id : null,
+      currentPunkt: finalAssignedPunkt,
     });
 
     // Clear cart if requested

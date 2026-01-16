@@ -118,16 +118,8 @@ const TransactionDetailModal = ({ transaction, open, onClose }) => {
                   <span className="font-medium">{formatNumber(transaction.amounts?.punkt)} so'm</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Viloyat agent:</span>
-                  <span className="font-medium">{formatNumber(transaction.amounts?.viloyatAgent)} so'm</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tuman agent:</span>
-                  <span className="font-medium">{formatNumber(transaction.amounts?.tumanAgent)} so'm</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">MFY agent:</span>
-                  <span className="font-medium">{formatNumber(transaction.amounts?.mfyAgent)} so'm</span>
+                  <span className="text-gray-600">Agent:</span>
+                  <span className="font-medium">{formatNumber(transaction.amounts?.agent || transaction.amounts?.viloyatAgent || transaction.amounts?.tumanAgent || transaction.amounts?.mfyAgent)} so'm</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Moliya:</span>
@@ -152,22 +144,19 @@ const TransactionDetailModal = ({ transaction, open, onClose }) => {
                     <span className="font-medium">{transaction.recipients.punkt.name || '-'}</span>
                   </div>
                 )}
-                {transaction.recipients?.viloyatAgent && (
+                {transaction.recipients?.agent && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Viloyat agent:</span>
-                    <span className="font-medium">{transaction.recipients.viloyatAgent.name || '-'}</span>
+                    <span className="text-gray-600">Agent:</span>
+                    <span className="font-medium">{transaction.recipients.agent.name || '-'}</span>
                   </div>
                 )}
-                {transaction.recipients?.tumanAgent && (
+                {/* Backward compatibility */}
+                {(transaction.recipients?.viloyatAgent || transaction.recipients?.tumanAgent || transaction.recipients?.mfyAgent) && !transaction.recipients?.agent && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Tuman agent:</span>
-                    <span className="font-medium">{transaction.recipients.tumanAgent.name || '-'}</span>
-                  </div>
-                )}
-                {transaction.recipients?.mfyAgent && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">MFY agent:</span>
-                    <span className="font-medium">{transaction.recipients.mfyAgent.name || '-'}</span>
+                    <span className="text-gray-600">Agent:</span>
+                    <span className="font-medium">
+                      {transaction.recipients.viloyatAgent?.name || transaction.recipients.tumanAgent?.name || transaction.recipients.mfyAgent?.name || '-'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -388,19 +377,9 @@ const KPITransactionsSection = () => {
                             P: {formatNumber(transaction.amounts.punkt)}
                           </span>
                         )}
-                        {transaction.amounts?.viloyatAgent > 0 && (
+                        {(transaction.amounts?.agent > 0 || transaction.amounts?.viloyatAgent > 0 || transaction.amounts?.tumanAgent > 0 || transaction.amounts?.mfyAgent > 0) && (
                           <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
-                            V: {formatNumber(transaction.amounts.viloyatAgent)}
-                          </span>
-                        )}
-                        {transaction.amounts?.tumanAgent > 0 && (
-                          <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded">
-                            T: {formatNumber(transaction.amounts.tumanAgent)}
-                          </span>
-                        )}
-                        {transaction.amounts?.mfyAgent > 0 && (
-                          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded">
-                            M: {formatNumber(transaction.amounts.mfyAgent)}
+                            A: {formatNumber(transaction.amounts?.agent || transaction.amounts?.viloyatAgent || transaction.amounts?.tumanAgent || transaction.amounts?.mfyAgent)}
                           </span>
                         )}
                         {transaction.amounts?.finance > 0 && (

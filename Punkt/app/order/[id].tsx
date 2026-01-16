@@ -84,7 +84,6 @@ export default function OrderDetailScreen() {
       }
       const response = await apiService.getOrderById(id);
       setOrder(response.data);
-      console.log('order', response.data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Buyurtma yuklanmadi');
       router.back();
@@ -192,7 +191,7 @@ export default function OrderDetailScreen() {
 
     setActionLoading(true);
     try {
-      const response = await apiService.requestToContragent(id, { contragentId: selectedContragent._id });
+      await apiService.requestToContragent(id, { contragentId: selectedContragent._id });
       
       const productCount = selectedContragent.products?.length || 0;
       const message = productCount > 0 
@@ -607,32 +606,6 @@ export default function OrderDetailScreen() {
     !canReceiveFromPunkt && // Ensure this only shows when receive from punkt is not available (pending/accepted only, not delivered)
     !canSendToPunkt; // Ensure this only shows when send to punkt is not available (only for second punkt)
   
-  // Debug: Log button visibility for troubleshooting
-  if (order && punkt) {
-    const currentPunktId = order.currentPunkt 
-      ? (typeof order.currentPunkt === 'object' ? order.currentPunkt._id : order.currentPunkt)
-      : null;
-    console.log('Button visibility debug:', {
-      isDeliveredToPunkt,
-      isOrderInPunktTuman,
-      isMyPunkt,
-      isCurrentPunkt,
-      hasReceivedFromPunktRequest,
-      canReceiveFromContragent,
-      canReceiveFromPunkt,
-      canSendToPunkt,
-      canAssignToAgent,
-      orderTumanId,
-      punktTumanIdForOrder,
-      punktId: punkt._id,
-      currentPunktId,
-      punktToPunktRequests: order.punktToPunktRequests?.map(req => ({
-        status: req.status,
-        toPunktId: typeof req.toPunktId === 'object' ? req.toPunktId._id : req.toPunktId,
-        fromPunktId: typeof req.fromPunktId === 'object' ? req.fromPunktId._id : req.fromPunktId,
-      })),
-    });
-  }
 
   return (
     <View style={styles.container}>
@@ -685,17 +658,64 @@ export default function OrderDetailScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mahsulotlar</Text>
         <View style={styles.card}>
-          {order.items.map((item, index) => (
-            <View key={index} style={styles.itemRow}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.product.name}</Text>
-                <Text style={styles.itemQuantity}>Miqdor: {item.quantity} ta</Text>
+          {order.items.map((item, index) => {
+            // Product ma'lumotlarini olish - agar product object bo'lsa, undan foydalanamiz
+            // Agar product faqat ID bo'lsa, boshqa ma'lumotlardan foydalanamiz
+            const product = typeof item.product === 'object' ? item.product : null;
+            const productName = product?.name 
+              ? product.name 
+              : (item as any).productModel || (item as any).productType || 'Mahsulot';
+            const productPrice = product?.price 
+              ? product.price 
+              : item.price;
+            const productContragent = product?.contragent;
+            
+            return (
+              <View key={index} style={styles.itemRow}>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>{productName}</Text>
+                  <Text style={styles.itemQuantity}>Miqdor: {item.quantity} ta</Text>
+                  {productContragent && (
+                    <View style={styles.contragentInfo}>
+                      <Text style={styles.contragentLabel}>Contragent:</Text>
+                      <Text style={styles.contragentName}>{productContragent.name}</Text>
+                      {productContragent.inn && (
+                        <Text style={styles.contragentDetails}>INN: {productContragent.inn}</Text>
+                      )}
+                      {productContragent.phone && (
+                        <Text style={styles.contragentDetails}>Tel: {productContragent.phone}</Text>
+                      )}
+                      {productContragent.tuman && (
+                        <Text style={styles.contragentDetails}>
+                          {productContragent.viloyat?.name || ''}{productContragent.tuman ? `, ${productContragent.tuman.name}` : ''}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  {product?.category && (
+                    <Text style={styles.itemCategory}>
+                      Kategoriya: {product.category.name}
+                    </Text>
+                  )}
+                  {(item as any).productType && !productContragent && (
+                    <Text style={styles.itemCategory}>
+                      Turi: {(item as any).productType}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.itemPriceContainer}>
+                  <Text style={styles.itemPrice}>
+                    {formatPrice(item.price * item.quantity)}
+                  </Text>
+                  {item.originalPrice && item.originalPrice !== item.price && (
+                    <Text style={styles.itemOriginalPrice}>
+                      {formatPrice(item.originalPrice * item.quantity)}
+                    </Text>
+                  )}
+                </View>
               </View>
-              <Text style={styles.itemPrice}>
-                {formatPrice(item.price * item.quantity)}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </View>
 
@@ -1024,21 +1044,13 @@ export default function OrderDetailScreen() {
               <AgentPicker
                 selectedAgent={selectedAgent}
                 onSelect={setSelectedAgent}
-                viloyatId={order?.deliveryViloyat._id}
-                tumanId={order?.deliveryTuman?._id}
-                mfyId={order?.deliveryMfy?._id}
               />
               {selectedAgent && (
                 <View style={styles.selectedPunktInfo}>
                   <Text style={styles.selectedPunktLabel}>Tanlangan agent:</Text>
                   <Text style={styles.selectedPunktName}>{selectedAgent.name}</Text>
                   <Text style={styles.selectedPunktDetails}>
-                    {selectedAgent.phone} • {selectedAgent.viloyat.name}
-                    {selectedAgent.tuman && `, ${selectedAgent.tuman.name}`}
-                    {selectedAgent.mfy && `, ${selectedAgent.mfy.name}`}
-                  </Text>
-                  <Text style={styles.selectedPunktDetails}>
-                    Turi: {selectedAgent.agentType === 'viloyat' ? 'Viloyat' : selectedAgent.agentType === 'tuman' ? 'Tuman' : 'MFY'}
+                    {selectedAgent.phone}
                   </Text>
                 </View>
               )}
@@ -1459,10 +1471,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  itemPriceContainer: {
+    alignItems: 'flex-end',
+  },
   itemPrice: {
     fontSize: 16,
     fontWeight: '700',
     color: '#007AFF',
+  },
+  itemOriginalPrice: {
+    fontSize: 12,
+    color: '#999',
+    textDecorationLine: 'line-through',
+    marginTop: 4,
+  },
+  itemCategory: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  contragentInfo: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  contragentLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  contragentName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 2,
+  },
+  contragentDetails: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   totalRow: {
     flexDirection: 'row',

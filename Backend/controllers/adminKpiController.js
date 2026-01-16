@@ -6,13 +6,11 @@ const Punkt = require('../models/Punkt');
 
 // Default KPI distribution (used for initial create forms)
 const DEFAULT_INITIAL_DISTRIBUTION = Object.freeze({
-  punkt: 15,
-  viloyatAgent: 15,
-  tumanAgent: 15,
-  mfyAgent: 35,
-  finance: 15,
-  deliveryService: 5,
-  punktTransfer: 0,
+  punkt: 20,
+  agent: 30,
+  manager: 15,
+  finance: 20,
+  deliveryService: 15,
 });
 
 // Create KPI bonus distribution configuration
@@ -32,16 +30,15 @@ const createKpiDistribution = async (req, res) => {
     // Validate distribution percentages sum to 100
     const total =
       (distribution.punkt || 0) +
-      (distribution.viloyatAgent || 0) +
-      (distribution.tumanAgent || 0) +
-      (distribution.mfyAgent || 0) +
+      (distribution.agent || 0) +
+      (distribution.manager || 0) +
       (distribution.finance || 0) +
       (distribution.deliveryService || 0);
 
     if (total !== 100) {
       return res.status(400).json({
         success: false,
-        message: `Asosiy taqsimlashlar yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: ${total}%`,
+        message: `KPI taqsimlashlar yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: ${total}%`,
       });
     }
 
@@ -192,16 +189,15 @@ const updateKpiDistribution = async (req, res) => {
     if (distribution) {
       const total =
         (distribution.punkt || 0) +
-        (distribution.viloyatAgent || 0) +
-        (distribution.tumanAgent || 0) +
-        (distribution.mfyAgent || 0) +
+        (distribution.agent || 0) +
+        (distribution.manager || 0) +
         (distribution.finance || 0) +
         (distribution.deliveryService || 0);
 
       if (total !== 100) {
         return res.status(400).json({
           success: false,
-          message: `Asosiy taqsimlashlar yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: ${total}%`,
+          message: `KPI taqsimlashlar yig'indisi 100% bo'lishi kerak. Hozirgi yig'indi: ${total}%`,
         });
       }
     }
@@ -310,6 +306,7 @@ const getAllKpiTransactions = async (req, res) => {
       productId,
       punktId,
       agentId,
+      managerId,
       orderStatus,
       isPaid,
       startDate,
@@ -323,18 +320,10 @@ const getAllKpiTransactions = async (req, res) => {
     if (orderId) filter.order = orderId;
     if (productId) filter['orderItem.product'] = productId;
     if (punktId) {
-      filter.$or = [
-        { 'recipients.punkt': punktId },
-        { 'recipients.fromPunkt': punktId },
-        { 'recipients.toPunkt': punktId },
-      ];
+      filter['recipients.punkt'] = punktId;
     }
     if (agentId) {
-      filter.$or = [
-        { 'recipients.viloyatAgent': agentId },
-        { 'recipients.tumanAgent': agentId },
-        { 'recipients.mfyAgent': agentId },
-      ];
+      filter['recipients.agent'] = agentId;
     }
     if (orderStatus) filter.orderStatus = orderStatus;
     if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
@@ -356,11 +345,8 @@ const getAllKpiTransactions = async (req, res) => {
       .populate('orderItem.product', 'name price productCode')
       .populate('distributionConfig', 'name distribution')
       .populate('recipients.punkt', 'name phone')
-      .populate('recipients.viloyatAgent', 'name phone viloyat tuman mfy')
-      .populate('recipients.tumanAgent', 'name phone viloyat tuman mfy')
-      .populate('recipients.mfyAgent', 'name phone viloyat tuman mfy')
-      .populate('recipients.fromPunkt', 'name phone')
-      .populate('recipients.toPunkt', 'name phone')
+      .populate('recipients.agent', 'name phone viloyat tuman mfy')
+      .populate('recipients.manager', 'name phone viloyat')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -394,11 +380,8 @@ const getKpiTransactionById = async (req, res) => {
       .populate('orderItem.product', 'name price productCode')
       .populate('distributionConfig', 'name distribution')
       .populate('recipients.punkt', 'name phone')
-      .populate('recipients.viloyatAgent', 'name phone viloyat tuman mfy')
-      .populate('recipients.tumanAgent', 'name phone viloyat tuman mfy')
-      .populate('recipients.mfyAgent', 'name phone viloyat tuman mfy')
-      .populate('recipients.fromPunkt', 'name phone')
-      .populate('recipients.toPunkt', 'name phone');
+      .populate('recipients.agent', 'name phone viloyat tuman mfy')
+      .populate('recipients.manager', 'name phone viloyat');
 
     if (!transaction) {
       return res.status(404).json({
@@ -450,10 +433,8 @@ const getKpiStatistics = async (req, res) => {
           totalTransactions: { $sum: 1 },
           totalKpiAmount: { $sum: '$totalKpiAmount' },
           totalPunkt: { $sum: '$amounts.punkt' },
-          totalViloyatAgent: { $sum: '$amounts.viloyatAgent' },
-          totalTumanAgent: { $sum: '$amounts.tumanAgent' },
-          totalMfyAgent: { $sum: '$amounts.mfyAgent' },
-          totalPunktTransfer: { $sum: '$amounts.punktTransfer' },
+          totalAgent: { $sum: '$amounts.agent' },
+          totalManager: { $sum: '$amounts.manager' },
           paidTransactions: {
             $sum: { $cond: ['$isPaid', 1, 0] },
           },
@@ -468,10 +449,8 @@ const getKpiStatistics = async (req, res) => {
       totalTransactions: 0,
       totalKpiAmount: 0,
       totalPunkt: 0,
-      totalViloyatAgent: 0,
-      totalTumanAgent: 0,
-      totalMfyAgent: 0,
-      totalPunktTransfer: 0,
+      totalAgent: 0,
+      totalManager: 0,
       paidTransactions: 0,
       unpaidTransactions: 0,
     };
@@ -501,9 +480,8 @@ const getInitialKpiDistribution = async (req, res) => {
           'Tavsiyaviy boshlang\'ich taqsimlash. Admin kerak bo\'lsa qiymatlarni o\'zgartirishi mumkin.',
         distribution: DEFAULT_INITIAL_DISTRIBUTION,
         notes: [
-          'Asosiy taqsimlashlar (punkt, viloyatAgent, tumanAgent, mfyAgent, finance, deliveryService) yig\'indisi 100% bo\'lishi shart',
-          'Punkt transfer 0 bo\'lsa, transfer bonus ajratilmaydi',
-          'Punkt transfer > 0 bo\'lsa, bu foizning yarmi fromPunkt ga, yarmi toPunkt ga ajratiladi',
+          'KPI taqsimlashlar (punkt, agent, manager, finance, deliveryService) yig\'indisi 100% bo\'lishi shart',
+          'KPI miqdori (foyda * kpiBonusPercent / 100) 100% sifatida olinadi va admin belgilagan foizlar asosida taqsimlanadi',
           'Yetkazib berish xizmati (deliveryService) faqat moliya bo\'limida saqlanadi va hech qanday recipient ga berilmaydi',
           'Bu qiymatlar faqat create formasi uchun boshlang\'ich tavsiya',
         ],
@@ -542,15 +520,15 @@ const parseDateRange = (startDate, endDate) => {
   return filter;
 };
 
-// Get all viloyat agents KPI data
-const getViloyatAgentsKpi = async (req, res) => {
+// Get all agents KPI data (unified function for all agents)
+const getAgentsKpi = async (req, res) => {
   try {
-    const { viloyatId, agentId, isPaid, startDate, endDate, page = 1, limit = 50 } = req.query;
+    const { viloyatId, tumanId, mfyId, agentId, isPaid, startDate, endDate, page = 1, limit = 50 } = req.query;
 
     const filter = { orderStatus: CUSTOMER_CONFIRMED_STATUS };
-    filter['recipients.viloyatAgent'] = { $exists: true, $ne: null };
+    filter['recipients.agent'] = { $exists: true, $ne: null };
 
-    if (agentId) filter['recipients.viloyatAgent'] = agentId;
+    if (agentId) filter['recipients.agent'] = agentId;
     if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
 
     const dateFilter = parseDateRange(startDate, endDate);
@@ -565,14 +543,14 @@ const getViloyatAgentsKpi = async (req, res) => {
       { $match: filter },
       {
         $group: {
-          _id: '$recipients.viloyatAgent',
+          _id: '$recipients.agent',
           totalTransactions: { $sum: 1 },
-          totalAmount: { $sum: '$amounts.viloyatAgent' },
+          totalAmount: { $sum: '$amounts.agent' },
           paidAmount: {
-            $sum: { $cond: ['$isPaid', '$amounts.viloyatAgent', 0] },
+            $sum: { $cond: ['$isPaid', '$amounts.agent', 0] },
           },
           unpaidAmount: {
-            $sum: { $cond: ['$isPaid', 0, '$amounts.viloyatAgent'] },
+            $sum: { $cond: ['$isPaid', 0, '$amounts.agent'] },
           },
         },
       },
@@ -582,184 +560,6 @@ const getViloyatAgentsKpi = async (req, res) => {
     ]);
 
     // Populate agent details
-    const agentIds = agentStats.map((s) => s._id);
-    const agents = await Agent.find({ _id: { $in: agentIds } })
-      .select('name phone viloyat')
-      .populate('viloyat', 'name');
-
-    const agentMap = {};
-    agents.forEach((a) => {
-      agentMap[a._id.toString()] = a;
-    });
-
-    // Filter by viloyat if specified
-    let result = agentStats.map((stat) => ({
-      agent: agentMap[stat._id.toString()] || { _id: stat._id },
-      ...stat,
-      _id: undefined,
-    }));
-
-    if (viloyatId) {
-      result = result.filter(
-        (r) => r.agent.viloyat && r.agent.viloyat._id.toString() === viloyatId
-      );
-    }
-
-    const total = await KpiBonusTransaction.aggregate([
-      { $match: filter },
-      { $group: { _id: '$recipients.viloyatAgent' } },
-      { $count: 'total' },
-    ]);
-
-    res.status(200).json({
-      success: true,
-      count: result.length,
-      total: total[0]?.total || 0,
-      page: pageNum,
-      limit: limitNum,
-      totalPages: Math.ceil((total[0]?.total || 0) / limitNum),
-      data: result,
-    });
-  } catch (error) {
-    console.error('Error fetching viloyat agents KPI:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Viloyat agentlari KPI ma\'lumotlarini olishda xatolik',
-      error: error.message,
-    });
-  }
-};
-
-// Get all tuman agents KPI data
-const getTumanAgentsKpi = async (req, res) => {
-  try {
-    const { viloyatId, tumanId, agentId, isPaid, startDate, endDate, page = 1, limit = 50 } = req.query;
-
-    const filter = { orderStatus: CUSTOMER_CONFIRMED_STATUS };
-    filter['recipients.tumanAgent'] = { $exists: true, $ne: null };
-
-    if (agentId) filter['recipients.tumanAgent'] = agentId;
-    if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
-
-    const dateFilter = parseDateRange(startDate, endDate);
-    if (dateFilter.createdAt) filter.createdAt = dateFilter.createdAt;
-
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const skip = (pageNum - 1) * limitNum;
-
-    const agentStats = await KpiBonusTransaction.aggregate([
-      { $match: filter },
-      {
-        $group: {
-          _id: '$recipients.tumanAgent',
-          totalTransactions: { $sum: 1 },
-          totalAmount: { $sum: '$amounts.tumanAgent' },
-          paidAmount: {
-            $sum: { $cond: ['$isPaid', '$amounts.tumanAgent', 0] },
-          },
-          unpaidAmount: {
-            $sum: { $cond: ['$isPaid', 0, '$amounts.tumanAgent'] },
-          },
-        },
-      },
-      { $sort: { totalAmount: -1 } },
-      { $skip: skip },
-      { $limit: limitNum },
-    ]);
-
-    const agentIds = agentStats.map((s) => s._id);
-    const agents = await Agent.find({ _id: { $in: agentIds } })
-      .select('name phone viloyat tuman')
-      .populate('viloyat', 'name')
-      .populate('tuman', 'name');
-
-    const agentMap = {};
-    agents.forEach((a) => {
-      agentMap[a._id.toString()] = a;
-    });
-
-    let result = agentStats.map((stat) => ({
-      agent: agentMap[stat._id.toString()] || { _id: stat._id },
-      ...stat,
-      _id: undefined,
-    }));
-
-    // Filter by viloyat or tuman if specified
-    if (viloyatId) {
-      result = result.filter(
-        (r) => r.agent.viloyat && r.agent.viloyat._id.toString() === viloyatId
-      );
-    }
-    if (tumanId) {
-      result = result.filter(
-        (r) => r.agent.tuman && r.agent.tuman._id.toString() === tumanId
-      );
-    }
-
-    const total = await KpiBonusTransaction.aggregate([
-      { $match: filter },
-      { $group: { _id: '$recipients.tumanAgent' } },
-      { $count: 'total' },
-    ]);
-
-    res.status(200).json({
-      success: true,
-      count: result.length,
-      total: total[0]?.total || 0,
-      page: pageNum,
-      limit: limitNum,
-      totalPages: Math.ceil((total[0]?.total || 0) / limitNum),
-      data: result,
-    });
-  } catch (error) {
-    console.error('Error fetching tuman agents KPI:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Tuman agentlari KPI ma\'lumotlarini olishda xatolik',
-      error: error.message,
-    });
-  }
-};
-
-// Get all MFY agents KPI data
-const getMfyAgentsKpi = async (req, res) => {
-  try {
-    const { viloyatId, tumanId, mfyId, agentId, isPaid, startDate, endDate, page = 1, limit = 50 } = req.query;
-
-    const filter = { orderStatus: CUSTOMER_CONFIRMED_STATUS };
-    filter['recipients.mfyAgent'] = { $exists: true, $ne: null };
-
-    if (agentId) filter['recipients.mfyAgent'] = agentId;
-    if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
-
-    const dateFilter = parseDateRange(startDate, endDate);
-    if (dateFilter.createdAt) filter.createdAt = dateFilter.createdAt;
-
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const skip = (pageNum - 1) * limitNum;
-
-    const agentStats = await KpiBonusTransaction.aggregate([
-      { $match: filter },
-      {
-        $group: {
-          _id: '$recipients.mfyAgent',
-          totalTransactions: { $sum: 1 },
-          totalAmount: { $sum: '$amounts.mfyAgent' },
-          paidAmount: {
-            $sum: { $cond: ['$isPaid', '$amounts.mfyAgent', 0] },
-          },
-          unpaidAmount: {
-            $sum: { $cond: ['$isPaid', 0, '$amounts.mfyAgent'] },
-          },
-        },
-      },
-      { $sort: { totalAmount: -1 } },
-      { $skip: skip },
-      { $limit: limitNum },
-    ]);
-
     const agentIds = agentStats.map((s) => s._id);
     const agents = await Agent.find({ _id: { $in: agentIds } })
       .select('name phone viloyat tuman mfy')
@@ -797,7 +597,7 @@ const getMfyAgentsKpi = async (req, res) => {
 
     const total = await KpiBonusTransaction.aggregate([
       { $match: filter },
-      { $group: { _id: '$recipients.mfyAgent' } },
+      { $group: { _id: '$recipients.agent' } },
       { $count: 'total' },
     ]);
 
@@ -811,14 +611,15 @@ const getMfyAgentsKpi = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error('Error fetching MFY agents KPI:', error);
+    console.error('Error fetching agents KPI:', error);
     res.status(500).json({
       success: false,
-      message: 'MFY agentlari KPI ma\'lumotlarini olishda xatolik',
+      message: 'Agentlar KPI ma\'lumotlarini olishda xatolik',
       error: error.message,
     });
   }
 };
+
 
 // Get all punkts KPI data
 const getPunktsKpi = async (req, res) => {
@@ -828,17 +629,9 @@ const getPunktsKpi = async (req, res) => {
     const filter = { orderStatus: CUSTOMER_CONFIRMED_STATUS };
 
     if (punktId) {
-      filter.$or = [
-        { 'recipients.punkt': punktId },
-        { 'recipients.fromPunkt': punktId },
-        { 'recipients.toPunkt': punktId },
-      ];
+      filter['recipients.punkt'] = punktId;
     } else {
-      filter.$or = [
-        { 'recipients.punkt': { $exists: true, $ne: null } },
-        { 'recipients.fromPunkt': { $exists: true, $ne: null } },
-        { 'recipients.toPunkt': { $exists: true, $ne: null } },
-      ];
+      filter['recipients.punkt'] = { $exists: true, $ne: null };
     }
 
     if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
@@ -850,74 +643,32 @@ const getPunktsKpi = async (req, res) => {
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Aggregate punkt stats - need to handle multiple punkt fields
+    // Aggregate punkt stats
     const punktStats = await KpiBonusTransaction.aggregate([
       { $match: filter },
       {
-        $facet: {
-          regularPunkt: [
-            { $match: { 'recipients.punkt': { $exists: true, $ne: null } } },
-            {
-              $group: {
-                _id: '$recipients.punkt',
-                totalTransactions: { $sum: 1 },
-                totalAmount: { $sum: '$amounts.punkt' },
-                paidAmount: { $sum: { $cond: ['$isPaid', '$amounts.punkt', 0] } },
-                unpaidAmount: { $sum: { $cond: ['$isPaid', 0, '$amounts.punkt'] } },
-              },
-            },
-          ],
-          fromPunkt: [
-            { $match: { 'recipients.fromPunkt': { $exists: true, $ne: null } } },
-            {
-              $group: {
-                _id: '$recipients.fromPunkt',
-                totalTransactions: { $sum: 1 },
-                totalAmount: { $sum: '$recipients.fromPunktAmount' },
-                paidAmount: { $sum: { $cond: ['$isPaid', '$recipients.fromPunktAmount', 0] } },
-                unpaidAmount: { $sum: { $cond: ['$isPaid', 0, '$recipients.fromPunktAmount'] } },
-              },
-            },
-          ],
-          toPunkt: [
-            { $match: { 'recipients.toPunkt': { $exists: true, $ne: null } } },
-            {
-              $group: {
-                _id: '$recipients.toPunkt',
-                totalTransactions: { $sum: 1 },
-                totalAmount: { $sum: '$recipients.toPunktAmount' },
-                paidAmount: { $sum: { $cond: ['$isPaid', '$recipients.toPunktAmount', 0] } },
-                unpaidAmount: { $sum: { $cond: ['$isPaid', 0, '$recipients.toPunktAmount'] } },
-              },
-            },
-          ],
+        $group: {
+          _id: '$recipients.punkt',
+          totalTransactions: { $sum: 1 },
+          totalAmount: { $sum: '$amounts.punkt' },
+          paidAmount: { $sum: { $cond: ['$isPaid', '$amounts.punkt', 0] } },
+          unpaidAmount: { $sum: { $cond: ['$isPaid', 0, '$amounts.punkt'] } },
         },
       },
     ]);
 
-    // Merge all punkt stats
     const mergedStats = {};
-    const allStats = [
-      ...punktStats[0].regularPunkt,
-      ...punktStats[0].fromPunkt,
-      ...punktStats[0].toPunkt,
-    ];
-
-    allStats.forEach((stat) => {
-      const id = stat._id.toString();
-      if (!mergedStats[id]) {
+    punktStats.forEach((stat) => {
+      if (stat._id) {
+        const id = stat._id.toString();
         mergedStats[id] = {
           _id: stat._id,
-          totalTransactions: 0,
-          totalAmount: 0,
-          paidAmount: 0,
-          unpaidAmount: 0,
+          totalTransactions: stat.totalTransactions,
+          totalAmount: stat.totalAmount || 0,
+          paidAmount: stat.paidAmount || 0,
+          unpaidAmount: stat.unpaidAmount || 0,
         };
       }
-      mergedStats[id].totalTransactions += stat.totalTransactions;
-      mergedStats[id].totalAmount += stat.totalAmount || 0;
-      mergedStats[id].paidAmount += stat.paidAmount || 0;
-      mergedStats[id].unpaidAmount += stat.unpaidAmount || 0;
     });
 
     const punktIds = Object.keys(mergedStats);
@@ -993,22 +744,9 @@ const getAgentKpiDetails = async (req, res) => {
       });
     }
 
-    // Determine agent role
-    let agentRole = role;
-    if (!agentRole) {
-      if (agent.mfy) agentRole = 'mfy';
-      else if (agent.tuman) agentRole = 'tuman';
-      else agentRole = 'viloyat';
-    }
-
-    const recipientField = agentRole === 'mfy' ? 'recipients.mfyAgent' :
-      agentRole === 'tuman' ? 'recipients.tumanAgent' : 'recipients.viloyatAgent';
-    const amountField = agentRole === 'mfy' ? '$amounts.mfyAgent' :
-      agentRole === 'tuman' ? '$amounts.tumanAgent' : '$amounts.viloyatAgent';
-
     const filter = {
       orderStatus: CUSTOMER_CONFIRMED_STATUS,
-      [recipientField]: agentId,
+      'recipients.agent': agentId,
     };
 
     if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
@@ -1027,9 +765,9 @@ const getAgentKpiDetails = async (req, res) => {
         $group: {
           _id: null,
           totalTransactions: { $sum: 1 },
-          totalAmount: { $sum: amountField },
-          paidAmount: { $sum: { $cond: ['$isPaid', amountField, 0] } },
-          unpaidAmount: { $sum: { $cond: ['$isPaid', 0, amountField] } },
+          totalAmount: { $sum: '$amounts.agent' },
+          paidAmount: { $sum: { $cond: ['$isPaid', '$amounts.agent', 0] } },
+          unpaidAmount: { $sum: { $cond: ['$isPaid', 0, '$amounts.agent'] } },
         },
       },
     ]);
@@ -1045,8 +783,7 @@ const getAgentKpiDetails = async (req, res) => {
 
     const transactionsWithAmount = transactions.map((t) => {
       const obj = t.toObject();
-      obj.agentAmount = agentRole === 'mfy' ? t.amounts.mfyAgent :
-        agentRole === 'tuman' ? t.amounts.tumanAgent : t.amounts.viloyatAgent;
+      obj.agentAmount = t.amounts.agent || 0;
       return obj;
     });
 
@@ -1054,7 +791,6 @@ const getAgentKpiDetails = async (req, res) => {
       success: true,
       data: {
         agent,
-        role: agentRole,
         summary: summary[0] || {
           totalTransactions: 0,
           totalAmount: 0,
@@ -1101,11 +837,7 @@ const getPunktKpiDetails = async (req, res) => {
 
     const filter = {
       orderStatus: CUSTOMER_CONFIRMED_STATUS,
-      $or: [
-        { 'recipients.punkt': punktId },
-        { 'recipients.fromPunkt': punktId },
-        { 'recipients.toPunkt': punktId },
-      ],
+      'recipients.punkt': punktId,
     };
 
     if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
@@ -1122,8 +854,7 @@ const getPunktKpiDetails = async (req, res) => {
     const transactions = await KpiBonusTransaction.find(filter)
       .populate('order', 'orderNumber status totalPrice')
       .populate('orderItem.product', 'name price productCode')
-      .populate('recipients.fromPunkt', 'name')
-      .populate('recipients.toPunkt', 'name')
+      .populate('recipients.punkt', 'name phone')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -1133,23 +864,12 @@ const getPunktKpiDetails = async (req, res) => {
     const transactionsWithAmount = transactions.map((t) => {
       const obj = t.toObject();
       let punktAmount = 0;
-      let bonusType = '';
 
       if (t.recipients.punkt?.toString() === punktId) {
         punktAmount += t.amounts.punkt || 0;
-        bonusType = 'regular';
-      }
-      if (t.recipients.fromPunkt?.toString() === punktId) {
-        punktAmount += t.recipients.fromPunktAmount || 0;
-        bonusType = bonusType ? 'mixed' : 'from_punkt';
-      }
-      if (t.recipients.toPunkt?.toString() === punktId) {
-        punktAmount += t.recipients.toPunktAmount || 0;
-        bonusType = bonusType ? 'mixed' : 'to_punkt';
       }
 
       obj.punktAmount = punktAmount;
-      obj.bonusType = bonusType;
       return obj;
     });
 
@@ -1158,8 +878,7 @@ const getPunktKpiDetails = async (req, res) => {
     allTransactions.forEach((t) => {
       let punktAmount = 0;
       if (t.recipients.punkt?.toString() === punktId) punktAmount += t.amounts.punkt || 0;
-      if (t.recipients.fromPunkt?.toString() === punktId) punktAmount += t.recipients.fromPunktAmount || 0;
-      if (t.recipients.toPunkt?.toString() === punktId) punktAmount += t.recipients.toPunktAmount || 0;
+      // Only regular punkt bonus now
 
       summaryTotals.totalAmount += punktAmount;
       if (t.isPaid) summaryTotals.paidAmount += punktAmount;
@@ -1205,9 +924,7 @@ module.exports = {
   getKpiStatistics,
   getInitialKpiDistribution,
   // New KPI data endpoints
-  getViloyatAgentsKpi,
-  getTumanAgentsKpi,
-  getMfyAgentsKpi,
+  getAgentsKpi,
   getPunktsKpi,
   getAgentKpiDetails,
   getPunktKpiDetails,

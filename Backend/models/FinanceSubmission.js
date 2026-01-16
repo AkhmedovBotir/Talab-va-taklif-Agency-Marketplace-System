@@ -9,8 +9,8 @@ const financeSubmissionSchema = new mongoose.Schema(
     },
     fromAgentType: {
       type: String,
-      enum: ['mfy', 'tuman', 'viloyat'],
-      required: [true, 'Agent turi kiritilishi shart'],
+      enum: ['agent'],
+      default: 'agent',
     },
     toAgent: {
       type: mongoose.Schema.Types.ObjectId,
@@ -19,7 +19,7 @@ const financeSubmissionSchema = new mongoose.Schema(
     },
     toAgentType: {
       type: String,
-      enum: ['tuman', 'viloyat', 'finance'],
+      enum: ['agent', 'finance'],
       required: [true, 'Qabul qiluvchi turi kiritilishi shart'],
     },
     amount: {

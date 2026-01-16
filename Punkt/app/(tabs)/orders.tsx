@@ -50,7 +50,6 @@ export default function OrdersScreen() {
 
       if (reset) {
         setOrders(response.data);
-        console.log("orders", response.data);
       } else {
         setOrders((prev) => [...prev, ...response.data]);
       }

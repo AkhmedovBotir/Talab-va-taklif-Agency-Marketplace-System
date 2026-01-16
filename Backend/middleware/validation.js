@@ -2305,6 +2305,99 @@ const contragentTypeValidationSchemas = {
   }),
 };
 
+const viloyatManagerValidationSchemas = {
+  create: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(200)
+      .required()
+      .trim()
+      .messages({
+        'string.empty': 'Ismi kiritilishi shart',
+        'string.min': 'Ismi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Ismi 200 ta belgidan oshmasligi kerak',
+      }),
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+      }),
+    password: Joi.string()
+      .min(6)
+      .required()
+      .messages({
+        'string.empty': 'Parol kiritilishi shart',
+        'string.min': 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+      }),
+    viloyat: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Viloyat kiritilishi shart',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .default('active')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+
+  update: Joi.object({
+    name: Joi.string()
+      .min(2)
+      .max(200)
+      .trim()
+      .messages({
+        'string.min': 'Ismi kamida 2 ta belgidan iborat bo\'lishi kerak',
+        'string.max': 'Ismi 200 ta belgidan oshmasligi kerak',
+      }),
+    phone: Joi.string()
+      .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
+      .messages({
+        'string.pattern.base': 'To\'g\'ri telefon raqam formatini kiriting',
+      }),
+    password: Joi.string()
+      .min(6)
+      .messages({
+        'string.min': 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak',
+      }),
+    viloyat: Joi.string()
+      .messages({
+        'string.base': 'Viloyat ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    status: Joi.string()
+      .valid('active', 'inactive')
+      .messages({
+        'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
+      }),
+  }),
+
+  login: Joi.object({
+    phone: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Telefon raqami kiritilishi shart',
+      }),
+    password: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Parol kiritilishi shart',
+      }),
+    deviceId: Joi.string()
+      .optional()
+      .messages({
+        'string.base': 'Qurilma ID to\'g\'ri formatda bo\'lishi kerak',
+      }),
+    deviceInfo: Joi.object()
+      .optional()
+      .messages({
+        'object.base': 'Qurilma ma\'lumotlari to\'g\'ri formatda bo\'lishi kerak',
+      }),
+  }),
+};
+
 module.exports = {
   validate,
   adminValidationSchemas,
@@ -2328,4 +2421,5 @@ module.exports = {
   marketplacePartnershipRequestValidationSchemas,
   featuredContragentValidationSchemas,
   adminProductModerationValidationSchemas,
+  viloyatManagerValidationSchemas,
 };

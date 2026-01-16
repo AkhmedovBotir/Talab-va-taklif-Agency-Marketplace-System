@@ -124,7 +124,6 @@ export default function SearchScreen() {
                     if (userAge !== null && userAge < 18) {
                         searchProducts = searchProducts.filter((product) => {
                             if (product.censored === true) {
-                                console.log('SearchScreen: Censored product filtered out for user under 18:', product.name);
                                 return false;
                             }
                             return true;
@@ -168,7 +167,6 @@ export default function SearchScreen() {
                     if (userAge !== null && userAge < 18) {
                         filteredProducts = filteredProducts.filter((product) => {
                             if (product.censored === true) {
-                                console.log('SearchScreen: Censored product filtered out for user under 18:', product.name);
                                 return false;
                             }
                             return true;
@@ -181,7 +179,6 @@ export default function SearchScreen() {
                         setProducts(filteredProducts);
                     }
 
-                    console.log(response.results);
                     setPage(response.results.page);
                     setHasMore(response.results.page < response.results.totalPages);
                 } else {
@@ -211,7 +208,6 @@ export default function SearchScreen() {
                     if (userAge !== null && userAge < 18) {
                         allProducts = allProducts.filter((product) => {
                             if (product.censored === true) {
-                                console.log('SearchScreen: Censored product filtered out for user under 18:', product.name);
                                 return false;
                             }
                             return true;

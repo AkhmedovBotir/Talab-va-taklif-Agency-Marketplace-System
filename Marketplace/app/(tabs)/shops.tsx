@@ -350,7 +350,7 @@ export default function CategoriesScreen() {
                 onAddToCart={handleAddToCart}
                 isInCart={isInCart}
             />
-        );
+    );
     };
 
     const renderFooter = () => {

@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart, Receipt, LocationCity, Business, Home, Store } from '@mui/icons-material';
+import { BarChart, Receipt, People, Store, Settings, Person } from '@mui/icons-material';
 import KPIStatisticsSection from '../../components/KPI/KPIStatisticsSection';
 import KPITransactionsSection from '../../components/KPI/KPITransactionsSection';
-import KPIViloyatAgentsSection from '../../components/KPI/KPIViloyatAgentsSection';
-import KPITumanAgentsSection from '../../components/KPI/KPITumanAgentsSection';
-import KPIMfyAgentsSection from '../../components/KPI/KPIMfyAgentsSection';
+import KPIAgentsSection from '../../components/KPI/KPIAgentsSection';
 import KPIPunktsSection from '../../components/KPI/KPIPunktsSection';
+import KPIDistributionSection from '../../components/KPI/KPIDistributionSection';
+import KPIManagersSection from '../../components/KPI/KPIManagersSection';
 
 const TABS = [
+  {
+    id: 'distribution',
+    label: 'Taqsimot',
+    icon: Settings,
+    component: KPIDistributionSection,
+  },
   {
     id: 'statistics',
     label: 'Statistika',
@@ -22,28 +28,22 @@ const TABS = [
     component: KPITransactionsSection,
   },
   {
-    id: 'viloyat-agents',
-    label: 'Viloyat Agentlari',
-    icon: LocationCity,
-    component: KPIViloyatAgentsSection,
-  },
-  {
-    id: 'tuman-agents',
-    label: 'Tuman Agentlari',
-    icon: Business,
-    component: KPITumanAgentsSection,
-  },
-  {
-    id: 'mfy-agents',
-    label: 'MFY Agentlari',
-    icon: Home,
-    component: KPIMfyAgentsSection,
+    id: 'agents',
+    label: 'Agentlar',
+    icon: People,
+    component: KPIAgentsSection,
   },
   {
     id: 'punkts',
     label: 'Punktlar',
     icon: Store,
     component: KPIPunktsSection,
+  },
+  {
+    id: 'managers',
+    label: 'Menejerlar',
+    icon: Person,
+    component: KPIManagersSection,
   },
 ];
 

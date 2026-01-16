@@ -14,17 +14,11 @@ import { apiService, AgentSelection } from '../services/api';
 interface AgentPickerProps {
   selectedAgent: AgentSelection | null;
   onSelect: (agent: AgentSelection) => void;
-  viloyatId?: string;
-  tumanId?: string;
-  mfyId?: string;
 }
 
 export function AgentPicker({
   selectedAgent,
   onSelect,
-  viloyatId,
-  tumanId,
-  mfyId,
 }: AgentPickerProps) {
   const [agents, setAgents] = useState<AgentSelection[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +29,7 @@ export function AgentPicker({
     if (showList) {
       loadAgents();
     }
-  }, [showList, searchQuery, viloyatId, tumanId, mfyId]);
+  }, [showList, searchQuery]);
 
   const loadAgents = async () => {
     setLoading(true);
@@ -45,18 +39,6 @@ export function AgentPicker({
         page: 1,
         limit: 100,
       };
-
-      if (viloyatId) {
-        params.viloyat = viloyatId;
-      }
-
-      if (tumanId) {
-        params.tuman = tumanId;
-      }
-
-      if (mfyId) {
-        params.mfy = mfyId;
-      }
 
       if (searchQuery.trim()) {
         params.search = searchQuery.trim();
@@ -77,19 +59,6 @@ export function AgentPicker({
     setSearchQuery('');
   };
 
-  const getAgentTypeLabel = (type: string) => {
-    switch (type) {
-      case 'viloyat':
-        return 'Viloyat';
-      case 'tuman':
-        return 'Tuman';
-      case 'mfy':
-        return 'MFY';
-      default:
-        return type;
-    }
-  };
-
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -99,7 +68,7 @@ export function AgentPicker({
       >
         <Text style={[styles.selectorText, !selectedAgent && styles.placeholder]} numberOfLines={1}>
           {selectedAgent
-            ? `${selectedAgent.name} (${getAgentTypeLabel(selectedAgent.agentType)})`
+            ? selectedAgent.name
             : 'Agentni tanlang'}
         </Text>
         <Ionicons
@@ -146,23 +115,8 @@ export function AgentPicker({
                   onPress={() => handleSelect(item)}
                 >
                   <View style={styles.itemContent}>
-                    <View style={styles.itemHeader}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <View style={[
-                        styles.typeBadge,
-                        item.agentType === 'viloyat' && styles.typeviloyat,
-                        item.agentType === 'tuman' && styles.typetuman,
-                        item.agentType === 'mfy' && styles.typemfy,
-                      ]}>
-                        <Text style={styles.typeText}>{getAgentTypeLabel(item.agentType)}</Text>
-                      </View>
-                    </View>
+                    <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemPhone}>{item.phone}</Text>
-                    <Text style={styles.itemLocation}>
-                      {item.viloyat.name}
-                      {item.tuman && `, ${item.tuman.name}`}
-                      {item.mfy && `, ${item.mfy.name}`}
-                    </Text>
                   </View>
                   {selectedAgent?._id === item._id && (
                     <Ionicons name="checkmark" size={20} color="#007AFF" />
@@ -255,45 +209,15 @@ const styles = StyleSheet.create({
   itemContent: {
     flex: 1,
   },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 8,
-  },
   itemName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#000',
-    flex: 1,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  typeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  typeviloyat: {
-    backgroundColor: '#FF9500',
-  },
-  typetuman: {
-    backgroundColor: '#007AFF',
-  },
-  typemfy: {
-    backgroundColor: '#34C759',
+    marginBottom: 4,
   },
   itemPhone: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 2,
-  },
-  itemLocation: {
-    fontSize: 12,
-    color: '#999',
   },
   loadingContainer: {
     padding: 20,

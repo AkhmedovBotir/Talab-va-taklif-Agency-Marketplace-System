@@ -42,7 +42,7 @@ export default function SelectRegionsScreen() {
         const parsed: DeliveryRegion[] = JSON.parse(params.selectedRegions);
         loadInitialRegions(parsed);
       } catch (e) {
-        console.error('Error parsing selected regions:', e);
+        // Ignore parsing errors
       }
     }
   }, [params?.selectedRegions]);
@@ -72,12 +72,12 @@ export default function SelectRegionsScreen() {
             loadedRegions.push({ viloyat, tuman });
           }
         } catch (e) {
-          console.error('Error loading region:', e);
+          // Ignore region loading errors
         }
       }
       setSelectedRegions(loadedRegions);
     } catch (e) {
-      console.error('Error loading initial regions:', e);
+      // Ignore initial regions loading errors
     }
   };
 
@@ -91,10 +91,10 @@ export default function SelectRegionsScreen() {
         status: 'active',
       });
 
-      const sortedRegions = [...response.data].sort((a, b) =>
+      const sortedRegions = [...response.data].sort((a, b) => 
         a.name.localeCompare(b.name, 'uz', { sensitivity: 'base' })
       );
-      setRegions(sortedRegions);
+        setRegions(sortedRegions);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Viloyatlarni yuklashda xatolik');
     } finally {
@@ -112,7 +112,7 @@ export default function SelectRegionsScreen() {
         parent: viloyatId,
         status: 'active',
       });
-      const sortedDistricts = [...response.data].sort((a, b) =>
+      const sortedDistricts = [...response.data].sort((a, b) => 
         a.name.localeCompare(b.name, 'uz', { sensitivity: 'base' })
       );
       setDistricts(sortedDistricts);
@@ -205,12 +205,12 @@ export default function SelectRegionsScreen() {
         Alert.alert('Xatolik', error.message || 'Hududlarni saqlashda xatolik yuz berdi');
       }
     } else {
-      router.push({
-        pathname: returnPath as any,
-        params: {
-          selectedRegions: JSON.stringify(deliveryRegions),
-        },
-      });
+    router.push({
+      pathname: returnPath as any,
+      params: {
+        selectedRegions: JSON.stringify(deliveryRegions),
+      },
+    });
     }
   };
 
@@ -292,21 +292,21 @@ export default function SelectRegionsScreen() {
 
       {activeTab === 'selected' ? (
         /* Selected Regions Tab */
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           {selectedRegions.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="location-outline" size={64} color="#D1D5DB" />
               <Text style={styles.emptyStateTitle}>Hududlar tanlanmagan</Text>
               <Text style={styles.emptyStateText}>
                 Yetkazib berish hududlarini tanlash uchun "Hududlar" bo'limiga o'ting
-              </Text>
+                  </Text>
               <TouchableOpacity
                 style={styles.emptyStateButton}
                 onPress={() => setActiveTab('regions')}
               >
                 <Text style={styles.emptyStateButtonText}>Hududlarni tanlash</Text>
               </TouchableOpacity>
-            </View>
+                </View>
           ) : (
             <>
               <View style={styles.selectedHeader}>
@@ -354,12 +354,12 @@ export default function SelectRegionsScreen() {
                   </View>
                   <TouchableOpacity
                     onPress={() => handleRemoveRegion(index)}
-                    style={styles.removeButton}
-                  >
+                  style={styles.removeButton}
+                >
                     <Ionicons name="close-circle" size={28} color="#FF3B30" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+                </TouchableOpacity>
+              </View>
+            ))}
             </>
           )}
         </ScrollView>
@@ -367,21 +367,21 @@ export default function SelectRegionsScreen() {
         /* Regions Selection Tab */
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           {/* Modern Search Bar */}
-          <View style={styles.searchContainer}>
+        <View style={styles.searchContainer}>
             <Ionicons name="search" size={22} color="#8E8E93" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
+          <TextInput
+            style={styles.searchInput}
               placeholder="Viloyat yoki tuman qidirish..."
               placeholderTextColor="#8E8E93"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClear}>
                 <Ionicons name="close-circle" size={22} color="#8E8E93" />
-              </TouchableOpacity>
-            )}
-          </View>
+            </TouchableOpacity>
+          )}
+        </View>
 
           {/* Selected Region Preview */}
           {selectedViloyat && (
@@ -411,13 +411,13 @@ export default function SelectRegionsScreen() {
             </View>
           )}
 
-          {/* Viloyat Selection */}
-          <View style={styles.section}>
+        {/* Viloyat Selection */}
+        <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="map-outline" size={22} color="#1A1A1A" />
-              <Text style={styles.sectionTitle}>Viloyat tanlash</Text>
+          <Text style={styles.sectionTitle}>Viloyat tanlash</Text>
             </View>
-            {loading ? (
+          {loading ? (
               <View style={styles.loaderContainer}>
                 <ActivityIndicator size="large" color="#007AFF" />
               </View>
@@ -429,47 +429,47 @@ export default function SelectRegionsScreen() {
             ) : (
               <View style={styles.regionsGrid}>
                 {filteredRegions.map((item) => (
-                  <TouchableOpacity
+                <TouchableOpacity
                     key={item._id}
-                    style={[
+                  style={[
                       styles.regionCard,
                       selectedViloyat?._id === item._id && styles.regionCardSelected,
-                    ]}
-                    onPress={() => handleViloyatSelect(item)}
-                  >
+                  ]}
+                  onPress={() => handleViloyatSelect(item)}
+                >
                     <Ionicons
                       name={selectedViloyat?._id === item._id ? 'checkmark-circle' : 'location-outline'}
                       size={24}
                       color={selectedViloyat?._id === item._id ? '#007AFF' : '#8E8E93'}
                     />
-                    <Text
-                      style={[
+                  <Text
+                    style={[
                         styles.regionCardText,
                         selectedViloyat?._id === item._id && styles.regionCardTextSelected,
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                  </TouchableOpacity>
+                    ]}
+                  >
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
                 ))}
               </View>
-            )}
-          </View>
+          )}
+        </View>
 
-          {/* Tuman Selection */}
-          {selectedViloyat && (
-            <View style={styles.section}>
+        {/* Tuman Selection */}
+        {selectedViloyat && (
+          <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="location-outline" size={22} color="#1A1A1A" />
-                <Text style={styles.sectionTitle}>Tuman tanlash (ixtiyoriy)</Text>
+            <Text style={styles.sectionTitle}>Tuman tanlash (ixtiyoriy)</Text>
               </View>
-              {loadingDistricts ? (
+            {loadingDistricts ? (
                 <View style={styles.loaderContainer}>
                   <ActivityIndicator size="large" color="#007AFF" />
                 </View>
-              ) : districts.length > 0 ? (
-                <>
-                  <TouchableOpacity
+            ) : districts.length > 0 ? (
+              <>
+                <TouchableOpacity
                     style={[
                       styles.districtOption,
                       selectedTuman === null && styles.districtOptionSelected,
@@ -509,33 +509,33 @@ export default function SelectRegionsScreen() {
                           style={[
                             styles.districtOptionText,
                             selectedTuman?._id === item._id && styles.districtOptionTextSelected,
-                          ]}
-                        >
-                          {item.name}
-                        </Text>
-                      </TouchableOpacity>
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
                     ))}
                   </View>
-                </>
-              ) : (
+              </>
+            ) : (
                 <View style={styles.emptyList}>
                   <Ionicons name="information-circle-outline" size={48} color="#D1D5DB" />
                   <Text style={styles.emptyListText}>
-                    Bu viloyat uchun tumanlar mavjud emas
-                  </Text>
+                Bu viloyat uchun tumanlar mavjud emas
+              </Text>
                 </View>
-              )}
-            </View>
-          )}
+            )}
+          </View>
+        )}
 
-          {/* Add Button */}
-          {selectedViloyat && (
-            <TouchableOpacity style={styles.addButton} onPress={handleAddRegion}>
-              <Ionicons name="add-circle" size={24} color="#fff" />
-              <Text style={styles.addButtonText}>Qo'shish</Text>
-            </TouchableOpacity>
-          )}
-        </ScrollView>
+        {/* Add Button */}
+        {selectedViloyat && (
+          <TouchableOpacity style={styles.addButton} onPress={handleAddRegion}>
+            <Ionicons name="add-circle" size={24} color="#fff" />
+            <Text style={styles.addButtonText}>Qo'shish</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
       )}
     </View>
   );

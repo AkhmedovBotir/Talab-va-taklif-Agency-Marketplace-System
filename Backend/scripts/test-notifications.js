@@ -18,7 +18,7 @@ const ADMIN_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5NDI1OWFhZG
 const notificationTypes = ['info', 'warning', 'success', 'error', 'announcement', 'promotion', 'update'];
 
 // Target types
-const targetTypes = ['all', 'punkts', 'viloyat_agents', 'tuman_agents', 'mfy_agents', 'marketplace_users', 'contragents'];
+const targetTypes = ['all', 'punkts', 'mfy_agents', 'marketplace_users', 'contragents'];
 
 // Test messages
 const testMessages = {
@@ -56,9 +56,7 @@ const testMessages = {
 const targetDescriptions = {
   all: 'Barcha foydalanuvchilar',
   punkts: 'Punktlar',
-  viloyat_agents: 'Viloyat agentlari',
-  tuman_agents: 'Tuman agentlari',
-  mfy_agents: 'MFY agentlari',
+  mfy_agents: 'Agentlar (barcha agentlar)',
   marketplace_users: 'Marketplace foydalanuvchilari',
   contragents: 'Kontragentlar',
 };

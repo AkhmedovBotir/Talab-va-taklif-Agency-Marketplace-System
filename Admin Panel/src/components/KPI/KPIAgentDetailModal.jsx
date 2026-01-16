@@ -10,7 +10,7 @@ const formatNumber = (num) => {
   return new Intl.NumberFormat('uz-UZ').format(num);
 };
 
-const KPIAgentDetailModal = ({ agentId, role, open, onClose }) => {
+const KPIAgentDetailModal = ({ agentId, open, onClose }) => {
   const { showError } = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
@@ -21,7 +21,6 @@ const KPIAgentDetailModal = ({ agentId, role, open, onClose }) => {
     setLoading(true);
     try {
       const response = await kpiAPI.getAgentKPIDetails(agentId, {
-        role,
         page: pagination.page,
         limit: pagination.limit,
       });
@@ -43,12 +42,6 @@ const KPIAgentDetailModal = ({ agentId, role, open, onClose }) => {
   }, [open, agentId, pagination.page]);
 
   if (!open) return null;
-
-  const roleLabels = {
-    viloyat: 'Viloyat',
-    tuman: 'Tuman',
-    mfy: 'MFY',
-  };
 
   return (
     <AnimatePresence>
@@ -74,7 +67,7 @@ const KPIAgentDetailModal = ({ agentId, role, open, onClose }) => {
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div>
               <h2 className="text-xl font-bold text-gray-800">
-                {roleLabels[data?.role] || ''} Agent KPI Tafsilotlari
+                Agent KPI Tafsilotlari
               </h2>
               <p className="text-sm text-gray-500">{data?.agent?.name || 'Yuklanmoqda...'}</p>
             </div>

@@ -185,13 +185,7 @@ const AssignToAgentModal = ({ open, onClose, onSuccess, certificateData, certifi
   };
 
   const positionType = getPositionType();
-  const positionTypeLabel = positionType === 'mfy_agent' 
-    ? 'MFY Agent' 
-    : positionType === 'tuman_agent' 
-    ? 'Tuman Agent' 
-    : positionType === 'viloyat_agent'
-    ? 'Viloyat Agent'
-    : 'Agent turi avtomatik aniqlanadi';
+  const positionTypeLabel = positionType ? 'Agent' : 'Agent turi avtomatik aniqlanadi';
 
   return (
     <AnimatePresence>
@@ -322,7 +316,7 @@ const AssignToAgentModal = ({ open, onClose, onSuccess, certificateData, certifi
                       </div>
                     </div>
                     <p className="bg-gray-100 p-2 rounded-md border border-l-4 border-blue-500 pl-6 text-xs text-gray-500 mt-2">
-                      Agent turi avtomatik aniqlanadi: faqat viloyat → Viloyat Agent, viloyat + tuman → Tuman Agent, viloyat + tuman + MFY → MFY Agent
+                      Agent turi avtomatik aniqlanadi
                     </p>
                     {positionType && (
                       <p className="text-sm text-indigo-600 font-medium mt-2">

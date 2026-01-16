@@ -15,7 +15,6 @@ const Agents = () => {
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('viloyat'); // 'viloyat', 'tuman', 'mfy'
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -26,7 +25,6 @@ const Agents = () => {
   // Filters
   const [filters, setFilters] = useState({
     status: '',
-    agentType: 'viloyat',
     search: '',
     viloyat: '',
     tuman: '',
@@ -48,7 +46,6 @@ const Agents = () => {
       const params = {
         page: pagination.page,
         limit: pagination.limit,
-        agentType: filters.agentType || undefined,
       };
 
       if (filters.status) params.status = filters.status;
@@ -77,35 +74,10 @@ const Agents = () => {
     }
   };
 
-  // Update agentType when tab changes
-  useEffect(() => {
-    setFilters(prev => {
-      const newFilters = {
-        ...prev,
-        agentType: activeTab,
-      };
-      
-      // Clear region filters based on active tab
-      if (activeTab === 'viloyat') {
-        // Keep viloyat, clear tuman and mfy
-        newFilters.tuman = '';
-        newFilters.mfy = '';
-      } else if (activeTab === 'tuman') {
-        // Keep viloyat and tuman, clear mfy
-        newFilters.mfy = '';
-      } else if (activeTab === 'mfy') {
-        // Keep all filters
-      }
-      
-      return newFilters;
-    });
-    setPagination(prev => ({ ...prev, page: 1 }));
-  }, [activeTab]);
-
   useEffect(() => {
     fetchAgents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, pagination.limit, filters.status, filters.agentType, filters.viloyat, filters.tuman, filters.mfy]);
+  }, [pagination.page, pagination.limit, filters.status, filters.viloyat, filters.tuman, filters.mfy]);
 
   const handleCreateSuccess = () => {
     setCreateModalOpen(false);
@@ -163,7 +135,6 @@ const Agents = () => {
       viloyat: '',
       tuman: '',
       mfy: '',
-      agentType: activeTab,
       search: '',
     });
     setPagination({ ...pagination, page: 1 });
@@ -283,134 +254,47 @@ const Agents = () => {
         </div>
       </motion.div>
 
-      {/* Tab Navigation */}
+      {/* Region Filters */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6"
+        className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6"
       >
-        <div className="border-b border-gray-200">
-          <nav className="flex overflow-x-auto scrollbar-hide" aria-label="Tabs">
-            <div className="flex min-w-max">
-              <button
-                onClick={() => setActiveTab('viloyat')}
-                className={`
-                  px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200
-                  ${
-                    activeTab === 'viloyat'
-                      ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                  }
-                `}
-              >
-                Viloyat Agentlari
-              </button>
-              <button
-                onClick={() => setActiveTab('tuman')}
-                className={`
-                  px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200
-                  ${
-                    activeTab === 'tuman'
-                      ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                  }
-                `}
-              >
-                Tuman Agentlari
-              </button>
-              <button
-                onClick={() => setActiveTab('mfy')}
-                className={`
-                  px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-all duration-200
-                  ${
-                    activeTab === 'mfy'
-                      ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                  }
-                `}
-              >
-                MFY Agentlari
-              </button>
-            </div>
-          </nav>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-gray-700">Hudud Filterlari</h3>
         </div>
-
-        {/* Tab-specific Filters */}
-        <div className="p-4 bg-gray-50 border-t border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {activeTab === 'viloyat' && (
-              <div>
-                <RegionSelect
-                  name="viloyat"
-                  value={filters.viloyat}
-                  onChange={handleViloyatChange}
-                  label="Viloyat"
-                  type="region"
-                />
-              </div>
-            )}
-
-            {activeTab === 'tuman' && (
-              <>
-                <div>
-                  <RegionSelect
-                    name="viloyat"
-                    value={filters.viloyat}
-                    onChange={handleViloyatChange}
-                    label="Viloyat"
-                    type="region"
-                  />
-                </div>
-                <div>
-                  <RegionSelect
-                    name="tuman"
-                    value={filters.tuman}
-                    onChange={handleTumanChange}
-                    label="Tuman"
-                    type="district"
-                    parentId={filters.viloyat || undefined}
-                    disabled={!filters.viloyat}
-                  />
-                </div>
-              </>
-            )}
-
-            {activeTab === 'mfy' && (
-              <>
-                <div>
-                  <RegionSelect
-                    name="viloyat"
-                    value={filters.viloyat}
-                    onChange={handleViloyatChange}
-                    label="Viloyat"
-                    type="region"
-                  />
-                </div>
-                <div>
-                  <RegionSelect
-                    name="tuman"
-                    value={filters.tuman}
-                    onChange={handleTumanChange}
-                    label="Tuman"
-                    type="district"
-                    parentId={filters.viloyat || undefined}
-                    disabled={!filters.viloyat}
-                  />
-                </div>
-                <div>
-                  <RegionSelect
-                    name="mfy"
-                    value={filters.mfy}
-                    onChange={handleMfyChange}
-                    label="MFY"
-                    type="mfy"
-                    parentId={filters.tuman || undefined}
-                    disabled={!filters.tuman}
-                  />
-                </div>
-              </>
-            )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <RegionSelect
+              name="viloyat"
+              value={filters.viloyat}
+              onChange={handleViloyatChange}
+              label="Viloyat"
+              type="region"
+            />
+          </div>
+          <div>
+            <RegionSelect
+              name="tuman"
+              value={filters.tuman}
+              onChange={handleTumanChange}
+              label="Tuman"
+              type="district"
+              parentId={filters.viloyat || undefined}
+              disabled={!filters.viloyat}
+            />
+          </div>
+          <div>
+            <RegionSelect
+              name="mfy"
+              value={filters.mfy}
+              onChange={handleMfyChange}
+              label="MFY"
+              type="mfy"
+              parentId={filters.tuman || undefined}
+              disabled={!filters.tuman}
+            />
           </div>
         </div>
       </motion.div>
@@ -432,7 +316,6 @@ const Agents = () => {
         pagination={pagination}
         onPageChange={handlePageChange}
         onStatusChange={fetchAgents}
-        activeTab={activeTab}
       />
 
       {/* Modals */}

@@ -24,7 +24,6 @@ const ArchivedAgents = () => {
     viloyat: '',
     tuman: '',
     mfy: '',
-    agentType: '',
   });
 
   const fetchAgents = useCallback(async () => {
@@ -39,7 +38,6 @@ const ArchivedAgents = () => {
       if (filters.viloyat) params.viloyat = filters.viloyat;
       if (filters.tuman) params.tuman = filters.tuman;
       if (filters.mfy) params.mfy = filters.mfy;
-      if (filters.agentType) params.agentType = filters.agentType;
 
       const response = await archiveAPI.getArchivedAgents(params);
 
@@ -65,7 +63,6 @@ const ArchivedAgents = () => {
     filters.viloyat,
     filters.tuman,
     filters.mfy,
-    filters.agentType,
     showError,
   ]);
 
@@ -87,7 +84,6 @@ const ArchivedAgents = () => {
       viloyat: '',
       tuman: '',
       mfy: '',
-      agentType: '',
     });
     setPagination({ ...pagination, page: 1 });
   };
@@ -116,24 +112,6 @@ const ArchivedAgents = () => {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-          </div>
-
-          {/* Agent Type Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Agent turi</label>
-            <select
-              value={filters.agentType}
-              onChange={(e) => {
-                setFilters({ ...filters, agentType: e.target.value });
-                setPagination({ ...pagination, page: 1 });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Barchasi</option>
-              <option value="viloyat">Viloyat agenti</option>
-              <option value="tuman">Tuman agenti</option>
-              <option value="mfy">MFY agenti</option>
-            </select>
           </div>
 
           {/* Viloyat Filter */}

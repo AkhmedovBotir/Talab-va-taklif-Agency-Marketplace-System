@@ -22,7 +22,7 @@ export default function OrderDetailsScreen() {
   const [confirming, setConfirming] = useState(false);
   const [markingDelivered, setMarkingDelivered] = useState(false);
   const router = useRouter();
-  const { role, agent } = useAuth();
+  const { agent } = useAuth();
 
   useEffect(() => {
     loadOrder();
@@ -119,11 +119,11 @@ export default function OrderDetailsScreen() {
   };
 
   const canConfirm = () => {
-    if (!order) return false;
-    // MFY agent uchun: faqat assigned_to_agent status'ida va hali tasdiqlanmagan bo'lsa
+    if (!order || !agent) return false;
+    // Agent uchun: faqat assigned_to_agent status'ida va hali tasdiqlanmagan bo'lsa
     return (
-      role === 'mfy' &&
       order.status === 'assigned_to_agent' &&
+      order.assignedToAgent?._id === agent._id &&
       !order.agentConfirmedAt
     );
   };
@@ -131,7 +131,6 @@ export default function OrderDetailsScreen() {
   const canMarkDelivered = () => {
     if (!order || !agent) return false;
     return (
-      role === 'mfy' &&
       order.assignedToAgent?._id === agent._id &&
       order.confirmedByAgent !== null &&
       !order.deliveredAt
@@ -277,12 +276,16 @@ export default function OrderDetailsScreen() {
           <View style={styles.infoRow}>
             <Ionicons name="person" size={20} color="#007AFF" />
             <Text style={styles.infoLabel}>Ism:</Text>
-            <Text style={styles.infoValue}>{order.user.name}</Text>
+            <Text style={styles.infoValue}>
+              {order.user?.name || 'Mijoz'}
+            </Text>
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="call" size={20} color="#007AFF" />
             <Text style={styles.infoLabel}>Telefon:</Text>
-            <Text style={styles.infoValue}>{order.phoneNumber}</Text>
+            <Text style={styles.infoValue}>
+              {order.phoneNumber || order.user?.phone}
+            </Text>
           </View>
         </View>
       </View>
@@ -306,22 +309,54 @@ export default function OrderDetailsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mahsulotlar</Text>
-        {order.items.map((item, index) => (
-          <View key={index} style={styles.itemCard}>
-            <View style={styles.itemHeader}>
-              <Text style={styles.itemName}>{item.product.name}</Text>
-              <Text style={styles.itemQuantity}>x{item.quantity}</Text>
+        {order.items.map((item, index) => {
+          // Product ma'lumotlarini to'g'ri ko'rsatish
+          const productName = typeof item.product === 'object' && item.product?.name 
+            ? item.product.name 
+            : (item as any).productModel || (item as any).productType || 'Mahsulot';
+          
+          const productInfo = typeof item.product === 'object' && item.product
+            ? `Narxi: ${(item.product.price || 0).toLocaleString()} so'm`
+            : (item as any).productType 
+              ? `${(item as any).productType} - ${(item as any).productModel || ''}`
+              : '';
+
+          return (
+            <View key={index} style={styles.itemCard}>
+              <View style={styles.itemHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.itemName}>{productName}</Text>
+                  {productInfo && (
+                    <Text style={styles.itemInfo}>{productInfo}</Text>
+                  )}
+                </View>
+                <Text style={styles.itemQuantity}>x{item.quantity}</Text>
+              </View>
+              <View style={styles.itemFooter}>
+                <View>
+                  <Text style={styles.itemPrice}>
+                    Birlik narxi: {(item.price || 0).toLocaleString()} so'm
+                  </Text>
+                  {item.originalPrice && (
+                    <Text style={styles.itemOriginalPrice}>
+                      Asl narx: {(item.originalPrice || 0).toLocaleString()} so'm
+                    </Text>
+                  )}
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.itemTotal}>
+                    Jami: {((item.price || 0) * (item.quantity || 0)).toLocaleString()} so'm
+                  </Text>
+                  {(item as any).kpiBonusPercent && (
+                    <Text style={styles.itemKpi}>
+                      KPI: {(item as any).kpiBonusPercent}%
+                    </Text>
+                  )}
+                </View>
+              </View>
             </View>
-            <View style={styles.itemFooter}>
-              <Text style={styles.itemPrice}>
-                {item.price.toLocaleString()} so'm
-              </Text>
-              <Text style={styles.itemTotal}>
-                Jami: {(item.price * item.quantity).toLocaleString()} so'm
-              </Text>
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       <View style={styles.section}>
@@ -342,7 +377,7 @@ export default function OrderDetailsScreen() {
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Jami summa:</Text>
             <Text style={styles.totalValue}>
-              {order.totalPrice.toLocaleString()} so'm
+              {(order.totalPrice || 0).toLocaleString()} so'm
             </Text>
           </View>
         </View>
@@ -422,15 +457,55 @@ export default function OrderDetailsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Joriy punkt</Text>
           <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Ionicons name="storefront" size={20} color="#007AFF" />
-              <Text style={styles.infoValue}>{order.currentPunkt.name}</Text>
-            </View>
-            {order.currentPunkt.phone && (
-              <View style={styles.infoRow}>
-                <Ionicons name="call" size={20} color="#007AFF" />
-                <Text style={styles.infoValue}>{order.currentPunkt.phone}</Text>
-              </View>
+            {typeof order.currentPunkt === 'object' ? (
+              <>
+                <View style={styles.infoRow}>
+                  <Ionicons name="storefront" size={20} color="#007AFF" />
+                  <Text style={styles.infoValue}>{order.currentPunkt.name}</Text>
+                </View>
+                {order.currentPunkt.phone && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="call" size={20} color="#007AFF" />
+                    <Text style={styles.infoValue}>{order.currentPunkt.phone}</Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {/* ID bo'lsa, confirmedByPunkt yoki assignedByPunkt'dan nom olishga harakat qilamiz */}
+                {(() => {
+                  const punktId = order.currentPunkt;
+                  const punkt = order.confirmedByPunkt?._id === punktId 
+                    ? order.confirmedByPunkt 
+                    : order.assignedByPunkt?._id === punktId 
+                      ? order.assignedByPunkt 
+                      : null;
+                  
+                  if (punkt) {
+                    return (
+                      <>
+                        <View style={styles.infoRow}>
+                          <Ionicons name="storefront" size={20} color="#007AFF" />
+                          <Text style={styles.infoValue}>{punkt.name}</Text>
+                        </View>
+                        {punkt.phone && (
+                          <View style={styles.infoRow}>
+                            <Ionicons name="call" size={20} color="#007AFF" />
+                            <Text style={styles.infoValue}>{punkt.phone}</Text>
+                          </View>
+                        )}
+                      </>
+                    );
+                  } else {
+                    return (
+                      <View style={styles.infoRow}>
+                        <Ionicons name="storefront" size={20} color="#007AFF" />
+                        <Text style={styles.infoValue}>Punkt ID: {punktId}</Text>
+                      </View>
+                    );
+                  }
+                })()}
+              </>
             )}
           </View>
         </View>
@@ -673,15 +748,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     flex: 1,
+    marginBottom: 4,
+  },
+  itemInfo: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   itemQuantity: {
     fontSize: 16,
     color: '#666',
+    fontWeight: '600',
   },
   itemFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
@@ -690,11 +772,23 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 4,
+  },
+  itemOriginalPrice: {
+    fontSize: 12,
+    color: '#999',
+    textDecorationLine: 'line-through',
   },
   itemTotal: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 4,
+  },
+  itemKpi: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '500',
   },
   summaryRow: {
     flexDirection: 'row',

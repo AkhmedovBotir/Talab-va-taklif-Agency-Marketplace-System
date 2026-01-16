@@ -83,6 +83,39 @@ export default function ProductDetailScreen() {
             
             const loadedProduct = response.data;
             
+            // Check if category is just an ID string or an object
+            const categoryId = typeof loadedProduct.category === 'string' 
+                ? loadedProduct.category 
+                : loadedProduct.category?._id || loadedProduct.category?.id;
+            
+            const subcategoryId = typeof loadedProduct.subcategory === 'string' 
+                ? loadedProduct.subcategory 
+                : loadedProduct.subcategory?._id || loadedProduct.subcategory?.id;
+            
+            // Load category details if category is just an ID
+            if (categoryId && typeof loadedProduct.category === 'string') {
+                try {
+                    const categoryResponse = await apiService.getCategoryById(categoryId, true);
+                    if (categoryResponse.success && categoryResponse.data) {
+                        loadedProduct.category = categoryResponse.data;
+                    }
+                } catch (error) {
+                    // Category loading failed, continue with ID
+                }
+            }
+            
+            // Load subcategory details if subcategory is just an ID
+            if (subcategoryId && typeof loadedProduct.subcategory === 'string') {
+                try {
+                    const subcategoryResponse = await apiService.getCategoryById(subcategoryId, false);
+                    if (subcategoryResponse.success && subcategoryResponse.data) {
+                        loadedProduct.subcategory = subcategoryResponse.data;
+                    }
+                } catch (error) {
+                    // Subcategory loading failed, continue with ID
+                }
+            }
+            
             // Add productType if not present
             if (!loadedProduct.productType) {
                 // Determine productType based on API endpoint or product properties
@@ -93,7 +126,6 @@ export default function ProductDetailScreen() {
             // Check if product is censored and user is under 18
             const userAge = calculateAge(user?.birthDate);
             if (userAge !== null && userAge < 18 && loadedProduct.censored === true) {
-                console.log('ProductDetailScreen: Censored product blocked for user under 18:', loadedProduct.name);
                 Alert.alert(
                     'Kirish taqiqlangan',
                     'Bu mahsulot 18 yoshdan kichik foydalanuvchilar uchun taqiqlangan.',
@@ -211,11 +243,20 @@ export default function ProductDetailScreen() {
     // Table data rows
     const tableRows = [
         { label: 'Narxi', value: formatPrice(product.price) },
-        { label: 'Miqdori', value: `${product.quantity} ${product.unit}` },
-        { label: 'O\'lchami', value: product.unitSize ? `${product.unitSize} ${product.unit}` : 'N/A' },
-        { label: 'Sotuvchi', value: product.contragent.name },
-        { label: 'Kategoriya', value: product.category.name + (product.subcategory ? ` → ${product.subcategory.name}` : '') },
+        { label: 'Asl narxi', value: product.originalPrice ? formatPrice(product.originalPrice) : 'N/A' },
+        { label: 'Miqdori', value: `${product.quantity || 0} ${product.unit || 'dona'}` },
+        { label: 'O\'lchami', value: product.unitSize ? `${product.unitSize} ${product.unit || 'dona'}` : 'N/A' },
     ];
+
+    // Add category and subcategory
+    if (product.category) {
+        const categoryName = product.category.name || 'N/A';
+        const subcategoryName = product.subcategory?.name;
+        tableRows.push({ 
+            label: 'Kategoriya', 
+            value: subcategoryName ? `${categoryName} → ${subcategoryName}` : categoryName 
+        });
+    }
 
     return (
         <View style={styles.container}>
@@ -360,19 +401,34 @@ export default function ProductDetailScreen() {
                     )}
 
                     {/* Delivery Regions */}
-                    {product.deliveryRegions && product.deliveryRegions.length > 0 && (
+                    {product.deliveryRegions && product.deliveryRegions.length > 0 ? (
                         <View style={styles.deliverySection}>
                             <Text style={styles.sectionTitle}>Yetkazib berish hududlari</Text>
                             {product.deliveryRegions.map((region, index) => (
                                 <View key={index} style={styles.deliveryRegion}>
                                     <Ionicons name="checkmark-circle" size={16} color="#007AFF" />
                                     <Text style={styles.deliveryText}>
-                                        {region.viloyat.name}
-                                        {region.tuman && `, ${region.tuman.name}`}
+                                        {region.viloyat?.name || ''}
+                                        {region.tuman?.name && `, ${region.tuman.name}`}
                                     </Text>
                                 </View>
                             ))}
                         </View>
+                    ) : (
+                        // If no deliveryRegions, show contragent location
+                        product.contragent && (product.contragent.viloyat || product.contragent.tuman) && (
+                            <View style={styles.deliverySection}>
+                                <Text style={styles.sectionTitle}>Yetkazib berish hududi</Text>
+                                <View style={styles.deliveryRegion}>
+                                    <Ionicons name="location" size={16} color="#007AFF" />
+                                    <Text style={styles.deliveryText}>
+                                        {product.contragent.viloyat?.name || ''}
+                                        {product.contragent.tuman?.name && `, ${product.contragent.tuman.name}`}
+                                        {product.contragent.mfy?.name && `, ${product.contragent.mfy.name}`}
+                                    </Text>
+                                </View>
+                            </View>
+                        )
                     )}
                 </View>
             </ScrollView>

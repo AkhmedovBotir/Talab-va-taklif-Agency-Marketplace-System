@@ -82,7 +82,6 @@ export default function ProductViewScreen() {
     try {
       const response = await apiService.getProductById(productId);
       setProduct(response.data);
-      console.log('Product response:', response.data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Maxsulotni yuklashda xatolik');
       router.back();

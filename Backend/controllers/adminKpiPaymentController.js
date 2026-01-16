@@ -2,6 +2,7 @@ const KpiBonusTransaction = require('../models/KpiBonusTransaction');
 const KpiPaymentDistribution = require('../models/KpiPaymentDistribution');
 const Agent = require('../models/Agent');
 const Punkt = require('../models/Punkt');
+const ViloyatManager = require('../models/ViloyatManager');
 const Notification = require('../models/Notification');
 const { getIO } = require('../config/socket');
 
@@ -20,9 +21,7 @@ const getUnpaidPayments = async (req, res) => {
       filter.recipientType = recipientType;
     }
 
-    if (agentType) {
-      filter.agentType = agentType;
-    }
+    // agentType filter is deprecated - all agents are the same now
 
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -48,7 +47,7 @@ const getUnpaidPayments = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Populate mfy separately for agents only
+    // Populate mfy separately for agents only, viloyat for managers
     for (const payment of payments) {
       if (payment.recipientType === 'agent' && payment.recipient) {
         await payment.populate({
@@ -65,6 +64,17 @@ const getUnpaidPayments = async (req, res) => {
             },
             {
               path: 'mfy',
+              select: 'name type code',
+            },
+          ],
+        });
+      } else if (payment.recipientType === 'manager' && payment.recipient) {
+        await payment.populate({
+          path: 'recipient',
+          select: 'name phone viloyat',
+          populate: [
+            {
+              path: 'viloyat',
               select: 'name type code',
             },
           ],
@@ -135,9 +145,7 @@ const getUnpaidPaymentsGrouped = async (req, res) => {
       matchFilter.recipientType = recipientType;
     }
 
-    if (agentType) {
-      matchFilter.agentType = agentType;
-    }
+    // agentType filter is deprecated - all agents are the same now
 
     // Group by recipient
     const grouped = await KpiPaymentDistribution.aggregate([
@@ -147,7 +155,6 @@ const getUnpaidPaymentsGrouped = async (req, res) => {
           _id: {
             recipient: '$recipient',
             recipientType: '$recipientType',
-            agentType: '$agentType',
           },
           totalAmount: { $sum: '$amount' },
           paymentsCount: { $sum: 1 },
@@ -170,18 +177,21 @@ const getUnpaidPaymentsGrouped = async (req, res) => {
             .populate('viloyat', 'name type code')
             .populate('tuman', 'name type code')
             .populate('mfy', 'name type code')
-            .select('name phone viloyat tuman mfy agentType');
+            .select('name phone viloyat tuman mfy');
         } else if (group._id.recipientType === 'punkt') {
           recipient = await Punkt.findById(recipientId)
             .populate('viloyat', 'name type code')
             .populate('tuman', 'name type code')
             .select('name phone viloyat tuman');
+        } else if (group._id.recipientType === 'manager') {
+          recipient = await ViloyatManager.findById(recipientId)
+            .populate('viloyat', 'name type code')
+            .select('name phone viloyat');
         }
 
         return {
           recipient,
           recipientType: group._id.recipientType,
-          agentType: group._id.agentType,
           totalAmount: group.totalAmount,
           paymentsCount: group.paymentsCount,
         };
@@ -313,18 +323,14 @@ const markPaymentsAsPaid = async (req, res) => {
     for (const payment of updatedPayments) {
       if (!payment.recipient) continue;
 
-      // Determine targetType based on recipientType and agentType
+      // Determine targetType based on recipientType
       let targetType = null;
       if (payment.recipientType === 'agent') {
-        if (payment.agentType === 'viloyat') {
-          targetType = 'viloyat_agents';
-        } else if (payment.agentType === 'tuman') {
-          targetType = 'tuman_agents';
-        } else if (payment.agentType === 'mfy') {
-          targetType = 'mfy_agents';
-        }
+        targetType = 'mfy_agents'; // All agents use mfy_agents room (backward compatibility)
       } else if (payment.recipientType === 'punkt') {
         targetType = 'punkts';
+      } else if (payment.recipientType === 'manager') {
+        targetType = 'viloyat_managers';
       }
 
       if (!targetType) continue;
@@ -353,7 +359,7 @@ const markPaymentsAsPaid = async (req, res) => {
           type: 'success',
           targetType,
           targetIds: [payment.recipient._id],
-          targetRefModel: payment.recipientType === 'agent' ? 'Agent' : 'Punkt',
+          targetRefModel: payment.recipientType === 'agent' ? 'Agent' : payment.recipientType === 'manager' ? 'ViloyatManager' : 'Punkt',
           sentBy: admin._id,
         });
 
@@ -374,9 +380,14 @@ const markPaymentsAsPaid = async (req, res) => {
           io.to(targetType).emit('notification:new', eventData);
 
           // Emit to specific user
-          const userRoom = payment.recipientType === 'agent' 
-            ? `agent:${payment.recipient._id}` 
-            : `punkt:${payment.recipient._id}`;
+          let userRoom = '';
+          if (payment.recipientType === 'agent') {
+            userRoom = `agent:${payment.recipient._id}`;
+          } else if (payment.recipientType === 'manager') {
+            userRoom = `viloyat_manager:${payment.recipient._id}`;
+          } else {
+            userRoom = `punkt:${payment.recipient._id}`;
+          }
           io.to(userRoom).emit('notification:new', eventData);
         }
       } catch (notifError) {
@@ -461,17 +472,8 @@ const getPaymentStatistics = async (req, res) => {
       },
     ]);
 
-    // By agent type
-    const byAgentType = await KpiPaymentDistribution.aggregate([
-      { $match: { status: 'pending', recipientType: 'agent' } },
-      {
-        $group: {
-          _id: '$agentType',
-          totalAmount: { $sum: '$amount' },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+    // By agent type (deprecated - all agents are the same now)
+    const byAgentType = []; // No longer grouping by agentType
 
     res.status(200).json({
       success: true,
@@ -529,9 +531,7 @@ const getPaidPayments = async (req, res) => {
       filter.recipientType = recipientType;
     }
 
-    if (agentType) {
-      filter.agentType = agentType;
-    }
+    // agentType filter is deprecated - all agents are the same now
 
     if (startDate || endDate) {
       filter.paidAt = {};
@@ -569,7 +569,7 @@ const getPaidPayments = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Populate mfy separately for agents only
+    // Populate mfy separately for agents only, viloyat for managers
     for (const payment of payments) {
       if (payment.recipientType === 'agent' && payment.recipient) {
         await payment.populate({
@@ -586,6 +586,17 @@ const getPaidPayments = async (req, res) => {
             },
             {
               path: 'mfy',
+              select: 'name type code',
+            },
+          ],
+        });
+      } else if (payment.recipientType === 'manager' && payment.recipient) {
+        await payment.populate({
+          path: 'recipient',
+          select: 'name phone viloyat',
+          populate: [
+            {
+              path: 'viloyat',
               select: 'name type code',
             },
           ],
@@ -628,11 +639,8 @@ const syncKpiPayments = async (req, res) => {
       isPaid: false,
     })
       .populate('recipients.punkt')
-      .populate('recipients.viloyatAgent')
-      .populate('recipients.tumanAgent')
-      .populate('recipients.mfyAgent')
-      .populate('recipients.fromPunkt')
-      .populate('recipients.toPunkt');
+      .populate('recipients.agent')
+      .populate('recipients.manager');
 
     const createdPayments = [];
     const updatedPayments = [];
@@ -651,63 +659,25 @@ const syncKpiPayments = async (req, res) => {
         );
       }
 
-      // Process viloyat agent
-      if (transaction.recipients.viloyatAgent && transaction.amounts.viloyatAgent > 0) {
+      // Process agent
+      if (transaction.recipients.agent && transaction.amounts.agent > 0) {
         await processPayment(
           'agent',
-          transaction.recipients.viloyatAgent._id,
-          transaction.amounts.viloyatAgent,
+          transaction.recipients.agent._id,
+          transaction.amounts.agent,
           transaction._id,
           createdPayments,
           updatedPayments,
-          'viloyat'
+          null // No agentType anymore
         );
       }
 
-      // Process tuman agent
-      if (transaction.recipients.tumanAgent && transaction.amounts.tumanAgent > 0) {
+      // Process manager
+      if (transaction.recipients.manager && transaction.amounts.manager > 0) {
         await processPayment(
-          'agent',
-          transaction.recipients.tumanAgent._id,
-          transaction.amounts.tumanAgent,
-          transaction._id,
-          createdPayments,
-          updatedPayments,
-          'tuman'
-        );
-      }
-
-      // Process MFY agent
-      if (transaction.recipients.mfyAgent && transaction.amounts.mfyAgent > 0) {
-        await processPayment(
-          'agent',
-          transaction.recipients.mfyAgent._id,
-          transaction.amounts.mfyAgent,
-          transaction._id,
-          createdPayments,
-          updatedPayments,
-          'mfy'
-        );
-      }
-
-      // Process fromPunkt (transfer)
-      if (transaction.recipients.fromPunkt && transaction.recipients.fromPunktAmount > 0) {
-        await processPayment(
-          'punkt',
-          transaction.recipients.fromPunkt._id,
-          transaction.recipients.fromPunktAmount,
-          transaction._id,
-          createdPayments,
-          updatedPayments
-        );
-      }
-
-      // Process toPunkt (transfer)
-      if (transaction.recipients.toPunkt && transaction.recipients.toPunktAmount > 0) {
-        await processPayment(
-          'punkt',
-          transaction.recipients.toPunkt._id,
-          transaction.recipients.toPunktAmount,
+          'manager',
+          transaction.recipients.manager._id,
+          transaction.amounts.manager,
           transaction._id,
           createdPayments,
           updatedPayments
@@ -743,14 +713,13 @@ async function processPayment(
   kpiTransactionId,
   createdPayments,
   updatedPayments,
-  agentType = null
+  agentType = null // Deprecated - no longer used
 ) {
   // Check if payment already exists for this recipient (pending status)
   const existingPayment = await KpiPaymentDistribution.findOne({
     recipientType,
     recipient: recipientId,
     status: 'pending',
-    ...(agentType && { agentType }),
   });
 
   if (existingPayment) {
@@ -766,11 +735,17 @@ async function processPayment(
     }
   } else {
     // Create new payment
+    let recipientModel = 'Punkt';
+    if (recipientType === 'agent') {
+      recipientModel = 'Agent';
+    } else if (recipientType === 'manager') {
+      recipientModel = 'ViloyatManager';
+    }
+
     const newPayment = new KpiPaymentDistribution({
       recipientType,
       recipient: recipientId,
-      recipientModel: recipientType === 'agent' ? 'Agent' : 'Punkt',
-      agentType,
+      recipientModel,
       amount,
       status: 'pending',
       kpiTransactions: [kpiTransactionId],

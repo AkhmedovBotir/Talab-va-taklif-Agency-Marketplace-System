@@ -59,6 +59,7 @@ const menuItems = [
       { icon: Business, label: 'Kontragentlar', path: '/dashboard/contragents' },
       { icon: AssignmentInd, label: 'Agentlar', path: '/dashboard/agents' },
       { icon: LocationOn, label: 'Punktlar', path: '/dashboard/punkts' },
+      { icon: Person, label: 'Menejerlar', path: '/dashboard/managers' },
       { icon: Archive, label: 'Arxiv', path: '/dashboard/archive' },
     ],
   },

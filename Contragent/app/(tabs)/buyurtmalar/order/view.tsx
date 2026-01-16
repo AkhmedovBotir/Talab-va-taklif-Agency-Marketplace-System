@@ -28,8 +28,110 @@ export default function OrderViewScreen() {
 
     try {
       const response = await apiService.getContragentOrderById(orderId);
-      console.log(response.data);
-      setOrder(response.data);
+      
+      // Check if products are populated or just IDs
+      const order = response.data;
+      
+      // Helper function to shorten base64 images in console
+      const shortenBase64Images = (obj: any): any => {
+        if (typeof obj !== 'object' || obj === null) return obj;
+        if (Array.isArray(obj)) {
+          return obj.map(shortenBase64Images);
+        }
+        const result: any = {};
+        for (const key in obj) {
+          if (typeof obj[key] === 'string' && obj[key].startsWith('data:image')) {
+            // Shorten base64 images to first 50 chars + "..."
+            result[key] = obj[key].substring(0, 50) + '... [base64 truncated]';
+          } else if (typeof obj[key] === 'object') {
+            result[key] = shortenBase64Images(obj[key]);
+          } else {
+            result[key] = obj[key];
+          }
+        }
+        return result;
+      };
+      
+      // Log order data with shortened base64 images
+      console.log('=== ORDER BY ID ===');
+      console.log('Order ID:', orderId);
+      console.log('Full Order Data:', JSON.stringify(shortenBase64Images(order), null, 2));
+      console.log('=== ORDER ITEMS DETAILS ===');
+      order.items?.forEach((item: any, index: number) => {
+        console.log(`Item ${index + 1}:`, {
+          product: typeof item.product === 'string' ? item.product : {
+            _id: item.product?._id,
+            name: item.product?.name,
+            productCode: item.product?.productCode,
+            price: item.product?.price,
+            images: item.product?.images?.map((img: string) => 
+              typeof img === 'string' && img.startsWith('data:image') 
+                ? img.substring(0, 50) + '... [base64 truncated]'
+                : img
+            )
+          },
+          quantity: item.quantity,
+          price: item.price,
+          originalPrice: item.originalPrice,
+          kpiBonusPercent: item.kpiBonusPercent,
+          calculatedKpiAmount: item.originalPrice && item.price 
+            ? (item.price - item.originalPrice) * item.quantity 
+            : 0,
+          itemTotal: item.price * item.quantity
+        });
+      });
+      console.log('=== ORDER TOTALS ===');
+      console.log('totalPrice:', order.totalPrice);
+      console.log('totalOriginalPrice:', order.totalOriginalPrice);
+      console.log('totalKpiPrice (KPI summa):', order.totalKpiPrice);
+      
+      // Calculate totals for console
+      const requestedItemsForCalc = order.items || [];
+      let totalGrossProfit = 0;
+      requestedItemsForCalc.forEach((item: any) => {
+        if (item.originalPrice && item.price) {
+          totalGrossProfit += (item.price - item.originalPrice) * item.quantity;
+        }
+      });
+      const netProfit = totalGrossProfit - (order.totalKpiPrice || 0);
+      console.log('totalGrossProfit (Umumiy foyda):', totalGrossProfit);
+      console.log('netProfit (Sof foyda = Umumiy foyda - KPI summa):', netProfit);
+      
+      // Check if any item has product as string (ID)
+      const needsProductFetch = order.items?.some((item: any) => 
+        typeof item.product === 'string'
+      );
+      
+      if (needsProductFetch) {
+        // Fetch products for items that only have IDs
+        const productPromises = order.items.map(async (item: any) => {
+          if (typeof item.product === 'string') {
+            try {
+              const productResponse = await apiService.getProductById(item.product);
+              return {
+                ...item,
+                product: productResponse.data
+              };
+            } catch (error) {
+              return {
+                ...item,
+                product: {
+                  _id: item.product,
+                  name: 'Maxsulot topilmadi',
+                  images: [],
+                  productCode: ''
+                }
+              };
+            }
+          }
+          return item;
+        });
+        
+        const itemsWithProducts = await Promise.all(productPromises);
+        order.items = itemsWithProducts;
+      }
+      
+      setOrder(order);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Buyurtmani yuklashda xatolik');
       router.back();
@@ -75,6 +177,7 @@ export default function OrderViewScreen() {
     let totalPrice = 0;
     let totalOriginalPrice = 0;
     let totalKpiPrice = 0;
+    let totalGrossProfit = 0; // Umumiy foyda (price - originalPrice)
 
     requestedItems.forEach((item) => {
       const itemTotal = item.price * item.quantity;
@@ -85,11 +188,18 @@ export default function OrderViewScreen() {
       }
       
       if (item.originalPrice !== undefined && item.price !== undefined) {
-        totalKpiPrice += (item.price - item.originalPrice) * item.quantity;
+        const itemGrossProfit = (item.price - item.originalPrice) * item.quantity;
+        totalGrossProfit += itemGrossProfit;
       }
     });
 
-    return { totalPrice, totalOriginalPrice, totalKpiPrice };
+    // totalKpiPrice backend dan keladi
+    totalKpiPrice = order.totalKpiPrice || 0;
+    
+    // Sof foyda = Umumiy foyda - KPI summa
+    const netProfit = totalGrossProfit - totalKpiPrice;
+
+    return { totalPrice, totalOriginalPrice, totalKpiPrice, totalGrossProfit, netProfit };
   };
 
   const getStatusColor = (status: string) => {
@@ -272,7 +382,13 @@ export default function OrderViewScreen() {
   const request = getCurrentRequest(order);
   const statusColor = getStatusColor(request.status);
   const requestedItems = getRequestedItems(order);
-  const { totalPrice: requestedTotalPrice, totalOriginalPrice: requestedTotalOriginalPrice, totalKpiPrice: requestedTotalKpiPrice } = calculateRequestedTotals(order);
+  const { 
+    totalPrice: requestedTotalPrice, 
+    totalOriginalPrice: requestedTotalOriginalPrice, 
+    totalKpiPrice: requestedTotalKpiPrice,
+    totalGrossProfit: requestedTotalGrossProfit,
+    netProfit: requestedNetProfit
+  } = calculateRequestedTotals(order);
 
   const getPaymentMethodText = (method: string) => {
     switch (method) {
@@ -462,19 +578,30 @@ export default function OrderViewScreen() {
             </View>
 
             {requestedItems.map((item, index) => {
-              const originalPrice = item.originalPrice ?? item.product.price ?? 0;
+              // Handle case where product might be just an ID string
+              const product = typeof item.product === 'string' 
+                ? { _id: item.product, name: 'Maxsulot', images: [], productCode: '' }
+                : item.product;
+              
+              const originalPrice = item.originalPrice ?? product.price ?? 0;
               const salePrice = item.price;
               const kpiBonus = item.kpiBonusPercent ?? 0;
-              const kpiAmount = originalPrice > 0 ? (salePrice - originalPrice) * item.quantity : 0;
+              const grossProfit = originalPrice > 0 ? (salePrice - originalPrice) * item.quantity : 0;
+              // Item uchun KPI summa = grossProfit * kpiBonusPercent / 100
+              const itemKpiAmount = grossProfit > 0 && kpiBonus > 0 
+                ? (grossProfit * kpiBonus) / 100 
+                : 0;
+              // Sof foyda = Umumiy foyda - KPI summa
+              const netProfit = grossProfit - itemKpiAmount;
               const itemTotal = salePrice * item.quantity;
               const unitPrice = salePrice;
 
               return (
                 <View key={index} style={styles.itemContainer}>
                   <View style={styles.itemHeader}>
-                    {item.product.images && item.product.images.length > 0 ? (
+                    {product.images && product.images.length > 0 ? (
                       <Image
-                        source={{ uri: item.product.images[0] }}
+                        source={{ uri: product.images[0] }}
                         style={styles.itemImage}
                         resizeMode="cover"
                       />
@@ -484,9 +611,9 @@ export default function OrderViewScreen() {
                       </View>
                     )}
                     <View style={styles.itemInfo}>
-                      <Text style={styles.itemName}>{item.product.name}</Text>
-                      {item.product.productCode && (
-                        <Text style={styles.itemCode}>Kod: {item.product.productCode}</Text>
+                      <Text style={styles.itemName}>{product.name || 'Maxsulot'}</Text>
+                      {product.productCode && (
+                        <Text style={styles.itemCode}>Kod: {product.productCode}</Text>
                       )}
                       <View style={styles.quantityContainer}>
                         <Ionicons name="layers-outline" size={14} color="#666" />
@@ -517,14 +644,14 @@ export default function OrderViewScreen() {
                       )}
                     </View>
                     
-                    {kpiBonus > 0 && kpiAmount > 0 && (
-                      <View style={[styles.priceRow, styles.kpiRow]}>
+                    {netProfit > 0 && (
+                      <View style={[styles.priceRow, styles.netProfitRow]}>
                         <View style={styles.kpiLabelContainer}>
-                          <Ionicons name="gift-outline" size={14} color="#34C759" />
-                          <Text style={styles.priceLabel}>KPI bonus:</Text>
+                          <Ionicons name="trending-up-outline" size={14} color="#007AFF" />
+                          <Text style={styles.priceLabel}>Sof foyda:</Text>
                         </View>
-                        <Text style={styles.priceValueKpi}>
-                          {kpiBonus}% ({formatPrice(kpiAmount)})
+                        <Text style={styles.priceValueNetProfit}>
+                          {formatPrice(netProfit)}
                         </Text>
                       </View>
                     )}
@@ -577,9 +704,17 @@ export default function OrderViewScreen() {
             {requestedTotalKpiPrice > 0 && (
               <View style={styles.infoRowSmall}>
                 <View style={styles.kpiLabelContainerSmall}>
-                  <Text style={styles.infoLabelSmall}>Jami KPI bonus</Text>
+                  <Text style={styles.infoLabelSmall}>KPI summa</Text>
                 </View>
                 <Text style={[styles.infoValueSmall, styles.priceValueKpiSmall]}>{formatPrice(requestedTotalKpiPrice)}</Text>
+              </View>
+            )}
+            {requestedNetProfit > 0 && (
+              <View style={styles.infoRowSmall}>
+                <View style={styles.kpiLabelContainerSmall}>
+                  <Text style={styles.infoLabelSmall}>Sof foyda</Text>
+                </View>
+                <Text style={[styles.infoValueSmall, styles.priceValueNetProfitSmall]}>{formatPrice(requestedNetProfit)}</Text>
               </View>
             )}
             <View style={[styles.infoRow, styles.totalRow]}>
@@ -857,6 +992,11 @@ const styles = StyleSheet.create({
     color: '#34C759',
     fontWeight: '600',
   },
+  priceValueNetProfitSmall: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
   actionsContainer: {
     gap: 12,
     marginTop: 8,
@@ -966,6 +1106,11 @@ const styles = StyleSheet.create({
   priceValueKpi: {
     fontSize: 13,
     color: '#34C759',
+    fontWeight: '600',
+  },
+  priceValueNetProfit: {
+    fontSize: 13,
+    color: '#007AFF',
     fontWeight: '600',
   },
   kpiRow: {

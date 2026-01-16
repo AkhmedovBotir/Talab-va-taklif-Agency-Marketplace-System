@@ -1,11 +1,10 @@
 // Authentication Context
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiService } from '../services/api';
-import type { Agent, AgentRole, LoginRequest, LoginResponse } from '../types/api';
+import type { Agent, LoginRequest, LoginResponse } from '../types/api';
 
 interface AuthContextType {
   agent: Agent | null;
-  role: AgentRole | null;
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -41,7 +40,6 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [agent, setAgent] = useState<Agent | null>(null);
-  const [role, setRole] = useState<AgentRole | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -50,11 +48,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const storedToken = await apiService.getToken();
       if (storedToken) {
         setToken(storedToken);
-        // Optionally verify token by making a test request
-        // For now, we'll just set the token
+        // Load agent profile to verify token and get agent data
+        try {
+          const profileResponse = await apiService.getAgentProfile();
+          if (profileResponse.success && profileResponse.data) {
+            setAgent(profileResponse.data);
+          } else {
+            // Token invalid, clear it
+            await apiService.logout();
+            setToken(null);
+            setAgent(null);
+          }
+        } catch (profileError: any) {
+          // If profile fetch fails (401, etc.), token is invalid
+          console.error('Profile fetch failed:', profileError);
+          await apiService.logout();
+          setToken(null);
+          setAgent(null);
+        }
+      } else {
+        setToken(null);
+        setAgent(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
+      setToken(null);
+      setAgent(null);
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +95,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response: LoginResponse = await apiService.login(credentials, deviceInfo);
       if (response.success && response.data) {
         setAgent(response.data.agent);
-        setRole(response.data.role);
         setToken(response.data.token);
       } else {
         throw new Error(response.message || 'Login failed');
@@ -119,7 +137,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await apiService.logout();
       setAgent(null);
-      setRole(null);
       setToken(null);
     } catch (error) {
       console.error('Logout failed:', error);
@@ -132,7 +149,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const value: AuthContextType = {
     agent,
-    role,
     token,
     isLoading,
     isAuthenticated: !!token && !!agent,

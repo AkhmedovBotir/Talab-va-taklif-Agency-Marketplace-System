@@ -208,9 +208,6 @@ const CreateAgentModal = ({ open, onClose, onSuccess }) => {
                         />
                       </div>
                     </div>
-                    <p className="bg-gray-100 p-2 rounded-md border border-l-4 border-blue-500 pl-6 text-xs text-gray-500 mt-2">
-                      Agent turi avtomatik aniqlanadi: faqat viloyat → Viloyat Agent, viloyat + tuman → Tuman Agent, viloyat + tuman + MFY → MFY Agent
-                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

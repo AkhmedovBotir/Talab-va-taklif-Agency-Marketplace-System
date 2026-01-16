@@ -24,9 +24,7 @@ const notificationSchema = new mongoose.Schema(
       enum: [
         'all',
         'punkts',
-        'viloyat_agents',
-        'tuman_agents',
-        'mfy_agents',
+        'mfy_agents', // All agents use mfy_agents (backward compatibility)
         'marketplace_users',
         'contragents',
       ],

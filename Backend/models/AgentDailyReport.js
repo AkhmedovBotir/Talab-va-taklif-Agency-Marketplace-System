@@ -11,11 +11,6 @@ const agentDailyReportSchema = new mongoose.Schema(
       type: Date,
       required: [true, 'Sana kiritilishi shart'],
     },
-    agentType: {
-      type: String,
-      enum: ['mfy', 'tuman', 'viloyat'],
-      required: [true, 'Agent turi kiritilishi shart'],
-    },
     // Buyurtmalar
     ordersCount: {
       type: Number,
@@ -90,7 +85,6 @@ const agentDailyReportSchema = new mongoose.Schema(
 // Indexes
 agentDailyReportSchema.index({ agent: 1, date: 1 }, { unique: true });
 agentDailyReportSchema.index({ date: -1 });
-agentDailyReportSchema.index({ agentType: 1 });
 agentDailyReportSchema.index({ isSubmitted: 1 });
 
 const AgentDailyReport = mongoose.model('AgentDailyReport', agentDailyReportSchema);
