@@ -143,7 +143,7 @@ const KPIAgentDetailModal = ({ agentId, open, onClose }) => {
               {/* Transactions Table */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Transaksiyalar</h3>
-                {data?.transactions?.data?.length > 0 ? (
+                {data?.data && data.data.length > 0 ? (
                   <div className="overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b border-gray-200">
@@ -156,7 +156,7 @@ const KPIAgentDetailModal = ({ agentId, open, onClose }) => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {data.transactions.data.map((tx, index) => (
+                        {data.data.map((tx, index) => (
                           <tr key={tx._id || index} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-sm">#{tx.order?.orderNumber || '-'}</td>
                             <td className="px-4 py-2 text-sm">{tx.orderItem?.product?.name || '-'}</td>
@@ -184,10 +184,10 @@ const KPIAgentDetailModal = ({ agentId, open, onClose }) => {
                 )}
 
                 {/* Pagination */}
-                {data?.transactions?.totalPages > 1 && (
+                {data?.totalPages > 1 && (
                   <div className="flex justify-between items-center mt-4">
                     <p className="text-sm text-gray-500">
-                      {data.transactions.total} ta transaksiyadan {data.transactions.count} ta ko'rsatilmoqda
+                      {data.total || 0} ta transaksiyadan {data.count || 0} ta ko'rsatilmoqda
                     </p>
                     <div className="flex gap-2">
                       <button
@@ -199,7 +199,7 @@ const KPIAgentDetailModal = ({ agentId, open, onClose }) => {
                       </button>
                       <button
                         onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
-                        disabled={pagination.page >= data.transactions.totalPages}
+                        disabled={pagination.page >= (data.totalPages || 1)}
                         className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50"
                       >
                         Keyingi

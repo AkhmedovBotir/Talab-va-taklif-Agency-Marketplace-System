@@ -97,7 +97,6 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
       setTempViloyat(selectedViloyat);
       setTempTuman(selectedTuman);
       setTempMfy(selectedMfy);
-      console.log('LocationSelector: Modal opened, temp values set - viloyat:', selectedViloyat?.name || 'none', 'tuman:', selectedTuman?.name || 'none', 'mfy:', selectedMfy?.name || 'none');
     }
   }, [locationModalVisible, selectedViloyat, selectedTuman, selectedMfy]);
 
@@ -167,7 +166,6 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
     setTempViloyat(selectedViloyat);
     setTempTuman(selectedTuman);
     setTempMfy(selectedMfy);
-    console.log('LocationSelector: Modal opened with viloyat:', selectedViloyat?._id || 'none', selectedViloyat?.name || 'none', 'tuman:', selectedTuman?._id || 'none', selectedTuman?.name || 'none', 'mfy:', selectedMfy?._id || 'none', selectedMfy?.name || 'none');
     setLocationModalVisible(true);
   };
 
@@ -232,8 +230,6 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
           } else {
             requestData.mfy = null;
           }
-          
-          console.log('PATCH /api/marketplace/me/viloyat-tuman Request:', JSON.stringify(requestData, null, 2));
           
           const response = await apiService.updateViloyatTuman(
             requestData,
@@ -306,14 +302,10 @@ export default function LocationSelector({ show = true, autoOpen = false }: Loca
           mfy: null,
         };
         
-        console.log('PATCH /api/marketplace/me/viloyat-tuman (Clear) Request:', JSON.stringify(requestData, null, 2));
-        
         const response = await apiService.updateViloyatTuman(
           requestData,
           token
         );
-        
-        console.log('PATCH /api/marketplace/me/viloyat-tuman (Clear) Response:', JSON.stringify(response, null, 2));
       } catch (error: any) {
         console.error('Error clearing location from API:', error);
         console.error('PATCH /api/marketplace/me/viloyat-tuman (Clear) Error Response:', error);

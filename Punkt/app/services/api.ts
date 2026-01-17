@@ -613,6 +613,138 @@ export interface MarkReadResponse {
   message: string;
 }
 
+// Payment Interfaces
+export interface PayZakladRequest {
+  orderId: string;
+  contragentRequestId: string;
+  zakladPercentage: number;
+}
+
+export interface PaymentTransaction {
+  _id: string;
+  type: 'income' | 'expense';
+  category: string;
+  amount: number;
+  description: string;
+  order?: {
+    _id: string;
+    orderNumber: string;
+    totalPrice: number;
+  };
+  contragentRequest?: string;
+  zakladPercentage?: number;
+  fromUser: {
+    userType: string;
+    userId: string | {
+      _id: string;
+      name: string;
+      phone?: string;
+      inn?: string;
+    };
+  };
+  toUser: {
+    userType: string;
+    userId: string | {
+      _id: string;
+      name: string;
+      phone?: string;
+      inn?: string;
+    };
+  };
+  status: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayZakladResponse {
+  success: boolean;
+  message: string;
+  data: {
+    punktTransaction: PaymentTransaction;
+    contragentTransaction: PaymentTransaction;
+  };
+}
+
+export interface PayFinalPaymentRequest {
+  orderId: string;
+  contragentRequestId: string;
+}
+
+export interface PayFinalPaymentResponse {
+  success: boolean;
+  message: string;
+  data: PaymentTransaction;
+}
+
+export interface PayProfitRequest {
+  orderId: string;
+  contragentRequestId: string;
+}
+
+export interface PayProfitResponse {
+  success: boolean;
+  message: string;
+  data: PaymentTransaction;
+}
+
+export interface TransactionsResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  summary: {
+    totalIncome: number;
+    totalExpense: number;
+    balance: number;
+    qarz: number;
+    haq: number;
+  };
+  data: PaymentTransaction[];
+}
+
+export interface BalanceResponse {
+  success: boolean;
+  data: {
+    totalIncome: number;
+    totalExpense: number;
+    balance: number;
+    qarz: number;
+    haq: number;
+  };
+}
+
+// Orders for Zaklad
+export interface ContragentRequestForZaklad {
+  _id: string;
+  contragentId: {
+    _id: string;
+    name: string;
+    inn: string;
+    phone: string;
+  };
+  status: string;
+  deliveredToPunktAt: string;
+  potentialZakladAmount: number;
+}
+
+export interface OrderForZaklad {
+  _id: string;
+  orderNumber: string;
+  totalPrice: number;
+  totalOriginalPrice: number;
+  status: string;
+  contragentRequestsForZaklad: ContragentRequestForZaklad[];
+}
+
+export interface OrdersForZakladResponse {
+  success: boolean;
+  count: number;
+  data: OrderForZaklad[];
+}
+
 class ApiService {
   private token: string | null = null;
   private onDeviceErrorCallback: (() => void) | null = null;
@@ -1185,6 +1317,56 @@ class ApiService {
   async markAllNotificationsAsRead(): Promise<MarkReadResponse> {
     return this.request<MarkReadResponse>('/punkts/notifications/read-all', {
       method: 'POST',
+    });
+  }
+
+  // Payment Methods
+  async payZaklad(data: PayZakladRequest): Promise<PayZakladResponse> {
+    return this.request<PayZakladResponse>('/punkts/payments/pay-zaklad', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getTransactions(params?: {
+    type?: 'income' | 'expense';
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<TransactionsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+    const query = queryParams.toString();
+    return this.request<TransactionsResponse>(`/punkts/payments/transactions${query ? `?${query}` : ''}`);
+  }
+
+  async getBalance(): Promise<BalanceResponse> {
+    return this.request<BalanceResponse>('/punkts/payments/balance');
+  }
+
+  async getOrdersForZaklad(): Promise<OrdersForZakladResponse> {
+    return this.request<OrdersForZakladResponse>('/punkts/payments/orders-for-zaklad');
+  }
+
+  async payFinalPayment(data: PayFinalPaymentRequest): Promise<PayFinalPaymentResponse> {
+    return this.request<PayFinalPaymentResponse>('/punkts/payments/pay-final-payment', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async payProfit(data: PayProfitRequest): Promise<PayProfitResponse> {
+    return this.request<PayProfitResponse>('/punkts/payments/pay-profit', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

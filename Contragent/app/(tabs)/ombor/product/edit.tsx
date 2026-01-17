@@ -104,8 +104,8 @@ export default function ProductEditScreen() {
         } else {
           setCategories(response.data);
         }
-        } else {
-          Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
+      } else {
+        Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
         setCategories([]);
       }
     } catch (error: any) {

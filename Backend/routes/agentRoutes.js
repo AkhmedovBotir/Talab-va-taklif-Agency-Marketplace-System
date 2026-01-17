@@ -23,6 +23,12 @@ const {
 } = require('../controllers/notificationController');
 const { validate, agentValidationSchemas } = require('../middleware/validation');
 const { agentAuth } = require('../middleware/auth');
+const {
+  payOrderToPunkt,
+  getOrdersForPayment,
+  getAgentTransactions,
+  getAgentBalance,
+} = require('../controllers/agentPaymentController');
 
 // Password setup
 router.post('/password-setup/step1', validate(agentValidationSchemas.passwordSetupStep1), passwordSetupStep1);
@@ -58,6 +64,20 @@ router.get('/notifications/list', agentAuth, getAgentNotifications);
 router.get('/notifications/unread-count', agentAuth, getAgentUnreadCount);
 router.post('/notifications/:notificationId/read', agentAuth, markAgentNotificationRead);
 router.post('/notifications/read-all', agentAuth, markAllAgentNotificationsRead);
+
+// ==================== AGENT PAYMENT ROUTES ====================
+
+// Agent to'lov qilishi kerak bo'lgan buyurtmalarni olish
+router.get('/payments/orders-for-payment', agentAuth, getOrdersForPayment);
+
+// Agent punktga buyurtma uchun to'lov qilish
+router.post('/payments/pay-to-punkt/:orderId', agentAuth, payOrderToPunkt);
+
+// Agent o'zining tranzaksiyalarini olish
+router.get('/payments/transactions', agentAuth, getAgentTransactions);
+
+// Agent balansini olish
+router.get('/payments/balance', agentAuth, getAgentBalance);
 
 module.exports = router;
 

@@ -6,7 +6,8 @@ import {
   CreditCard, 
   History, 
   TrendingUp,
-  Business
+  Business,
+  Payment
 } from '@mui/icons-material';
 import Balance from './Balance';
 import Reports from './Reports';
@@ -14,8 +15,15 @@ import KPIPayments from './KPIPayments';
 import Transactions from './Transactions';
 import Statistics from './Statistics';
 import ContragentPayments from './ContragentPayments';
+import AdminPayments from './AdminPayments';
 
 const TABS = [
+  {
+    id: 'admin-payments',
+    label: 'Admin To\'lovlari',
+    icon: Payment,
+    component: AdminPayments,
+  },
   {
     id: 'balance',
     label: 'Balans',

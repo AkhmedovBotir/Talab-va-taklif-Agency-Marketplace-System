@@ -66,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
           // If other error, use stored data
-          console.log('Could not refresh contragent data, using stored data');
         }
       }
     } catch (error) {

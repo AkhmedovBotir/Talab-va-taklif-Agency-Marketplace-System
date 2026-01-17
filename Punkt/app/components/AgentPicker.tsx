@@ -115,7 +115,7 @@ export function AgentPicker({
                   onPress={() => handleSelect(item)}
                 >
                   <View style={styles.itemContent}>
-                    <Text style={styles.itemName}>{item.name}</Text>
+                      <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemPhone}>{item.phone}</Text>
                   </View>
                   {selectedAgent?._id === item._id && (

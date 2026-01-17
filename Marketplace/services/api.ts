@@ -592,7 +592,6 @@ class ApiService {
           // Remove all marketplace-related keys
           if (marketplaceKeys.length > 0) {
             await AsyncStorage.multiRemove(marketplaceKeys);
-            console.log('User logged out due to 401 error. Cleared all marketplace data:', marketplaceKeys);
           }
           
           // Emit event to notify AuthContext about 401 error

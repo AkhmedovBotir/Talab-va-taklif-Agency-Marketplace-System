@@ -3,6 +3,7 @@ const KpiBonusTransaction = require('../models/KpiBonusTransaction');
 const Order = require('../models/Order');
 const Agent = require('../models/Agent');
 const Punkt = require('../models/Punkt');
+const ViloyatManager = require('../models/ViloyatManager');
 
 // Default KPI distribution (used for initial create forms)
 const DEFAULT_INITIAL_DISTRIBUTION = Object.freeze({
@@ -324,6 +325,9 @@ const getAllKpiTransactions = async (req, res) => {
     }
     if (agentId) {
       filter['recipients.agent'] = agentId;
+    }
+    if (managerId) {
+      filter['recipients.manager'] = managerId;
     }
     if (orderStatus) filter.orderStatus = orderStatus;
     if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
@@ -913,6 +917,196 @@ const getPunktKpiDetails = async (req, res) => {
   }
 };
 
+// Get all managers KPI data
+const getManagersKpi = async (req, res) => {
+  try {
+    const { viloyatId, managerId, isPaid, startDate, endDate, page = 1, limit = 50 } = req.query;
+
+    const filter = { orderStatus: CUSTOMER_CONFIRMED_STATUS };
+    filter['recipients.manager'] = { $exists: true, $ne: null };
+
+    if (managerId) filter['recipients.manager'] = managerId;
+    if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
+
+    const dateFilter = parseDateRange(startDate, endDate);
+    if (dateFilter.createdAt) filter.createdAt = dateFilter.createdAt;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get aggregated stats by manager
+    const managerStats = await KpiBonusTransaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$recipients.manager',
+          totalTransactions: { $sum: 1 },
+          totalAmount: { $sum: '$amounts.manager' },
+          paidAmount: {
+            $sum: { $cond: ['$isPaid', '$amounts.manager', 0] },
+          },
+          unpaidAmount: {
+            $sum: { $cond: ['$isPaid', 0, '$amounts.manager'] },
+          },
+        },
+      },
+      { $sort: { totalAmount: -1 } },
+      { $skip: skip },
+      { $limit: limitNum },
+    ]);
+
+    // Populate manager details
+    const managerIds = managerStats.map((s) => s._id);
+    const managers = await ViloyatManager.find({ _id: { $in: managerIds } })
+      .select('name phone viloyat status')
+      .populate('viloyat', 'name type code');
+
+    const managerMap = {};
+    managers.forEach((m) => {
+      managerMap[m._id.toString()] = m;
+    });
+
+    let result = managerStats.map((stat) => ({
+      manager: managerMap[stat._id.toString()] || { _id: stat._id },
+      ...stat,
+      _id: undefined,
+    }));
+
+    // Filter by viloyat if specified
+    if (viloyatId) {
+      result = result.filter((item) => {
+        const manager = item.manager;
+        if (manager && manager.viloyat) {
+          return manager.viloyat._id.toString() === viloyatId || manager.viloyat.toString() === viloyatId;
+        }
+        return false;
+      });
+    }
+
+    // Get total count for pagination
+    const totalCount = await KpiBonusTransaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$recipients.manager',
+        },
+      },
+      { $count: 'total' },
+    ]);
+
+    const total = totalCount[0]?.total || 0;
+
+    res.status(200).json({
+      success: true,
+      count: result.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      data: result,
+    });
+  } catch (error) {
+    console.error('Error fetching managers KPI:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Managerlar KPI ma\'lumotlarini olishda xatolik',
+      error: error.message,
+    });
+  }
+};
+
+// Get single manager KPI details (with transactions)
+const getManagerKpiDetails = async (req, res) => {
+  try {
+    const { managerId } = req.params;
+    const { isPaid, startDate, endDate, page = 1, limit = 50 } = req.query;
+
+    const manager = await ViloyatManager.findById(managerId)
+      .select('name phone viloyat status')
+      .populate('viloyat', 'name type code');
+
+    if (!manager) {
+      return res.status(404).json({
+        success: false,
+        message: 'Manager topilmadi',
+      });
+    }
+
+    const filter = {
+      orderStatus: CUSTOMER_CONFIRMED_STATUS,
+      'recipients.manager': managerId,
+    };
+
+    if (isPaid !== undefined) filter.isPaid = isPaid === 'true';
+
+    const dateFilter = parseDateRange(startDate, endDate);
+    if (dateFilter.createdAt) filter.createdAt = dateFilter.createdAt;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get summary
+    const summary = await KpiBonusTransaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalTransactions: { $sum: 1 },
+          totalAmount: { $sum: '$amounts.manager' },
+          paidAmount: { $sum: { $cond: ['$isPaid', '$amounts.manager', 0] } },
+          unpaidAmount: { $sum: { $cond: ['$isPaid', 0, '$amounts.manager'] } },
+        },
+      },
+    ]);
+
+    const total = await KpiBonusTransaction.countDocuments(filter);
+
+    const transactions = await KpiBonusTransaction.find(filter)
+      .populate('order', 'orderNumber status totalPrice')
+      .populate('orderItem.product', 'name price productCode')
+      .populate('recipients.manager', 'name phone viloyat')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const transactionsWithAmount = transactions.map((t) => {
+      const obj = t.toObject();
+      obj.managerAmount = t.amounts.manager || 0;
+      return obj;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        manager,
+        summary: summary[0] || {
+          totalTransactions: 0,
+          totalAmount: 0,
+          paidAmount: 0,
+          unpaidAmount: 0,
+        },
+        transactions: {
+          count: transactionsWithAmount.length,
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
+          data: transactionsWithAmount,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching manager KPI details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Manager KPI ma\'lumotlarini olishda xatolik',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createKpiDistribution,
   getAllKpiDistributions,
@@ -926,7 +1120,9 @@ module.exports = {
   // New KPI data endpoints
   getAgentsKpi,
   getPunktsKpi,
+  getManagersKpi,
   getAgentKpiDetails,
   getPunktKpiDetails,
+  getManagerKpiDetails,
 };
 

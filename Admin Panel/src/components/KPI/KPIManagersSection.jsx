@@ -23,6 +23,7 @@ const KPIManagersSection = () => {
   });
   const [filters, setFilters] = useState({
     viloyatId: '',
+    managerId: '',
     isPaid: '',
     startDate: '',
     endDate: '',
@@ -42,9 +43,18 @@ const KPIManagersSection = () => {
       };
 
       if (filters.viloyatId) params.viloyatId = filters.viloyatId;
+      if (filters.managerId) params.managerId = filters.managerId;
       if (filters.isPaid !== '') params.isPaid = filters.isPaid === 'true';
-      if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
+      if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        params.startDate = startDate.toISOString();
+      }
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        params.endDate = endDate.toISOString();
+      }
 
       const response = await kpiAPI.getManagersKPI(params);
       if (response.success) {
@@ -77,7 +87,7 @@ const KPIManagersSection = () => {
   };
 
   const handleResetFilters = () => {
-    setFilters({ viloyatId: '', isPaid: '', startDate: '', endDate: '' });
+    setFilters({ viloyatId: '', managerId: '', isPaid: '', startDate: '', endDate: '' });
     setTimeout(() => fetchManagers({ page: 1 }), 0);
   };
 

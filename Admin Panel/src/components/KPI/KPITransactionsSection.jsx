@@ -119,16 +119,22 @@ const TransactionDetailModal = ({ transaction, open, onClose }) => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Agent:</span>
-                  <span className="font-medium">{formatNumber(transaction.amounts?.agent || transaction.amounts?.viloyatAgent || transaction.amounts?.tumanAgent || transaction.amounts?.mfyAgent)} so'm</span>
+                  <span className="font-medium">{formatNumber(transaction.amounts?.agent)} so'm</span>
                 </div>
+                {transaction.amounts?.manager > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Menejer:</span>
+                    <span className="font-medium">{formatNumber(transaction.amounts?.manager)} so'm</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Moliya:</span>
                   <span className="font-medium">{formatNumber(transaction.amounts?.finance)} so'm</span>
                 </div>
-                {transaction.amounts?.punktTransfer > 0 && (
+                {transaction.amounts?.deliveryService > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Punkt transfer:</span>
-                    <span className="font-medium">{formatNumber(transaction.amounts?.punktTransfer)} so'm</span>
+                    <span className="text-gray-600">Yetkazib Berish:</span>
+                    <span className="font-medium">{formatNumber(transaction.amounts?.deliveryService)} so'm</span>
                   </div>
                 )}
               </div>
@@ -150,13 +156,10 @@ const TransactionDetailModal = ({ transaction, open, onClose }) => {
                     <span className="font-medium">{transaction.recipients.agent.name || '-'}</span>
                   </div>
                 )}
-                {/* Backward compatibility */}
-                {(transaction.recipients?.viloyatAgent || transaction.recipients?.tumanAgent || transaction.recipients?.mfyAgent) && !transaction.recipients?.agent && (
+                {transaction.recipients?.manager && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Agent:</span>
-                    <span className="font-medium">
-                      {transaction.recipients.viloyatAgent?.name || transaction.recipients.tumanAgent?.name || transaction.recipients.mfyAgent?.name || '-'}
-                    </span>
+                    <span className="text-gray-600">Menejer:</span>
+                    <span className="font-medium">{transaction.recipients.manager.name || '-'}</span>
                   </div>
                 )}
               </div>
@@ -217,8 +220,16 @@ const KPITransactionsSection = () => {
 
       if (filters.isPaid !== '') params.isPaid = filters.isPaid === 'true';
       if (filters.orderStatus) params.orderStatus = filters.orderStatus;
-      if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
+      if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        params.startDate = startDate.toISOString();
+      }
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        params.endDate = endDate.toISOString();
+      }
 
       const response = await kpiAPI.getAllTransactions(params);
       if (response.success) {
@@ -377,9 +388,14 @@ const KPITransactionsSection = () => {
                             P: {formatNumber(transaction.amounts.punkt)}
                           </span>
                         )}
-                        {(transaction.amounts?.agent > 0 || transaction.amounts?.viloyatAgent > 0 || transaction.amounts?.tumanAgent > 0 || transaction.amounts?.mfyAgent > 0) && (
+                        {transaction.amounts?.agent > 0 && (
                           <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
-                            A: {formatNumber(transaction.amounts?.agent || transaction.amounts?.viloyatAgent || transaction.amounts?.tumanAgent || transaction.amounts?.mfyAgent)}
+                            A: {formatNumber(transaction.amounts.agent)}
+                          </span>
+                        )}
+                        {transaction.amounts?.manager > 0 && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                            M: {formatNumber(transaction.amounts.manager)}
                           </span>
                         )}
                         {transaction.amounts?.finance > 0 && (
@@ -387,9 +403,9 @@ const KPITransactionsSection = () => {
                             F: {formatNumber(transaction.amounts.finance)}
                           </span>
                         )}
-                        {transaction.amounts?.punktTransfer > 0 && (
+                        {transaction.amounts?.deliveryService > 0 && (
                           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
-                            TR: {formatNumber(transaction.amounts.punktTransfer)}
+                            DS: {formatNumber(transaction.amounts.deliveryService)}
                           </span>
                         )}
                       </div>

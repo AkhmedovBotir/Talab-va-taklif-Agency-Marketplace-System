@@ -55,7 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Remove all marketplace-related keys
       if (marketplaceKeys.length > 0) {
         await AsyncStorage.multiRemove(marketplaceKeys);
-        console.log('Cleared all marketplace data from storage:', marketplaceKeys);
       }
       
       setToken(null);
@@ -93,7 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Listen for 401 unauthorized event from API service
     const handle401Error = async () => {
-      console.log('Received 401 unauthorized event, logging out user');
       // Clear state immediately
         setToken(null);
         setUser(null);

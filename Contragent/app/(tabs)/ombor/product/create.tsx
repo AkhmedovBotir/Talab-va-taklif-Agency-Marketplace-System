@@ -95,8 +95,8 @@ export default function ProductCreateScreen() {
         } else {
           setCategories(response.data);
         }
-        } else {
-          Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
+      } else {
+        Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
         setCategories([]);
       }
     } catch (error: any) {
@@ -203,10 +203,10 @@ export default function ProductCreateScreen() {
       // Only reset if it's not the initial mount and modal is not open
       // (to avoid clearing when modal closes)
       if (!isInitialMount.current && !isModalOpen.current) {
-        resetForm();
-      } else {
-        isInitialMount.current = false;
-      }
+          resetForm();
+        } else {
+          isInitialMount.current = false;
+        }
       // Reset modal flag when screen loses focus
       return () => {
         isModalOpen.current = false;

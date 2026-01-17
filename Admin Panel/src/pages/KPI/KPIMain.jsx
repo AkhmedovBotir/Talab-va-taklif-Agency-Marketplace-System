@@ -1,20 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart, Receipt, People, Store, Settings, Person } from '@mui/icons-material';
+import { BarChart, Receipt, People, Store, Person } from '@mui/icons-material';
 import KPIStatisticsSection from '../../components/KPI/KPIStatisticsSection';
 import KPITransactionsSection from '../../components/KPI/KPITransactionsSection';
 import KPIAgentsSection from '../../components/KPI/KPIAgentsSection';
 import KPIPunktsSection from '../../components/KPI/KPIPunktsSection';
-import KPIDistributionSection from '../../components/KPI/KPIDistributionSection';
 import KPIManagersSection from '../../components/KPI/KPIManagersSection';
 
 const TABS = [
-  {
-    id: 'distribution',
-    label: 'Taqsimot',
-    icon: Settings,
-    component: KPIDistributionSection,
-  },
   {
     id: 'statistics',
     label: 'Statistika',

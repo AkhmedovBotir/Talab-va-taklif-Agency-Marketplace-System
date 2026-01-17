@@ -221,18 +221,20 @@ export default function PaymentsScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>To\'lanmagan</Text>
-              <Text style={styles.statValue}>{formatCurrency(statistics.unpaid.totalAmount)}</Text>
-              <Text style={styles.statCount}>{statistics.unpaid.count} ta</Text>
+              <Text style={styles.statValue}>
+                {formatCurrency(statistics.unpaid?.totalAmount || 0)}
+              </Text>
+              <Text style={styles.statCount}>{statistics.unpaid?.count || 0} ta</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>To\'langan</Text>
               <Text style={[styles.statValue, styles.statValueGreen]}>
-                {formatCurrency(statistics.paid.totalAmount)}
+                {formatCurrency(statistics.paid?.totalAmount || 0)}
               </Text>
-              <Text style={styles.statCount}>{statistics.paid.count} ta</Text>
+              <Text style={styles.statCount}>{statistics.paid?.count || 0} ta</Text>
             </View>
           </View>
-          {statistics.overdue.count > 0 && (
+          {statistics.overdue && statistics.overdue.count > 0 && (
             <View style={styles.overdueCard}>
               <Ionicons name="alert-circle" size={20} color="#FF3B30" />
               <View style={styles.overdueInfo}>

@@ -89,9 +89,16 @@ const {
   getInitialKpiDistribution,
   getAgentsKpi,
   getPunktsKpi,
+  getManagersKpi,
   getAgentKpiDetails,
   getPunktKpiDetails,
+  getManagerKpiDetails,
 } = require('../controllers/adminKpiController');
+const {
+  sendMoneyToPunkt,
+  getAdminTransactions,
+  getAdminBalance,
+} = require('../controllers/adminPaymentController');
 const {
   getPendingProducts,
   getPendingProductById,
@@ -343,11 +350,13 @@ router.get('/kpi/transactions/:id', adminAuth, getKpiTransactionById);
 // KPI Statistics
 router.get('/kpi/statistics', adminAuth, getKpiStatistics);
 
-// KPI Data endpoints - Agents and Punkts KPI
+// KPI Data endpoints - Agents, Punkts and Managers KPI
 router.get('/kpi/data/agents', adminAuth, getAgentsKpi);
 router.get('/kpi/data/punkts', adminAuth, getPunktsKpi);
+router.get('/kpi/data/managers', adminAuth, getManagersKpi);
 router.get('/kpi/data/agents/:agentId', adminAuth, getAgentKpiDetails);
 router.get('/kpi/data/punkts/:punktId', adminAuth, getPunktKpiDetails);
+router.get('/kpi/data/managers/:managerId', adminAuth, getManagerKpiDetails);
 
 // Featured contragents endpoints
 router.get('/featured-contragents', adminAuth, getFeaturedContragentsForAdmin);
@@ -406,6 +415,17 @@ router.put('/devices/:id/activate', adminAuth, activateDevice);
 
 // Delete device
 router.delete('/devices/:id', adminAuth, deleteDevice);
+
+// ==================== ADMIN PAYMENT ROUTES ====================
+
+// Admin punktga pul yuborish
+router.post('/payments/send-to-punkt', adminAuth, sendMoneyToPunkt);
+
+// Admin o'zining tranzaksiyalarini olish
+router.get('/payments/transactions', adminAuth, getAdminTransactions);
+
+// Admin balansini olish
+router.get('/payments/balance', adminAuth, getAdminBalance);
 
 // Get admin by ID (must be after /data/* routes)
 router.get('/:id', getAdminById);

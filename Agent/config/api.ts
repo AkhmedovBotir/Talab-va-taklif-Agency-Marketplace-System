@@ -31,4 +31,9 @@ export const API_ENDPOINTS = {
   AGENT_NOTIFICATIONS_READ_ALL: '/agents/notifications/read-all',
   // Agent Profile
   AGENT_PROFILE: '/agents/profile/me',
+  // Agent Payments
+  AGENT_ORDERS_FOR_PAYMENT: '/agents/payments/orders-for-payment',
+  AGENT_PAY_PUNKT: (orderId: string) => `/agents/payments/pay-to-punkt/${orderId}`,
+  AGENT_PAYMENT_TRANSACTIONS: '/agents/payments/transactions',
+  AGENT_PAYMENT_BALANCE: '/agents/payments/balance',
 } as const;

@@ -21,6 +21,7 @@ export default function OrderDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [markingDelivered, setMarkingDelivered] = useState(false);
+  const [payingToPunkt, setPayingToPunkt] = useState(false);
   const router = useRouter();
   const { agent } = useAuth();
 
@@ -120,12 +121,87 @@ export default function OrderDetailsScreen() {
 
   const canConfirm = () => {
     if (!order || !agent) return false;
-    // Agent uchun: faqat assigned_to_agent status'ida va hali tasdiqlanmagan bo'lsa
+    // Agent uchun: faqat assigned_to_agent status'ida, hali tasdiqlanmagan va punktga to'lov qilingan bo'lsa
+    const paymentTransaction = (order as any).paymentTransaction || 
+                                (order as any).payment || 
+                                (order as any).transaction ||
+                                (order as any).agentPayment;
+    const hasPayment = paymentTransaction !== null && paymentTransaction !== undefined;
     return (
       order.status === 'assigned_to_agent' &&
       order.assignedToAgent?._id === agent._id &&
-      !order.agentConfirmedAt
+      !order.agentConfirmedAt &&
+      hasPayment // Punktga to'lov qilingan bo'lishi kerak
     );
+  };
+
+  const canPayToPunkt = () => {
+    if (!order || !agent) return false;
+    // Agar buyurtma allaqachon tasdiqlangan bo'lsa, to'lov tugmasi ko'rsatilmaydi
+    if (order.agentConfirmedAt) return false;
+    
+    // Agent uchun: faqat assigned_to_agent yoki confirmed_by_agent status'ida va hali punktga to'lov qilinmagan bo'lsa
+    const paymentTransaction = (order as any).paymentTransaction || 
+                                (order as any).payment || 
+                                (order as any).transaction ||
+                                (order as any).agentPayment;
+    const hasPayment = paymentTransaction !== null && paymentTransaction !== undefined;
+    
+    // Agar to'lov qilingan bo'lsa, to'lov tugmasi ko'rsatilmaydi
+    if (hasPayment) return false;
+    
+    return (
+      (order.status === 'assigned_to_agent' || order.status === 'confirmed_by_agent') &&
+      order.assignedToAgent?._id === agent._id &&
+      order.assignedByPunkt
+    );
+  };
+
+  const handlePayToPunkt = () => {
+    if (!order) return;
+
+    Alert.alert(
+      'Punktga to\'lov qilish va buyurtmani tasdiqlash',
+      `Haqiqatan ham punktga ${(order.totalPrice || 0).toLocaleString()} so'm to'lov qilib, buyurtmani tasdiqlamoqchimisiz?`,
+      [
+        { text: 'Bekor qilish', style: 'cancel' },
+        {
+          text: 'To\'lov qilish va tasdiqlash',
+          style: 'default',
+          onPress: payToPunkt,
+        },
+      ]
+    );
+  };
+
+  const payToPunkt = async () => {
+    if (!id) return;
+
+    setPayingToPunkt(true);
+    try {
+      const response = await apiService.payToPunkt(id);
+      if (response.success) {
+        // To'lov qilingandan keyin avtomatik ravishda buyurtmani tasdiqlash
+        try {
+          const confirmResponse = await apiService.confirmOrder(id);
+          if (confirmResponse.success) {
+            Alert.alert('Muvaffaqiyatli', 'To\'lov qilindi va buyurtma tasdiqlandi');
+          } else {
+            Alert.alert('Muvaffaqiyatli', response.message || 'To\'lov muvaffaqiyatli amalga oshirildi');
+          }
+        } catch (confirmError: any) {
+          // To'lov qilindi, lekin tasdiqlashda xatolik bo'lsa ham to'lov muvaffaqiyatli
+          Alert.alert('Muvaffaqiyatli', response.message || 'To\'lov muvaffaqiyatli amalga oshirildi');
+        }
+        // Reload order data after payment and confirmation
+        loadOrder();
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'To\'lov qilishda xatolik';
+      Alert.alert('Xatolik', errorMessage);
+    } finally {
+      setPayingToPunkt(false);
+    }
   };
 
   const canMarkDelivered = () => {
@@ -374,6 +450,21 @@ export default function OrderDetailsScreen() {
               {order.paymentStatus === 'paid' ? 'To\'langan' : 'To\'lanmagan'}
             </Text>
           </View>
+          {(() => {
+            const paymentTransaction = (order as any).paymentTransaction || 
+                                      (order as any).payment || 
+                                      (order as any).transaction ||
+                                      (order as any).agentPayment;
+            return paymentTransaction ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Punktga to'lov:</Text>
+                <View style={styles.paidBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                  <Text style={styles.paidText}>To'langan</Text>
+                </View>
+              </View>
+            ) : null;
+          })()}
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Jami summa:</Text>
             <Text style={styles.totalValue}>
@@ -604,6 +695,27 @@ export default function OrderDetailsScreen() {
               )}
             </View>
           ))}
+        </View>
+      )}
+
+      {canPayToPunkt() && (
+        <View style={styles.actionContainer}>
+          <TouchableOpacity
+            style={[styles.payButton, payingToPunkt && styles.payButtonDisabled]}
+            onPress={handlePayToPunkt}
+            disabled={payingToPunkt}
+          >
+            {payingToPunkt ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="wallet" size={20} color="#fff" />
+                <Text style={styles.payButtonText}>
+                  Punktga to'lov qilish va buyurtmani tasdiqlash ({(order.totalPrice || 0).toLocaleString()} so'm)
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       )}
 
@@ -884,6 +996,54 @@ const styles = StyleSheet.create({
     backgroundColor: '#E3F2FD',
     borderColor: '#007AFF',
     borderWidth: 1,
+  },
+  payButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF9500',
+    borderRadius: 12,
+    padding: 16,
+    gap: 8,
+  },
+  payButtonDisabled: {
+    opacity: 0.6,
+  },
+  payButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF4E6',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9500',
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#FF9500',
+    fontWeight: '500',
+  },
+  paidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  paidText: {
+    fontSize: 14,
+    color: '#34C759',
+    fontWeight: '600',
   },
   deliveredButton: {
     flexDirection: 'row',

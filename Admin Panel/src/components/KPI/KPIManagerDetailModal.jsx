@@ -109,6 +109,10 @@ const KPIManagerDetailModal = ({ managerId, open, onClose }) => {
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">KPI Statistikasi</h3>
                   <div className="space-y-2">
                     <div className="flex justify-between">
+                      <span className="text-gray-600">Jami transaksiyalar:</span>
+                      <span className="font-bold text-indigo-700">{data?.summary?.totalTransactions || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-gray-600">Jami summa:</span>
                       <span className="font-bold text-indigo-700">{formatNumber(data?.summary?.totalAmount)} so'm</span>
                     </div>
@@ -125,7 +129,7 @@ const KPIManagerDetailModal = ({ managerId, open, onClose }) => {
               </div>
 
               {/* Transactions Table */}
-              {data?.transactions && data.transactions.length > 0 && (
+              {data?.transactions?.data && data.transactions.data.length > 0 ? (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">KPI Transaksiyalar</h3>
                   <div className="overflow-x-auto">
@@ -142,7 +146,7 @@ const KPIManagerDetailModal = ({ managerId, open, onClose }) => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {data.transactions.map((transaction, index) => (
+                        {data.transactions.data.map((transaction, index) => (
                           <tr key={transaction._id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm text-gray-900">
                               {(pagination.page - 1) * pagination.limit + index + 1}
@@ -190,13 +194,13 @@ const KPIManagerDetailModal = ({ managerId, open, onClose }) => {
                   </div>
 
                   {/* Pagination */}
-                  {data.totalPages > 1 && (
+                  {data.transactions.totalPages > 1 && (
                     <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
                       <p className="text-sm text-gray-600">
-                        Jami <span className="font-medium">{data.total}</span> ta transaksiyadan{' '}
+                        Jami <span className="font-medium">{data.transactions.total || 0}</span> ta transaksiyadan{' '}
                         <span className="font-medium">
                           {(pagination.page - 1) * pagination.limit + 1}-
-                          {Math.min(pagination.page * pagination.limit, data.total)}
+                          {Math.min(pagination.page * pagination.limit, data.transactions.total || 0)}
                         </span>{' '}
                         ko'rsatilmoqda
                       </p>
@@ -210,7 +214,7 @@ const KPIManagerDetailModal = ({ managerId, open, onClose }) => {
                         </button>
                         <button
                           onClick={() => handlePageChange(pagination.page + 1)}
-                          disabled={pagination.page >= data.totalPages}
+                          disabled={pagination.page >= (data.transactions.totalPages || 1)}
                           className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50"
                         >
                           Keyingi
@@ -219,9 +223,7 @@ const KPIManagerDetailModal = ({ managerId, open, onClose }) => {
                     </div>
                   )}
                 </div>
-              )}
-
-              {(!data?.transactions || data.transactions.length === 0) && (
+              ) : (
                 <div className="text-center py-12 text-gray-500">
                   Transaksiyalar topilmadi
                 </div>

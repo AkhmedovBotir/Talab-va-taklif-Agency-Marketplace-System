@@ -17,8 +17,9 @@ import { useFocusEffect } from 'expo-router';
 import { apiService, StatisticsData } from '../../services/api';
 import { formatNumberDisplay } from '../../utils/formatNumber';
 import PaymentsScreen from './statistika/payments';
+import FinanceScreen from './statistika/finance';
 
-type TabType = 'statistics' | 'payments';
+type TabType = 'statistics' | 'payments' | 'finance';
 
 export default function StatistikaScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('statistics');
@@ -140,10 +141,20 @@ export default function StatistikaScreen() {
             To'lovlarim
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'finance' && styles.tabActive]}
+          onPress={() => setActiveTab('finance')}
+        >
+          <Text style={[styles.tabText, activeTab === 'finance' && styles.tabTextActive]}>
+            Moliya
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {activeTab === 'payments' ? (
         <PaymentsScreen />
+      ) : activeTab === 'finance' ? (
+        <FinanceScreen />
       ) : (
         <>
           {/* Date Filter */}

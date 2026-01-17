@@ -86,29 +86,6 @@ export default function HomeScreen() {
           limit: 20,
           status: 'active',
         });
-        
-        // Log maxalla products data to console
-        console.log('=== MAXALLA GUZARI MA\'LUMOTLARI ===');
-        console.log('Total products:', response.count);
-        console.log('Total pages:', response.totalPages);
-        console.log('Current page:', response.page);
-        console.log('Products count:', response.data?.length || 0);
-        
-        // Log products with shortened base64 images
-        const productsWithShortImages = response.data?.map((product: Product) => {
-          const shortImages = product.images?.map((img: string) => {
-            if (img && img.length > 100) {
-              return `${img.substring(0, 50)}... (${img.length} chars)`;
-            }
-            return img;
-          });
-          return {
-            ...product,
-            images: shortImages,
-          };
-        });
-        console.log('Products data (with shortened images):');
-        console.log(JSON.stringify(productsWithShortImages, null, 2));
       } else {
         // Load tuman products
         response = await apiService.getProducts({
@@ -133,37 +110,6 @@ export default function HomeScreen() {
           // If no MFY selected, show no maxalla products
           filteredProducts = [];
         }
-        
-        // Log filtered maxalla products to console
-        console.log('=== FILTRLANGAN MAXALLA MAHSULOTLARI ===');
-        console.log('Filtered products count:', filteredProducts.length);
-        console.log('Selected MFY:', selectedMfy?.name || 'Tanlanmagan', selectedMfy?._id || '');
-        console.log('Selected tuman:', selectedTuman?.name || 'Tanlanmagan');
-        console.log('Selected viloyat:', selectedViloyat?.name || 'Tanlanmagan');
-        
-        // Log filtered products with shortened base64 images
-        const filteredWithShortImages = filteredProducts.map((product: Product) => {
-          const shortImages = product.images?.map((img: string) => {
-            if (img && img.length > 100) {
-              return `${img.substring(0, 50)}... (${img.length} chars)`;
-            }
-            return img;
-          });
-          return {
-            _id: product._id,
-            name: product.name,
-            price: product.price,
-            quantity: product.quantity,
-            images: shortImages,
-            imagesCount: product.images?.length || 0,
-            category: product.category?.name,
-            contragent: product.contragent?.name,
-            contragentMfy: product.contragent?.mfy?.name,
-            contragentMfyId: product.contragent?.mfy?._id,
-          };
-        });
-        console.log('Filtered products (with shortened images):');
-        console.log(JSON.stringify(filteredWithShortImages, null, 2));
       } else {
         // For tuman products, filter by selected tuman
         if (selectedTuman) {

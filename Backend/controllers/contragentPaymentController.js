@@ -1,67 +1,318 @@
+const FinanceTransaction = require('../models/FinanceTransaction');
+const Order = require('../models/Order');
 const ContragentPaymentDistribution = require('../models/ContragentPaymentDistribution');
 
-// ==================== TO'LANGAN TO'LOVLAR ====================
-
-// Contragent o'ziga qilingan to'langan to'lovlarni ko'rish
-const getMyPaidPayments = async (req, res) => {
+// Kontragent o'zining kirim/chiqimlarini olish
+const getContragentTransactions = async (req, res) => {
   try {
-    const contragentId = req.user.userId;
-    const { page = 1, limit = 50, startDate, endDate } = req.query;
+    const { type, category, startDate, endDate, page = 1, limit = 50 } = req.query;
+    const { userId } = req.user; // Contragent ID
 
     const filter = {
-      contragent: contragentId,
-      status: 'paid',
+      $or: [
+        { 'fromUser.userType': 'Contragent', 'fromUser.userId': userId },
+        { 'toUser.userType': 'Contragent', 'toUser.userId': userId },
+      ],
     };
 
-    // Date filter for paidAt
+    if (type) filter.type = type;
+    if (category) filter.category = category;
+
     if (startDate || endDate) {
-      filter.paidAt = {};
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        filter.paidAt.$gte = start;
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        filter.paidAt.$lte = end;
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await FinanceTransaction.countDocuments(filter);
+
+    const transactions = await FinanceTransaction.find(filter)
+      .populate('order', 'orderNumber totalPrice')
+      .populate('fromUser.userId', 'name inn phone')
+      .populate('toUser.userId', 'name phone')
+      .populate('contragentRequest')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    // Calculate totals
+    const incomeTotal = await FinanceTransaction.aggregate([
+      {
+        $match: {
+          ...filter,
+          type: 'income',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const expenseTotal = await FinanceTransaction.aggregate([
+      {
+        $match: {
+          ...filter,
+          type: 'expense',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: transactions.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      summary: {
+        totalIncome: incomeTotal[0]?.total || 0,
+        totalExpense: expenseTotal[0]?.total || 0,
+        balance: (incomeTotal[0]?.total || 0) - (expenseTotal[0]?.total || 0),
+        qarz: ((incomeTotal[0]?.total || 0) - (expenseTotal[0]?.total || 0)) < 0 
+          ? Math.abs((incomeTotal[0]?.total || 0) - (expenseTotal[0]?.total || 0)) 
+          : 0,
+        haq: ((incomeTotal[0]?.total || 0) - (expenseTotal[0]?.total || 0)) > 0 
+          ? (incomeTotal[0]?.total || 0) - (expenseTotal[0]?.total || 0) 
+          : 0,
+      },
+      data: transactions,
+    });
+  } catch (error) {
+    console.error('Error fetching contragent transactions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Tranzaksiyalarni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Kontragent balansini olish
+const getContragentBalance = async (req, res) => {
+  try {
+    const { userId } = req.user; // Contragent ID
+
+    // Income: transactions where contragent is the receiver (toUser)
+    const incomeTotal = await FinanceTransaction.aggregate([
+      {
+        $match: {
+          'toUser.userType': 'Contragent',
+          'toUser.userId': userId,
+          status: 'completed',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    // Expense: transactions where contragent is the sender (fromUser)
+    const expenseTotal = await FinanceTransaction.aggregate([
+      {
+        $match: {
+          'fromUser.userType': 'Contragent',
+          'fromUser.userId': userId,
+          status: 'completed',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const totalIncome = incomeTotal[0]?.total || 0;
+    const totalExpense = expenseTotal[0]?.total || 0;
+    const balance = totalIncome - totalExpense;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalIncome,
+        totalExpense,
+        balance,
+        // Qarz va haq
+        qarz: balance < 0 ? Math.abs(balance) : 0, // Agar balans manfiy bo'lsa, qarz
+        haq: balance > 0 ? balance : 0, // Agar balans musbat bo'lsa, haq
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching contragent balance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Balansni olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
+
+// Kontragent zaklad ma'lumotlarini olish (qarz/haq)
+const getContragentZakladInfo = async (req, res) => {
+  try {
+    const { userId } = req.user; // Contragent ID
+    const { orderId, contragentRequestId } = req.query;
+
+    const filter = {
+      'toUser.userType': 'Contragent',
+      'toUser.userId': userId,
+      category: 'contragent_received_zaklad',
+      status: 'completed',
+    };
+
+    if (orderId) filter.order = orderId;
+    if (contragentRequestId) filter.contragentRequest = contragentRequestId;
+
+    // Get zaklad transactions
+    const zakladTransactions = await FinanceTransaction.find(filter)
+      .populate('order', 'orderNumber totalPrice totalOriginalPrice')
+      .populate('fromUser.userId', 'name phone viloyat tuman')
+      .populate('contragentRequest')
+      .sort({ createdAt: -1 });
+
+    // Calculate totals
+    const zakladTotal = zakladTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+    // Get pending zaklads (orders delivered but zaklad not paid yet)
+    const pendingZaklads = [];
+    
+    // Find all orders where this contragent has delivered but zaklad not paid
+    const orderFilter = {
+      'contragentRequests.contragentId': userId,
+      'contragentRequests.status': 'delivered_to_punkt',
+      status: 'delivered_to_punkt',
+    };
+    
+    if (orderId) {
+      orderFilter._id = orderId;
+    }
+    
+    const orders = await Order.find(orderFilter)
+      .populate('contragentRequests.contragentId', 'name inn phone')
+      .sort({ createdAt: -1 });
+    
+    for (const order of orders) {
+      for (const contragentRequest of order.contragentRequests) {
+        if (
+          contragentRequest.contragentId.toString() === userId.toString() &&
+          contragentRequest.status === 'delivered_to_punkt'
+        ) {
+          // Check if zaklad already paid
+          const zakladPaid = await FinanceTransaction.findOne({
+            order: order._id,
+            contragentRequest: contragentRequest._id,
+            category: 'contragent_received_zaklad',
+            status: 'completed',
+          });
+
+          if (!zakladPaid) {
+            // Calculate potential zaklad amount
+            let potentialZaklad = 0;
+            const requestItemIds = contragentRequest.itemIds || [];
+            requestItemIds.forEach((itemIndex) => {
+              if (order.items[itemIndex]) {
+                const item = order.items[itemIndex];
+                const itemTotal = item.price * item.quantity;
+                // Assume 40% as default (punkt can set this)
+                potentialZaklad += (itemTotal * 40) / 100;
+              }
+            });
+
+            pendingZaklads.push({
+              orderId: order._id,
+              orderNumber: order.orderNumber,
+              contragentRequestId: contragentRequest._id,
+              potentialZakladAmount: potentialZaklad,
+              deliveredAt: contragentRequest.deliveredToPunktAt,
+            });
+          }
+        }
       }
     }
 
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    res.status(200).json({
+      success: true,
+      data: {
+        zakladTransactions,
+        zakladTotal,
+        pendingZaklads,
+        summary: {
+          totalZakladReceived: zakladTotal,
+          pendingZakladCount: pendingZaklads.length,
+          pendingZakladTotal: pendingZaklads.reduce((sum, p) => sum + p.potentialZakladAmount, 0),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching contragent zaklad info:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Zaklad ma\'lumotlarini olishda xatolik yuz berdi',
+      error: error.message,
+    });
+  }
+};
 
-    // Get paid payments
-    const payments = await ContragentPaymentDistribution.find(filter)
-      .populate('paidBy', 'name phone')
-      .populate('orders', 'orderNumber totalPrice totalKpiPrice createdAt')
-      .sort({ paidAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+// ==================== OLD KPI PAYMENT FUNCTIONS ====================
 
-    // Get total count
+// Get my paid payments (to'langan to'lovlar)
+const getMyPaidPayments = async (req, res) => {
+  try {
+    const { userId } = req.user; // Contragent ID
+    const { page = 1, limit = 50, startDate, endDate } = req.query;
+
+    const filter = {
+      contragent: userId,
+      status: 'paid',
+    };
+
+    if (startDate || endDate) {
+      filter.paidAt = {};
+      if (startDate) filter.paidAt.$gte = new Date(startDate);
+      if (endDate) filter.paidAt.$lte = new Date(endDate);
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
     const total = await ContragentPaymentDistribution.countDocuments(filter);
 
-    // Calculate totals
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-    const totalPaidAmount = await ContragentPaymentDistribution.aggregate([
-      { $match: filter },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
+    const payments = await ContragentPaymentDistribution.find(filter)
+      .populate('orders', 'orderNumber totalPrice totalKpiPrice createdAt')
+      .populate('paidBy', 'name phone')
+      .sort({ paidAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
 
     res.status(200).json({
       success: true,
       count: payments.length,
       total,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(total / parseInt(limit)),
-      totalAmount,
-      totalPaidAmount: totalPaidAmount[0]?.total || 0,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
       data: payments,
     });
   } catch (error) {
-    console.error('Error in getMyPaidPayments:', error);
+    console.error('Error fetching paid payments:', error);
     res.status(500).json({
       success: false,
       message: 'To\'langan to\'lovlarni olishda xatolik yuz berdi',
@@ -70,75 +321,49 @@ const getMyPaidPayments = async (req, res) => {
   }
 };
 
-// ==================== TO'LANMAGAN TO'LOVLAR ====================
-
-// Contragent o'ziga qilingan to'lanmagan to'lovlarni ko'rish
+// Get my unpaid payments (to'lanmagan to'lovlar)
 const getMyUnpaidPayments = async (req, res) => {
   try {
-    const contragentId = req.user.userId;
-    const { page = 1, limit = 50, isOverdue } = req.query;
+    const { userId } = req.user; // Contragent ID
+    const { page = 1, limit = 50 } = req.query;
 
     const filter = {
-      contragent: contragentId,
+      contragent: userId,
       status: 'pending',
     };
 
-    if (isOverdue === 'true') {
-      filter.isOverdue = true;
-    }
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
 
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const total = await ContragentPaymentDistribution.countDocuments(filter);
 
-    // Get unpaid payments
-    let payments = await ContragentPaymentDistribution.find(filter)
+    const payments = await ContragentPaymentDistribution.find(filter)
       .populate('orders', 'orderNumber totalPrice totalKpiPrice createdAt')
       .sort({ dueDate: 1, createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(limitNum);
 
-    // Update isOverdue for all payments
+    // Update isOverdue
     const now = new Date();
     for (const payment of payments) {
-      if (payment.status === 'pending' && payment.dueDate && now > payment.dueDate) {
+      if (payment.dueDate && now > payment.dueDate) {
         payment.isOverdue = true;
         await payment.save();
       }
     }
 
-    // Get total count
-    const total = await ContragentPaymentDistribution.countDocuments(filter);
-
-    // Calculate totals
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-    const totalUnpaidAmount = await ContragentPaymentDistribution.aggregate([
-      { $match: filter },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-
-    // Calculate overdue totals
-    const overdueStats = await ContragentPaymentDistribution.aggregate([
-      { $match: { ...filter, isOverdue: true } },
-      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
-    ]);
-
     res.status(200).json({
       success: true,
       count: payments.length,
       total,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(total / parseInt(limit)),
-      totalAmount,
-      totalUnpaidAmount: totalUnpaidAmount[0]?.total || 0,
-      overdue: {
-        totalAmount: overdueStats[0]?.total || 0,
-        count: overdueStats[0]?.count || 0,
-      },
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
       data: payments,
     });
   } catch (error) {
-    console.error('Error in getMyUnpaidPayments:', error);
+    console.error('Error fetching unpaid payments:', error);
     res.status(500).json({
       success: false,
       message: 'To\'lanmagan to\'lovlarni olishda xatolik yuz berdi',
@@ -147,61 +372,38 @@ const getMyUnpaidPayments = async (req, res) => {
   }
 };
 
-// ==================== TO'LOVLAR STATISTIKASI ====================
-
-// Contragent o'ziga qilingan to'lovlar statistikasini ko'rish
+// Get my payment statistics
 const getMyPaymentStatistics = async (req, res) => {
   try {
-    const contragentId = req.user.userId;
-    const { startDate, endDate } = req.query;
+    const { userId } = req.user; // Contragent ID
 
-    const dateFilter = {};
-    if (startDate || endDate) {
-      dateFilter.paidAt = {};
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        dateFilter.paidAt.$gte = start;
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        dateFilter.paidAt.$lte = end;
-      }
-    }
-
-    // Total unpaid
-    const unpaidStats = await ContragentPaymentDistribution.aggregate([
-      { $match: { contragent: contragentId, status: 'pending' } },
+    const paidTotal = await ContragentPaymentDistribution.aggregate([
+      {
+        $match: {
+          contragent: userId,
+          status: 'paid',
+        },
+      },
       {
         $group: {
           _id: null,
-          totalAmount: { $sum: '$amount' },
+          total: { $sum: '$amount' },
           count: { $sum: 1 },
         },
       },
     ]);
 
-    // Total paid
-    const paidFilter = { contragent: contragentId, status: 'paid', ...dateFilter };
-    const paidStats = await ContragentPaymentDistribution.aggregate([
-      { $match: paidFilter },
+    const unpaidTotal = await ContragentPaymentDistribution.aggregate([
       {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: '$amount' },
-          count: { $sum: 1 },
+        $match: {
+          contragent: userId,
+          status: 'pending',
         },
       },
-    ]);
-
-    // Overdue stats
-    const overdueStats = await ContragentPaymentDistribution.aggregate([
-      { $match: { contragent: contragentId, status: 'pending', isOverdue: true } },
       {
         $group: {
           _id: null,
-          totalAmount: { $sum: '$amount' },
+          total: { $sum: '$amount' },
           count: { $sum: 1 },
         },
       },
@@ -210,48 +412,38 @@ const getMyPaymentStatistics = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        period: {
-          startDate: dateFilter.paidAt?.$gte || null,
-          endDate: dateFilter.paidAt?.$lte || null,
+        paid: {
+          total: paidTotal[0]?.total || 0,
+          count: paidTotal[0]?.count || 0,
         },
         unpaid: {
-          totalAmount: unpaidStats[0]?.totalAmount || 0,
-          count: unpaidStats[0]?.count || 0,
-        },
-        paid: {
-          totalAmount: paidStats[0]?.totalAmount || 0,
-          count: paidStats[0]?.count || 0,
-        },
-        overdue: {
-          totalAmount: overdueStats[0]?.totalAmount || 0,
-          count: overdueStats[0]?.count || 0,
+          total: unpaidTotal[0]?.total || 0,
+          count: unpaidTotal[0]?.count || 0,
         },
       },
     });
   } catch (error) {
-    console.error('Error in getMyPaymentStatistics:', error);
+    console.error('Error fetching payment statistics:', error);
     res.status(500).json({
       success: false,
-      message: 'To\'lovlar statistikasini olishda xatolik yuz berdi',
+      message: 'To\'lov statistikasini olishda xatolik yuz berdi',
       error: error.message,
     });
   }
 };
 
-// ==================== BITTA TO'LOVNI KO'RISH ====================
-
-// Contragent bitta to'lovni ID bo'yicha ko'rish
+// Get payment by ID
 const getMyPaymentById = async (req, res) => {
   try {
-    const contragentId = req.user.userId;
+    const { userId } = req.user; // Contragent ID
     const { id } = req.params;
 
     const payment = await ContragentPaymentDistribution.findOne({
       _id: id,
-      contragent: contragentId,
+      contragent: userId,
     })
-      .populate('paidBy', 'name phone')
-      .populate('orders', 'orderNumber totalPrice totalKpiPrice createdAt');
+      .populate('orders', 'orderNumber totalPrice totalKpiPrice createdAt')
+      .populate('paidBy', 'name phone');
 
     if (!payment) {
       return res.status(404).json({
@@ -265,7 +457,7 @@ const getMyPaymentById = async (req, res) => {
       data: payment,
     });
   } catch (error) {
-    console.error('Error in getMyPaymentById:', error);
+    console.error('Error fetching payment by ID:', error);
     res.status(500).json({
       success: false,
       message: 'To\'lovni olishda xatolik yuz berdi',
@@ -279,11 +471,7 @@ module.exports = {
   getMyUnpaidPayments,
   getMyPaymentStatistics,
   getMyPaymentById,
+  getContragentTransactions,
+  getContragentBalance,
+  getContragentZakladInfo,
 };
-
-
-
-
-
-
-

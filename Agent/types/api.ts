@@ -278,3 +278,97 @@ export interface AgentProfileResponse {
   data: Agent;
 }
 
+// Agent Payment Types
+export type PaymentTransactionType = 'income' | 'expense';
+export type PaymentTransactionCategory = 'agent_paid_to_punkt' | 'agent_received_from_customer';
+export type PaymentTransactionStatus = 'pending' | 'completed' | 'failed' | 'cancelled';
+
+export interface PaymentTransaction {
+  _id: string;
+  type: PaymentTransactionType;
+  category: PaymentTransactionCategory;
+  amount: number;
+  order?: {
+    _id: string;
+    orderNumber: string;
+    totalPrice: number;
+  };
+  description: string;
+  fromUser: {
+    userType: string;
+    userId: string | Agent | User | Punkt;
+  };
+  toUser: {
+    userType: string;
+    userId: string | Agent | User | Punkt;
+  };
+  status: PaymentTransactionStatus;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentTransactionsResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  summary: {
+    totalIncome: number;
+    totalExpense: number;
+    balance: number;
+    qarz: number;
+    haq: number;
+  };
+  data: PaymentTransaction[];
+}
+
+export interface PaymentBalanceResponse {
+  success: boolean;
+  data: {
+    totalIncome: number;
+    totalExpense: number;
+    balance: number;
+    qarz: number;
+    haq: number;
+  };
+}
+
+export interface OrderForPayment {
+  _id: string;
+  orderNumber: string;
+  totalPrice: number;
+  status: OrderStatus;
+  assignedToAgent: string;
+  assignedAt: string;
+  user: User;
+  deliveryViloyat: Region;
+  deliveryTuman: Region | null;
+  assignedByPunkt: Punkt;
+  paymentStatus: 'paid' | 'unpaid';
+  paymentTransaction: PaymentTransaction | null;
+}
+
+export interface OrdersForPaymentResponse {
+  success: boolean;
+  count: number;
+  data: OrderForPayment[];
+}
+
+export interface PayToPunktResponse {
+  success: boolean;
+  message: string;
+  data: PaymentTransaction;
+}
+
+export interface GetPaymentTransactionsParams {
+  type?: PaymentTransactionType;
+  category?: PaymentTransactionCategory;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+

@@ -755,6 +755,41 @@ const confirmDelivery = async (req, res) => {
     
     await order.save();
 
+    // Create payment transaction: Customer → Agent
+    try {
+      const FinanceTransaction = require('../models/FinanceTransaction');
+      
+      // Check if payment already exists
+      const existingPayment = await FinanceTransaction.findOne({
+        order: order._id,
+        category: 'agent_received_from_customer',
+        status: 'completed',
+      });
+
+      if (!existingPayment && order.assignedToAgent) {
+        await FinanceTransaction.create({
+          type: 'income', // Agent uchun kirim
+          category: 'agent_received_from_customer',
+          amount: order.totalPrice,
+          order: order._id,
+          description: `Mijoz tomonidan agentga buyurtma uchun to'lov qilindi`,
+          fromUser: {
+            userType: 'MarketplaceUser',
+            userId: userId,
+          },
+          toUser: {
+            userType: 'Agent',
+            userId: order.assignedToAgent,
+          },
+          status: 'completed',
+          completedAt: new Date(),
+        });
+      }
+    } catch (error) {
+      console.error('Error creating customer payment transaction:', error);
+      // Don't fail the request if payment transaction creation fails
+    }
+
     // Calculate and create KPI bonus transactions
     try {
       const { calculateAndCreateKpiBonus } = require('../utils/kpiBonusCalculator');
@@ -762,6 +797,117 @@ const confirmDelivery = async (req, res) => {
     } catch (error) {
       console.error('Error calculating KPI bonus:', error);
       // Don't fail the request if KPI calculation fails
+    }
+
+    // Punkt kontragentga qolgan summalarni to'lash (mijoz tasdiqlagandan keyin)
+    try {
+      const FinanceTransaction = require('../models/FinanceTransaction');
+      
+      // Check if order is tuman type and has contragent requests
+      if (order.orderType === 'tuman' && order.contragentRequests && order.contragentRequests.length > 0) {
+        // Find delivered contragent requests
+        const deliveredRequests = order.contragentRequests.filter(
+          (req) => req.status === 'delivered_to_punkt'
+        );
+
+        for (const contragentRequest of deliveredRequests) {
+          // Check if final payment already exists
+          const existingFinalPayment = await FinanceTransaction.findOne({
+            order: order._id,
+            contragentRequest: contragentRequest._id,
+            category: 'punkt_to_contragent_final_payment',
+            status: 'completed',
+          });
+
+          if (!existingFinalPayment) {
+            // Get zaklad transaction first
+            const zakladTransaction = await FinanceTransaction.findOne({
+              order: order._id,
+              contragentRequest: contragentRequest._id,
+              category: 'punkt_to_contragent_zaklad',
+              status: 'completed',
+            });
+
+            // Calculate remaining original price and profit
+            let totalOriginalPrice = 0;
+            let totalPrice = 0;
+
+            const requestItemIds = contragentRequest.itemIds || [];
+            requestItemIds.forEach((itemIndex) => {
+              if (order.items[itemIndex]) {
+                const item = order.items[itemIndex];
+                totalOriginalPrice += item.originalPrice * item.quantity;
+                totalPrice += item.price * item.quantity;
+              }
+            });
+
+            // Get zaklad amount if exists
+            const zakladAmount = zakladTransaction ? zakladTransaction.amount : 0;
+
+            // Remaining original price calculation:
+            // Zaklad is paid from price (price * percentage), but we need to pay remaining original price
+            // If zaklad was paid, we calculate what portion of original it represents
+            // For simplicity: if zaklad > 0, remaining = total original - (zaklad * original/price ratio)
+            // If zaklad = 0, remaining = total original
+            let remainingOriginalPrice = totalOriginalPrice;
+            if (zakladAmount > 0 && totalPrice > 0) {
+              // Calculate zaklad as percentage of original (proportional)
+              const zakladAsOriginal = (zakladAmount * totalOriginalPrice) / totalPrice;
+              remainingOriginalPrice = totalOriginalPrice - zakladAsOriginal;
+            }
+            
+            // Profit = total price - total original (for items in this request)
+            const profitAmount = totalPrice - totalOriginalPrice;
+
+            // Create transaction for remaining original price
+            if (remainingOriginalPrice > 0) {
+              await FinanceTransaction.create({
+                type: 'expense', // Punkt uchun chiqim
+                category: 'punkt_to_contragent_final_payment',
+                amount: remainingOriginalPrice,
+                order: order._id,
+                contragentRequest: contragentRequest._id,
+                description: `Punkt tomonidan kontragentga qolgan asl narx to'landi`,
+                fromUser: {
+                  userType: 'Punkt',
+                  userId: order.assignedByPunkt || order.currentPunkt,
+                },
+                toUser: {
+                  userType: 'Contragent',
+                  userId: contragentRequest.contragentId,
+                },
+                status: 'completed',
+                completedAt: new Date(),
+              });
+            }
+
+            // Create transaction for profit (sof foyda)
+            if (profitAmount > 0) {
+              await FinanceTransaction.create({
+                type: 'expense', // Punkt uchun chiqim
+                category: 'punkt_to_contragent_profit',
+                amount: profitAmount,
+                order: order._id,
+                contragentRequest: contragentRequest._id,
+                description: `Punkt tomonidan kontragentga sof foyda to'landi`,
+                fromUser: {
+                  userType: 'Punkt',
+                  userId: order.assignedByPunkt || order.currentPunkt,
+                },
+                toUser: {
+                  userType: 'Contragent',
+                  userId: contragentRequest.contragentId,
+                },
+                status: 'completed',
+                completedAt: new Date(),
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error creating final payment transactions:', error);
+      // Don't fail the request if payment transaction creation fails
     }
 
     // Populate for response

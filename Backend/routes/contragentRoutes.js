@@ -31,6 +31,11 @@ const {
   getMyPaymentStatistics,
   getMyPaymentById,
 } = require('../controllers/contragentPaymentController');
+const {
+  getContragentTransactions,
+  getContragentBalance,
+  getContragentZakladInfo,
+} = require('../controllers/contragentPaymentController');
 const { validate, contragentValidationSchemas } = require('../middleware/validation');
 const { contragentAuth } = require('../middleware/auth');
 
@@ -81,11 +86,23 @@ router.get('/notifications/unread-count', contragentAuth, getContragentUnreadCou
 router.post('/notifications/:notificationId/read', contragentAuth, markContragentNotificationRead);
 router.post('/notifications/read-all', contragentAuth, markAllContragentNotificationsRead);
 
-// Payment routes for Contragent
+// Payment routes for Contragent (old KPI payment routes)
+// Aniq route'lar parametrli route'lardan oldin bo'lishi kerak
 router.get('/payments/paid', contragentAuth, getMyPaidPayments);
 router.get('/payments/unpaid', contragentAuth, getMyUnpaidPayments);
 router.get('/payments/statistics', contragentAuth, getMyPaymentStatistics);
-router.get('/payments/:id', contragentAuth, getMyPaymentById);
+router.get('/payments/payment/:id', contragentAuth, getMyPaymentById); // Changed from /payments/:id to avoid conflict
+
+// ==================== CONTRAGENT PAYMENT ROUTES ====================
+
+// Kontragent zaklad ma'lumotlarini olish (qarz/haq)
+router.get('/finance/zaklad-info', contragentAuth, getContragentZakladInfo);
+
+// Kontragent o'zining tranzaksiyalarini olish
+router.get('/finance/transactions', contragentAuth, getContragentTransactions);
+
+// Kontragent balansini olish
+router.get('/finance/balance', contragentAuth, getContragentBalance);
 
 module.exports = router;
 

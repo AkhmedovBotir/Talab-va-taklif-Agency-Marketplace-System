@@ -22,7 +22,10 @@ const KPIAgentsSection = () => {
     pages: 0,
   });
   const [filters, setFilters] = useState({
+    viloyatId: '',
+    tumanId: '',
     mfyId: '',
+    agentId: '',
     isPaid: '',
     startDate: '',
     endDate: '',
@@ -41,10 +44,21 @@ const KPIAgentsSection = () => {
         limit: appliedLimit,
       };
 
+      if (filters.viloyatId) params.viloyatId = filters.viloyatId;
+      if (filters.tumanId) params.tumanId = filters.tumanId;
       if (filters.mfyId) params.mfyId = filters.mfyId;
+      if (filters.agentId) params.agentId = filters.agentId;
       if (filters.isPaid !== '') params.isPaid = filters.isPaid === 'true';
-      if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
+      if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        params.startDate = startDate.toISOString();
+      }
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        params.endDate = endDate.toISOString();
+      }
 
       const response = await kpiAPI.getAgentsKPI(params);
       if (response.success) {
@@ -77,7 +91,7 @@ const KPIAgentsSection = () => {
   };
 
   const handleResetFilters = () => {
-    setFilters({ mfyId: '', isPaid: '', startDate: '', endDate: '' });
+    setFilters({ viloyatId: '', tumanId: '', mfyId: '', agentId: '', isPaid: '', startDate: '', endDate: '' });
     setTimeout(() => fetchAgents({ page: 1 }), 0);
   };
 
@@ -97,11 +111,40 @@ const KPIAgentsSection = () => {
       <div className="flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg">
         <div>
           <RegionSelect
+            name="viloyatId"
+            value={filters.viloyatId}
+            onChange={(e) => {
+              handleFilterChange('viloyatId', e.target.value);
+              handleFilterChange('tumanId', '');
+              handleFilterChange('mfyId', '');
+            }}
+            label="Viloyat"
+            type="region"
+          />
+        </div>
+        <div>
+          <RegionSelect
+            name="tumanId"
+            value={filters.tumanId}
+            onChange={(e) => {
+              handleFilterChange('tumanId', e.target.value);
+              handleFilterChange('mfyId', '');
+            }}
+            label="Tuman"
+            type="district"
+            parentId={filters.viloyatId || undefined}
+            disabled={!filters.viloyatId}
+          />
+        </div>
+        <div>
+          <RegionSelect
             name="mfyId"
             value={filters.mfyId}
             onChange={(e) => handleFilterChange('mfyId', e.target.value)}
             label="MFY"
             type="mfy"
+            parentId={filters.tumanId || undefined}
+            disabled={!filters.tumanId}
           />
         </div>
         <div>
@@ -184,6 +227,12 @@ const KPIAgentsSection = () => {
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{item.agent?.name || '-'}</div>
                       <div className="text-xs text-gray-500">{item.agent?.phone || '-'}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {item.agent?.viloyat?.name || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {item.agent?.tuman?.name || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {item.agent?.mfy?.name || '-'}

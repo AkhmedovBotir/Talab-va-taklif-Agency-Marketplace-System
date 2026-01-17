@@ -1859,9 +1859,9 @@ export const kpiAPI = {
       limit = 50, 
       orderId, 
       productId, 
-      contragentId, 
       punktId, 
       agentId, 
+      managerId,
       orderStatus, 
       isPaid, 
       startDate, 
@@ -1874,9 +1874,9 @@ export const kpiAPI = {
     
     if (orderId) queryParams.append('orderId', orderId);
     if (productId) queryParams.append('productId', productId);
-    if (contragentId) queryParams.append('contragentId', contragentId);
     if (punktId) queryParams.append('punktId', punktId);
     if (agentId) queryParams.append('agentId', agentId);
+    if (managerId) queryParams.append('managerId', managerId);
     if (orderStatus) queryParams.append('orderStatus', orderStatus);
     if (isPaid !== undefined) queryParams.append('isPaid', isPaid.toString());
     if (startDate) queryParams.append('startDate', startDate);
@@ -1892,18 +1892,18 @@ export const kpiAPI = {
 
   // Get KPI statistics
   getStatistics: async (params = {}) => {
-    const { startDate, endDate } = params;
+    const { startDate, endDate, isPaid } = params;
     const queryParams = new URLSearchParams();
     
     if (startDate) queryParams.append('startDate', startDate);
     if (endDate) queryParams.append('endDate', endDate);
+    if (isPaid !== undefined) queryParams.append('isPaid', isPaid.toString());
     
     const queryString = queryParams.toString();
     return apiRequest(`/admins/kpi/statistics${queryString ? `?${queryString}` : ''}`);
   },
 
-  // Get all agents KPI (barcha agentlar bir xil - viloyat, tuman, MFY farqi yo'q)
-  // Backward compatibility uchun barcha uchta endpoint bir xil ishlaydi
+  // Get all agents KPI
   getAgentsKPI: async (params = {}) => {
     const { page = 1, limit = 50, viloyatId, tumanId, mfyId, agentId, isPaid, startDate, endDate } = params;
     const queryParams = new URLSearchParams({
@@ -1919,21 +1919,7 @@ export const kpiAPI = {
     if (startDate) queryParams.append('startDate', startDate);
     if (endDate) queryParams.append('endDate', endDate);
     
-    // Barcha uchta endpoint bir xil ishlaydi, viloyat-agents endpoint'ini ishlatamiz
-    return apiRequest(`/admins/kpi/data/viloyat-agents?${queryParams.toString()}`);
-  },
-
-  // Backward compatibility - eski funksiyalar
-  getViloyatAgentsKPI: async (params = {}) => {
-    return kpiAPI.getAgentsKPI(params);
-  },
-
-  getTumanAgentsKPI: async (params = {}) => {
-    return kpiAPI.getAgentsKPI(params);
-  },
-
-  getMfyAgentsKPI: async (params = {}) => {
-    return kpiAPI.getAgentsKPI(params);
+    return apiRequest(`/admins/kpi/data/agents?${queryParams.toString()}`);
   },
 
   // Get punkts KPI
@@ -2563,6 +2549,43 @@ export const financeAPI = {
     
     const queryString = queryParams.toString();
     return apiRequest(`/admin-finance/balance/delivery-service-kpi${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Admin Payments
+  // Send money to punkt
+  sendToPunkt: async (paymentData) => {
+    return apiRequest('/admins/payments/send-to-punkt', {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    });
+  },
+
+  // Get admin transactions
+  getAdminTransactions: async (params = {}) => {
+    const { 
+      type, 
+      category, 
+      startDate, 
+      endDate, 
+      page = 1, 
+      limit = 50 
+    } = params;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (type) queryParams.append('type', type);
+    if (category) queryParams.append('category', category);
+    if (startDate) queryParams.append('startDate', startDate);
+    if (endDate) queryParams.append('endDate', endDate);
+    
+    return apiRequest(`/admins/payments/transactions?${queryParams.toString()}`);
+  },
+
+  // Get admin balance
+  getAdminBalance: async () => {
+    return apiRequest('/admins/payments/balance');
   },
 };
 

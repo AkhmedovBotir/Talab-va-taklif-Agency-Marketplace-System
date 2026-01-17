@@ -351,9 +351,9 @@ export default function SelectRegionsScreen() {
                         <Text style={styles.selectedCardSubtitle}>Butun viloyat</Text>
                       )}
                     </View>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveRegion(index)}
+                </View>
+                <TouchableOpacity
+                  onPress={() => handleRemoveRegion(index)}
                   style={styles.removeButton}
                 >
                     <Ionicons name="close-circle" size={28} color="#FF3B30" />

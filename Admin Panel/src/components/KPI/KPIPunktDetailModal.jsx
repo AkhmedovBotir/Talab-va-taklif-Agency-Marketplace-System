@@ -142,7 +142,7 @@ const KPIPunktDetailModal = ({ punktId, open, onClose }) => {
               {/* Transactions Table */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-500 uppercase mb-3">Transaksiyalar</h3>
-                {data?.transactions?.data?.length > 0 ? (
+                {data?.data && data.data.length > 0 ? (
                   <div className="overflow-x-auto border border-gray-200 rounded-lg">
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b border-gray-200">
@@ -150,28 +150,17 @@ const KPIPunktDetailModal = ({ punktId, open, onClose }) => {
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Buyurtma</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Mahsulot</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Punkt summasi</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Bonus turi</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Holat</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Sana</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {data.transactions.data.map((tx, index) => (
+                        {data.data.map((tx, index) => (
                           <tr key={tx._id || index} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-sm">#{tx.order?.orderNumber || '-'}</td>
                             <td className="px-4 py-2 text-sm">{tx.orderItem?.product?.name || '-'}</td>
                             <td className="px-4 py-2 text-sm font-medium text-purple-600">
                               {formatNumber(tx.punktAmount)} so'm
-                            </td>
-                            <td className="px-4 py-2">
-                              <span className={`px-2 py-0.5 rounded text-xs ${
-                                tx.bonusType === 'regular' ? 'bg-gray-100 text-gray-700' :
-                                tx.bonusType === 'from_punkt' ? 'bg-orange-100 text-orange-700' :
-                                tx.bonusType === 'to_punkt' ? 'bg-blue-100 text-blue-700' :
-                                'bg-purple-100 text-purple-700'
-                              }`}>
-                                {bonusTypeLabels[tx.bonusType] || tx.bonusType}
-                              </span>
                             </td>
                             <td className="px-4 py-2">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
@@ -194,10 +183,10 @@ const KPIPunktDetailModal = ({ punktId, open, onClose }) => {
                 )}
 
                 {/* Pagination */}
-                {data?.transactions?.totalPages > 1 && (
+                {data?.totalPages > 1 && (
                   <div className="flex justify-between items-center mt-4">
                     <p className="text-sm text-gray-500">
-                      {data.transactions.total} ta transaksiyadan {data.transactions.count} ta ko'rsatilmoqda
+                      {data.total || 0} ta transaksiyadan {data.count || 0} ta ko'rsatilmoqda
                     </p>
                     <div className="flex gap-2">
                       <button
@@ -209,7 +198,7 @@ const KPIPunktDetailModal = ({ punktId, open, onClose }) => {
                       </button>
                       <button
                         onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
-                        disabled={pagination.page >= data.transactions.totalPages}
+                        disabled={pagination.page >= (data.totalPages || 1)}
                         className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50"
                       >
                         Keyingi

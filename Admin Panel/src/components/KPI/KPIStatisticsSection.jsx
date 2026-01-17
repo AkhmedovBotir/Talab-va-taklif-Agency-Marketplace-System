@@ -10,6 +10,7 @@ import {
   Store,
   LocationCity,
   SwapHoriz,
+  Person,
 } from '@mui/icons-material';
 
 const formatNumber = (num) => {
@@ -49,8 +50,16 @@ const KPIStatisticsSection = () => {
     setLoading(true);
     try {
       const params = {};
-      if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
+      if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        params.startDate = startDate.toISOString();
+      }
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        params.endDate = endDate.toISOString();
+      }
 
       const response = await kpiAPI.getStatistics(params);
       if (response.success) {
@@ -141,48 +150,61 @@ const KPIStatisticsSection = () => {
         />
         <StatCard
           icon={CheckCircle}
-          label="To'langan"
-          value={formatNumber(statistics?.paidTransactions)}
+          label="To'langan KPI"
+          value={`${formatNumber(statistics?.paidKpiAmount || 0)} so'm`}
           color="bg-emerald-100 text-emerald-600"
         />
         <StatCard
           icon={PendingActions}
-          label="To'lanmagan"
-          value={formatNumber(statistics?.unpaidTransactions)}
+          label="To'lanmagan KPI"
+          value={`${formatNumber(statistics?.unpaidKpiAmount || 0)} so'm`}
           color="bg-amber-100 text-amber-600"
         />
       </div>
 
       {/* Distribution Stats */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Taqsimlash bo'yicha</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            icon={Store}
-            label="Punktlar"
-            value={`${formatNumber(statistics?.totalPunkt)} so'm`}
-            color="bg-purple-100 text-purple-600"
-          />
-          <StatCard
-            icon={LocationCity}
-            label="Agentlar"
-            value={`${formatNumber(statistics?.totalAgent || statistics?.totalViloyatAgent || statistics?.totalTumanAgent || statistics?.totalMfyAgent)} so'm`}
-            color="bg-indigo-100 text-indigo-600"
-          />
-          <StatCard
-            icon={AccountBalance}
-            label="Moliya"
-            value={`${formatNumber(statistics?.totalFinance)} so'm`}
-            color="bg-green-100 text-green-600"
-          />
-          <StatCard
-            icon={SwapHoriz}
-            label="Punkt transfer"
-            value={`${formatNumber(statistics?.totalPunktTransfer)} so'm`}
-            color="bg-orange-100 text-orange-600"
-          />
+      {statistics?.byRecipient && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Taqsimlash bo'yicha</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <StatCard
+              icon={Store}
+              label="Punktlar"
+              value={`${formatNumber(statistics.byRecipient.punkt?.totalAmount || 0)} so'm`}
+              color="bg-purple-100 text-purple-600"
+              subValue={`To'langan: ${formatNumber(statistics.byRecipient.punkt?.paidAmount || 0)} so'm`}
+            />
+            <StatCard
+              icon={LocationCity}
+              label="Agentlar"
+              value={`${formatNumber(statistics.byRecipient.agent?.totalAmount || 0)} so'm`}
+              color="bg-indigo-100 text-indigo-600"
+              subValue={`To'langan: ${formatNumber(statistics.byRecipient.agent?.paidAmount || 0)} so'm`}
+            />
+            <StatCard
+              icon={Person}
+              label="Menejerlar"
+              value={`${formatNumber(statistics.byRecipient.manager?.totalAmount || 0)} so'm`}
+              color="bg-purple-100 text-purple-600"
+              subValue={`To'langan: ${formatNumber(statistics.byRecipient.manager?.paidAmount || 0)} so'm`}
+            />
+            <StatCard
+              icon={AccountBalance}
+              label="Moliya"
+              value={`${formatNumber(statistics.byRecipient.finance?.totalAmount || 0)} so'm`}
+              color="bg-green-100 text-green-600"
+              subValue={`To'langan: ${formatNumber(statistics.byRecipient.finance?.paidAmount || 0)} so'm`}
+            />
+            <StatCard
+              icon={SwapHoriz}
+              label="Yetkazib Berish"
+              value={`${formatNumber(statistics.byRecipient.deliveryService?.totalAmount || 0)} so'm`}
+              color="bg-orange-100 text-orange-600"
+              subValue={`To'langan: ${formatNumber(statistics.byRecipient.deliveryService?.paidAmount || 0)} so'm`}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

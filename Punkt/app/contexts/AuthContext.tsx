@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [punkt, setPunkt] = useState<Punkt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // isAuthenticated ni computed property sifatida emas, balki to'g'ridan-to'g'ri hisoblaymiz
   const isAuthenticated = !!token;
 
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           // Keyin state ga o'rnatamiz - bu asinxron, lekin darhol ishlaydi
           // React state updates asinxron, shuning uchun biz state ni darhol yangilaymiz
-          setToken(storedToken);
+        setToken(storedToken);
           setPunkt(parsedPunkt);
           
           // Token validation - biror API so'rovi yuborib token yaroqliligini tekshirish
@@ -136,15 +136,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(newToken);
           setPunkt(newPunkt);
           apiService.setToken(newToken);
-          
+
           console.log('✅ State ga o\'rnatildi');
           
           // Keyin AsyncStorage ga saqlaymiz
           try {
-            await Promise.all([
-              AsyncStorage.setItem(TOKEN_KEY, newToken),
-              AsyncStorage.setItem(PUNKT_KEY, JSON.stringify(newPunkt)),
-            ]);
+          await Promise.all([
+            AsyncStorage.setItem(TOKEN_KEY, newToken),
+            AsyncStorage.setItem(PUNKT_KEY, JSON.stringify(newPunkt)),
+          ]);
             
             console.log('✅ AsyncStorage ga saqlandi');
             
@@ -218,7 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadStoredAuth();
   }, []);
-
+    
   // Set device error callback separately to avoid dependency issues
   useEffect(() => {
     // Set device error callback to logout user
@@ -229,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout]);
   
   console.log('🔄 AuthProvider render - token:', token ? 'Mavjud' : 'Yo\'q', 'isAuthenticated:', isAuthenticated);
-  
+
   return (
     <AuthContext.Provider
       value={{

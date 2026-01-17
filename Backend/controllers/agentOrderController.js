@@ -298,6 +298,23 @@ const confirmOrderByAgent = async (req, res) => {
       });
     }
 
+    // Check if agent has paid for the order (agent must pay before delivering to customer)
+    const FinanceTransaction = require('../models/FinanceTransaction');
+    const agentPayment = await FinanceTransaction.findOne({
+      order: order._id,
+      category: 'agent_paid_to_punkt',
+      'fromUser.userType': 'Agent',
+      'fromUser.userId': agent._id,
+      status: 'completed',
+    });
+
+    if (!agentPayment) {
+      return res.status(400).json({
+        success: false,
+        message: 'Buyurtma uchun to\'lov qilmagansiz. Avval punktga to\'lov qilish kerak.',
+      });
+    }
+
     // Update order
     order.confirmedByAgent = agent._id;
     order.agentConfirmedAt = new Date();

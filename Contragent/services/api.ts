@@ -1248,6 +1248,52 @@ class ApiService {
       { method: 'GET' }
     );
   }
+
+  // Finance (New Finance System) APIs
+  async getFinanceTransactions(params?: {
+    type?: 'income' | 'expense';
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<FinanceTransactionsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const query = queryParams.toString();
+    return this.request<FinanceTransactionsResponse>(
+      `/api/contragents/finance/transactions${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
+  async getFinanceBalance(): Promise<FinanceBalanceResponse> {
+    return this.request<FinanceBalanceResponse>(
+      `/api/contragents/finance/balance`,
+      { method: 'GET' }
+    );
+  }
+
+  async getZakladInfo(params?: {
+    orderId?: string;
+    contragentRequestId?: string;
+  }): Promise<ZakladInfoResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.orderId) queryParams.append('orderId', params.orderId);
+    if (params?.contragentRequestId) queryParams.append('contragentRequestId', params.contragentRequestId);
+    
+    const query = queryParams.toString();
+    return this.request<ZakladInfoResponse>(
+      `/api/contragents/finance/zaklad-info${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  }
 }
 
 // Statistics interfaces
@@ -1398,6 +1444,129 @@ export interface PaymentStatisticsResponse {
 export interface PaymentDetailResponse {
   success: boolean;
   data: ContragentPayment;
+}
+
+// Finance (New Finance System) interfaces
+export interface FinanceTransactionOrder {
+  _id: string;
+  orderNumber: string;
+  totalPrice: number;
+  totalOriginalPrice?: number;
+}
+
+export interface FinanceTransactionFromUser {
+  userType: string;
+  userId: {
+    _id: string;
+    name: string;
+    phone: string;
+  } | string;
+}
+
+export interface FinanceTransactionToUser {
+  userType: string;
+  userId: string;
+}
+
+export interface FinanceTransaction {
+  _id: string;
+  type: 'income' | 'expense';
+  category: string;
+  amount: number;
+  order?: FinanceTransactionOrder;
+  contragentRequest?: string;
+  zakladPercentage?: number;
+  description: string;
+  fromUser?: FinanceTransactionFromUser;
+  toUser?: FinanceTransactionToUser;
+  status: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinanceTransactionsSummary {
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
+  qarz: number;
+  haq: number;
+}
+
+export interface FinanceTransactionsResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  summary: FinanceTransactionsSummary;
+  data: FinanceTransaction[];
+}
+
+export interface FinanceBalanceData {
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
+  qarz: number;
+  haq: number;
+}
+
+export interface FinanceBalanceResponse {
+  success: boolean;
+  data: FinanceBalanceData;
+}
+
+// Zaklad Info interfaces
+export interface ZakladTransaction {
+  _id: string;
+  type: 'income' | 'expense';
+  category: string;
+  amount: number;
+  order: {
+    _id: string;
+    orderNumber: string;
+    totalPrice: number;
+    totalOriginalPrice: number;
+  };
+  contragentRequest: string;
+  zakladPercentage: number;
+  fromUser: {
+    userType: string;
+    userId: {
+      _id: string;
+      name: string;
+      phone: string;
+    };
+  };
+  status: string;
+  completedAt: string;
+}
+
+export interface PendingZaklad {
+  orderId: string;
+  orderNumber: string;
+  contragentRequestId: string;
+  potentialZakladAmount: number;
+  deliveredAt: string;
+}
+
+export interface ZakladInfoSummary {
+  totalZakladReceived: number;
+  pendingZakladCount: number;
+  pendingZakladTotal: number;
+}
+
+export interface ZakladInfoData {
+  zakladTransactions: ZakladTransaction[];
+  zakladTotal: number;
+  pendingZaklads: PendingZaklad[];
+  summary: ZakladInfoSummary;
+}
+
+export interface ZakladInfoResponse {
+  success: boolean;
+  data: ZakladInfoData;
 }
 
 export const apiService = new ApiService();

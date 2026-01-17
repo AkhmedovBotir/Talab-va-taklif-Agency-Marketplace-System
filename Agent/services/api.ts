@@ -9,6 +9,7 @@ import type {
   GetKPIParams,
   GetOrdersHistoryParams,
   GetOrdersParams,
+  GetPaymentTransactionsParams,
   KPIDailyBalanceResponse,
   KPIDailyReportResponse,
   KPISummaryResponse,
@@ -17,7 +18,11 @@ import type {
   LoginResponse,
   MarkDeliveredResponse,
   OrderResponse,
+  OrdersForPaymentResponse,
   OrdersResponse,
+  PayToPunktResponse,
+  PaymentBalanceResponse,
+  PaymentTransactionsResponse,
 } from '../types/api';
 
 const TOKEN_KEY = '@agent_token';
@@ -317,6 +322,39 @@ class ApiService {
   // Mark All Notifications as Read
   async markAllNotificationsRead(): Promise<any> {
     const response = await this.api.post(API_ENDPOINTS.AGENT_NOTIFICATIONS_READ_ALL);
+    return response.data;
+  }
+
+  // Get Orders For Payment
+  async getOrdersForPayment(): Promise<OrdersForPaymentResponse> {
+    const response = await this.api.get<OrdersForPaymentResponse>(
+      API_ENDPOINTS.AGENT_ORDERS_FOR_PAYMENT
+    );
+    return response.data;
+  }
+
+  // Pay to Punkt
+  async payToPunkt(orderId: string): Promise<PayToPunktResponse> {
+    const response = await this.api.post<PayToPunktResponse>(
+      API_ENDPOINTS.AGENT_PAY_PUNKT(orderId)
+    );
+    return response.data;
+  }
+
+  // Get Payment Transactions
+  async getPaymentTransactions(params?: GetPaymentTransactionsParams): Promise<PaymentTransactionsResponse> {
+    const response = await this.api.get<PaymentTransactionsResponse>(
+      API_ENDPOINTS.AGENT_PAYMENT_TRANSACTIONS,
+      { params }
+    );
+    return response.data;
+  }
+
+  // Get Payment Balance
+  async getPaymentBalance(): Promise<PaymentBalanceResponse> {
+    const response = await this.api.get<PaymentBalanceResponse>(
+      API_ENDPOINTS.AGENT_PAYMENT_BALANCE
+    );
     return response.data;
   }
 }

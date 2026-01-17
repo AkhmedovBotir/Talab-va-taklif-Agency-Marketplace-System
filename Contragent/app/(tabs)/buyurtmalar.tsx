@@ -44,8 +44,8 @@ export default function BuyurtmalarScreen() {
       }
 
       setHasMore(response.page < response.totalPages);
-      } catch (error: any) {
-        Alert.alert('Xatolik', error.message || 'Buyurtmalarni yuklashda xatolik');
+    } catch (error: any) {
+      Alert.alert('Xatolik', error.message || 'Buyurtmalarni yuklashda xatolik');
     } finally {
       setLoading(false);
       setRefreshing(false);

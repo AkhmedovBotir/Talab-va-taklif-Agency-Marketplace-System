@@ -23,6 +23,12 @@ const {
 } = require('../controllers/notificationController');
 const { validate, punktValidationSchemas } = require('../middleware/validation');
 const { punktAuth } = require('../middleware/auth');
+const {
+  payZakladToContragent,
+  getOrdersForZaklad,
+  getPunktTransactions,
+  getPunktBalance,
+} = require('../controllers/punktPaymentController');
 
 // Password setup
 router.post('/password-setup/step1', validate(punktValidationSchemas.passwordSetupStep1), passwordSetupStep1);
@@ -58,6 +64,20 @@ router.get('/notifications/list', punktAuth, getPunktNotifications);
 router.get('/notifications/unread-count', punktAuth, getPunktUnreadCount);
 router.post('/notifications/:notificationId/read', punktAuth, markPunktNotificationRead);
 router.post('/notifications/read-all', punktAuth, markAllPunktNotificationsRead);
+
+// ==================== PUNKT PAYMENT ROUTES ====================
+
+// Punkt zaklad berish uchun buyurtmalarni olish
+router.get('/payments/orders-for-zaklad', punktAuth, getOrdersForZaklad);
+
+// Punkt kontragentga zaklad berish
+router.post('/payments/pay-zaklad', punktAuth, payZakladToContragent);
+
+// Punkt o'zining tranzaksiyalarini olish
+router.get('/payments/transactions', punktAuth, getPunktTransactions);
+
+// Punkt balansini olish
+router.get('/payments/balance', punktAuth, getPunktBalance);
 
 module.exports = router;
 

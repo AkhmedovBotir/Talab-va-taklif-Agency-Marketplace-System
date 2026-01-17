@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -18,6 +19,45 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PunktPicker } from '../components/PunktPicker';
 import { useAuth } from '../contexts/AuthContext';
 import { AgentSelection, apiService, Contragent, Order, PunktSelection } from '../services/api';
+
+// Helper function to shorten base64 strings in logs
+const shortenBase64 = (str: string, maxLength: number = 100): string => {
+  if (typeof str !== 'string') return str;
+  if (str.length <= maxLength) return str;
+  if (str.startsWith('data:image') || str.length > 200) {
+    return str.substring(0, maxLength) + '... [truncated]';
+  }
+  return str;
+};
+
+// Helper function to clean object for logging (remove long base64 strings)
+const cleanForLog = (obj: any, depth: number = 0): any => {
+  if (depth > 5) return '[max depth reached]';
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') {
+    if (typeof obj === 'string' && obj.length > 200) {
+      return shortenBase64(obj);
+    }
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanForLog(item, depth + 1));
+  }
+  const cleaned: any = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const value = obj[key];
+      if (typeof value === 'string' && value.length > 200) {
+        cleaned[key] = shortenBase64(value);
+      } else if (typeof value === 'object') {
+        cleaned[key] = cleanForLog(value, depth + 1);
+      } else {
+        cleaned[key] = value;
+      }
+    }
+  }
+  return cleaned;
+};
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,6 +77,19 @@ export default function OrderDetailScreen() {
   const [loadingContragents, setLoadingContragents] = useState(false);
   const [sendToPunktModalVisible, setSendToPunktModalVisible] = useState(false);
   const [selectedSendToPunkt, setSelectedSendToPunkt] = useState<PunktSelection | null>(null);
+  const [payZakladModalVisible, setPayZakladModalVisible] = useState(false);
+  const [selectedContragentRequest, setSelectedContragentRequest] = useState<{
+    _id: string;
+    contragentId: Contragent | string;
+  } | null>(null);
+  const [zakladPercentage, setZakladPercentage] = useState<number>(40);
+  const [payFinalPaymentModalVisible, setPayFinalPaymentModalVisible] = useState(false);
+  const [payProfitModalVisible, setPayProfitModalVisible] = useState(false);
+  const [selectedContragentRequestForPayment, setSelectedContragentRequestForPayment] = useState<{
+    _id: string;
+    contragentId: Contragent | string;
+  } | null>(null);
+  const [paidZakladRequestIds, setPaidZakladRequestIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadOrder();
@@ -49,7 +102,7 @@ export default function OrderDetailScreen() {
       const response = await apiService.getOrderContragents(id);
       setOrderContragents(response.data.contragents);
     } catch (error: any) {
-      console.error('Error loading order contragents:', error);
+      // Error handled silently
     } finally {
       setLoadingContragents(false);
     }
@@ -83,6 +136,22 @@ export default function OrderDetailScreen() {
         setLoading(true);
       }
       const response = await apiService.getOrderById(id);
+      
+      // Backend'dan kelgan zakladPaid field'larini state'ga sinxronlashtirish
+      if (response.data.contragentRequests) {
+        const paidIds = new Set<string>();
+        response.data.contragentRequests.forEach((req: any) => {
+          if (req._id && ((req as any).zakladPaid === true)) {
+            paidIds.add(req._id);
+          }
+        });
+        if (paidIds.size > 0) {
+          setPaidZakladRequestIds(prev => {
+            return new Set([...prev, ...paidIds]);
+          });
+        }
+      }
+      
       setOrder(response.data);
     } catch (error: any) {
       Alert.alert('Xatolik', error.message || 'Buyurtma yuklanmadi');
@@ -410,6 +479,7 @@ export default function OrderDetailScreen() {
   const isAcceptedByContragent = orderStatus === 'accepted_by_contragent';
   const isDeliveredToPunkt = orderStatus === 'delivered_to_punkt';
   const isAssignedToAgent = orderStatus === 'assigned_to_agent';
+  const isConfirmedByCustomer = orderStatus === 'confirmed_by_customer';
   
   // Check if this punkt confirmed the order
   const isMyPunkt = punkt?._id === order.confirmedByPunkt?._id;
@@ -527,9 +597,6 @@ export default function OrderDetailScreen() {
         ? req.toPunktId._id 
         : req.toPunktId;
       const matches = toPunktId && punkt?._id && String(toPunktId) === String(punkt._id);
-      if (matches) {
-        console.log('Found received request:', { toPunktId, punktId: punkt._id, req });
-      }
       return matches;
     }
   ) || false;
@@ -586,11 +653,41 @@ export default function OrderDetailScreen() {
     !canReceiveFromContragent && // Don't show if can receive from contragent
     !canReceiveFromPunkt; // Don't show if can receive from punkt
   
+  // Check if zaklad can be paid (when order is delivered_to_punkt and there's a delivered contragent request)
+  // This must be checked BEFORE canAssignToAgent to ensure zaklad is paid first
+  // Zaklad to'langanligini tekshirish: agar contragentRequest'da zakladPaid field bo'lsa yoki 
+  // boshqa usul bilan zaklad to'langanligini aniqlash
+  const deliveredContragentRequests = order.contragentRequests?.filter(
+    (req) => {
+      if (typeof req !== 'object') return false;
+      const status = req.status;
+      const requestId = req._id;
+      // Zaklad to'langanligini tekshirish:
+      // 1. Agar req'da zakladPaid field bo'lsa
+      // 2. Yoki state'da zaklad to'langan request ID'lar ro'yxatida bo'lsa
+      const zakladPaid = (req as any).zakladPaid === true || paidZakladRequestIds.has(requestId);
+      return status === 'delivered_to_punkt' && !zakladPaid;
+    }
+  ) || [];
+  
+  // Zaklad to'lash mumkin bo'lsa, faqat zaklad to'lanmagan delivered request'lar bo'lsa
+  const canPayZaklad = 
+    isDeliveredToPunkt &&
+    (isMyPunkt || isCurrentPunkt) &&
+    deliveredContragentRequests.length > 0 && // Faqat zaklad to'lanmagan request'lar
+    !isAssignedToAgent &&
+    !order.assignedToAgent &&
+    !canReceiveFromContragent &&
+    !canReceiveFromPunkt &&
+    !canSendToPunkt &&
+    !isConfirmedByCustomer; // Don't show if customer already confirmed
+
   // Step 7: Assign to agent (if delivered to punkt and this punkt has it, and not yet assigned)
   // Workflow: Holat 1, 2 - o'z tumanidagi buyurtmalar uchun agentga yuborish
   // Holat 3 - faqat buyurtmachi tumani punkti uchun agentga yuborish (kontragent tumani punkti uchun emas)
   // Must show AFTER "Receive from Contragent" or "Receive from Punkt" - only show if already delivered to punkt
   // Only show if order is in this punkt's tuman (not for second punkt in Holat 3)
+  // IMPORTANT: Can only assign to agent AFTER zaklad is paid (if zaklad needs to be paid)
   
   // For Holat 3: Buloqboshi punkt can assign to agent if:
   // 1. Order is in Buloqboshi tuman (isOrderInPunktTuman = true)
@@ -604,7 +701,178 @@ export default function OrderDetailScreen() {
     !order.assignedToAgent &&
     !canReceiveFromContragent && // Ensure this only shows when receive from contragent is not available
     !canReceiveFromPunkt && // Ensure this only shows when receive from punkt is not available (pending/accepted only, not delivered)
-    !canSendToPunkt; // Ensure this only shows when send to punkt is not available (only for second punkt)
+    !canSendToPunkt && // Ensure this only shows when send to punkt is not available (only for second punkt)
+    !canPayZaklad; // IMPORTANT: Can only assign to agent AFTER zaklad is paid (if zaklad needs to be paid)
+
+  // Check if final payment and profit can be paid (when customer confirmed the order)
+  const canPayFinalPayment = 
+    isConfirmedByCustomer &&
+    (isMyPunkt || isCurrentPunkt) &&
+    deliveredContragentRequests.length > 0 &&
+    !canReceiveFromContragent &&
+    !canReceiveFromPunkt &&
+    !canSendToPunkt &&
+    !canAssignToAgent;
+
+  const canPayProfit = canPayFinalPayment; // Same conditions
+
+  const handlePayZaklad = () => {
+    if (deliveredContragentRequests.length === 0) {
+      Alert.alert('Xatolik', 'Zaklad to\'lash uchun yetkazilgan contragent so\'rovi topilmadi');
+      return;
+    }
+    
+    // If there's only one delivered request, select it automatically
+    if (deliveredContragentRequests.length === 1) {
+      const req = deliveredContragentRequests[0];
+      if (typeof req === 'object' && req._id) {
+        setSelectedContragentRequest(req);
+        setPayZakladModalVisible(true);
+      }
+    } else {
+      // If multiple, show selection (for now, just use the first one)
+      const req = deliveredContragentRequests[0];
+      if (typeof req === 'object' && req._id) {
+        setSelectedContragentRequest(req);
+        setPayZakladModalVisible(true);
+      }
+    }
+  };
+
+  const submitPayZaklad = async () => {
+    if (!selectedContragentRequest || !zakladPercentage) {
+      Alert.alert('Xatolik', 'Barcha maydonlarni to\'ldiring');
+      return;
+    }
+
+    if (zakladPercentage < 0 || zakladPercentage > 100) {
+      Alert.alert('Xatolik', 'Zaklad foizi 0 dan 100 gacha bo\'lishi kerak');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await apiService.payZaklad({
+        orderId: id,
+        contragentRequestId: selectedContragentRequest._id,
+        zakladPercentage: zakladPercentage,
+      });
+      
+      // Zaklad to'langan contragent request ID'sini state'ga qo'shish
+      // Bu orqali zaklad to'langanligi darhol yangilanadi va canPayZaklad false bo'ladi
+      const paidRequestId = selectedContragentRequest._id;
+      setPaidZakladRequestIds(prev => {
+        return new Set([...prev, paidRequestId]);
+      });
+      
+      // Zaklad to'langandan keyin order'ni yangilash
+      // Bu orqali backend'dan yangi order ma'lumotlari keladi
+      await loadOrder();
+      
+      setPayZakladModalVisible(false);
+      setSelectedContragentRequest(null);
+      setZakladPercentage(40);
+      Alert.alert('Muvaffaqiyatli', 'Zaklad muvaffaqiyatli to\'landi');
+    } catch (error: any) {
+      Alert.alert('Xatolik', error.message || 'Zaklad to\'lashda xatolik');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePayFinalPayment = () => {
+    if (deliveredContragentRequests.length === 0) {
+      Alert.alert('Xatolik', 'Qolgan asl narx to\'lash uchun yetkazilgan contragent so\'rovi topilmadi');
+      return;
+    }
+    
+    if (deliveredContragentRequests.length === 1) {
+      const req = deliveredContragentRequests[0];
+      if (typeof req === 'object' && req._id) {
+        setSelectedContragentRequestForPayment(req);
+        setPayFinalPaymentModalVisible(true);
+      }
+    } else {
+      const req = deliveredContragentRequests[0];
+      if (typeof req === 'object' && req._id) {
+        setSelectedContragentRequestForPayment(req);
+        setPayFinalPaymentModalVisible(true);
+      }
+    }
+  };
+
+  const submitPayFinalPayment = async () => {
+    if (!selectedContragentRequestForPayment) {
+      Alert.alert('Xatolik', 'Contragent so\'rovi tanlanmagan');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await apiService.payFinalPayment({
+        orderId: id,
+        contragentRequestId: selectedContragentRequestForPayment._id,
+      });
+      Alert.alert('Muvaffaqiyatli', 'Qolgan asl narx muvaffaqiyatli to\'landi', [
+        { text: 'OK', onPress: () => {
+          setPayFinalPaymentModalVisible(false);
+          setSelectedContragentRequestForPayment(null);
+          loadOrder();
+        }},
+      ]);
+    } catch (error: any) {
+      Alert.alert('Xatolik', error.message || 'Qolgan asl narx to\'lashda xatolik');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePayProfit = () => {
+    if (deliveredContragentRequests.length === 0) {
+      Alert.alert('Xatolik', 'Sof foyda to\'lash uchun yetkazilgan contragent so\'rovi topilmadi');
+      return;
+    }
+    
+    if (deliveredContragentRequests.length === 1) {
+      const req = deliveredContragentRequests[0];
+      if (typeof req === 'object' && req._id) {
+        setSelectedContragentRequestForPayment(req);
+        setPayProfitModalVisible(true);
+      }
+    } else {
+      const req = deliveredContragentRequests[0];
+      if (typeof req === 'object' && req._id) {
+        setSelectedContragentRequestForPayment(req);
+        setPayProfitModalVisible(true);
+      }
+    }
+  };
+
+  const submitPayProfit = async () => {
+    if (!selectedContragentRequestForPayment) {
+      Alert.alert('Xatolik', 'Contragent so\'rovi tanlanmagan');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await apiService.payProfit({
+        orderId: id,
+        contragentRequestId: selectedContragentRequestForPayment._id,
+      });
+      Alert.alert('Muvaffaqiyatli', 'Sof foyda muvaffaqiyatli to\'landi', [
+        { text: 'OK', onPress: () => {
+          setPayProfitModalVisible(false);
+          setSelectedContragentRequestForPayment(null);
+          loadOrder();
+        }},
+      ]);
+    } catch (error: any) {
+      Alert.alert('Xatolik', error.message || 'Sof foyda to\'lashda xatolik');
+    } finally {
+      setActionLoading(false);
+    }
+  };
   
 
   return (
@@ -671,10 +939,10 @@ export default function OrderDetailScreen() {
             const productContragent = product?.contragent;
             
             return (
-              <View key={index} style={styles.itemRow}>
-                <View style={styles.itemInfo}>
+            <View key={index} style={styles.itemRow}>
+              <View style={styles.itemInfo}>
                   <Text style={styles.itemName}>{productName}</Text>
-                  <Text style={styles.itemQuantity}>Miqdor: {item.quantity} ta</Text>
+                <Text style={styles.itemQuantity}>Miqdor: {item.quantity} ta</Text>
                   {productContragent && (
                     <View style={styles.contragentInfo}>
                       <Text style={styles.contragentLabel}>Contragent:</Text>
@@ -690,7 +958,7 @@ export default function OrderDetailScreen() {
                           {productContragent.viloyat?.name || ''}{productContragent.tuman ? `, ${productContragent.tuman.name}` : ''}
                         </Text>
                       )}
-                    </View>
+              </View>
                   )}
                   {product?.category && (
                     <Text style={styles.itemCategory}>
@@ -704,15 +972,15 @@ export default function OrderDetailScreen() {
                   )}
                 </View>
                 <View style={styles.itemPriceContainer}>
-                  <Text style={styles.itemPrice}>
-                    {formatPrice(item.price * item.quantity)}
-                  </Text>
+              <Text style={styles.itemPrice}>
+                {formatPrice(item.price * item.quantity)}
+              </Text>
                   {item.originalPrice && item.originalPrice !== item.price && (
                     <Text style={styles.itemOriginalPrice}>
                       {formatPrice(item.originalPrice * item.quantity)}
                     </Text>
                   )}
-                </View>
+            </View>
               </View>
             );
           })}
@@ -1000,6 +1268,39 @@ export default function OrderDetailScreen() {
           />
         )}
 
+        {/* Step 8: Pay zaklad to contragent (if delivered to punkt and not yet assigned) */}
+        {canPayZaklad && (
+          <Button
+            title="Contragentga zaklad to'lash"
+            onPress={handlePayZaklad}
+            variant="secondary"
+            loading={actionLoading}
+            style={styles.actionButton}
+          />
+        )}
+
+        {/* Step 9: Pay final payment to contragent (if customer confirmed) */}
+        {canPayFinalPayment && (
+          <Button
+            title="Contragentga qolgan asl narx to'lash"
+            onPress={handlePayFinalPayment}
+            variant="secondary"
+            loading={actionLoading}
+            style={styles.actionButton}
+          />
+        )}
+
+        {/* Step 10: Pay profit to contragent (if customer confirmed) */}
+        {canPayProfit && (
+          <Button
+            title="Contragentga sof foyda to'lash"
+            onPress={handlePayProfit}
+            variant="secondary"
+            loading={actionLoading}
+            style={styles.actionButton}
+          />
+        )}
+
         {/* If no actions available, show message */}
         {!canRespondToPunktRequest && 
          !canConfirm && 
@@ -1008,7 +1309,10 @@ export default function OrderDetailScreen() {
          !canReceiveFromContragent && 
          !canSendToPunkt &&
          !canReceiveFromPunkt && 
-         !canAssignToAgent && (
+         !canAssignToAgent && 
+         !canPayZaklad &&
+         !canPayFinalPayment &&
+         !canPayProfit && (
           <View style={styles.noActionsContainer}>
             <Text style={styles.noActionsText}>
               {isAssignedToAgent && 'Buyurtma agentga yuborilgan'}
@@ -1283,6 +1587,245 @@ export default function OrderDetailScreen() {
                 onPress={submitSendToPunkt}
                 loading={actionLoading}
                 disabled={!selectedSendToPunkt}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={payZakladModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPayZakladModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Contragentga zaklad to'lash</Text>
+              <TouchableOpacity onPress={() => {
+                setPayZakladModalVisible(false);
+                setSelectedContragentRequest(null);
+                setZakladPercentage(40);
+              }}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              {selectedContragentRequest && (
+                <View style={styles.selectedPunktInfo}>
+                  <Text style={styles.modalLabel}>Contragent:</Text>
+                  {typeof selectedContragentRequest.contragentId === 'object' ? (
+                    <Text style={styles.selectedPunktName}>
+                      {selectedContragentRequest.contragentId.name}
+                    </Text>
+                  ) : (
+                    <Text style={styles.selectedPunktName}>Contragent ID: {selectedContragentRequest.contragentId}</Text>
+                  )}
+                </View>
+              )}
+
+              <View style={styles.modalInputContainer}>
+                <Text style={styles.modalLabel}>Zaklad foizi (%)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={zakladPercentage.toString()}
+                  onChangeText={(text) => {
+                    const num = parseInt(text, 10);
+                    if (!isNaN(num) && num >= 0 && num <= 100) {
+                      setZakladPercentage(num);
+                    } else if (text === '') {
+                      setZakladPercentage(0);
+                    }
+                  }}
+                  keyboardType="numeric"
+                  placeholder="40"
+                  placeholderTextColor="#999"
+                />
+                <Text style={styles.modalHint}>
+                  Zaklad foizi 0 dan 100 gacha bo'lishi kerak
+                </Text>
+              </View>
+
+              {order && zakladPercentage > 0 && (
+                <View style={styles.zakladCalculation}>
+                  <Text style={styles.modalLabel}>Hisob-kitob:</Text>
+                  <Text style={styles.calculationText}>
+                    Buyurtma jami: {order.totalPrice.toLocaleString()} so'm
+                  </Text>
+                  <Text style={styles.calculationText}>
+                    Zaklad ({zakladPercentage}%): {(order.totalPrice * zakladPercentage / 100).toLocaleString()} so'm
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.modalFooter}>
+              <Button
+                title="Bekor qilish"
+                onPress={() => {
+                  setPayZakladModalVisible(false);
+                  setSelectedContragentRequest(null);
+                  setZakladPercentage(40);
+                }}
+                variant="outline"
+                style={styles.modalButton}
+              />
+              <Button
+                title="To'lash"
+                onPress={submitPayZaklad}
+                loading={actionLoading}
+                disabled={!selectedContragentRequest || zakladPercentage <= 0 || zakladPercentage > 100}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Final Payment Modal */}
+      <Modal
+        visible={payFinalPaymentModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPayFinalPaymentModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Contragentga qolgan asl narx to'lash</Text>
+              <TouchableOpacity onPress={() => {
+                setPayFinalPaymentModalVisible(false);
+                setSelectedContragentRequestForPayment(null);
+              }}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              {selectedContragentRequestForPayment && (
+                <View style={styles.selectedPunktInfo}>
+                  <Text style={styles.modalLabel}>Contragent:</Text>
+                  {typeof selectedContragentRequestForPayment.contragentId === 'object' ? (
+                    <Text style={styles.selectedPunktName}>
+                      {selectedContragentRequestForPayment.contragentId.name}
+                    </Text>
+                  ) : (
+                    <Text style={styles.selectedPunktName}>Contragent ID: {selectedContragentRequestForPayment.contragentId}</Text>
+                  )}
+                </View>
+              )}
+
+              {order && (
+                <View style={styles.zakladCalculation}>
+                  <Text style={styles.modalLabel}>Hisob-kitob:</Text>
+                  <Text style={styles.calculationText}>
+                    Buyurtma jami narx: {order.totalPrice.toLocaleString()} so'm
+                  </Text>
+                  <Text style={styles.calculationText}>
+                    Jami asl narx: {order.totalOriginalPrice?.toLocaleString() || '0'} so'm
+                  </Text>
+                  <Text style={styles.calculationText}>
+                    Qolgan asl narx: {order.totalOriginalPrice ? (order.totalOriginalPrice - (order.totalPrice * 0.4)).toLocaleString() : '0'} so'm
+                  </Text>
+                  <Text style={[styles.calculationText, { color: '#8E8E93', fontSize: 12, marginTop: 8 }]}>
+                    * Qolgan asl narx = Jami asl narx - Zaklad (zaklad price dan hisoblangani uchun, original ga proportional)
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.modalFooter}>
+              <Button
+                title="Bekor qilish"
+                onPress={() => {
+                  setPayFinalPaymentModalVisible(false);
+                  setSelectedContragentRequestForPayment(null);
+                }}
+                variant="outline"
+                style={styles.modalButton}
+              />
+              <Button
+                title="To'lash"
+                onPress={submitPayFinalPayment}
+                loading={actionLoading}
+                disabled={!selectedContragentRequestForPayment}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Profit Payment Modal */}
+      <Modal
+        visible={payProfitModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPayProfitModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Contragentga sof foyda to'lash</Text>
+              <TouchableOpacity onPress={() => {
+                setPayProfitModalVisible(false);
+                setSelectedContragentRequestForPayment(null);
+              }}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              {selectedContragentRequestForPayment && (
+                <View style={styles.selectedPunktInfo}>
+                  <Text style={styles.modalLabel}>Contragent:</Text>
+                  {typeof selectedContragentRequestForPayment.contragentId === 'object' ? (
+                    <Text style={styles.selectedPunktName}>
+                      {selectedContragentRequestForPayment.contragentId.name}
+                    </Text>
+                  ) : (
+                    <Text style={styles.selectedPunktName}>Contragent ID: {selectedContragentRequestForPayment.contragentId}</Text>
+                  )}
+                </View>
+              )}
+
+              {order && (
+                <View style={styles.zakladCalculation}>
+                  <Text style={styles.modalLabel}>Hisob-kitob:</Text>
+                  <Text style={styles.calculationText}>
+                    Buyurtma jami narx: {order.totalPrice.toLocaleString()} so'm
+                  </Text>
+                  <Text style={styles.calculationText}>
+                    Jami asl narx: {order.totalOriginalPrice?.toLocaleString() || '0'} so'm
+                  </Text>
+                  <Text style={[styles.calculationText, { color: '#34C759', fontWeight: '700' }]}>
+                    Sof foyda: {order.totalOriginalPrice ? (order.totalPrice - order.totalOriginalPrice).toLocaleString() : order.totalPrice.toLocaleString()} so'm
+                  </Text>
+                  <Text style={[styles.calculationText, { color: '#8E8E93', fontSize: 12, marginTop: 8 }]}>
+                    * Sof foyda = Jami narx - Jami asl narx
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.modalFooter}>
+              <Button
+                title="Bekor qilish"
+                onPress={() => {
+                  setPayProfitModalVisible(false);
+                  setSelectedContragentRequestForPayment(null);
+                }}
+                variant="outline"
+                style={styles.modalButton}
+              />
+              <Button
+                title="To'lash"
+                onPress={submitPayProfit}
+                loading={actionLoading}
+                disabled={!selectedContragentRequestForPayment}
                 style={styles.modalButton}
               />
             </View>
@@ -1662,6 +2205,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     fontStyle: 'italic',
+  },
+  modalInputContainer: {
+    marginTop: 16,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFF',
+    marginTop: 8,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  zakladCalculation: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+  },
+  calculationText: {
+    fontSize: 14,
+    color: '#000',
+    marginTop: 4,
   },
 });
 

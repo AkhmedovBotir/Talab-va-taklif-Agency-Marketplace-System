@@ -24,6 +24,7 @@ const KPIPunktsSection = () => {
   const [filters, setFilters] = useState({
     viloyatId: '',
     tumanId: '',
+    punktId: '',
     isPaid: '',
     startDate: '',
     endDate: '',
@@ -44,9 +45,18 @@ const KPIPunktsSection = () => {
 
       if (filters.viloyatId) params.viloyatId = filters.viloyatId;
       if (filters.tumanId) params.tumanId = filters.tumanId;
+      if (filters.punktId) params.punktId = filters.punktId;
       if (filters.isPaid !== '') params.isPaid = filters.isPaid === 'true';
-      if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
+      if (filters.startDate) {
+        const startDate = new Date(filters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        params.startDate = startDate.toISOString();
+      }
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        params.endDate = endDate.toISOString();
+      }
 
       const response = await kpiAPI.getPunktsKPI(params);
       if (response.success) {
@@ -86,7 +96,7 @@ const KPIPunktsSection = () => {
   };
 
   const handleResetFilters = () => {
-    setFilters({ viloyatId: '', tumanId: '', isPaid: '', startDate: '', endDate: '' });
+    setFilters({ viloyatId: '', tumanId: '', punktId: '', isPaid: '', startDate: '', endDate: '' });
     setTimeout(() => fetchPunkts({ page: 1 }), 0);
   };
 
