@@ -1,0 +1,81 @@
+.placeholder {
+  min-height: 80px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card[role="button"] {
+  cursor: pointer;
+}
+
+.card[role="button"]:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 8px;
+}
+
+.title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+}
+
+.arrow {
+  color: #666;
+  font-size: 20px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.item {
+  flex: 1;
+  text-align: center;
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #007AFF;
+}
+
+.valuePaid {
+  font-size: 14px;
+  font-weight: 700;
+  color: #34C759;
+}
+
+.valueUnpaid {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FF9500;
+}
+
+.divider {
+  width: 1px;
+  height: 40px;
+  background: #e5e5ea;
+  margin: 0 8px;
+}

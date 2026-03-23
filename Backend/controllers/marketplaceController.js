@@ -144,18 +144,13 @@ const getAllProducts = async (req, res) => {
 };
 
 // Get product by ID for marketplace (without kpiBonusPercent)
-// This endpoint returns only TUMAN products (contragentLevel: 'tuman')
+// This endpoint returns TUMAN products (contragentLevel: 'tuman'). Tasdiqlanmagan yoki inactive bo'lsa ham ID bo'yicha topilsa qaytariladi — sahifada ko'rinsin.
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verify it's a tuman product
     const Contragent = require('../models/Contragent');
-    const product = await Product.findOne({
-      _id: id,
-      status: 'active',
-      moderationStatus: 'approved', // Only approved products for marketplace
-    }).populate('contragent', 'contragentLevel');
+    const product = await Product.findOne({ _id: id }).populate('contragent', 'contragentLevel');
 
     if (!product) {
       return res.status(404).json({
@@ -172,36 +167,23 @@ const getProductById = async (req, res) => {
       });
     }
 
-    // Re-fetch with full population
-    const fullProduct = await Product.findOne({
-      _id: id,
-      status: 'active',
-      moderationStatus: 'approved',
-    })
+    // Re-fetch with full population (ID bo'yicha, status/moderationStatus filtersiz — tasdiqlanmagan ham qaytariladi)
+    const fullProduct = await Product.findOne({ _id: id })
       .populate('category', 'name slug status')
       .populate('subcategory', 'name slug status')
       .populate({
         path: 'contragent',
         select: 'name phone viloyat tuman mfy status',
         populate: [
-          {
-            path: 'viloyat',
-            select: 'name type code',
-          },
-          {
-            path: 'tuman',
-            select: 'name type code',
-          },
-          {
-            path: 'mfy',
-            select: 'name type code',
-          },
+          { path: 'viloyat', select: 'name type code' },
+          { path: 'tuman', select: 'name type code' },
+          { path: 'mfy', select: 'name type code' },
         ],
       })
       .populate('deliveryRegions.viloyat', 'name type code')
       .populate('deliveryRegions.tuman', 'name type code');
 
-    if (!product) {
+    if (!fullProduct) {
       return res.status(404).json({
         success: false,
         message: 'Maxsulot topilmadi yoki hali tasdiqlanmagan',
@@ -209,7 +191,7 @@ const getProductById = async (req, res) => {
     }
 
     // Remove kpiBonusPercent
-    const productObj = product.toObject();
+    const productObj = fullProduct.toObject();
     delete productObj.kpiBonusPercent;
 
     res.status(200).json({
@@ -1112,9 +1094,9 @@ const getMaxallaProductById = async (req, res) => {
     const MaxallaProduct = require('../models/MaxallaProduct');
     const Contragent = require('../models/Contragent');
 
+    // Maxalla maxsulotini ID bo'yicha qidirish (statusdan qat'iy nazar — tasdiqlanmagan bo'lsa ham qaytariladi)
     const maxallaProduct = await MaxallaProduct.findOne({
       _id: id,
-      status: 'active',
     })
       .populate({
         path: 'baseProduct',
@@ -1126,7 +1108,7 @@ const getMaxallaProductById = async (req, res) => {
       })
       .populate({
         path: 'contragent',
-        select: 'name phone viloyat tuman mfy status',
+        select: 'name phone viloyat tuman mfy status contragentLevel',
         populate: [
           { path: 'viloyat', select: 'name type code' },
           { path: 'tuman', select: 'name type code' },
@@ -1141,7 +1123,7 @@ const getMaxallaProductById = async (req, res) => {
       });
     }
 
-    // Verify contragent is maxalla level
+    // Kontragent maxalla (mfy) darajada ekanligini tekshirish (contragentLevel select da bo'lishi kerak)
     if (!maxallaProduct.contragent || maxallaProduct.contragent.contragentLevel !== 'mfy') {
       return res.status(404).json({
         success: false,

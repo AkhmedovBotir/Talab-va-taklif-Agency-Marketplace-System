@@ -1,7 +1,110 @@
 const DeliveryProvider = require('../models/DeliveryProvider');
 const Order = require('../models/Order');
 const Contragent = require('../models/Contragent');
+const Product = require('../models/Product');
+const MaxallaProduct = require('../models/MaxallaProduct');
 const bcrypt = require('bcrypt');
+
+// Helper: populate order item product so that `product` qaytadi, faqat ID emas
+const populateDeliveryOrderItemProduct = async (item) => {
+  // Maxalla mahsulot
+  if (item.productType === 'maxalla') {
+    // Agar allaqachon populate qilingan bo'lsa, DB ga qayta so'rov yubormaymiz
+    if (item.product && item.product.baseProduct) {
+      const maxallaProduct = item.product;
+      const bp = maxallaProduct.baseProduct;
+      return {
+        _id: maxallaProduct._id,
+        name: bp.name,
+        description: bp.description,
+        images: bp.images,
+        price: maxallaProduct.price,
+        originalPrice: maxallaProduct.originalPrice,
+        quantity: maxallaProduct.quantity,
+        unit: bp.unit,
+        unitSize: bp.unitSize,
+        category: bp.category,
+        subcategory: bp.subcategory,
+        contragent: maxallaProduct.contragent,
+        status: maxallaProduct.status,
+        productType: 'maxalla',
+      };
+    }
+
+    // Aks holda DB dan to'liq ma'lumotni olib kelamiz
+    const maxallaProduct = await MaxallaProduct.findById(item.product)
+      .populate({
+        path: 'baseProduct',
+        select: 'name description images category subcategory unit unitSize status',
+        populate: [
+          { path: 'category', select: 'name slug status' },
+          { path: 'subcategory', select: 'name slug status' },
+        ],
+      })
+      .populate({
+        path: 'contragent',
+        select: 'name phone viloyat tuman mfy status',
+        populate: [
+          { path: 'viloyat', select: 'name type code' },
+          { path: 'tuman', select: 'name type code' },
+          { path: 'mfy', select: 'name type code' },
+        ],
+      });
+
+    if (!maxallaProduct || !maxallaProduct.baseProduct) return null;
+
+    const bp = maxallaProduct.baseProduct;
+    return {
+      _id: maxallaProduct._id,
+      name: bp.name,
+      description: bp.description,
+      images: bp.images,
+      price: maxallaProduct.price,
+      originalPrice: maxallaProduct.originalPrice,
+      quantity: maxallaProduct.quantity,
+      unit: bp.unit,
+      unitSize: bp.unitSize,
+      category: bp.category,
+      subcategory: bp.subcategory,
+      contragent: maxallaProduct.contragent,
+      status: maxallaProduct.status,
+      productType: 'maxalla',
+    };
+  }
+
+  // Tuman mahsulot
+  if (item.product) {
+    // Agar allaqachon populate qilingan bo'lsa
+    if (item.product.category || item.product.name) {
+      const productObj = { ...item.product };
+      delete productObj.kpiBonusPercent;
+      productObj.productType = 'tuman';
+      return productObj;
+    }
+  }
+
+  const product = await Product.findById(item.product)
+    .populate('category', 'name slug status')
+    .populate('subcategory', 'name slug status')
+    .populate({
+      path: 'contragent',
+      select: 'name phone viloyat tuman mfy status',
+      populate: [
+        { path: 'viloyat', select: 'name type code' },
+        { path: 'tuman', select: 'name type code' },
+        { path: 'mfy', select: 'name type code' },
+      ],
+    })
+    .populate('deliveryRegions.viloyat', 'name type code')
+    .populate('deliveryRegions.tuman', 'name type code');
+
+  if (!product) return null;
+
+  const productObj = product.toObject();
+  delete productObj.kpiBonusPercent;
+  productObj.productType = 'tuman';
+  return productObj;
+};
 
 // Get current delivery provider profile
 const getMyProfile = async (req, res) => {
@@ -223,61 +326,47 @@ const getMyOrders = async (req, res) => {
       .limit(limitNum);
 
     // Filter to only show orders where this delivery provider is assigned
-    const filteredOrders = orders
-      .map((order) => {
-        const orderObj = order.toObject();
-        // Find the contragent request that has this delivery provider
-        const relevantRequest = orderObj.contragentRequests.find(
-          (req) =>
-            req.deliveryProvider &&
-            req.deliveryProvider._id.toString() === deliveryProviderId.toString()
+    const filteredOrders = [];
+
+    for (const order of orders) {
+      const orderObj = order.toObject();
+
+      // Find the contragent request that has this delivery provider
+      const relevantRequest = orderObj.contragentRequests.find(
+        (req) =>
+          req.deliveryProvider &&
+          req.deliveryProvider._id.toString() === deliveryProviderId.toString()
+      );
+
+      if (!relevantRequest) {
+        continue; // Skip this order
+      }
+
+      // Filter items to only show items from this request
+      if (relevantRequest.itemIds && relevantRequest.itemIds.length > 0) {
+        orderObj.items = orderObj.items.filter((item, index) =>
+          relevantRequest.itemIds.includes(index)
         );
+      }
 
-        if (!relevantRequest) {
-          return null; // Skip this order
-        }
+      // Filter to only show this request
+      orderObj.contragentRequests = [relevantRequest];
 
-        // Filter items to only show items from this request
-        if (relevantRequest.itemIds && relevantRequest.itemIds.length > 0) {
-          orderObj.items = orderObj.items.filter((item, index) =>
-            relevantRequest.itemIds.includes(index)
-          );
-        }
-
-        // Filter to only show this request
-        orderObj.contragentRequests = [relevantRequest];
-
-        // Transform maxalla products to marketplace format
-        if (orderObj.items) {
-          orderObj.items = orderObj.items.map((item) => {
-            if (item.product && item.product.baseProduct) {
-              const bp = item.product.baseProduct;
-              return {
-                ...item,
-                product: {
-                  _id: item.product._id,
-                  name: bp.name,
-                  description: bp.description,
-                  images: bp.images,
-                  price: item.product.price,
-                  originalPrice: item.product.originalPrice,
-                  quantity: item.product.quantity,
-                  unit: bp.unit,
-                  unitSize: bp.unitSize,
-                  category: bp.category,
-                  subcategory: bp.subcategory,
-                  contragent: item.product.contragent,
-                  productType: 'maxalla',
-                },
-              };
-            }
-            return item;
+      // Populate product ma'lumotlari (maxalla va tuman) har bir item uchun
+      if (orderObj.items && orderObj.items.length > 0) {
+        const populatedItems = [];
+        for (const item of orderObj.items) {
+          const populatedProduct = await populateDeliveryOrderItemProduct(item);
+          populatedItems.push({
+            ...item,
+            product: populatedProduct || item.product,
           });
         }
+        orderObj.items = populatedItems;
+      }
 
-        return orderObj;
-      })
-      .filter((order) => order !== null);
+      filteredOrders.push(orderObj);
+    }
 
     // Get total count
     const total = await Order.countDocuments(filter);
@@ -368,32 +457,17 @@ const getOrderById = async (req, res) => {
       );
     }
 
-    // Transform maxalla products to marketplace format
-    if (orderObj.items) {
-      orderObj.items = orderObj.items.map((item) => {
-        if (item.product && item.product.baseProduct) {
-          const bp = item.product.baseProduct;
-          return {
-            ...item,
-            product: {
-              _id: item.product._id,
-              name: bp.name,
-              description: bp.description,
-              images: bp.images,
-              price: item.product.price,
-              originalPrice: item.product.originalPrice,
-              quantity: item.product.quantity,
-              unit: bp.unit,
-              unitSize: bp.unitSize,
-              category: bp.category,
-              subcategory: bp.subcategory,
-              contragent: item.product.contragent,
-              productType: 'maxalla',
-            },
-          };
-        }
-        return item;
-      });
+    // Har bir item uchun product ni to'liq ma'lumot bilan to'ldirish
+    if (orderObj.items && orderObj.items.length > 0) {
+      const populatedItems = [];
+      for (const item of orderObj.items) {
+        const populatedProduct = await populateDeliveryOrderItemProduct(item);
+        populatedItems.push({
+          ...item,
+          product: populatedProduct || item.product,
+        });
+      }
+      orderObj.items = populatedItems;
     }
 
     res.status(200).json({
@@ -447,20 +521,19 @@ const markOrderAsDelivered = async (req, res) => {
 
     const request = order.contragentRequests[requestIndex];
 
-    // Check if order is already delivered
-    if (order.customerConfirmed || order.status === 'confirmed_by_customer') {
+    // Check if this request is already marked delivered
+    if (request.status === 'delivered') {
       return res.status(400).json({
         success: false,
-        message: 'Buyurtma allaqachon yetkazib berilgan',
+        message: 'Bu buyurtma allaqachon yetkazib berilgan deb belgilangan',
       });
     }
 
-    // Update order status
-    order.customerConfirmed = true;
-    order.customerConfirmedAt = new Date();
-    order.status = 'confirmed_by_customer';
-    order.deliveredAt = new Date();
-
+    // Maxalla: yetkazuvchi mijozga yetkazdi — faqat shu request uchun 'delivered' belgilaymiz.
+    // Mijoz keyin confirm-delivery orqali tasdiqlaydi va to'lov yaratiladi.
+    order.contragentRequests[requestIndex].status = 'delivered';
+    order.contragentRequests[requestIndex].deliveredByProviderAt = new Date();
+    order.markModified('contragentRequests');
     await order.save();
 
     // Populate for response
@@ -469,14 +542,12 @@ const markOrderAsDelivered = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Buyurtma yetkazib berildi deb belgilandi',
+      message: 'Buyurtma yetkazib berildi deb belgilandi. Mijoz tasdiqlagach to\'lov amalga oshadi.',
       data: {
         orderId: order._id,
         orderNumber: order.orderNumber,
-        status: order.status,
-        customerConfirmed: order.customerConfirmed,
-        customerConfirmedAt: order.customerConfirmedAt,
-        deliveredAt: order.deliveredAt,
+        contragentRequestStatus: 'delivered',
+        deliveredByProviderAt: order.contragentRequests[requestIndex].deliveredByProviderAt,
       },
     });
   } catch (error) {

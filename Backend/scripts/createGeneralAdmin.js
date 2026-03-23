@@ -15,7 +15,7 @@ const createGeneralAdmin = async () => {
       telefonRaqam: process.env.ADMIN_PHONE,
       username: process.env.ADMIN_USERNAME,
       parol: process.env.ADMIN_PASSWORD,
-      permissions: ['dashboard', 'admins', 'regions', 'counterparties', 'agents', 'points', 'archive', 'warehouse', 'marketplace_clients', 'messages', 'orders', 'kpi_bonuses', 'area_statistics', 'sms', 'finance', 'pricing', 'partnership_requests', 'vacancies', 'settings'],
+      permissions: ['dashboard', 'admins', 'regions', 'counterparties', 'counterparties_types', 'counterparties_tuman', 'counterparties_mfy', 'agents', 'points', 'managers', 'archive', 'archive_punkts', 'archive_agents', 'warehouse', 'warehouse_categories', 'warehouse_products', 'warehouse_maxalla_products', 'marketplace_clients', 'messages', 'orders', 'kpi_bonuses', 'kpi_statistics', 'kpi_transactions', 'kpi_agents', 'kpi_punkts', 'kpi_managers', 'area_statistics', 'area_statistics_summary', 'area_statistics_viloyats', 'sms', 'finance', 'finance_admin_payments', 'finance_balance', 'finance_reports', 'finance_kpi_payments', 'finance_transactions', 'finance_statistics', 'finance_contragent_payments', 'pricing', 'pricing_reviews', 'pricing_contacts', 'partnership_requests', 'vacancies', 'settings', 'settings_kpi', 'settings_comment_templates', 'settings_featured_contragents', 'settings_devices', 'certificate_assignment'],
     };
 
     // Check if admin already exists

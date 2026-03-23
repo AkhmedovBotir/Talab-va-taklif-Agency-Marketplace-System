@@ -1,0 +1,94 @@
+.page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: 24px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filterBtn {
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: #f0f0f0;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+}
+
+.filterActive {
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: #007AFF;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+}
+
+.list {
+  padding-bottom: 16px;
+}
+
+.cardWrap {
+  margin-bottom: 16px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+}
+
+.fromPunkt {
+  padding: 12px 16px;
+  background: #f9f9f9;
+  border-top: 1px solid #e5e5ea;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fromPunktText {
+  flex: 1;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.statusBadge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #E3F2FD;
+  color: #1976D2;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e5ea;
+}
+
+.actions button {
+  flex: 1;
+}
+
+.empty {
+  padding: 64px 16px;
+  text-align: center;
+}
+
+.emptyText {
+  font-size: 16px;
+  color: #999;
+  margin: 0;
+}

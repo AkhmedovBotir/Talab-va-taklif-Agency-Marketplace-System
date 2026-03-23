@@ -297,6 +297,100 @@ const adminValidationSchemas = {
         'any.only': 'Status "active" yoki "inactive" bo\'lishi kerak',
       }),
   }),
+
+  // Admin: Tuman contragent product schemas
+  createTumanContragentProduct: Joi.object({
+    contragentId: Joi.string()
+      .required()
+      .messages({
+        'string.empty': 'Kontragent ID kiritilishi shart',
+        'any.required': 'Kontragent ID kiritilishi shart',
+      }),
+    name: Joi.string().min(2).max(500).required().trim().messages({
+      'string.empty': 'Maxsulot nomi kiritilishi shart',
+      'string.min': 'Maxsulot nomi kamida 2 ta belgidan iborat bo\'lishi kerak',
+      'string.max': 'Maxsulot nomi 500 ta belgidan oshmasligi kerak',
+      'any.required': 'Maxsulot nomi kiritilishi shart',
+    }),
+    description: Joi.alternatives()
+      .try(Joi.object(), Joi.string().allow(null, ''))
+      .allow(null, '')
+      .messages({
+        'alternatives.types': 'Description Delta formatida (obyekt) yoki null bo\'lishi kerak',
+      }),
+    price: Joi.number().min(0).required().messages({
+      'number.base': 'Narx raqam bo\'lishi kerak',
+      'number.min': 'Narx 0 dan kichik bo\'la olmaydi',
+      'any.required': 'Narx kiritilishi shart',
+    }),
+    originalPrice: Joi.number().min(0).required().messages({
+      'number.base': 'Asl narx raqam bo\'lishi kerak',
+      'number.min': 'Asl narx 0 dan kichik bo\'la olmaydi',
+      'any.required': 'Asl narx kiritilishi shart',
+    }),
+    images: Joi.array().items(Joi.string()).max(5).messages({
+      'array.max': 'Maksimal 5 ta rasm yuklash mumkin',
+    }),
+    category: Joi.string().required().messages({
+      'string.empty': 'Kategoriya kiritilishi shart',
+      'any.required': 'Kategoriya kiritilishi shart',
+    }),
+    subcategory: Joi.alternatives().try(Joi.string(), Joi.valid(null, '')),
+    quantity: Joi.number().min(0).required().messages({
+      'number.base': 'Miqdor raqam bo\'lishi kerak',
+      'number.min': 'Miqdor 0 dan kichik bo\'la olmaydi',
+      'any.required': 'Miqdor kiritilishi shart',
+    }),
+    unit: Joi.string().valid('dona', 'litr', 'kg').required().messages({
+      'any.only': 'Birlik "dona", "litr" yoki "kg" bo\'lishi kerak',
+      'any.required': 'Birlik kiritilishi shart',
+    }),
+    unitSize: Joi.alternatives().try(Joi.number().min(0), Joi.valid(null, '')),
+    length: Joi.alternatives().try(Joi.number().min(0), Joi.valid(null, '')),
+    width: Joi.alternatives().try(Joi.number().min(0), Joi.valid(null, '')),
+    weight: Joi.alternatives().try(Joi.number().min(0), Joi.valid(null, '')),
+    status: Joi.string().valid('active', 'inactive', 'archived').default('active'),
+    kpiBonusPercent: Joi.number().min(0).max(100).required().messages({
+      'number.base': 'KPI bonus foizi raqam bo\'lishi kerak',
+      'number.min': 'KPI bonus foizi 0 dan kichik bo\'la olmaydi',
+      'number.max': 'KPI bonus foizi 100 dan katta bo\'la olmaydi',
+      'any.required': 'KPI bonus foizi kiritilishi shart',
+    }),
+    deliveryRegions: Joi.array()
+      .items(
+        Joi.object({
+          viloyat: Joi.string().required(),
+          tuman: Joi.alternatives().try(Joi.string(), Joi.valid(null, '')),
+        })
+      )
+      .allow(null),
+  }),
+
+  updateTumanContragentProduct: Joi.object({
+    name: Joi.string().min(2).max(500).trim(),
+    description: Joi.alternatives().try(Joi.string().allow(''), Joi.object(), Joi.valid(null)),
+    price: Joi.number().min(0),
+    originalPrice: Joi.number().min(0),
+    images: Joi.array().items(Joi.string()).max(5),
+    category: Joi.string(),
+    subcategory: Joi.alternatives().try(Joi.string(), Joi.valid(null, '')),
+    quantity: Joi.number().min(0),
+    unit: Joi.string().valid('dona', 'litr', 'kg'),
+    unitSize: Joi.alternatives().try(Joi.number().min(0), Joi.valid(null, '')),
+    length: Joi.alternatives().try(Joi.number().min(0), Joi.valid(null, '')),
+    width: Joi.alternatives().try(Joi.number().min(0), Joi.valid(null, '')),
+    weight: Joi.alternatives().try(Joi.number().min(0), Joi.valid(null, '')),
+    status: Joi.string().valid('active', 'inactive', 'archived'),
+    kpiBonusPercent: Joi.number().min(0).max(100),
+    deliveryRegions: Joi.array()
+      .items(
+        Joi.object({
+          viloyat: Joi.string().required(),
+          tuman: Joi.alternatives().try(Joi.string(), Joi.valid(null, '')),
+        })
+      )
+      .allow(null),
+  }),
 };
 
 const regionValidationSchemas = {

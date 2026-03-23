@@ -1,0 +1,162 @@
+.page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: 24px;
+}
+
+.balanceSection {
+  margin-bottom: 20px;
+}
+
+.balanceCard {
+  background: #f5f5f7;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.balanceLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8e8e93;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.balancePositive {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: #34C759;
+  margin-bottom: 4px;
+}
+
+.balanceNegative {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: #FF3B30;
+  margin-bottom: 4px;
+}
+
+.balanceSub {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.haq {
+  font-size: 14px;
+  font-weight: 500;
+  color: #34C759;
+}
+
+.qarz {
+  font-size: 14px;
+  font-weight: 500;
+  color: #FF3B30;
+}
+
+.statsRow {
+  display: flex;
+  gap: 12px;
+}
+
+.statCard {
+  flex: 1;
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+}
+
+.statLabel {
+  display: block;
+  font-size: 12px;
+  color: #8e8e93;
+  margin-bottom: 4px;
+}
+
+.statIncome {
+  font-size: 18px;
+  font-weight: 700;
+  color: #34C759;
+}
+
+.statExpense {
+  font-size: 18px;
+  font-weight: 700;
+  color: #FF3B30;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #000;
+  margin: 0 0 16px;
+}
+
+.list {
+  padding-bottom: 16px;
+}
+
+.txCard {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.txDesc {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 4px;
+  line-height: 1.35;
+}
+
+.txCode {
+  font-size: 13px;
+  color: #8e8e93;
+  margin: 0 0 12px;
+}
+
+.txRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.txAmountIncome {
+  font-size: 16px;
+  font-weight: 700;
+  color: #34C759;
+}
+
+.txAmountExpense {
+  font-size: 16px;
+  font-weight: 700;
+  color: #FF3B30;
+}
+
+.txDate {
+  font-size: 13px;
+  color: #8e8e93;
+}
+
+.empty {
+  padding: 64px 16px;
+  text-align: center;
+}
+
+.emptyText {
+  font-size: 16px;
+  color: #999;
+  margin: 0;
+}

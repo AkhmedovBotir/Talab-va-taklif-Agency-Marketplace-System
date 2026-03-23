@@ -1,0 +1,104 @@
+.page { flex: 1; background: #f5f5f5; }
+.center { flex: 1; display: flex; align-items: center; justify-content: center; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid #eee; border-top-color: #007AFF; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.header {
+  background: #fff;
+  padding: 16px;
+  padding-top: 12px;
+  border-bottom: 1px solid #eee;
+}
+.headerTitle {
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  margin: 0;
+}
+
+.filterWrap {
+  background: #fff;
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.filterArrow { color: #999; }
+.clearBtn { background: none; border: none; padding: 4px; cursor: pointer; }
+.totalText {
+  font-size: 13px;
+  color: #666;
+  margin-top: 12px;
+  text-align: center;
+}
+
+.list { padding: 16px; padding-bottom: 80px; }
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 16px;
+  color: #999;
+  font-size: 16px;
+}
+.empty svg { margin-bottom: 16px; }
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.orderNumber { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 4px; }
+.customerName { font-size: 16px; color: #333; margin-bottom: 2px; }
+.phone { font-size: 14px; color: #666; }
+.statusBadge {
+  padding: 6px 12px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: 120px;
+  text-align: center;
+}
+.cardInfo { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.infoRow { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #666; }
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #fff;
+  border-top: 1px solid #eee;
+}
+.pageBtn {
+  padding: 8px 16px;
+  background: #007AFF;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pageBtn:disabled { background: #ccc; cursor: not-allowed; }
+.pageInfo { font-size: 14px; color: #666; }

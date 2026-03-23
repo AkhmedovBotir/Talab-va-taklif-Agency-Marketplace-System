@@ -736,70 +736,110 @@ const confirmDelivery = async (req, res) => {
       });
     }
 
-    // Check if order is confirmed by agent
-    if (!order.confirmedByAgent) {
+    const FinanceTransaction = require('../models/FinanceTransaction');
+    const isTumanWithAgent = order.assignedToAgent != null;
+    const isMaxallaWithDelivery = order.contragentRequests && order.contragentRequests.some(
+      (r) => r.deliveryProvider && r.status === 'delivered'
+    );
+
+    if (isTumanWithAgent) {
+      if (!order.confirmedByAgent) {
+        return res.status(400).json({
+          success: false,
+          message: 'Buyurtma hali agent tomonidan tasdiqlanmagan',
+        });
+      }
+    } else if (isMaxallaWithDelivery) {
+      // Maxalla: yetkazuvchi allaqachon "yetkazdi" deb belgilagan bo'lishi kerak
+      // (hech qanday qo'shimcha tekshiruv shart emas)
+    } else {
       return res.status(400).json({
         success: false,
-        message: 'Buyurtma hali agent tomonidan tasdiqlanmagan',
+        message: 'Buyurtma hali yetkazib berilmagan yoki yetkazuvchi tomonidan tasdiqlanmagan',
       });
     }
 
     // Update order
     order.customerConfirmed = true;
     order.customerConfirmedAt = new Date();
-    
-    // Update order status
-    if (order.status === 'confirmed_by_agent') {
+    if (order.status === 'confirmed_by_agent' || isMaxallaWithDelivery) {
       order.status = 'confirmed_by_customer';
     }
-    
+    if (isMaxallaWithDelivery) {
+      order.deliveredAt = new Date();
+    }
     await order.save();
 
-    // Create payment transaction: Customer → Agent
+    // Create payment transaction(s)
     try {
-      const FinanceTransaction = require('../models/FinanceTransaction');
-      
-      // Check if payment already exists
-      const existingPayment = await FinanceTransaction.findOne({
-        order: order._id,
-        category: 'agent_received_from_customer',
-        status: 'completed',
-      });
-
-      if (!existingPayment && order.assignedToAgent) {
-        await FinanceTransaction.create({
-          type: 'income', // Agent uchun kirim
-          category: 'agent_received_from_customer',
-          amount: order.totalPrice,
+      if (isTumanWithAgent) {
+        const existingPayment = await FinanceTransaction.findOne({
           order: order._id,
-          description: `Mijoz tomonidan agentga buyurtma uchun to'lov qilindi`,
-          fromUser: {
-            userType: 'MarketplaceUser',
-            userId: userId,
-          },
-          toUser: {
-            userType: 'Agent',
-            userId: order.assignedToAgent,
-          },
+          category: 'agent_received_from_customer',
           status: 'completed',
-          completedAt: new Date(),
         });
+        if (!existingPayment) {
+          await FinanceTransaction.create({
+            type: 'income',
+            category: 'agent_received_from_customer',
+            amount: order.totalPrice,
+            order: order._id,
+            description: `Mijoz tomonidan agentga buyurtma uchun to'lov qilindi`,
+            fromUser: { userType: 'MarketplaceUser', userId },
+            toUser: { userType: 'Agent', userId: order.assignedToAgent },
+            status: 'completed',
+            completedAt: new Date(),
+          });
+        }
+      } else if (isMaxallaWithDelivery) {
+        // Maxalla: har bir "delivered" request uchun mijoz → kontragent to'lovi
+        const deliveredRequests = order.contragentRequests.filter((r) => r.status === 'delivered');
+        for (const req of deliveredRequests) {
+          const existingPayment = await FinanceTransaction.findOne({
+            order: order._id,
+            contragentRequest: req._id,
+            category: 'contragent_received_from_marketplace',
+            status: 'completed',
+          });
+          if (existingPayment) continue;
+          let amount = 0;
+          (req.itemIds || []).forEach((idx) => {
+            if (order.items[idx]) {
+              const item = order.items[idx];
+              amount += item.price * item.quantity;
+            }
+          });
+          if (amount > 0) {
+            await FinanceTransaction.create({
+              type: 'income',
+              category: 'contragent_received_from_marketplace',
+              amount,
+              order: order._id,
+              contragentRequest: req._id,
+              description: `Mijoz tomonidan maxalla yetkazuvchi yetkazgan buyurtma uchun to'lov`,
+              fromUser: { userType: 'MarketplaceUser', userId },
+              toUser: { userType: 'Contragent', userId: req.contragentId },
+              status: 'completed',
+              completedAt: new Date(),
+            });
+          }
+        }
       }
     } catch (error) {
       console.error('Error creating customer payment transaction:', error);
-      // Don't fail the request if payment transaction creation fails
     }
 
-    // Calculate and create KPI bonus transactions
-    try {
-      const { calculateAndCreateKpiBonus } = require('../utils/kpiBonusCalculator');
-      await calculateAndCreateKpiBonus(order._id, order.status);
-    } catch (error) {
-      console.error('Error calculating KPI bonus:', error);
-      // Don't fail the request if KPI calculation fails
+    // Calculate and create KPI bonus transactions (faqat tuman buyurtmalari uchun)
+    if (isTumanWithAgent) {
+      try {
+        const { calculateAndCreateKpiBonus } = require('../utils/kpiBonusCalculator');
+        await calculateAndCreateKpiBonus(order._id, order.status);
+      } catch (error) {
+        console.error('Error calculating KPI bonus:', error);
+      }
     }
 
-    // Punkt kontragentga qolgan summalarni to'lash (mijoz tasdiqlagandan keyin)
+    // Punkt kontragentga qolgan summalarni to'lash (mijoz tasdiqlagandan keyin, faqat tuman)
     try {
       const FinanceTransaction = require('../models/FinanceTransaction');
       
@@ -1303,6 +1343,129 @@ const createMaxallaOrder = async (req, res) => {
   }
 };
 
+// Maxalla buyurtma to'lov holati (yetkazuvchi yetkazgan buyurtma)
+const getMaxallaOrderPaymentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.user;
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Buyurtma topilmadi' });
+    }
+    if (order.user.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Bu buyurtma sizga tegishli emas' });
+    }
+
+    const hasDelivered = order.contragentRequests && order.contragentRequests.some((r) => r.status === 'delivered');
+    const FinanceTransaction = require('../models/FinanceTransaction');
+    const payments = await FinanceTransaction.find({
+      order: order._id,
+      category: 'contragent_received_from_marketplace',
+      status: 'completed',
+    }).populate('toUser.userId', 'name phone');
+
+    const totalPaid = payments.reduce((sum, t) => sum + t.amount, 0);
+    const paymentStatus = payments.length > 0 && hasDelivered ? 'paid' : (hasDelivered ? 'unpaid' : 'awaiting_delivery');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        totalPrice: order.totalPrice,
+        paymentStatus,
+        totalPaid,
+        transactions: payments,
+        deliveredByProvider: hasDelivered,
+      },
+    });
+  } catch (error) {
+    console.error('Error getting maxalla payment status:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ success: false, message: 'Noto\'g\'ri buyurtma ID' });
+    }
+    res.status(500).json({ success: false, message: 'To\'lov holatini olishda xatolik', error: error.message });
+  }
+};
+
+// Maxalla buyurtma uchun to'lov qilish (yetkazuvchi yetkazganidan keyin, alohida to'lov API)
+const payMaxallaOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.user;
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Buyurtma topilmadi' });
+    }
+    if (order.user.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Bu buyurtma sizga tegishli emas' });
+    }
+
+    const deliveredRequests = order.contragentRequests && order.contragentRequests.filter((r) => r.status === 'delivered');
+    if (!deliveredRequests || deliveredRequests.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Yetkazuvchi hali buyurtmani yetkazib berganini belgilamagan',
+      });
+    }
+
+    const FinanceTransaction = require('../models/FinanceTransaction');
+    let created = 0;
+    for (const req of deliveredRequests) {
+      const existingPayment = await FinanceTransaction.findOne({
+        order: order._id,
+        contragentRequest: req._id,
+        category: 'contragent_received_from_marketplace',
+        status: 'completed',
+      });
+      if (existingPayment) continue;
+      let amount = 0;
+      (req.itemIds || []).forEach((idx) => {
+        if (order.items[idx]) {
+          const item = order.items[idx];
+          amount += item.price * item.quantity;
+        }
+      });
+      if (amount > 0) {
+        await FinanceTransaction.create({
+          type: 'income',
+          category: 'contragent_received_from_marketplace',
+          amount,
+          order: order._id,
+          contragentRequest: req._id,
+          description: `Mijoz tomonidan maxalla yetkazuvchi yetkazgan buyurtma uchun to'lov`,
+          fromUser: { userType: 'MarketplaceUser', userId },
+          toUser: { userType: 'Contragent', userId: req.contragentId },
+          status: 'completed',
+          completedAt: new Date(),
+        });
+        created++;
+      }
+    }
+
+    if (created === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu buyurtma uchun to\'lov allaqachon amalga oshirilgan',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'To\'lov muvaffaqiyatli amalga oshirildi',
+      data: { orderId: order._id, transactionsCreated: created },
+    });
+  } catch (error) {
+    console.error('Error paying maxalla order:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ success: false, message: 'Noto\'g\'ri buyurtma ID' });
+    }
+    res.status(500).json({ success: false, message: 'To\'lov amalga oshirishda xatolik', error: error.message });
+  }
+};
+
 module.exports = {
   createOrder,
   createMaxallaOrder,
@@ -1310,5 +1473,7 @@ module.exports = {
   getOrderById,
   cancelOrder,
   confirmDelivery,
+  getMaxallaOrderPaymentStatus,
+  payMaxallaOrder,
 };
 

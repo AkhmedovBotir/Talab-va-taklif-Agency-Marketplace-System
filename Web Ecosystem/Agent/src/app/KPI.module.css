@@ -1,0 +1,53 @@
+.page { flex: 1; background: #f5f5f5; padding-bottom: 24px; }
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+.backBtn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 10px;
+  color: #333;
+  cursor: pointer;
+}
+.headerTitle { font-size: 18px; font-weight: bold; color: #333; margin: 0; }
+
+.filterWrap { background: #fff; padding: 16px; border-bottom: 1px solid #eee; }
+.filterRow { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.list { padding: 16px; }
+.loading, .empty { text-align: center; padding: 48px 16px; color: #666; }
+.empty { display: flex; flex-direction: column; align-items: center; }
+.empty svg { margin-bottom: 16px; }
+
+.card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.cardLeft { }
+.orderNum { font-size: 16px; font-weight: 600; color: #333; display: block; margin-bottom: 4px; }
+.date { font-size: 12px; color: #999; }
+.cardRight { text-align: right; }
+.amount { font-size: 16px; font-weight: bold; color: #007AFF; display: block; margin-bottom: 4px; }
+.paid { font-size: 12px; color: #34C759; }
+.unpaid { font-size: 12px; color: #FF9500; }
+
+.pagination { display: flex; justify-content: space-between; align-items: center; padding: 16px; }
+.pageBtn { padding: 8px 16px; background: #007AFF; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.pageBtn:disabled { background: #ccc; cursor: not-allowed; }
+.pageInfo { font-size: 14px; color: #666; }

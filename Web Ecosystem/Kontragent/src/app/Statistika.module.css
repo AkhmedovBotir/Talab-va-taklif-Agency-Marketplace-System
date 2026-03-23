@@ -1,0 +1,171 @@
+.container {
+  flex: 1;
+  background: #f5f7fa;
+}
+
+.header {
+  background: #fff;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.tabs {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tab {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  background: none;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.tab:hover {
+  color: #007AFF;
+}
+
+.tabActive {
+  color: #007AFF;
+  font-weight: 600;
+  border-bottom-color: #007AFF;
+}
+
+.content {
+  padding: 16px;
+  padding-bottom: 24px;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: #666;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #eee;
+  border-top-color: #007AFF;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error {
+  text-align: center;
+  padding: 48px 16px;
+  color: #FF3B30;
+}
+
+.retryBtn {
+  margin-top: 16px;
+  padding: 12px 24px;
+  background: #007AFF;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.cardBlue { border-left: 4px solid #007AFF; }
+.cardGreen { border-left: 4px solid #34C759; }
+.cardOrange { border-left: 4px solid #FF9500; }
+.cardRed { border-left: 4px solid #FF3B30; }
+
+.cardValue {
+  font-size: 28px;
+  font-weight: bold;
+  color: #1a1a1a;
+  margin: 8px 0 4px;
+}
+
+.cardLabel {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.revenueCard {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.revenueHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: #666;
+}
+
+.revenueValue {
+  font-size: 32px;
+  font-weight: bold;
+  color: #1a1a1a;
+  margin: 8px 0 16px;
+}
+
+.revenueStats {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  text-align: center;
+}
+
+.revenueStatValue {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.revenueStatLabel {
+  font-size: 12px;
+  color: #666;
+  margin: 4px 0 0;
+}
+
+.revenueDivider {
+  width: 1px;
+  background: #f0f0f0;
+}

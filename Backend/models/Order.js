@@ -222,7 +222,7 @@ const orderSchema = new mongoose.Schema(
         },
         status: {
           type: String,
-          enum: ['pending', 'accepted', 'rejected', 'delivered_to_punkt'],
+          enum: ['pending', 'accepted', 'rejected', 'delivered_to_punkt', 'delivered'],
           default: 'pending',
         },
         requestedAt: {
@@ -244,6 +244,11 @@ const orderSchema = new mongoose.Schema(
           default: null,
         },
         sentToDeliveryProviderAt: {
+          type: Date,
+          default: null,
+        },
+        // Maxalla: yetkazuvchi mijozga yetkazganda
+        deliveredByProviderAt: {
           type: Date,
           default: null,
         },

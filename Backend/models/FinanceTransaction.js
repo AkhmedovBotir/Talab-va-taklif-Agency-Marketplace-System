@@ -28,6 +28,7 @@ const financeTransactionSchema = new mongoose.Schema(
         'contragent_received_final_payment', // Kontragent qolgan asl narx oladi
         'contragent_received_profit', // Kontragent sof foyda oladi
         'contragent_received_full_payment', // Kontragent to'liq to'lov oladi (punktdan) - deprecated
+        'contragent_received_from_marketplace', // Maxalla: mijoz yetkazuvchi yetkazgan buyurtma uchun kontragentga to'lov
       ],
       required: [true, 'Tranzaksiya kategoriyasi kiritilishi shart'],
     },

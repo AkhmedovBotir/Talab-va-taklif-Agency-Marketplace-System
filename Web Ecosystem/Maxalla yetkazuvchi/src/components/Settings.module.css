@@ -1,0 +1,109 @@
+.container {
+  flex: 1;
+  background: #F8F9FA;
+  padding: 20px;
+  padding-bottom: 24px;
+}
+
+.section {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.sectionTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin: 0 0 12px;
+}
+
+.description {
+  font-size: 15px;
+  color: #6B7280;
+  line-height: 22px;
+  margin-bottom: 24px;
+}
+
+.inputContainer {
+  margin-bottom: 20px;
+}
+
+.label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.passwordInputGroup {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  background: #F9FAFB;
+}
+
+.passwordInput {
+  flex: 1;
+  padding: 16px;
+  font-size: 16px;
+  color: #1A1A1A;
+  border: none;
+  background: transparent;
+  outline: none;
+}
+
+.eyeButton {
+  padding: 12px;
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+}
+
+.eyeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 13px;
+  color: #9CA3AF;
+  margin: 6px 0 0;
+}
+
+.button {
+  width: 100%;
+  padding: 18px;
+  margin-top: 8px;
+  background: #007AFF;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 122, 255, 0.3);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tipContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tipText {
+  font-size: 15px;
+  color: #6B7280;
+  line-height: 22px;
+  margin: 0;
+}

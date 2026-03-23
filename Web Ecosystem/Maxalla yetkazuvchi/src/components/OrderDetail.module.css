@@ -1,0 +1,240 @@
+.container {
+  flex: 1;
+  background: #F8F9FA;
+  padding: 20px;
+  padding-bottom: 24px;
+}
+
+.centerContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background: #F8F9FA;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #E5E7EB;
+  border-top-color: #007AFF;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinnerSmall {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.errorText {
+  font-size: 16px;
+  color: #FF3B30;
+  font-weight: 600;
+}
+
+.headerSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.orderNumberContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.orderNumber {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.statusBadge {
+  padding: 10px 16px;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.section {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.infoLabel {
+  font-size: 15px;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+.infoValue {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1A1A1A;
+  text-align: right;
+}
+
+.addressContainer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.addressText {
+  font-size: 16px;
+  color: #1A1A1A;
+  line-height: 24px;
+}
+
+.noteContainer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: #FFF7ED;
+  border-radius: 12px;
+  border: 1px solid #FED7AA;
+}
+
+.noteText {
+  font-size: 14px;
+  color: #92400E;
+  line-height: 20px;
+}
+
+.itemCard {
+  padding: 16px;
+  background: #F9FAFB;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #F3F4F6;
+}
+
+.itemName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A1A1A;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.itemDetails {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.itemQuantity {
+  font-size: 14px;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+.itemPrice {
+  font-size: 15px;
+  font-weight: 700;
+  color: #007AFF;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 20px;
+  border-top: 2px solid #E5E7EB;
+}
+
+.totalLabel {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.totalPrice {
+  font-size: 24px;
+  font-weight: 700;
+  color: #007AFF;
+}
+
+.deliverButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 20px;
+  margin-top: 8px;
+  background: #34C759;
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(52, 199, 89, 0.3);
+}
+
+.deliverButton:hover:not(:disabled) {
+  background: #2da84a;
+}
+
+.buttonDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.deliveredText {
+  font-size: 15px;
+  color: #34C759;
+  font-weight: 600;
+  text-align: center;
+  margin: 0;
+}
+
+.emptyItemsText {
+  font-size: 14px;
+  color: #6B7280;
+  margin-top: 8px;
+}

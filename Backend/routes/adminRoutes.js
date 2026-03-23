@@ -108,6 +108,14 @@ const {
   updateProduct,
 } = require('../controllers/adminProductModerationController');
 const {
+  getTumanContragents,
+  createTumanContragentProduct,
+  getTumanContragentProducts,
+  getTumanContragentProductById,
+  updateTumanContragentProduct,
+  deleteTumanContragentProduct,
+} = require('../controllers/adminTumanContragentProductController');
+const {
   getAllPartnershipRequests,
   getPartnershipRequestById,
   updateContactStatus,
@@ -202,6 +210,35 @@ router.delete('/categories/:id', adminAuth, deleteCategory);
 
 // Get all products (for admin with advanced filters)
 router.get('/data/products', adminAuth, getAllProductsForAdmin);
+
+// ==================== ADMIN: TUMAN CONTRAGENT PRODUCTS ====================
+// Get tuman contragents (for selection)
+router.get('/tuman-contragents', adminAuth, getTumanContragents);
+
+// Create product for tuman contragent (auto approved)
+router.post(
+  '/tuman-contragent-products',
+  adminAuth,
+  validate(adminValidationSchemas.createTumanContragentProduct),
+  createTumanContragentProduct
+);
+
+// List products (all tuman contragents or by ?contragentId=)
+router.get('/tuman-contragent-products', adminAuth, getTumanContragentProducts);
+
+// Get product by id
+router.get('/tuman-contragent-products/:id', adminAuth, getTumanContragentProductById);
+
+// Update product
+router.put(
+  '/tuman-contragent-products/:id',
+  adminAuth,
+  validate(adminValidationSchemas.updateTumanContragentProduct),
+  updateTumanContragentProduct
+);
+
+// Delete (archive) product
+router.delete('/tuman-contragent-products/:id', adminAuth, deleteTumanContragentProduct);
 
 // Update product
 router.put('/products/:id', adminAuth, validate(adminProductModerationValidationSchemas.update), updateProduct);

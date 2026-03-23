@@ -43,6 +43,8 @@ const {
   getOrderById,
   cancelOrder,
   confirmDelivery,
+  getMaxallaOrderPaymentStatus,
+  payMaxallaOrder,
 } = require('../controllers/orderController');
 const {
   getMe,
@@ -140,6 +142,8 @@ router.get('/maxalla-orders', marketplaceUserAuth, getOrders);
 router.get('/maxalla-orders/:id', marketplaceUserAuth, getOrderById);
 router.delete('/maxalla-orders/:id', marketplaceUserAuth, cancelOrder);
 router.post('/maxalla-orders/:id/confirm-delivery', marketplaceUserAuth, confirmDelivery);
+router.get('/maxalla-orders/:id/payment-status', marketplaceUserAuth, getMaxallaOrderPaymentStatus);
+router.post('/maxalla-orders/:id/pay', marketplaceUserAuth, payMaxallaOrder);
 
 // Profile routes (require authentication)
 router.get('/me', marketplaceUserAuth, getMe);

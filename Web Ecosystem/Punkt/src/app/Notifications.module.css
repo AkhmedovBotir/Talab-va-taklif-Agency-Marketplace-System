@@ -1,0 +1,90 @@
+.page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #000;
+  margin: 0;
+}
+
+.markAllBtn {
+  background: none;
+  border: none;
+  color: #007AFF;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.list {
+  padding-bottom: 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  border-left: 4px solid #007AFF;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  cursor: pointer;
+}
+
+.card.unread {
+  background: #f0f8ff;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+  flex: 1;
+}
+
+.unreadDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.cardMessage {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.cardDate {
+  font-size: 11px;
+  color: #999;
+}
+
+.empty {
+  padding: 64px 16px;
+  text-align: center;
+}
+
+.emptyText {
+  font-size: 16px;
+  color: #999;
+  margin: 0;
+}
