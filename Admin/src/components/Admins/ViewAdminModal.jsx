@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Close, CheckCircle } from '@mui/icons-material';
+import { Close } from '@mui/icons-material';
 import { adminAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
-import { PERMISSIONS_GROUPED } from '../../utils/permissions';
 
 const ViewAdminModal = ({ open, onClose, admin }) => {
   const { showError } = useSnackbar();
@@ -21,7 +20,8 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await adminAPI.getAdminById(admin._id);
+      const adminId = admin.id ?? admin._id;
+      const response = await adminAPI.getAdminById(adminId);
       if (response.success) {
         // API returns { success: true, data: {...} }
         setAdminData(response.data);
@@ -131,7 +131,7 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
                           <label className="block text-sm font-medium text-gray-500 mb-1">
                             Telefon raqami
                           </label>
-                          <p className="text-gray-900">{adminData.telefonRaqam || '-'}</p>
+                          <p className="text-gray-900">{adminData.phone || adminData.telefonRaqam || '-'}</p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -151,62 +151,6 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
                         </div>
                       </div>
                     </div>
-
-                    {/* Permissions */}
-                    {adminData.permissions && (
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Ruhsatlar</h3>
-                        <div className="space-y-4">
-                          {PERMISSIONS_GROUPED.map((group) => (
-                            <div key={group.label || 'standalone'}>
-                              {group.section && group.permissions?.[0] ? (
-                                <div
-                                  className={`flex items-center gap-2 p-2 rounded-md border mb-2 font-semibold ${
-                                    adminData.permissions.includes(group.permissions[0].value)
-                                      ? 'bg-green-50 border-green-200 text-green-800'
-                                      : 'bg-gray-50 border-gray-200 text-gray-700'
-                                  }`}
-                                >
-                                  {adminData.permissions.includes(group.permissions[0].value) && (
-                                    <CheckCircle className="text-green-600 w-4 h-4 shrink-0" />
-                                  )}
-                                  <span className="text-sm">{group.permissions[0].label}</span>
-                                </div>
-                              ) : null}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-0">
-                                {(group.section ? group.permissions?.slice(1) : group.permissions)?.map((permission) => {
-                                  const hasPermission = adminData.permissions.includes(permission.value);
-                                  return (
-                                    <div
-                                      key={permission.value}
-                                      className={`flex items-center gap-2 p-2 rounded-md border ${
-                                        hasPermission
-                                          ? 'bg-green-50 border-green-200'
-                                          : 'bg-gray-50 border-gray-200'
-                                      }`}
-                                    >
-                                      {hasPermission && (
-                                        <CheckCircle className="text-green-600 w-4 h-4 shrink-0" />
-                                      )}
-                                      <span
-                                        className={`text-sm ${
-                                          hasPermission ? 'text-green-800 font-medium' : 'text-gray-500'
-                                        }`}
-                                      >
-                                        {permission.label}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-xs text-gray-500 mt-3">
-                          Jami: {adminData.permissions.length} ta ruhsat
-                        </p>
-                      </div>
-                    )}
 
                     {/* Timestamps */}
                     <div>

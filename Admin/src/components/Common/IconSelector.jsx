@@ -5,75 +5,75 @@ import * as Icons from '@mui/icons-material';
 
 // Icons organized by categories
 const ICONS_BY_CATEGORY = {
-  'business': [
+  business: [
     'Store', 'ShoppingBag', 'ShoppingCart', 'Category', 'Business', 'Work', 'BusinessCenter',
     'Storefront', 'ShoppingMall', 'LocalMall', 'LocalGroceryStore', 'BakeryDining',
     'PointOfSale', 'Receipt', 'ReceiptLong', 'Inventory', 'Inventory2', 'Shop', 'Shop2',
     'StoreMallDirectory', 'CorporateFare', 'Domain', 'AccountBalance', 'TrendingUp',
     'BarChart', 'Assessment', 'Analytics', 'PieChart', 'ShowChart', 'Timeline',
   ],
-  'food': [
+  food: [
     'Restaurant', 'RestaurantMenu', 'Fastfood', 'LocalCafe', 'LocalBar', 'SportsBar',
     'Dining', 'RoomService', 'SetMeal', 'BreakfastDining', 'LunchDining', 'DinnerDining',
     'Icecream', 'Cake', 'LocalPizza', 'LocalDrink', 'WineBar', 'FoodBank', 'Kitchen',
     'Coffee', 'LocalDining', 'RamenDining', 'DinnerDining', 'BrunchDining', 'TakeoutDining',
   ],
-  'transportation': [
+  transportation: [
     'LocalShipping', 'DirectionsCar', 'TwoWheeler', 'Flight', 'Train', 'DirectionsBus',
     'Subway', 'Tram', 'DirectionsBike', 'ElectricBike', 'ElectricScooter',
     'AirportShuttle', 'LocalTaxi', 'Commute', 'DirectionsWalk', 'DirectionsRun',
     'FlightTakeoff', 'FlightLand', 'TrainIcon', 'DirectionsTransit', 'DirectionsSubway',
     'DirectionsRailway', 'AirlineSeatReclineNormal', 'AirlineSeatFlat', 'AirlineSeatIndividualSuite',
   ],
-  'building': [
+  building: [
     'Home', 'Apartment', 'Factory', 'Construction', 'Build', 'Engineering',
     'BusinessCenter', 'LocationCity', 'Place', 'Warehouse', 'Museum', 'TheaterComedy',
     'Stadium', 'Castle', 'Church', 'Mosque', 'TempleBuddhist', 'TempleHindu',
     'School', 'Library', 'Hospital', 'Hotel', 'OfficeBuilding', 'Warehouse',
   ],
-  'finance': [
+  finance: [
     'AccountBalance', 'Payment', 'CreditCard', 'AttachMoney', 'MonetizationOn',
     'Savings', 'AccountBalanceWallet', 'AccountTree', 'CurrencyExchange',
     'Paid', 'RequestQuote', 'PriceCheck', 'PointOfSale', 'Calculate',
     'AccountCircle', 'AccountBox', 'CreditScore', 'SavingsOutlined', 'AccountBalanceOutlined',
     'Payments', 'Receipt', 'ReceiptLong', 'Money', 'MoneyOff', 'Euro', 'Dollar', 'Yen',
   ],
-  'hospitality': [
+  hospitality: [
     'Hotel', 'Spa', 'BeachAccess', 'Pool', 'Casino', 'GolfCourse',
     'SportsSoccer', 'SportsBasketball', 'SportsTennis', 'SportsVolleyball',
     'SportsHockey', 'SportsBaseball', 'SportsCricket', 'SportsKabaddi',
     'FitnessCenter', 'Sports', 'SportsEsports', 'SportsMotorsports', 'SportsMma',
     'Pool', 'BeachAccess', 'Spa', 'HotTub', 'AcUnit', 'Air', 'WaterDrop',
   ],
-  'education': [
+  education: [
     'School', 'Library', 'Book', 'MenuBook', 'Computer', 'Laptop',
     'Tablet', 'Phone', 'PhoneAndroid', 'PhoneIphone', 'Devices',
     'CastForEducation', 'Science', 'Psychology', 'HistoryEdu', 'School',
     'AutoStories', 'MenuBook', 'BookOnline', 'Class', 'WorkspacePremium',
     'GraduationCap', 'SchoolOutlined', 'LibraryBooks', 'LocalLibrary',
   ],
-  'communication': [
+  communication: [
     'Phone', 'Email', 'Message', 'Chat', 'Forum', 'Comment', 'Comments',
     'Sms', 'Call', 'CallEnd', 'CallMade', 'CallReceived', 'CallSplit',
     'VideoCall', 'Videocam', 'VideocamOff', 'Mic', 'MicOff',
     'PhoneInTalk', 'PhoneEnabled', 'PhoneDisabled', 'PhoneCallback', 'PhonePaused',
     'ChatBubble', 'ChatBubbleOutline', 'Forum', 'QuestionAnswer', 'ContactMail',
   ],
-  'location': [
+  location: [
     'LocationOn', 'Map', 'Navigation', 'Place', 'MyLocation', 'NearMe',
     'Directions', 'Route', 'Explore', 'ExploreOff', 'LocalActivity',
     'LocalAtm', 'LocalParking', 'LocalGasStation', 'LocalPharmacy',
     'LocationCity', 'LocationSearching', 'LocationDisabled', 'PinDrop', 'AddLocation',
     'EditLocation', 'LocationOff', 'WhereToVote', 'Room', 'Home',
   ],
-  'medical': [
+  medical: [
     'MedicalServices', 'LocalHospital', 'Healing', 'HealthAndSafety', 'Vaccines',
     'Emergency', 'LocalPharmacy', 'MedicalInformation', 'Medication',
     'MonitorHeart', 'Favorite', 'FavoriteBorder', 'HealthAndSafety',
     'LocalHospital', 'Healing', 'MedicalServices', 'Coronavirus', 'Sick',
     'Emergency', 'LocalPharmacy', 'MedicationLiquid', 'PregnantWoman', 'ChildCare',
   ],
-  'services': [
+  services: [
     'AutoRepair', 'CarRepair', 'BuildCircle', 'Handyman', 'Plumbing',
     'ElectricalServices', 'CleaningServices', 'DryCleaning', 'LocalLaundryService',
     'Carpenter', 'Construction', 'Engineering', 'PrecisionManufacturing',
@@ -81,28 +81,28 @@ const ICONS_BY_CATEGORY = {
     'Build', 'Handyman', 'Plumbing', 'ElectricalServices', 'CleaningServices',
     'Carpenter', 'Construction', 'Engineering', 'PrecisionManufacturing',
   ],
-  'media': [
+  media: [
     'Camera', 'PhotoCamera', 'Videocam', 'MusicNote', 'Movie', 'TheaterComedy',
     'MovieFilter', 'VideoLibrary', 'PhotoLibrary', 'Image', 'Images',
     'VideoFile', 'AudioFile', 'MovieCreation', 'LiveTv', 'Radio',
     'CameraAlt', 'CameraRoll', 'CameraEnhance', 'Photo', 'PhotoAlbum',
     'VideoCall', 'Videocam', 'Movie', 'TheaterComedy', 'MusicNote',
   ],
-  'technology': [
+  technology: [
     'Computer', 'Laptop', 'Phone', 'Tablet', 'Devices', 'Smartphone',
     'Watch', 'Headphones', 'Speaker', 'Tv', 'Monitor', 'Print',
     'Scanner', 'Fax', 'Router', 'Memory', 'Storage', 'Cloud',
     'Computer', 'LaptopMac', 'LaptopWindows', 'PhoneAndroid', 'PhoneIphone',
     'TabletAndroid', 'TabletMac', 'Watch', 'WatchLater', 'Devices',
   ],
-  'shopping': [
+  shopping: [
     'ShoppingBag', 'ShoppingCart', 'AddShoppingCart', 'RemoveShoppingCart',
     'ShoppingBasket', 'LocalOffer', 'LocalOfferOutlined', 'Discount',
     'Loyalty', 'CardGiftcard', 'Redeem', 'CardMembership',
     'ShoppingBag', 'ShoppingCart', 'AddShoppingCart', 'RemoveShoppingCart',
     'ShoppingBasket', 'LocalOffer', 'Discount', 'Loyalty', 'CardGiftcard',
   ],
-  'general': [
+  general: [
     'Settings', 'MoreVert', 'MoreHoriz', 'Menu', 'Apps', 'Dashboard',
     'Notifications', 'NotificationsActive', 'NotificationsOff', 'Star',
     'StarBorder', 'StarHalf', 'Favorite', 'FavoriteBorder', 'ThumbUp',
@@ -112,74 +112,72 @@ const ICONS_BY_CATEGORY = {
     'ArrowForward', 'ArrowBack', 'Refresh', 'Sync', 'Autorenew',
     'MoreVert', 'MoreHoriz', 'Menu', 'Apps', 'Dashboard', 'Settings',
   ],
-  'security': [
+  security: [
     'Lock', 'LockOpen', 'Visibility', 'VisibilityOff', 'Security',
     'Verified', 'VerifiedUser', 'AdminPanelSettings', 'Shield', 'ShieldCheck',
     'Lock', 'LockOpen', 'LockClock', 'LockReset', 'Password',
     'Security', 'Verified', 'VerifiedUser', 'AdminPanelSettings', 'Policy',
   ],
-  'people': [
+  people: [
     'Person', 'People', 'Group', 'PersonAdd', 'PersonRemove', 'AccountCircle', 'AccountBox',
     'PersonOutline', 'PeopleOutline', 'GroupAdd', 'GroupRemove', 'SupervisorAccount',
     'PersonPin', 'PersonPinCircle', 'HowToReg', 'PersonAddAlt', 'PersonRemoveAlt',
   ],
-  'documents': [
+  documents: [
     'Assignment', 'AssignmentInd', 'AssignmentTurnedIn', 'Description',
     'Article', 'Note', 'Notes', 'StickyNote2', 'TextSnippet',
     'Folder', 'FolderOpen', 'InsertDriveFile', 'AttachFile', 'Link',
     'Description', 'Article', 'Note', 'Notes', 'TextSnippet',
   ],
-  'time': [
+  time: [
     'CalendarToday', 'Event', 'Schedule', 'AccessTime', 'DateRange',
     'Alarm', 'Timer', 'Stopwatch', 'HourglassEmpty', 'HourglassFull',
     'CalendarMonth', 'CalendarViewDay', 'CalendarViewWeek', 'CalendarViewMonth',
     'Today', 'EventAvailable', 'EventBusy', 'EventNote', 'Schedule',
   ],
-  'weather': [
+  weather: [
     'Cloud', 'CloudQueue', 'CloudDone', 'CloudOff', 'CloudUpload', 'CloudDownload',
     'AcUnit', 'Air', 'WaterDrop', 'Brightness', 'BrightnessHigh', 'BrightnessLow',
     'WbSunny', 'WbTwilight', 'WbCloudy', 'Grain', 'FilterDrama',
   ],
-  'arts': [
+  arts: [
     'Palette', 'Brush', 'ColorLens', 'FormatPaint', 'Draw',
     'Photo', 'Image', 'Images', 'PhotoLibrary', 'PhotoAlbum',
     'Camera', 'CameraAlt', 'CameraRoll', 'CameraEnhance',
   ],
-  'tools': [
+  tools: [
     'Build', 'Handyman', 'Construction', 'Engineering', 'PrecisionManufacturing',
     'Settings', 'Tune', 'FilterList', 'Sort', 'ViewList', 'ViewModule',
     'GridOn', 'GridOff', 'ViewComfy', 'ViewCompact', 'ViewHeadline',
   ],
 };
 
-// Flatten all icons into a single array
 const ALL_ICONS = Object.values(ICONS_BY_CATEGORY).flat();
 
-// Category labels
 const CATEGORY_LABELS = {
-  'all': 'Barchasi',
-  'business': 'Biznes & Savdo',
-  'food': 'Ovqat & Restoran',
-  'transportation': 'Transport',
-  'building': 'Binolar & Ko\'chmas mulk',
-  'finance': 'Moliya & Pul',
-  'hospitality': 'Mehmonxona & Turizm',
-  'education': 'Ta\'lim',
-  'communication': 'Aloqa',
-  'location': 'Joylashuv & Navigatsiya',
-  'medical': 'Tibbiyot & Sog\'liq',
-  'services': 'Xizmatlar & Ta\'mirlash',
-  'media': 'Media & Ko\'ngilochar',
-  'technology': 'Texnologiya',
-  'shopping': 'Sotib olish & Do\'kon',
-  'general': 'Umumiy',
-  'security': 'Xavfsizlik',
-  'people': 'Odamlar',
-  'documents': 'Hujjatlar',
-  'time': 'Vaqt & Kalendar',
-  'weather': 'Ob-havo',
-  'arts': 'San\'at & Dizayn',
-  'tools': 'Asboblar & Sozlamalar',
+  all: 'Barchasi',
+  business: 'Biznes & Savdo',
+  food: 'Ovqat & Restoran',
+  transportation: 'Transport',
+  building: "Binolar & Ko'chmas mulk",
+  finance: 'Moliya & Pul',
+  hospitality: 'Mehmonxona & Turizm',
+  education: "Ta'lim",
+  communication: 'Aloqa',
+  location: 'Joylashuv & Navigatsiya',
+  medical: "Tibbiyot & Sog'liq",
+  services: "Xizmatlar & Ta'mirlash",
+  media: "Media & Ko'ngilochar",
+  technology: 'Texnologiya',
+  shopping: "Sotib olish & Do'kon",
+  general: 'Umumiy',
+  security: 'Xavfsizlik',
+  people: 'Odamlar',
+  documents: 'Hujjatlar',
+  time: 'Vaqt & Kalendar',
+  weather: 'Ob-havo',
+  arts: "San'at & Dizayn",
+  tools: 'Asboblar & Sozlamalar',
 };
 
 const IconSelector = ({ value, onChange, label, required = false }) => {
@@ -191,14 +189,10 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
   const SelectedIcon = selectedIconName && Icons[selectedIconName] ? Icons[selectedIconName] : null;
 
   const filteredIcons = useMemo(() => {
-    let icons = selectedCategory === 'all' 
-      ? ALL_ICONS 
-      : ICONS_BY_CATEGORY[selectedCategory] || [];
+    let icons = selectedCategory === 'all' ? ALL_ICONS : ICONS_BY_CATEGORY[selectedCategory] || [];
 
     if (searchQuery.trim()) {
-      icons = icons.filter((iconName) =>
-        iconName.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      icons = icons.filter((iconName) => iconName.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
     return icons;
@@ -218,12 +212,11 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
   return (
     <div>
       {label && (
-        <label className="block text-xs font-semibold text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
-      
-      {/* Icon Input/Button */}
+
       <div className="flex gap-2">
         <button
           type="button"
@@ -232,11 +225,11 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
         >
           {SelectedIcon ? (
             <>
-              <SelectedIcon className="w-5 h-5 text-indigo-600" />
+              <SelectedIcon sx={{ fontSize: 20 }} className="text-indigo-600" />
               <span className="text-gray-700 font-mono text-xs">{selectedIconName}</span>
             </>
           ) : (
-            <span className="text-gray-500">Icon tanlang...</span>
+            <span className="text-gray-500">Icon tanlang</span>
           )}
         </button>
         {SelectedIcon && (
@@ -245,20 +238,13 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
             onClick={handleClear}
             className="px-3 py-2 border border-gray-300 rounded-md hover:bg-red-50 hover:border-red-300 transition-colors text-sm text-red-600"
           >
-            <Close className="w-4 h-4" />
+            <Close sx={{ fontSize: 18 }} />
           </button>
         )}
       </div>
 
-      {/* Hidden input for form submission */}
-      <input
-        type="hidden"
-        name="icon"
-        value={selectedIconName}
-        required={required}
-      />
+      <input type="hidden" name="icon" value={selectedIconName} />
 
-      {/* Icon Picker Modal */}
       <AnimatePresence>
         {isOpen && (
           <>
@@ -286,16 +272,14 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
                 className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Header */}
                 <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-lg font-bold">Icon Tanlash</h2>
-                      <p className="text-xs text-indigo-100 mt-0.5">
-                        Iconni tanlang yoki qidiring
-                      </p>
+                      <h2 className="text-lg font-bold">Icon tanlash</h2>
+                      <p className="text-xs text-indigo-100 mt-0.5">Iconni tanlang yoki qidiring</p>
                     </div>
                     <button
+                      type="button"
                       onClick={() => {
                         setIsOpen(false);
                         setSearchQuery('');
@@ -303,16 +287,15 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
                       }}
                       className="text-white/80 hover:text-white hover:bg-white/20 rounded-lg p-1.5 transition-all"
                     >
-                      <Close className="w-4 h-4" />
+                      <Close sx={{ fontSize: 18 }} />
                     </button>
                   </div>
                 </div>
 
-                {/* Search and Category Filter */}
                 <div className="p-4 border-b border-gray-200">
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
                       <input
                         type="text"
                         placeholder="Icon qidirish..."
@@ -327,16 +310,15 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
                       onChange={(e) => setSelectedCategory(e.target.value)}
                       className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white min-w-[200px]"
                     >
-                      {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                      {Object.entries(CATEGORY_LABELS).map(([key, catLabel]) => (
                         <option key={key} value={key}>
-                          {label}
+                          {catLabel}
                         </option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {/* Icons Grid */}
                 <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
                   {filteredIcons.length === 0 ? (
                     <div className="text-center py-8">
@@ -347,13 +329,14 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
                       {filteredIcons.map((iconName) => {
                         const IconComponent = Icons[iconName];
                         const isSelected = selectedIconName === iconName;
-                        
+
                         if (!IconComponent) return null;
 
                         return (
                           <motion.button
                             key={iconName}
                             type="button"
+                            title={iconName}
                             onClick={() => handleIconSelect(iconName)}
                             className={`
                               flex flex-col items-center justify-center gap-1 p-3 rounded-lg border-2 transition-all
@@ -366,7 +349,7 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            <IconComponent className="w-6 h-6" />
+                            <IconComponent sx={{ fontSize: 24 }} />
                           </motion.button>
                         );
                       })}
@@ -383,5 +366,3 @@ const IconSelector = ({ value, onChange, label, required = false }) => {
 };
 
 export default IconSelector;
-
-

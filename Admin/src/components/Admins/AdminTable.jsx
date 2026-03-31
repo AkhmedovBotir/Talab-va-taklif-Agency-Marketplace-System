@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Edit, Delete, Visibility } from '@mui/icons-material';
+import { Edit, Delete, Visibility, FirstPage, LastPage, NavigateBefore, NavigateNext } from '@mui/icons-material';
 import { adminAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { formatTableDate } from '../../utils/dateFormatter';
@@ -10,9 +10,10 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
   const { showSuccess, showError } = useSnackbar();
 
   const handleStatusToggle = async (admin, newStatus) => {
-    setUpdatingStatus({ ...updatingStatus, [admin._id]: true });
+    const adminId = admin.id ?? admin._id;
+    setUpdatingStatus({ ...updatingStatus, [adminId]: true });
     try {
-      const response = await adminAPI.updateAdminStatus(admin._id, newStatus);
+      const response = await adminAPI.updateAdminStatus(adminId, newStatus);
       if (response.success) {
         showSuccess(response.message || 'Status muvaffaqiyatli yangilandi');
         onStatusChange?.();
@@ -20,7 +21,7 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
     } catch (error) {
       showError(error.message || 'Status yangilashda xatolik');
     } finally {
-      setUpdatingStatus({ ...updatingStatus, [admin._id]: false });
+      setUpdatingStatus({ ...updatingStatus, [adminId]: false });
     }
   };
 
@@ -41,6 +42,17 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
       </div>
     );
   }
+
+  const getVisiblePages = () => {
+    const totalPages = pagination.pages || 0;
+    const current = pagination.page || 1;
+
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    if (current <= 4) return [1, 2, 3, 4, 5, '...', totalPages];
+    if (current >= totalPages - 3) return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, '...', current - 1, current, current + 1, '...', totalPages];
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -77,7 +89,7 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
               
               return (
                 <motion.tr
-                  key={admin._id}
+                  key={admin.id ?? admin._id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
@@ -110,7 +122,7 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
                           const newStatus = e.target.checked ? 'active' : 'inactive';
                           handleStatusToggle(admin, newStatus);
                         }}
-                        disabled={updatingStatus[admin._id] || isGeneralRole}
+                        disabled={updatingStatus[admin.id ?? admin._id] || isGeneralRole}
                         className="sr-only peer"
                       />
                       <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 ${isGeneralRole ? 'opacity-50 cursor-not-allowed' : ''} disabled:opacity-50`}></div>
@@ -180,7 +192,7 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
       {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-gray-700">
               Jami <span className="font-medium">{pagination.total}</span> ta admindan{' '}
               <span className="font-medium">
@@ -188,48 +200,57 @@ const AdminTable = ({ admins, loading, onEdit, onDelete, onView, pagination, onP
               </span>{' '}
               ko'rsatilmoqda
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => onPageChange(1)}
+                disabled={pagination.page === 1}
+                className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+              >
+                <FirstPage className="w-4 h-4" />
+              </button>
               <button
                 onClick={() => onPageChange(pagination.page - 1)}
                 disabled={pagination.page === 1}
-                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
               >
-                Oldingi
+                <NavigateBefore className="w-4 h-4" />
+                <span>Oldingi</span>
               </button>
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
-                  let pageNum;
-                  if (pagination.pages <= 5) {
-                    pageNum = i + 1;
-                  } else if (pagination.page <= 3) {
-                    pageNum = i + 1;
-                  } else if (pagination.page >= pagination.pages - 2) {
-                    pageNum = pagination.pages - 4 + i;
-                  } else {
-                    pageNum = pagination.page - 2 + i;
-                  }
-                  
-                  return (
+              <div className="flex items-center gap-1">
+                {getVisiblePages().map((pageNum, idx) =>
+                  pageNum === '...' ? (
+                    <span key={`ellipsis-${idx}`} className="px-2 text-gray-500 select-none">
+                      ...
+                    </span>
+                  ) : (
                     <button
                       key={pageNum}
                       onClick={() => onPageChange(pageNum)}
-                      className={`px-3 py-1 border rounded-md text-sm ${
+                      className={`px-3 py-1.5 border rounded-md text-sm min-w-9 transition-colors ${
                         pageNum === pagination.page
-                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                           : 'border-gray-300 hover:bg-gray-100'
                       }`}
                     >
                       {pageNum}
                     </button>
-                  );
-                })}
+                  )
+                )}
               </div>
               <button
                 onClick={() => onPageChange(pagination.page + 1)}
                 disabled={pagination.page === pagination.pages}
-                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
               >
-                Keyingi
+                <span>Keyingi</span>
+                <NavigateNext className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onPageChange(pagination.pages)}
+                disabled={pagination.page === pagination.pages}
+                className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+              >
+                <LastPage className="w-4 h-4" />
               </button>
             </div>
           </div>

@@ -17,8 +17,6 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-import { dashboardAPI } from '../services/api';
-import { useSnackbar } from '../contexts/SnackbarContext';
 import { formatDate } from '../utils/dateFormatter';
 import {
   Dashboard as DashboardIcon,
@@ -52,8 +50,7 @@ const formatCurrency = (num) => {
 };
 
 const Dashboard = () => {
-  const { showError } = useSnackbar();
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false);
   const [generalStats, setGeneralStats] = useState(null);
   const [dailyStats, setDailyStats] = useState([]);
   const [weeklyStats, setWeeklyStats] = useState([]);
@@ -63,48 +60,6 @@ const Dashboard = () => {
   const [usersStats, setUsersStats] = useState(null);
   const [productsStats, setProductsStats] = useState(null);
   const [activeChart, setActiveChart] = useState('daily'); // 'daily', 'weekly', 'monthly'
-
-  useEffect(() => {
-    fetchAllStatistics();
-  }, []);
-
-  const fetchAllStatistics = async () => {
-    setLoading(true);
-    try {
-      const [
-        generalRes,
-        dailyRes,
-        weeklyRes,
-        monthlyRes,
-        ordersRes,
-        financeRes,
-        usersRes,
-        productsRes,
-      ] = await Promise.all([
-        dashboardAPI.getStatistics(),
-        dashboardAPI.getDailyStatistics(30),
-        dashboardAPI.getWeeklyStatistics(12),
-        dashboardAPI.getMonthlyStatistics(12),
-        dashboardAPI.getOrdersStatistics(),
-        dashboardAPI.getFinanceStatistics(),
-        dashboardAPI.getUsersStatistics(),
-        dashboardAPI.getProductsStatistics(),
-      ]);
-
-      if (generalRes.success) setGeneralStats(generalRes.data);
-      if (dailyRes.success) setDailyStats(dailyRes.data || []);
-      if (weeklyRes.success) setWeeklyStats(weeklyRes.data || []);
-      if (monthlyRes.success) setMonthlyStats(monthlyRes.data || []);
-      if (ordersRes.success) setOrdersStats(ordersRes.data);
-      if (financeRes.success) setFinanceStats(financeRes.data);
-      if (usersRes.success) setUsersStats(usersRes.data);
-      if (productsRes.success) setProductsStats(productsRes.data);
-    } catch (err) {
-      showError(err.message || 'Statistikani yuklashda xatolik yuz berdi');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -150,6 +105,9 @@ const Dashboard = () => {
         </h1>
         <p className="text-gray-600">Umumiy statistika va ko'rsatkichlar</p>
       </motion.div>
+      <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3">
+        Dashboard statistikasi API chaqiruvlari o'chirilgan.
+      </div>
 
       {/* General Statistics Cards */}
       {generalStats && (

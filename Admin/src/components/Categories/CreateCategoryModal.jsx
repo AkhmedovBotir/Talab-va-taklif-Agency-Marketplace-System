@@ -1,295 +1,160 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Close, Save, Image as ImageIcon } from '@mui/icons-material';
-import { categoryManagementAPI } from '../../services/api';
+import { Close } from '@mui/icons-material';
+import { categoryAPI, subcategoryAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 
-const CreateCategoryModal = ({ open, onClose, onSuccess, isSubcategory = false, parentCategory = null }) => {
+const empty = {
+  name: '',
+  slug: '',
+  image: '',
+  censored: false,
+  status: 'active',
+  parent_id: '',
+};
+
+const CreateCategoryModal = ({ open, onClose, onSuccess, isSubcategory = false, parentCategory = null, categories = [] }) => {
   const { showSuccess, showError } = useSnackbar();
-  const [formData, setFormData] = useState({
-    name: '',
-    image: '',
-    censored: false,
-    status: 'active',
-    parent: isSubcategory && parentCategory ? parentCategory._id : null,
-  });
+  const [form, setForm] = useState(empty);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fileName, setFileName] = useState('');
 
   useEffect(() => {
-    if (open) {
-      setFormData({
-        name: '',
-        image: '',
-        censored: false,
-        status: 'active',
-        parent: isSubcategory && parentCategory ? parentCategory._id : null,
-      });
-      setError('');
-    }
+    if (!open) return;
+    setError('');
+    setFileName('');
+    setForm({
+      ...empty,
+      parent_id: isSubcategory ? String(parentCategory?.id ?? parentCategory?._id ?? '') : '',
+    });
   }, [open, isSubcategory, parentCategory]);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked, files } = e.target;
-    
-    if (name === 'image' && files && files[0]) {
-      const file = files[0];
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFormData((prev) => ({ ...prev, image: reader.result }));
-        };
-        reader.readAsDataURL(file);
-      } else {
-        showError('Faqat rasm fayllari qabul qilinadi');
-      }
-    } else if (type === 'checkbox') {
-      setFormData((prev) => ({ ...prev, [name]: checked }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    
-    if (!formData.name || formData.name.trim().length < 2) {
-      setError('Nomi kamida 2 ta belgi bo\'lishi kerak');
+  const onImage = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showError('Faqat rasm fayli tanlang');
       return;
     }
+    setFileName(file.name || '');
+    const reader = new FileReader();
+    reader.onloadend = () => setForm((p) => ({ ...p, image: String(reader.result || '') }));
+    reader.readAsDataURL(file);
+  };
 
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!form.name.trim() || !form.slug.trim()) {
+      setError('Name va slug majburiy');
+      return;
+    }
+    if (isSubcategory && !form.parent_id) {
+      setError('Asosiy kategoriya tanlang');
+      return;
+    }
     setLoading(true);
     try {
-      let payload;
-      let response;
-      
-      if (isSubcategory) {
-        if (!formData.parent) {
-          setError('Asosiy kategoriya tanlanishi shart');
-          setLoading(false);
-          return;
-        }
-        // Subcategory uchun image va censored qabul qilinmaydi
-        payload = {
-          name: formData.name.trim(),
-          status: formData.status,
-          parent: formData.parent,
-        };
-        response = await categoryManagementAPI.createSubcategory(payload);
-      } else {
-        // Category uchun barcha fieldlar
-        payload = {
-          name: formData.name.trim(),
-          status: formData.status,
-          censored: formData.censored,
-        };
-        
-        if (formData.image) {
-          payload.image = formData.image;
-        }
-        
-        response = await categoryManagementAPI.createCategory(payload);
-      }
-
-      if (response.success) {
-        showSuccess(response.message || `${isSubcategory ? 'Subkategoriya' : 'Kategoriya'} muvaffaqiyatli yaratildi`);
-        onSuccess();
-        onClose();
+      const payload = {
+        name: form.name.trim(),
+        slug: form.slug.trim(),
+        image: form.image || '',
+        censored: Boolean(form.censored),
+        status: form.status,
+      };
+      if (isSubcategory) payload.parent_id = Number(form.parent_id);
+      const res = isSubcategory ? await subcategoryAPI.create(payload) : await categoryAPI.create(payload);
+      if (res.success) {
+        showSuccess(res.message || (isSubcategory ? 'Subkategoriya yaratildi' : 'Kategoriya yaratildi'));
+        onSuccess?.();
       }
     } catch (err) {
-      const errorMsg = err.message || `${isSubcategory ? 'Subkategoriya' : 'Kategoriya'} yaratishda xatolik yuz berdi`;
-      setError(errorMsg);
-      showError(errorMsg);
+      const msg = err.message || 'Saqlashda xatolik';
+      setError(msg);
+      showError(msg);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleClose = () => {
-    setError('');
-    onClose();
   };
 
   return (
     <AnimatePresence>
       {open && (
         <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99]"
-            onClick={handleClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white p-4">
-                <div className="flex items-center justify-between">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/50 z-50" style={{ margin: '0' }} />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(ev) => ev.stopPropagation()}>
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-bold text-gray-800">{isSubcategory ? 'Yangi subkategoriya' : 'Yangi kategoriya'}</h2>
+                <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><Close /></button>
+              </div>
+              <form onSubmit={submit} className="p-6 space-y-4">
+                {error && <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">{error}</div>}
+                {isSubcategory && (
                   <div>
-                    <h2 className="text-lg font-bold">
-                      {isSubcategory ? 'Yangi Subkategoriya' : 'Yangi Kategoriya'}
-                    </h2>
-                    <p className="text-xs text-indigo-100 mt-0.5">
-                      {isSubcategory ? 'Subkategoriya ma\'lumotlarini kiriting' : 'Kategoriya ma\'lumotlarini kiriting'}
-                    </p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Asosiy kategoriya *</label>
+                    <select value={form.parent_id} onChange={(e) => setForm((p) => ({ ...p, parent_id: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
+                      <option value="">Tanlang</option>
+                      {categories.map((c) => (
+                        <option key={c.id ?? c._id} value={String(c.id ?? c._id)}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
-                  <button
-                    onClick={handleClose}
-                    className="text-white/80 hover:text-white hover:bg-white/20 rounded-lg p-1.5 transition-all"
-                  >
-                    <Close className="w-4 h-4" />
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nomi *</label>
+                    <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Slug *</label>
+                    <input value={form.slug} onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rasm (base64)</label>
+                  <label className="w-full flex items-center gap-3 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+                    <span className="px-3 py-1 text-sm bg-gray-100 rounded border border-gray-300">Fayl tanlash</span>
+                    <span className="text-sm text-gray-600 truncate">{fileName || "Fayl tanlanmagan"}</span>
+                    <input type="file" accept="image/*" onChange={(e) => onImage(e.target.files?.[0])} className="hidden" />
+                  </label>
+                  {form.image && (
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="text-xs text-green-600">Rasm tanlandi</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm((p) => ({ ...p, image: '' }));
+                          setFileName('');
+                        }}
+                        className="text-xs text-red-600 hover:text-red-700"
+                      >
+                        Olib tashlash
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
+                      <option value="active">Faol</option>
+                      <option value="inactive">Nofaol</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 mt-7">
+                    <input type="checkbox" checked={form.censored} onChange={(e) => setForm((p) => ({ ...p, censored: e.target.checked }))} />
+                    <span className="text-sm text-gray-700">Censored</span>
+                  </label>
+                </div>
+                <div className="flex gap-3 pt-2 border-t">
+                  <button type="button" onClick={onClose} className="flex-1 py-2 border rounded-md hover:bg-gray-50">Bekor qilish</button>
+                  <button type="submit" disabled={loading} className="flex-1 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50">
+                    {loading ? 'Saqlanmoqda...' : 'Saqlash'}
                   </button>
                 </div>
-              </div>
-
-              {/* Form Content */}
-              <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Parent Category (for subcategory) */}
-                  {isSubcategory && parentCategory && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-xs font-medium text-blue-800">Asosiy kategoriya:</p>
-                      <p className="text-sm text-blue-900 font-semibold">{parentCategory.name}</p>
-                    </div>
-                  )}
-
-                  {/* Name */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      Nomi <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      required
-                      minLength={2}
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="Masalan: Elektronika"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white"
-                    />
-                  </div>
-
-                  {/* Image - faqat category uchun */}
-                  {!isSubcategory && (
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">
-                        Rasm (ixtiyoriy)
-                      </label>
-                      {formData.image && (
-                        <div className="mb-2 flex justify-center">
-                          <img
-                            src={formData.image}
-                            alt="Preview"
-                            className="max-w-48 max-h-48 object-contain border border-gray-300 rounded-lg"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      )}
-                      <div className="relative">
-                        <input
-                          type="file"
-                          name="image"
-                          accept="image/*"
-                          onChange={handleChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white"
-                        />
-                        {formData.image && (
-                          <button
-                            type="button"
-                            onClick={() => setFormData((prev) => ({ ...prev, image: '' }))}
-                            className="mt-1 text-xs text-red-600 hover:text-red-800"
-                          >
-                            Rasmini olib tashlash
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">PNG, JPG, JPEG formatlari qabul qilinadi</p>
-                    </div>
-                  )}
-
-                  {/* Status and Censored */}
-                  <div className={`grid ${isSubcategory ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
-                      <select
-                        name="status"
-                        value={formData.status}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white"
-                      >
-                        <option value="active">Faol</option>
-                        <option value="inactive">Nofaol</option>
-                      </select>
-                    </div>
-                    {/* Censored - faqat category uchun */}
-                    {!isSubcategory && (
-                      <div className="flex items-end">
-                        <label className="flex items-center gap-2 p-2 bg-white border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors w-full">
-                          <input
-                            type="checkbox"
-                            name="censored"
-                            checked={formData.censored}
-                            onChange={handleChange}
-                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
-                          />
-                          <span className="text-xs font-semibold text-gray-700">Censored</span>
-                        </label>
-                      </div>
-                    )}
-                    {/* Subcategory uchun censored haqida ma'lumot */}
-                    {isSubcategory && parentCategory && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-xs text-blue-800">
-                          <span className="font-semibold">Eslatma:</span> Censored statusi asosiy kategoriyadan avtomatik meros qilib olinadi ({parentCategory.censored ? 'Censored' : 'Not Censored'})
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Error Message */}
-                  {error && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-xs text-red-800 font-medium">{error}</p>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-gray-200">
-                    <button
-                      type="button"
-                      onClick={handleClose}
-                      className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors font-medium"
-                    >
-                      Bekor qilish
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-md hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm shadow-md hover:shadow-lg"
-                    >
-                      <Save className="w-4 h-4" />
-                      {loading ? 'Saqlanmoqda...' : 'Saqlash'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </motion.div>
+              </form>
+            </div>
           </motion.div>
         </>
       )}
@@ -298,4 +163,3 @@ const CreateCategoryModal = ({ open, onClose, onSuccess, isSubcategory = false, 
 };
 
 export default CreateCategoryModal;
-

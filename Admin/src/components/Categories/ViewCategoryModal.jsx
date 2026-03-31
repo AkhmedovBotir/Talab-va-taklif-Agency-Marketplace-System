@@ -1,228 +1,86 @@
-import { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
-import { motion } from 'framer-motion';
-import ImageGalleryModal from '../Common/ImageGalleryModal';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Close } from '@mui/icons-material';
+import { categoryAPI, subcategoryAPI } from '../../services/api';
+import { formatTableDate } from '../../utils/dateFormatter';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 
-const ViewCategoryModal = ({ open, onClose, category }) => {
-  const [imageGalleryOpen, setImageGalleryOpen] = useState(false);
+const ViewCategoryModal = ({ open, onClose, item, isSubcategory = false, categories = [] }) => {
+  const { showError } = useSnackbar();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  if (!category) return null;
+  useEffect(() => {
+    if (!open || !item) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const id = item.id ?? item._id;
+        const res = isSubcategory ? await subcategoryAPI.getById(id) : await categoryAPI.getById(id);
+        if (!cancelled && res.success) setData(res.data || item);
+      } catch (e) {
+        if (!cancelled) {
+          showError(e.message || 'Yuklashda xatolik');
+          setData(item);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, item, isSubcategory, showError]);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const row = (label, value) => (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-2 border-b border-gray-100">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="sm:col-span-2 text-sm text-gray-900 font-medium break-words">{value ?? '-'}</span>
+    </div>
+  );
+
+  const parentName = () => {
+    const pid = data?.parent_id ?? data?.parent?.id ?? data?.parent?._id;
+    if (!pid) return '-';
+    return categories.find((c) => String(c.id ?? c._id) === String(pid))?.name || '-';
   };
 
-  const isSubcategory = category.parent !== null && category.parent !== undefined;
-
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-xl font-bold text-gray-800"
-        >
-          {isSubcategory ? 'Subkategoriya ma\'lumotlari' : 'Kategoriya ma\'lumotlari'}
-        </motion.div>
-      </DialogTitle>
-      <DialogContent>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-4"
-        >
-          {/* Image */}
-          {category.image && (
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Rasm</label>
-              <div className="flex justify-center">
-                <img
-                  src={category.image}
-                  alt={category.name}
-                  className="max-w-full max-h-64 rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setImageGalleryOpen(true)}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/50 z-50" style={{ margin: '0' }} />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-bold text-gray-800">{isSubcategory ? 'Subkategoriya' : 'Kategoriya'}</h2>
+                <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><Close /></button>
               </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nomi</label>
-              <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{category.name || '-'}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
-              <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{category.slug || '-'}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <p className="text-sm">
-                <span
-                  className={`px-2 py-1 rounded text-xs font-medium ${
-                    category.status === 'active'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {category.status === 'active' ? 'Faol' : 'Nofaol'}
-                </span>
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Censored</label>
-              <p className="text-sm">
-                <span
-                  className={`px-2 py-1 rounded text-xs font-medium ${
-                    category.censored
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-blue-100 text-blue-800'
-                  }`}
-                >
-                  {category.censored ? 'Censored' : 'Not Censored'}
-                </span>
-              </p>
-            </div>
-            {isSubcategory && category.parent && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Asosiy kategoriya</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {typeof category.parent === 'object' ? category.parent.name : '-'}
-                </p>
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Yaratilgan sana</label>
-              <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                {formatDate(category.createdAt)}
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Yangilangan sana</label>
-              <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                {formatDate(category.updatedAt)}
-              </p>
-            </div>
-          </div>
-
-          {category.createdBy && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Yaratuvchi ma'lumotlari</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomi</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                    {category.createdBy.name || '-'}
-                  </p>
-                </div>
-                {category.createdBy.inn && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">INN</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {category.createdBy.inn}
-                    </p>
+              <div className="p-6">
+                {loading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-300 border-t-indigo-600" />
                   </div>
-                )}
-                {category.createdBy.phone && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {category.createdBy.phone}
-                    </p>
-                  </div>
-                )}
-                {category.createdByModel && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {category.createdByModel}
-                    </p>
-                  </div>
+                ) : (
+                  <>
+                    {data?.image && <img src={data.image} alt={data?.name || 'image'} className="mb-4 max-h-40 rounded border border-gray-200" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+                    {row('Nomi', data?.name)}
+                    {row('Slug', data?.slug)}
+                    {row('Status', data?.status === 'active' ? 'Faol' : 'Nofaol')}
+                    {row('Censored', data?.censored ? 'Ha' : "Yo'q")}
+                    {isSubcategory && row('Asosiy kategoriya', parentName())}
+                    {row('Yaratilgan', formatTableDate(data?.createdAt || data?.created_at))}
+                    {row('Yangilangan', formatTableDate(data?.updatedAt || data?.updated_at))}
+                  </>
                 )}
               </div>
             </div>
-          )}
-
-          {!isSubcategory && category.subcategories && category.subcategories.length > 0 && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">
-                Subkategoriyalar ({category.subcategories.length} ta)
-              </h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {category.subcategories.map((sub) => (
-                  <div
-                    key={sub._id}
-                    className="bg-gray-50 p-3 rounded border border-gray-200"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{sub.name}</p>
-                        <p className="text-xs text-gray-500">{sub.slug}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          sub.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {sub.status === 'active' ? 'Faol' : 'Nofaol'}
-                      </span>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            sub.censored
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}
-                        >
-                          {sub.censored ? 'Censored' : 'Not Censored'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </motion.div>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="primary">
-          Yopish
-        </Button>
-      </DialogActions>
-
-      {/* Image Gallery Modal */}
-      {category.image && (
-        <ImageGalleryModal
-          open={imageGalleryOpen}
-          onClose={() => setImageGalleryOpen(false)}
-          images={[category.image]}
-          title={category.name}
-        />
+          </motion.div>
+        </>
       )}
-    </Dialog>
+    </AnimatePresence>
   );
 };
 
 export default ViewCategoryModal;
-
-
-
-
-
-
-

@@ -1,335 +1,280 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { categoryManagementAPI } from '../../services/api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search, Clear, Add } from '@mui/icons-material';
+import { useSearchParams } from 'react-router-dom';
+import { categoryAPI, subcategoryAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import CategoryTable from '../../components/Categories/CategoryTable';
-import ViewCategoryModal from '../../components/Categories/ViewCategoryModal';
 import CreateCategoryModal from '../../components/Categories/CreateCategoryModal';
 import EditCategoryModal from '../../components/Categories/EditCategoryModal';
 import DeleteCategoryModal from '../../components/Categories/DeleteCategoryModal';
-import { Search, Clear, Add } from '@mui/icons-material';
+import ViewCategoryModal from '../../components/Categories/ViewCategoryModal';
 
 const Categories = ({ hideHeader = false }) => {
   const { showError, showSuccess } = useSnackbar();
-  const [categories, setCategories] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [items, setItems] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 50,
-    total: 0,
-    totalPages: 0,
-  });
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
 
-  // Filters
-  const [filters, setFilters] = useState({
-    status: '',
-    censored: '',
-    search: '',
-  });
+  const [filters, setFilters] = useState({ status: '', censored: '', search: '' });
 
-  // Modals
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [deletingCategory, setDeletingCategory] = useState(null);
-  const [isEditingSubcategory, setIsEditingSubcategory] = useState(false);
-  const [isDeletingSubcategory, setIsDeletingSubcategory] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [isSubcategoryAction, setIsSubcategoryAction] = useState(false);
+  const [parentCategory, setParentCategory] = useState(null);
 
-  // Fetch categories
-  const fetchCategories = async () => {
+  const fetchAllSubcategories = useCallback(async () => {
+    let page = 1;
+    let all = [];
+    let keep = true;
+    while (keep) {
+      const res = await subcategoryAPI.getAll({ page, limit: 100 });
+      if (!res.success) break;
+      const payload = res.data || {};
+      const list = Array.isArray(payload.items) ? payload.items : Array.isArray(payload) ? payload : [];
+      all = all.concat(list);
+      const pages = Number(payload.total_pages) || Math.ceil((Number(payload.total) || list.length) / (Number(payload.limit) || 100));
+      if (!pages || page >= pages || list.length === 0) keep = false;
+      else page += 1;
+    }
+    return all;
+  }, []);
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    setError('');
     try {
-      const params = {
-        page: pagination.page,
-        limit: pagination.limit,
-      };
-      
-      if (filters.status) params.status = filters.status;
-      if (filters.censored !== '') params.censored = filters.censored === 'true';
-
-      const response = await categoryManagementAPI.getAllCategories(params);
-
-      if (response.success) {
-        setCategories(response.data || []);
-        setPagination({
-          page: response.page || pagination.page,
-          limit: response.limit || pagination.limit,
-          total: response.total || 0,
-          totalPages: response.totalPages || 0,
-        });
+      const params = { page: pagination.page, limit: pagination.limit };
+      const cRes = await categoryAPI.getAll(params);
+      if (cRes.success) {
+        const payload = cRes.data || {};
+        const list = Array.isArray(payload.items) ? payload.items : Array.isArray(payload) ? payload : [];
+        const subs = await fetchAllSubcategories();
+        setSubcategories(subs);
+        setItems(list);
+        setPagination((p) => ({
+          ...p,
+          page: Number(payload.page) || p.page,
+          limit: Number(payload.limit) || p.limit,
+          total: Number(payload.total) || list.length,
+          pages: Number(payload.total_pages) || Math.ceil((Number(payload.total) || list.length) / (Number(payload.limit) || p.limit || 1)),
+        }));
       }
-    } catch (err) {
-      const errorMsg = err.message || 'Kategoriyalarni yuklashda xatolik yuz berdi';
-      setError(errorMsg);
-      showError(errorMsg);
+    } catch (e) {
+      showError(e.message || 'Kategoriyalarni yuklashda xatolik');
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, fetchAllSubcategories, showError]);
 
   useEffect(() => {
-    fetchCategories();
-  }, [pagination.page, pagination.limit, filters.status, filters.censored]);
+    fetchData();
+  }, [fetchData]);
 
-  const handlePageChange = (newPage) => {
-    setPagination({ ...pagination, page: newPage });
-  };
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      onCreateCategory();
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
-  const handleView = (category) => {
-    setSelectedCategory(category);
-    setViewModalOpen(true);
-  };
-
-  const handleCreate = () => {
-    setSelectedCategory(null);
-    setCreateModalOpen(true);
-  };
-
-  const handleCreateSubcategory = (parentCategory) => {
-    setSelectedCategory(parentCategory);
-    setCreateModalOpen(true);
-  };
-
-  const handleEdit = (category, isSubcategory = false) => {
-    setEditingCategory(category);
-    setIsEditingSubcategory(isSubcategory);
-    setEditModalOpen(true);
-  };
-
-  const handleDelete = (category, isSubcategory = false) => {
-    setDeletingCategory(category);
-    setIsDeletingSubcategory(isSubcategory);
-    setDeleteModalOpen(true);
-  };
-
-  const handleDeleteSuccess = () => {
-    fetchCategories();
-  };
-
-  const handleCreateSuccess = () => {
-    fetchCategories();
-  };
-
-  const handleEditSuccess = () => {
-    fetchCategories();
-  };
-
-  // Filter by search (client-side)
-  const filteredCategories = categories.filter((category) => {
-    if (!filters.search) return true;
-    const search = filters.search.toLowerCase();
-    return (
-      category.name?.toLowerCase().includes(search) ||
-      category.slug?.toLowerCase().includes(search) ||
-      category.subcategories?.some((sub) =>
-        sub.name?.toLowerCase().includes(search) || sub.slug?.toLowerCase().includes(search)
-      )
-    );
-  });
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters({
-      status: '',
-      censored: '',
-      search: '',
+  const grouped = useMemo(() => {
+    const byParent = new Map();
+    for (const sub of subcategories) {
+      const pid = sub.parent_id ?? sub.parent?.id ?? sub.parent?._id;
+      if (!pid) continue;
+      const key = String(pid);
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key).push(sub);
+    }
+    return items.map((c) => {
+      const id = String(c.id ?? c._id);
+      return { ...c, subcategories: byParent.get(id) || [] };
     });
-    setPagination({ ...pagination, page: 1 });
+  }, [items, subcategories]);
+
+  const filtered = useMemo(() => {
+    return grouped.filter((category) => {
+      if (filters.status && category.status !== filters.status) return false;
+      if (filters.censored !== '' && String(Boolean(category.censored)) !== filters.censored) return false;
+      if (!filters.search) return true;
+      const q = filters.search.toLowerCase();
+      return (
+        category.name?.toLowerCase().includes(q) ||
+        category.slug?.toLowerCase().includes(q) ||
+        (category.subcategories || []).some((s) => s.name?.toLowerCase().includes(q) || s.slug?.toLowerCase().includes(q))
+      );
+    });
+  }, [grouped, filters]);
+
+  const onCreateCategory = () => {
+    setIsSubcategoryAction(false);
+    setParentCategory(null);
+    setCreateOpen(true);
+  };
+
+  const onCreateSub = (parent) => {
+    setIsSubcategoryAction(true);
+    setParentCategory(parent);
+    setCreateOpen(true);
+  };
+
+  const onView = (row, isSubcategory) => {
+    setSelected(row);
+    setIsSubcategoryAction(Boolean(isSubcategory));
+    setViewOpen(true);
+  };
+
+  const onEdit = (row, isSubcategory) => {
+    setSelected(row);
+    setIsSubcategoryAction(Boolean(isSubcategory));
+    setEditOpen(true);
+  };
+
+  const onDelete = (row, isSubcategory) => {
+    setSelected(row);
+    setIsSubcategoryAction(Boolean(isSubcategory));
+    setDeleteOpen(true);
+  };
+
+  const onToggleStatus = async (row, status, isSubcategory) => {
+    try {
+      const id = row.id ?? row._id;
+      const res = isSubcategory ? await subcategoryAPI.updateStatus(id, status) : await categoryAPI.updateStatus(id, status);
+      if (res.success) {
+        showSuccess(res.message || 'Status yangilandi');
+        await fetchData();
+        return true;
+      }
+    } catch (e) {
+      showError(e.message || 'Statusni yangilashda xatolik');
+    }
+    return false;
   };
 
   return (
-    <div>
-      {/* Header */}
+    <div className="space-y-6 max-w-7xl mx-auto">
       {!hideHeader && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Kategoriyalar</h1>
-              <p className="text-gray-600">Kategoriyalar va subkategoriyalarni boshqarish</p>
-            </div>
-            <button
-              onClick={handleCreate}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold shadow-lg hover:shadow-xl"
-            >
-              <Add className="w-5 h-5" />
-              Yangi Kategoriya
-            </button>
+            <h2 className="text-2xl font-bold text-gray-800">Kategoriyalar</h2>
+            <p className="text-gray-600 text-sm">Category va subcategory boshqaruvi</p>
           </div>
-        </motion.div>
+          <button type="button" onClick={onCreateCategory} className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 font-medium shrink-0">
+            <Add />
+            Yangi kategoriya
+          </button>
+        </div>
       )}
 
-      {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6"
-      >
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-gray-700">Filterlar</h3>
           <div className="flex items-center gap-3">
-            {hideHeader && (
-              <button
-                onClick={handleCreate}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold shadow-lg hover:shadow-xl text-sm"
-              >
-                <Add className="w-4 h-4" />
-                Yangi Kategoriya
-              </button>
-            )}
-          <button
-            onClick={handleClearFilters}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <Clear className="w-4 h-4" />
-            <span>Tozalash</span>
-          </button>
-        </div>
+            <button type="button" onClick={() => setFilters({ status: '', censored: '', search: '' })} className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+              <Clear className="w-4 h-4" />
+              Tozalash
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Qidirish..."
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <input value={filters.search} onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))} placeholder="Qidirish..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
           </div>
-
-          {/* Status Filter */}
-          <select
-            value={filters.status}
-            onChange={(e) => {
-              setFilters({ ...filters, status: e.target.value });
-              setPagination({ ...pagination, page: 1 });
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
+          <select value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))} className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
             <option value="">Barcha statuslar</option>
             <option value="active">Faol</option>
             <option value="inactive">Nofaol</option>
           </select>
-
-          {/* Censored Filter */}
-          <select
-            value={filters.censored}
-            onChange={(e) => {
-              setFilters({ ...filters, censored: e.target.value });
-              setPagination({ ...pagination, page: 1 });
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Barcha (Censored)</option>
+          <select value={filters.censored} onChange={(e) => setFilters((p) => ({ ...p, censored: e.target.value }))} className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
+            <option value="">Barchasi (censored)</option>
             <option value="true">Censored</option>
-            <option value="false">Not Censored</option>
+            <option value="false">Not censored</option>
           </select>
-
-          {/* Limit */}
-          <select
-            value={pagination.limit}
-            onChange={(e) => {
-              setPagination({ ...pagination, limit: Number(e.target.value), page: 1 });
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
+          <select value={pagination.limit} onChange={(e) => setPagination((p) => ({ ...p, page: 1, limit: Number(e.target.value) }))} className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500">
+            <option value="10">10 ta</option>
+            <option value="20">20 ta</option>
             <option value="50">50 ta</option>
             <option value="100">100 ta</option>
-            <option value="200">200 ta</option>
           </select>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
-      )}
-
-      {/* Table */}
       <CategoryTable
-        categories={filteredCategories}
+        categories={filtered}
         loading={loading}
-        onView={handleView}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onCreateSubcategory={handleCreateSubcategory}
         pagination={pagination}
-        onPageChange={handlePageChange}
+        onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
+        onView={onView}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onCreateSubcategory={onCreateSub}
+        onToggleStatus={onToggleStatus}
       />
 
-      {/* Modals */}
       <CreateCategoryModal
-        open={createModalOpen}
+        open={createOpen}
         onClose={() => {
-          setCreateModalOpen(false);
-          setSelectedCategory(null);
+          setCreateOpen(false);
+          setParentCategory(null);
         }}
-        onSuccess={handleCreateSuccess}
-        isSubcategory={!!selectedCategory}
-        parentCategory={selectedCategory}
+        onSuccess={() => {
+          setCreateOpen(false);
+          setParentCategory(null);
+          fetchData();
+        }}
+        isSubcategory={isSubcategoryAction}
+        parentCategory={parentCategory}
+        categories={items}
       />
 
-      {editingCategory && (
-        <EditCategoryModal
-          open={editModalOpen}
-          onClose={() => {
-            setEditModalOpen(false);
-            setEditingCategory(null);
-            setIsEditingSubcategory(false);
-          }}
-          onSuccess={handleEditSuccess}
-          category={editingCategory}
-          isSubcategory={isEditingSubcategory}
-          allCategories={categories}
-        />
-      )}
+      <EditCategoryModal
+        open={editOpen}
+        onClose={() => {
+          setEditOpen(false);
+          setSelected(null);
+        }}
+        onSuccess={() => {
+          setEditOpen(false);
+          setSelected(null);
+          fetchData();
+        }}
+        item={selected}
+        isSubcategory={isSubcategoryAction}
+        categories={items}
+      />
 
-      {selectedCategory && (
-        <ViewCategoryModal
-          open={viewModalOpen}
-          onClose={() => {
-            setViewModalOpen(false);
-            setSelectedCategory(null);
-          }}
-          category={selectedCategory}
-        />
-      )}
+      <ViewCategoryModal
+        open={viewOpen}
+        onClose={() => {
+          setViewOpen(false);
+          setSelected(null);
+        }}
+        item={selected}
+        isSubcategory={isSubcategoryAction}
+        categories={items}
+      />
 
-      {deletingCategory && (
-        <DeleteCategoryModal
-          open={deleteModalOpen}
-          onClose={() => {
-            setDeleteModalOpen(false);
-            setDeletingCategory(null);
-            setIsDeletingSubcategory(false);
-          }}
-          onSuccess={handleDeleteSuccess}
-          category={deletingCategory}
-          isSubcategory={isDeletingSubcategory}
-        />
-      )}
+      <DeleteCategoryModal
+        open={deleteOpen}
+        onClose={() => {
+          setDeleteOpen(false);
+          setSelected(null);
+        }}
+        onSuccess={() => {
+          setDeleteOpen(false);
+          setSelected(null);
+          fetchData();
+        }}
+        item={selected}
+        isSubcategory={isSubcategoryAction}
+      />
     </div>
   );
 };
 
 export default Categories;
-
-
-
-
-
-
-

@@ -14,7 +14,8 @@ const DeleteAdminModal = ({ open, onClose, onSuccess, admin }) => {
     setLoading(true);
 
     try {
-      const response = await adminAPI.deleteAdmin(admin._id);
+      const adminId = admin.id ?? admin._id;
+      const response = await adminAPI.deleteAdmin(adminId);
       if (response.success) {
         showSuccess(response.message || 'Admin muvaffaqiyatli o\'chirildi');
         onSuccess();

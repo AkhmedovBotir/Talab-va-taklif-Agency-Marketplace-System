@@ -1,335 +1,199 @@
-import { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
-import { motion } from 'framer-motion';
-import ImageGalleryModal from '../Common/ImageGalleryModal';
-import { formatDateTime } from '../../utils/dateFormatter';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Close, NavigateBefore, NavigateNext } from '@mui/icons-material';
+import { productAPI } from '../../services/api';
+import { useSnackbar } from '../../contexts/SnackbarContext';
+import { formatTableDate } from '../../utils/dateFormatter';
+import { descriptionToPlainText } from './productFormUtils';
 
-const ViewProductModal = ({ open, onClose, product }) => {
-  const [imageGalleryOpen, setImageGalleryOpen] = useState(false);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+const nameById = (list, id) => {
+  if (id == null || id === '') return null;
+  const s = String(id);
+  const f = (list || []).find((x) => String(x.id ?? x._id) === s);
+  return f?.name ?? null;
+};
 
-  if (!product) return null;
+const modLabel = (s) => {
+  if (s === 'pending') return 'Kutilmoqda';
+  if (s === 'approved') return 'Tasdiqlangan';
+  if (s === 'rejected') return 'Rad etilgan';
+  return s || '-';
+};
 
-  const handleImageClick = (index) => {
-    setSelectedImageIndex(index);
-    setImageGalleryOpen(true);
-  };
+const ViewProductModal = ({ open, onClose, productId, contragents = [], categories = [], subcategories = [] }) => {
+  const { showError } = useSnackbar();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  const formatPrice = (price) => {
-    if (!price) return '-';
-    return new Intl.NumberFormat('uz-UZ').format(price) + ' so\'m';
-  };
+  useEffect(() => {
+    if (!open || !productId) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await productAPI.getById(productId);
+        if (!cancelled && res.success) setData(res.data || null);
+      } catch (e) {
+        if (!cancelled) showError(e.message || 'Yuklashda xatolik');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, productId, showError]);
 
-  const getStatusBadge = (status) => {
-    const baseClasses = 'px-2 py-1 rounded text-xs font-medium';
-    switch (status) {
-      case 'active':
-        return `${baseClasses} bg-green-100 text-green-800`;
-      case 'inactive':
-        return `${baseClasses} bg-gray-100 text-gray-800`;
-      case 'archived':
-        return `${baseClasses} bg-red-100 text-red-800`;
-      default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
+  useEffect(() => {
+    if (!open) {
+      setData(null);
+      setImageViewerOpen(false);
+      setActiveImageIndex(0);
     }
+  }, [open]);
+
+  const row = (label, value) => (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-2 border-b border-gray-100">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="sm:col-span-2 text-sm text-gray-900 font-medium break-words">{value ?? '-'}</span>
+    </div>
+  );
+
+  const cid = data?.contragent_id ?? data?.contragent?.id;
+  const catId = data?.category_id ?? data?.category?.id;
+  const subId = data?.subcategory_id ?? data?.subcategory?.id;
+  const images = Array.isArray(data?.images) ? data.images.filter(Boolean).slice(0, 5) : [];
+
+  const openViewer = (idx) => {
+    setActiveImageIndex(idx);
+    setImageViewerOpen(true);
   };
 
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'active':
-        return 'Faol';
-      case 'inactive':
-        return 'Nofaol';
-      case 'archived':
-        return 'Arxivlangan';
-      default:
-        return status;
-    }
+  const nextImage = () => {
+    if (!images.length) return;
+    setActiveImageIndex((p) => (p + 1) % images.length);
   };
 
-  const getUnitLabel = (unit) => {
-    switch (unit) {
-      case 'dona':
-        return 'dona';
-      case 'litr':
-        return 'litr';
-      case 'kg':
-        return 'kg';
-      default:
-        return unit || '-';
-    }
+  const prevImage = () => {
+    if (!images.length) return;
+    setActiveImageIndex((p) => (p - 1 + images.length) % images.length);
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-xl font-bold text-gray-800"
-        >
-          Mahsulot ma'lumotlari
-        </motion.div>
-      </DialogTitle>
-      <DialogContent>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-6"
-        >
-          {/* Basic Information */}
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Asosiy ma'lumotlar</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nomi</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{product.name || '-'}</p>
+    <AnimatePresence>
+      {open && productId && (
+        <>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/50 z-50" style={{ margin: '0' }} />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
+                <h2 className="text-xl font-bold text-gray-800">Mahsulot</h2>
+                <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                  <Close />
+                </button>
               </div>
-              {product.productCode && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mahsulot kodi</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{product.productCode}</p>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Kategoriya</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {product.category?.name || '-'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subkategoriya</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {product.subcategory?.name || '-'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <p className="text-sm">
-                  <span className={getStatusBadge(product.status)}>
-                    {getStatusLabel(product.status)}
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Price and Quantity */}
-          <div className="border-t pt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Narx va miqdor</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Narx</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {formatPrice(product.price)}
-                </p>
-              </div>
-              {product.originalPrice && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Asl narx</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                    {formatPrice(product.originalPrice)}
-                  </p>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Miqdor</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {product.quantity !== undefined
-                    ? `${product.quantity} ${getUnitLabel(product.unit)}`
-                    : '-'}
-                </p>
-              </div>
-              {product.unitSize && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">O'lcham</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">{product.unitSize}</p>
-                </div>
-              )}
-              {product.kpiBonusPercent !== undefined && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">KPI bonus foizi</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                    {product.kpiBonusPercent}%
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Physical Dimensions */}
-          {(product.length !== undefined || product.width !== undefined || product.weight !== undefined) && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Fizik o'lchamlar</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {product.length !== undefined && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Uzunlik (cm)</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {product.length} cm
-                    </p>
+              <div className="p-6">
+                {loading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-300 border-t-indigo-600" />
                   </div>
-                )}
-                {product.width !== undefined && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Kenglik (cm)</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {product.width} cm
-                    </p>
-                  </div>
-                )}
-                {product.weight !== undefined && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Og'irlik (kg)</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {product.weight} kg
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Contragent Information */}
-          {product.contragent && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Kontragent ma'lumotlari</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomi</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                    {product.contragent.name || '-'}
-                  </p>
-                </div>
-                {product.contragent.inn && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">INN</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {product.contragent.inn}
-                    </p>
-                  </div>
-                )}
-                {product.contragent.phone && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {product.contragent.phone}
-                    </p>
-                  </div>
-                )}
-                {product.contragent.viloyat && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Viloyat</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {product.contragent.viloyat.name || '-'}
-                    </p>
-                  </div>
-                )}
-                {product.contragent.tuman && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tuman</label>
-                    <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                      {product.contragent.tuman.name || '-'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Delivery Regions */}
-          {product.deliveryRegions && product.deliveryRegions.length > 0 && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">
-                Yetkazib berish regionlari ({product.deliveryRegions.length} ta)
-              </h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {product.deliveryRegions.map((region, index) => (
-                  <div key={index} className="bg-gray-50 p-3 rounded border border-gray-200">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {region.viloyat?.name || '-'}
-                        </p>
-                        {region.tuman && (
-                          <p className="text-xs text-gray-500">{region.tuman.name}</p>
-                        )}
+                ) : data ? (
+                  <>
+                    {row('Mahsulot kodi', data.product_code)}
+                    {row('Nomi', data.name)}
+                    {row('Tavsif', descriptionToPlainText(data.description))}
+                    {row('Kontragent', data.contragent?.name || data.contragent_name || nameById(contragents, cid))}
+                    {row('Kategoriya', data.category?.name || nameById(categories, catId))}
+                    {row('Subkategoriya', data.subcategory?.name || nameById(subcategories, subId))}
+                    {row('Narx', data.price != null ? String(data.price) : null)}
+                    {row('Asl narx', data.original_price != null ? String(data.original_price) : null)}
+                    {row('Miqdor', data.quantity != null ? String(data.quantity) : null)}
+                    {row('Birlik', data.unit)}
+                    {row('Birlik o‘lchami', data.unit_size)}
+                    {row('Holat', data.status === 'active' ? 'Faol' : data.status === 'inactive' ? 'Nofaol' : data.status)}
+                    {row('Moderatsiya', modLabel(data.moderation_status))}
+                    {data.rejection_reason ? row('Rad sababi', data.rejection_reason) : null}
+                    {row('KPI bonus %', data.kpi_bonus_percent != null ? String(data.kpi_bonus_percent) : null)}
+                    {row('Yaratilgan', formatTableDate(data.createdAt || data.created_at))}
+                    {images.length > 0 && (
+                      <div className="pt-4">
+                        <p className="text-sm text-gray-500 mb-2">Rasmlar</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {images.map((src, i) => (
+                            <button key={i} type="button" onClick={() => openViewer(i)} className="block aspect-square rounded border border-gray-200 overflow-hidden bg-gray-50 hover:opacity-90 transition-opacity">
+                              <img src={src} alt="" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-center text-gray-500 py-8">Ma'lumot yo'q</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+          <AnimatePresence>
+            {imageViewerOpen && images.length > 0 && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/85 z-[60]"
+                  style={{ margin: '0' }}
+                  onClick={() => setImageViewerOpen(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  className="fixed inset-0 z-[61] flex items-center justify-center p-4"
+                >
+                  <div className="relative w-full max-w-5xl h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setImageViewerOpen(false)}
+                      className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/40 text-white hover:bg-black/60"
+                    >
+                      <Close />
+                    </button>
+                    {images.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={prevImage}
+                        className="absolute left-3 z-10 p-2 rounded-full bg-black/40 text-white hover:bg-black/60"
+                      >
+                        <NavigateBefore />
+                      </button>
+                    )}
+                    <img src={images[activeImageIndex]} alt="" className="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
+                    {images.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={nextImage}
+                        className="absolute right-3 z-10 p-2 rounded-full bg-black/40 text-white hover:bg-black/60"
+                      >
+                        <NavigateNext />
+                      </button>
+                    )}
+                    {images.length > 1 && (
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 text-white text-sm">
+                        {activeImageIndex + 1} / {images.length}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Images */}
-          {product.images && product.images.length > 0 && (
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">
-                Rasmlar ({product.images.length} ta)
-              </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {product.images.map((image, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={image}
-                      alt={`${product.name} - ${index + 1}`}
-                      className="w-full h-32 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => handleImageClick(index)}
-                      onError={(e) => {
-                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="150"%3E%3Crect fill="%23ddd" width="200" height="150"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ERasm yuklanmadi%3C/text%3E%3C/svg%3E';
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Dates */}
-          <div className="border-t pt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Sana ma'lumotlari</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Yaratilgan sana</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {formatDateTime(product.createdAt)}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Yangilangan sana</label>
-                <p className="text-sm text-gray-900 bg-gray-50 p-2 rounded">
-                  {formatDateTime(product.updatedAt)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="primary">
-          Yopish
-        </Button>
-      </DialogActions>
-
-      {/* Image Gallery Modal */}
-      {product.images && product.images.length > 0 && (
-        <ImageGalleryModal
-          open={imageGalleryOpen}
-          onClose={() => setImageGalleryOpen(false)}
-          images={product.images}
-          currentIndex={selectedImageIndex}
-          title={product.name}
-        />
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </>
       )}
-    </Dialog>
+    </AnimatePresence>
   );
 };
 
 export default ViewProductModal;
-
-
-
-
-

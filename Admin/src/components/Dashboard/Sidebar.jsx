@@ -1,141 +1,66 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dashboard as DashboardIcon,
-  People,
-  Settings,
-  Analytics,
-  Inventory,
   Menu as MenuIcon,
   ChevronLeft,
-  Logout,
-  AdminPanelSettings,
-  Store,
-  ShoppingBag,
-  LocationOn,
-  Person,
-  Category,
-  ShoppingCart,
+  ExpandLess,
   ExpandMore,
-  ChevronRight,
-  CreditCard,
-  Business,
-  AccountBalance,
-  AssignmentInd,
-  Sms,
-  PersonOutline,
-  Receipt,
-  CheckCircle,
-  Cancel,
-  Notifications,
-  RateReview,
-  ContactMail,
-  Handshake,
-  LocationDisabledSharp,
-  LocationCity,
-  Description,
-  AttachMoney,
-  Assessment,
-  History,
-  PendingActions,
-  TrendingUp,
-  Archive,
-  VerifiedUser,
+  Logout,
+  People,
+  AccountTree,
+  BusinessCenter,
+  SupportAgent,
+  Badge,
+  Store,
+  Apartment,
+  Inventory2,
+  Timeline,
+  BarChart,
 } from '@mui/icons-material';
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { filterMenuItemsByPermissions } from '../../utils/permissions';
-
-const menuItems = [
-  { icon: DashboardIcon, label: 'Dashboard', path: '/dashboard' },
-  {
-    icon: AccountBalance,
-    label: 'Tuzilmalar',
-    path: '/dashboard/structures',
-    children: [
-      { icon: AdminPanelSettings, label: 'Adminlar', path: '/dashboard/admins' },
-      { icon: LocationOn, label: 'Regionlar', path: '/dashboard/regions' },
-      { icon: Business, label: 'Kontragentlar', path: '/dashboard/contragents' },
-      { icon: AssignmentInd, label: 'Agentlar', path: '/dashboard/agents' },
-      { icon: LocationOn, label: 'Punktlar', path: '/dashboard/punkts' },
-      { icon: Person, label: 'Menejerlar', path: '/dashboard/managers' },
-      { icon: Archive, label: 'Arxiv', path: '/dashboard/archive' },
-    ],
-  },
-  { icon: Inventory, label: 'Ombor', path: '/dashboard/ombor' },
-  { icon: PersonOutline, label: 'Marketplace Mijozlar', path: '/dashboard/marketplace-users' },
-  { icon: Notifications, label: 'Xabarlar', path: '/dashboard/notifications' },
-  {
-    icon: ShoppingCart,
-    label: 'Buyurtmalar',
-    path: '/dashboard/orders',
-  },
-  { icon: Analytics, label: 'KPI Bonuslar', path: '/dashboard/kpi' },
-  { icon: LocationCity, label: 'Hududlar Statistikasi', path: '/dashboard/statistics' },
-  { icon: Sms, label: 'SMS lar', path: '/dashboard/sms-verifications' },
-  { icon: AttachMoney, label: 'Moliya', path: '/dashboard/finance' },
-  { icon: RateReview, label: 'Baholar', path: '/dashboard/reviews' },
-  { icon: Handshake, label: 'Hamkorlik So\'rovlari', path: '/dashboard/partnership-requests' },
-  { icon: VerifiedUser, label: 'Sertifikat Integratsiyasi', path: '/dashboard/certificate-assignment' },
-  { icon: Settings, label: 'Sozlamalar', path: '/dashboard/settings' },
-];
 
 const Sidebar = () => {
   const { isOpen, setIsOpen } = useSidebar();
   const { logout, admin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [expandedMenus, setExpandedMenus] = useState({});
+  const [isStructureOpen, setIsStructureOpen] = useState(false);
+
+  const structureItems = useMemo(
+    () => [
+      { icon: People, label: 'Adminlar', path: '/dashboard/admins' },
+      { icon: SupportAgent, label: 'Agentlar', path: '/dashboard/agents' },
+      { icon: Badge, label: 'Menejerlar', path: '/dashboard/managers' },
+      { icon: Store, label: 'Punktlar', path: '/dashboard/punkts' },
+      { icon: AccountTree, label: 'Hududlar', path: '/dashboard/regions' },
+      { icon: BusinessCenter, label: 'Kontragent va do\'konlar', path: '/dashboard/contragents/types' },
+    ],
+    []
+  );
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const toggleMenu = (menuPath) => {
-    setExpandedMenus((prev) => ({
-      ...prev,
-      [menuPath]: !prev[menuPath],
-    }));
-  };
+  const isPathActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const isDashboardActive = location.pathname === '/dashboard';
+  const isStructureActive = structureItems.some((item) => isPathActive(item.path));
 
-  const isMenuActive = (menu) => {
-    if (menu.children) {
-      return menu.children.some((child) => location.pathname === child.path);
-    }
-    return location.pathname === menu.path;
-  };
-
-  // Filter menu items based on permissions
-  const filteredMenuItems = useMemo(() => {
-    if (!admin || !admin.permissions) {
-      // If no admin or permissions, show only dashboard
-      return menuItems.filter(item => item.path === '/dashboard');
-    }
-    return filterMenuItemsByPermissions(menuItems, admin.permissions);
-  }, [admin]);
-
-  // Auto-expand parent menu if child is active
   useEffect(() => {
-    filteredMenuItems.forEach((item) => {
-      if (item.children) {
-        const hasActiveChild = item.children.some((child) => location.pathname === child.path);
-        if (hasActiveChild && !expandedMenus[item.path]) {
-          setExpandedMenus((prev) => ({
-            ...prev,
-            [item.path]: true,
-          }));
-        }
-      }
-    });
-  }, [location.pathname, filteredMenuItems]);
+    if (isStructureActive) {
+      setIsStructureOpen(true);
+    }
+  }, [isStructureActive]);
 
   return (
     <motion.div
       initial={false}
       animate={{
-        width: isOpen ? '280px' : '80px',
+        width: isOpen ? '320px' : '80px',
       }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
       className="bg-indigo-900 text-white h-screen fixed left-0 top-0 shadow-2xl z-50"
@@ -188,96 +113,205 @@ const Sidebar = () => {
 
         {/* Menu Items */}
         <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar">
-          {filteredMenuItems.map((item, index) => {
-            const Icon = item.icon;
-            const hasChildren = item.children && item.children.length > 0;
-            const isExpanded = expandedMenus[item.path];
-            const isActive = isMenuActive(item);
-
-            return (
-              <motion.div
-                key={item.path}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <div className="mx-2 mb-1">
-                  {/* Parent Menu Item */}
-                  <motion.div
-                    whileHover={{ backgroundColor: 'rgba(129, 140, 248, 0.2)', x: isOpen ? 5 : 0 }}
-                    className="rounded-lg"
-                  >
-                    <div
-                      onClick={() => {
-                        if (hasChildren) {
-                          toggleMenu(item.path);
-                        } else {
-                          navigate(item.path);
-                        }
-                      }}
-                      className={`flex items-center ${isOpen ? 'space-x-3 justify-between' : 'justify-center'} p-3 cursor-pointer rounded-lg transition-colors group ${isActive ? 'bg-indigo-800' : ''
-                        }`}
-                    >
-                      <div className="flex items-center space-x-3 flex-1">
-                        <Icon className="text-white flex-shrink-0" />
-                        <AnimatePresence>
-                          {isOpen && (
-                            <motion.span
-                              initial={{ opacity: 0, width: 0 }}
-                              animate={{ opacity: 1, width: 'auto' }}
-                              exit={{ opacity: 0, width: 0 }}
-                              className="font-medium whitespace-nowrap overflow-hidden"
-                            >
-                              {item.label}
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                      {hasChildren && (
-                        <motion.div
-                          animate={{ rotate: isExpanded ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
-                          className={isOpen ? '' : 'hidden'}
-                        >
-                          <ChevronRight className="text-white flex-shrink-0" />
-                        </motion.div>
-                      )}
-                    </div>
-                  </motion.div>
-
-                  {/* Children Menu Items */}
-                  {hasChildren && (isOpen ? isExpanded : (isExpanded || isActive)) && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className={isOpen ? "ml-8 mt-1 space-y-1" : "mt-1 space-y-1"}
-                    >
-                      {item.children.map((child) => {
-                        const ChildIcon = child.icon;
-                        const isChildActive = location.pathname === child.path;
-                        return (
-                          <div
-                            key={child.path}
-                            onClick={() => navigate(child.path)}
-                            className={`flex items-center ${isOpen ? 'gap-2 pl-4' : 'justify-center'} p-2 cursor-pointer rounded-lg transition-colors text-sm ${isChildActive
-                                ? 'bg-indigo-700 text-white'
-                                : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-                              }`}
-                            title={!isOpen ? child.label : ''}
-                          >
-                            {ChildIcon && <ChildIcon className={isOpen ? "w-4 h-4" : "w-5 h-5"} />}
-                            {isOpen && <span>{child.label}</span>}
-                          </div>
-                        );
-                      })}
-                    </motion.div>
-                  )}
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+            <div className="mx-2 mb-1">
+              <motion.div whileHover={{ backgroundColor: 'rgba(129, 140, 248, 0.2)', x: isOpen ? 5 : 0 }} className="rounded-lg">
+                <div
+                  onClick={() => navigate('/dashboard')}
+                  className={`flex items-center ${isOpen ? 'space-x-3' : 'justify-center'} p-3 cursor-pointer rounded-lg transition-colors ${
+                    isDashboardActive ? 'bg-indigo-800' : 'hover:bg-indigo-800/70'
+                  }`}
+                >
+                  <DashboardIcon className="text-white flex-shrink-0" />
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: 'auto' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        className="font-medium truncate"
+                      >
+                        Dashboard
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
-            );
-          })}
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}>
+            <div className="mx-2 mb-1">
+              <motion.div whileHover={{ backgroundColor: 'rgba(129, 140, 248, 0.2)', x: isOpen ? 5 : 0 }} className="rounded-lg">
+                <div
+                  onClick={() => {
+                    if (!isOpen) setIsOpen(true);
+                    setIsStructureOpen((prev) => !prev);
+                  }}
+                  className={`flex items-center ${isOpen ? 'justify-between' : 'justify-center'} p-3 cursor-pointer rounded-lg transition-colors ${
+                    isStructureActive || isStructureOpen ? 'bg-indigo-800' : 'hover:bg-indigo-800/70'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Apartment className="text-white flex-shrink-0" />
+                    <AnimatePresence>
+                      {isOpen && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: 'auto' }}
+                          exit={{ opacity: 0, width: 0 }}
+                          className="font-medium truncate"
+                        >
+                          Tuzilmalar
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  {isOpen && (isStructureOpen ? <ExpandLess /> : <ExpandMore />)}
+                </div>
+              </motion.div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {isOpen && isStructureOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mx-4 mb-1 p-2 rounded-xl bg-indigo-800/60">
+                    {structureItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = isPathActive(item.path);
+                      return (
+                        <div key={item.path} className="mb-1 last:mb-0">
+                          <div
+                            onClick={() => navigate(item.path)}
+                            className={`flex items-center space-x-3 p-3 cursor-pointer rounded-lg transition-colors ${
+                              isActive ? 'bg-indigo-600 text-white' : 'text-indigo-200 hover:bg-indigo-700/70 hover:text-white'
+                            }`}
+                          >
+                            <Icon className="flex-shrink-0" fontSize="small" />
+                            <span className="font-medium whitespace-nowrap overflow-hidden text-sm">{item.label}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 }}>
+            <div className="mx-2 mb-1">
+              <motion.div whileHover={{ backgroundColor: 'rgba(129, 140, 248, 0.2)', x: isOpen ? 5 : 0 }} className="rounded-lg">
+                <div
+                  onClick={() => navigate('/dashboard/warehouse/categories')}
+                  className={`flex items-center ${isOpen ? 'space-x-3' : 'justify-center'} p-3 cursor-pointer rounded-lg transition-colors ${
+                    isPathActive('/dashboard/warehouse') ? 'bg-indigo-800' : 'hover:bg-indigo-800/70'
+                  }`}
+                >
+                  <Inventory2 className="text-white flex-shrink-0" />
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: 'auto' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        className="font-medium truncate"
+                      >
+                        Ombor
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+            <div className="mx-2 mb-1">
+              <motion.div whileHover={{ backgroundColor: 'rgba(129, 140, 248, 0.2)', x: isOpen ? 5 : 0 }} className="rounded-lg">
+                <div
+                  onClick={() => navigate('/dashboard/marketplace-users')}
+                  className={`flex items-center ${isOpen ? 'space-x-3' : 'justify-center'} p-3 cursor-pointer rounded-lg transition-colors ${
+                    isPathActive('/dashboard/marketplace-users') ? 'bg-indigo-800' : 'hover:bg-indigo-800/70'
+                  }`}
+                >
+                  <People className="text-white flex-shrink-0" />
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: 'auto' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        className="font-medium truncate"
+                      >
+                        Marketplace foydalanuvchilari
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12 }}>
+            <div className="mx-2 mb-1">
+              <motion.div whileHover={{ backgroundColor: 'rgba(129, 140, 248, 0.2)', x: isOpen ? 5 : 0 }} className="rounded-lg">
+                <div
+                  onClick={() => navigate('/dashboard/order-pipeline-monitor')}
+                  className={`flex items-center ${isOpen ? 'space-x-3' : 'justify-center'} p-3 cursor-pointer rounded-lg transition-colors ${
+                    isPathActive('/dashboard/order-pipeline-monitor') ? 'bg-indigo-800' : 'hover:bg-indigo-800/70'
+                  }`}
+                >
+                  <Timeline className="text-white flex-shrink-0" />
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: 'auto' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        className="font-medium truncate"
+                      >
+                        Marketplace buyurtmalar
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.14 }}>
+            <div className="mx-2 mb-1">
+              <motion.div whileHover={{ backgroundColor: 'rgba(129, 140, 248, 0.2)', x: isOpen ? 5 : 0 }} className="rounded-lg">
+                <div
+                  onClick={() => navigate('/dashboard/statistics/transactions-by-area')}
+                  className={`flex items-center ${isOpen ? 'space-x-3' : 'justify-center'} p-3 cursor-pointer rounded-lg transition-colors ${
+                    isPathActive('/dashboard/statistics/transactions-by-area') ? 'bg-indigo-800' : 'hover:bg-indigo-800/70'
+                  }`}
+                >
+                  <BarChart className="text-white flex-shrink-0" />
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: 'auto' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        className="font-medium truncate"
+                      >
+                        Tranzaksiyalar statistikasi
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
         </nav>
 
         {/* Logout Button */}

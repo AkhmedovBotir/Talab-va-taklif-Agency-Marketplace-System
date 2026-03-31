@@ -1,0 +1,5 @@
+{
+  "name": "Marketplace Auth & Delivery",
+  "description": "A modern marketplace application with phone-based authentication, delivery area management, and product browsing.",
+  "requestFramePermissions": []
+}

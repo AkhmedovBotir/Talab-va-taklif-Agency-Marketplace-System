@@ -36,37 +36,28 @@ const Admins = () => {
   const [selectedAdmin, setSelectedAdmin] = useState(null);
 
   // Fetch admins
-  const fetchAdmins = async () => {
+  const fetchAdmins = async (page = pagination.page, limit = pagination.limit) => {
     setLoading(true);
     setError('');
     try {
-      const response = await adminAPI.getAllAdmins();
+      const response = await adminAPI.getAllAdmins({ page, limit });
 
       if (response.success) {
-        // API returns { success: true, count: X, data: [...] }
-        let adminsList = response.data || [];
-        
-        // Apply client-side filtering
-        if (filters.status) {
-          adminsList = adminsList.filter(admin => admin.status === filters.status);
-        }
-        if (filters.role) {
-          adminsList = adminsList.filter(admin => admin.role === filters.role);
-        }
-        
-        // Apply client-side pagination
-        const total = adminsList.length;
-        const pages = Math.ceil(total / pagination.limit);
-        const startIndex = (pagination.page - 1) * pagination.limit;
-        const endIndex = startIndex + pagination.limit;
-        const paginatedAdmins = adminsList.slice(startIndex, endIndex);
-        
-        setAdmins(paginatedAdmins);
-        setPagination({
-          ...pagination,
-          total,
-          pages,
-        });
+        const payload = response.data || {};
+        const adminsList = Array.isArray(payload.items)
+          ? payload.items
+          : Array.isArray(payload)
+            ? payload
+            : [];
+
+        setAdmins(adminsList);
+        setPagination((prev) => ({
+          ...prev,
+          page: Number(payload.page) || page,
+          limit: Number(payload.limit) || limit,
+          total: Number(payload.total) || adminsList.length,
+          pages: Number(payload.total_pages) || Math.ceil((Number(payload.total) || adminsList.length) / (Number(payload.limit) || limit || 1)),
+        }));
       }
     } catch (err) {
       const errorMsg = err.message || 'Adminlarni yuklashda xatolik yuz berdi';
@@ -79,7 +70,7 @@ const Admins = () => {
 
   useEffect(() => {
     fetchAdmins();
-  }, [pagination.page, pagination.limit, filters.status, filters.role]);
+  }, [pagination.page, pagination.limit]);
 
   const handleCreateSuccess = () => {
     setCreateModalOpen(false);
@@ -99,7 +90,8 @@ const Admins = () => {
   };
 
   const handlePageChange = (newPage) => {
-    setPagination({ ...pagination, page: newPage });
+    if (newPage < 1 || newPage > pagination.pages || newPage === pagination.page) return;
+    setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
   const handleEdit = (admin) => {
@@ -117,13 +109,16 @@ const Admins = () => {
     setViewModalOpen(true);
   };
 
-  // Filter by search (client-side) - already filtered in fetchAdmins, but keep for display
+  // Client-side filters for the currently loaded page
   const filteredAdmins = admins.filter((admin) => {
+    if (filters.status && admin.status !== filters.status) return false;
+    if (filters.role && admin.role !== filters.role) return false;
     if (!filters.search) return true;
     const search = filters.search.toLowerCase();
     return (
       admin.name?.toLowerCase().includes(search) ||
       admin.username?.toLowerCase().includes(search) ||
+      admin.phone?.includes(search) ||
       admin.telefonRaqam?.includes(search)
     );
   });
@@ -135,32 +130,11 @@ const Admins = () => {
       role: '',
       search: '',
     });
-    setPagination({ ...pagination, page: 1 });
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   return (
     <div>
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Adminlar</h1>
-            <p className="text-gray-600">Adminlarni boshqarish va ko'rish</p>
-          </div>
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors font-medium"
-          >
-            <Add />
-            <span>Yangi Admin</span>
-          </button>
-        </div>
-      </motion.div>
-
       {/* Filters */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -170,13 +144,22 @@ const Admins = () => {
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-gray-700">Filterlar</h3>
-          <button
-            onClick={handleClearFilters}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <Clear className="w-4 h-4" />
-            <span>Tozalash</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleClearFilters}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <Clear className="w-4 h-4" />
+              <span>Tozalash</span>
+            </button>
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 transition-colors font-medium"
+            >
+              <Add className="w-4 h-4" />
+              <span>Yangi admin</span>
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
@@ -195,8 +178,7 @@ const Admins = () => {
           <select
             value={filters.status}
             onChange={(e) => {
-              setFilters({ ...filters, status: e.target.value });
-              setPagination({ ...pagination, page: 1 });
+              setFilters((prev) => ({ ...prev, status: e.target.value }));
             }}
             className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
@@ -209,8 +191,7 @@ const Admins = () => {
           <select
             value={filters.role}
             onChange={(e) => {
-              setFilters({ ...filters, role: e.target.value });
-              setPagination({ ...pagination, page: 1 });
+              setFilters((prev) => ({ ...prev, role: e.target.value }));
             }}
             className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
@@ -223,7 +204,7 @@ const Admins = () => {
           <select
             value={pagination.limit}
             onChange={(e) => {
-              setPagination({ ...pagination, limit: Number(e.target.value), page: 1 });
+              setPagination((prev) => ({ ...prev, limit: Number(e.target.value), page: 1 }));
             }}
             className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >

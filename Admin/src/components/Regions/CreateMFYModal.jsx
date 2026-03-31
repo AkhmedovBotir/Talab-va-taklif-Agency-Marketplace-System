@@ -1,72 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
-import { regionAPI } from '../../services/api';
+import { mfyAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
-import RegionSelect from './RegionSelect';
 
-const CreateMFYModal = ({ open, onClose, onSuccess }) => {
+const CreateMFYModal = ({ open, onClose, onSuccess, regions, districts }) => {
   const { showSuccess, showError } = useSnackbar();
   const [formData, setFormData] = useState({
+    region_id: '',
+    district_id: '',
     name: '',
     code: '',
-    region: '',
-    district: '',
+    status: 'active',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'region') {
-      setFormData({ ...formData, region: value, district: '' });
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+  const regionOptions = useMemo(() => regions || [], [regions]);
+  const districtOptions = useMemo(
+    () => (districts || []).filter((d) => String(d.region_id) === String(formData.region_id)),
+    [districts, formData.region_id]
+  );
+
+  const reset = () => {
+    setError('');
+    setFormData({ region_id: '', district_id: '', name: '', code: '', status: 'active' });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      const mfyData = {
+      const response = await mfyAPI.createMFY({
+        district_id: Number(formData.district_id),
         name: formData.name,
-        type: 'mfy',
-        parent: formData.district,
         code: formData.code,
-        status: 'active', // Avtomatik faol
-      };
-      const response = await regionAPI.createRegion(mfyData);
+        status: formData.status,
+      });
       if (response.success) {
         showSuccess(response.message || 'MFY muvaffaqiyatli yaratildi');
-        setFormData({
-          name: '',
-          code: '',
-          region: '',
-          district: '',
-        });
+        reset();
         onSuccess();
       }
     } catch (err) {
-      const errorMsg = err.message || 'MFY yaratishda xatolik yuz berdi';
-      setError(errorMsg);
-      showError(errorMsg);
+      const msg = err.message || 'MFY yaratishda xatolik yuz berdi';
+      setError(msg);
+      showError(msg);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleClose = () => {
-    setError('');
-    setFormData({
-      name: '',
-      code: '',
-      region: '',
-      district: '',
-    });
-    onClose();
   };
 
   return (
@@ -77,7 +60,10 @@ const CreateMFYModal = ({ open, onClose, onSuccess }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={handleClose}
+            onClick={() => {
+              reset();
+              onClose();
+            }}
             className="fixed inset-0 bg-black bg-opacity-50 z-50"
           />
           <motion.div
@@ -86,101 +72,92 @@ const CreateMFYModal = ({ open, onClose, onSuccess }) => {
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div
-              className="bg-white rounded-lg shadow-xl max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-800">Yangi MFY Qo'shish</h2>
-                <button
-                  onClick={handleClose}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
+                <button onClick={() => { reset(); onClose(); }} className="text-gray-400 hover:text-gray-600">
                   <Close />
                 </button>
               </div>
 
-              {/* Form */}
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{error}</p>
-                  </div>
-                )}
+                {error && <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">{error}</div>}
 
-                {/* Region */}
                 <div>
-                  <RegionSelect
-                    name="region"
-                    value={formData.region}
-                    onChange={handleChange}
-                    label="Viloyat"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Viloyat *</label>
+                  <select
                     required
-                    type="region"
-                  />
+                    value={formData.region_id}
+                    onChange={(e) => setFormData((p) => ({ ...p, region_id: e.target.value, district_id: '' }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Tanlang</option>
+                    {regionOptions.map((region) => (
+                      <option key={region.id ?? region._id} value={region.id ?? region._id}>
+                        {region.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* District */}
                 <div>
-                  <RegionSelect
-                    name="district"
-                    value={formData.district}
-                    onChange={handleChange}
-                    label="Tuman"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tuman *</label>
+                  <select
                     required
-                    type="district"
-                    parentId={formData.region || null}
-                    disabled={!formData.region}
-                  />
+                    disabled={!formData.region_id}
+                    value={formData.district_id}
+                    onChange={(e) => setFormData((p) => ({ ...p, district_id: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
+                  >
+                    <option value="">Tanlang</option>
+                    {districtOptions.map((district) => (
+                      <option key={district.id ?? district._id} value={district.id ?? district._id}>
+                        {district.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    MFY nomi *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">MFY nomi *</label>
                   <input
                     type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
                     required
+                    value={formData.name}
+                    onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
-                {/* Code */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    MFY kodi *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">MFY kodi *</label>
                   <input
                     type="text"
-                    name="code"
-                    value={formData.code}
-                    onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                    value={formData.code}
+                    onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Masalan: MFY_001</p>
                 </div>
 
-                {/* Actions */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
+                    <option value="active">Faol</option>
+                    <option value="inactive">Nofaol</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button type="button" onClick={() => { reset(); onClose(); }} className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
                     Bekor qilish
                   </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {loading ? 'Qo\'shilmoqda...' : 'Qo\'shish'}
+                  <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-purple-400">
+                    {loading ? "Qo'shilmoqda..." : "Qo'shish"}
                   </button>
                 </div>
               </form>
@@ -193,4 +170,3 @@ const CreateMFYModal = ({ open, onClose, onSuccess }) => {
 };
 
 export default CreateMFYModal;
-

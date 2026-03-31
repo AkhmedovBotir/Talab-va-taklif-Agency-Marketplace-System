@@ -1,180 +1,174 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
-import { regionAPI } from '../../services/api';
+import { regionAPI, districtAPI, mfyAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
-import RegionSelect from './RegionSelect';
 
-const EditRegionModal = ({ open, onClose, onSuccess, region }) => {
+const EditRegionModal = ({ open, onClose, onSuccess, item, regions, districts }) => {
   const { showSuccess, showError } = useSnackbar();
-  const [formData, setFormData] = useState({
-    name: '',
-    code: '',
-    type: 'region',
-    parent: null,
-    status: 'active',
-  });
+  const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (region && open) {
-      setFormData({
-        name: region.name || '',
-        code: region.code || '',
-        type: region.type || 'region',
-        parent: region.parent?._id || region.parent || null,
-        status: region.status || 'active',
-      });
+    if (item && open) {
+      if (item.type === 'region') {
+        setFormData({ name: item.name || '', code: item.code || '', status: item.status || 'active' });
+      } else if (item.type === 'district') {
+        setFormData({
+          region_id: String(item.region_id || ''),
+          name: item.name || '',
+          code: item.code || '',
+          status: item.status || 'active',
+        });
+      } else {
+        const district = districts.find((d) => String(d.id ?? d._id) === String(item.district_id));
+        setFormData({
+          region_id: district ? String(district.region_id) : '',
+          district_id: String(item.district_id || ''),
+          name: item.name || '',
+          code: item.code || '',
+          status: item.status || 'active',
+        });
+      }
     }
-  }, [region, open]);
+  }, [item, open, districts]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  const districtOptions = useMemo(
+    () => (districts || []).filter((d) => String(d.region_id) === String(formData.region_id)),
+    [districts, formData.region_id]
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!item) return;
     setError('');
     setLoading(true);
-
     try {
-      const updateData = {
-        name: formData.name,
-        type: formData.type,
-        code: formData.code,
-        parent: formData.parent || null,
-        status: formData.status,
-      };
-      const response = await regionAPI.updateRegion(region._id, updateData);
+      const id = item.id ?? item._id;
+      let response;
+      if (item.type === 'region') {
+        response = await regionAPI.updateRegion(id, formData);
+      } else if (item.type === 'district') {
+        response = await districtAPI.updateDistrict(id, {
+          region_id: Number(formData.region_id),
+          name: formData.name,
+          code: formData.code,
+          status: formData.status,
+        });
+      } else {
+        response = await mfyAPI.updateMFY(id, {
+          district_id: Number(formData.district_id),
+          name: formData.name,
+          code: formData.code,
+          status: formData.status,
+        });
+      }
+
       if (response.success) {
-        showSuccess(response.message || 'Region muvaffaqiyatli yangilandi');
+        showSuccess(response.message || 'Muvaffaqiyatli yangilandi');
         onSuccess();
       }
     } catch (err) {
-      const errorMsg = err.message || 'Region yangilashda xatolik yuz berdi';
-      setError(errorMsg);
-      showError(errorMsg);
+      const msg = err.message || 'Yangilashda xatolik yuz berdi';
+      setError(msg);
+      showError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClose = () => {
-    setError('');
-    onClose();
-  };
+  if (!item) return null;
 
-  if (!region) return null;
-
-  const getTypeLabel = (type) => {
-    switch (type) {
-      case 'region':
-        return 'Viloyat';
-      case 'district':
-        return 'Tuman';
-      case 'mfy':
-        return 'MFY';
-      default:
-        return type;
-    }
-  };
+  const title = item.type === 'region' ? "Viloyatni Tahrirlash" : item.type === 'district' ? "Tumanni Tahrirlash" : "MFYni Tahrirlash";
 
   return (
     <AnimatePresence>
       {open && (
         <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={handleClose}
-            className="fixed inset-0 bg-black bg-opacity-50 z-50"
-          />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black bg-opacity-50 z-50" />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div
-              className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800">
-                  {getTypeLabel(region.type)}ni Tahrirlash
-                </h2>
-                <button
-                  onClick={handleClose}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <Close />
-                </button>
+                <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Close /></button>
               </div>
 
-              {/* Form */}
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{error}</p>
+                {error && <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">{error}</div>}
+
+                {item.type !== 'region' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Viloyat *</label>
+                    <select
+                      required
+                      value={formData.region_id || ''}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          region_id: e.target.value,
+                          ...(item.type === 'mfy' ? { district_id: '' } : {}),
+                        }))
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Tanlang</option>
+                      {regions.map((r) => (
+                        <option key={r.id ?? r._id} value={r.id ?? r._id}>{r.name}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
 
-                {/* Name */}
+                {item.type === 'mfy' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tuman *</label>
+                    <select
+                      required
+                      value={formData.district_id || ''}
+                      onChange={(e) => setFormData((p) => ({ ...p, district_id: e.target.value }))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Tanlang</option>
+                      {districtOptions.map((d) => (
+                        <option key={d.id ?? d._id} value={d.id ?? d._id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {getTypeLabel(formData.type)} nomi *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomi *</label>
                   <input
                     type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
                     required
+                    value={formData.name || ''}
+                    onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
-                {/* Code */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {getTypeLabel(formData.type)} kodi *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Kodi *</label>
                   <input
                     type="text"
-                    name="code"
-                    value={formData.code}
-                    onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                    value={formData.code || ''}
+                    onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
-                {/* Parent (if not region) */}
-                {formData.type !== 'region' && (
-                  <div>
-                    <RegionSelect
-                      name="parent"
-                      value={formData.parent || ''}
-                      onChange={handleChange}
-                      label={formData.type === 'district' ? 'Viloyat' : 'Tuman'}
-                      required
-                      type={formData.type === 'district' ? 'region' : 'district'}
-                    />
-                  </div>
-                )}
-
-                {/* Status */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    required
+                    value={formData.status || 'active'}
+                    onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value }))}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="active">Faol</option>
@@ -182,20 +176,9 @@ const EditRegionModal = ({ open, onClose, onSuccess, region }) => {
                   </select>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    Bekor qilish
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors"
-                  >
+                  <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Bekor qilish</button>
+                  <button type="submit" disabled={loading} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-400">
                     {loading ? 'Yangilanmoqda...' : 'Yangilash'}
                   </button>
                 </div>
@@ -209,4 +192,3 @@ const EditRegionModal = ({ open, onClose, onSuccess, region }) => {
 };
 
 export default EditRegionModal;
-

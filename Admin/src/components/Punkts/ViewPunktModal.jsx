@@ -1,170 +1,99 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
 import { punktAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
-import { formatDateTime } from '../../utils/dateFormatter';
+import { formatTableDate } from '../../utils/dateFormatter';
 
-const ViewPunktModal = ({ open, onClose, punkt }) => {
+const nameById = (list, id) => {
+  if (id == null || id === '') return null;
+  const s = String(id);
+  const f = (list || []).find((x) => String(x.id ?? x._id) === s);
+  return f?.name ?? null;
+};
+
+const ViewPunktModal = ({ open, onClose, punktId, regions = [], districts = [] }) => {
   const { showError } = useSnackbar();
-  const [punktData, setPunktData] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (open && punkt) {
-      fetchPunktDetails();
-    }
-  }, [open, punkt]);
-
-  const fetchPunktDetails = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await punktAPI.getPunktById(punkt._id);
-      if (response.success) {
-        setPunktData(response.data);
+    if (!open || !punktId) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await punktAPI.getById(punktId);
+        if (!cancelled && res.success) setData(res.data || null);
+      } catch (e) {
+        if (!cancelled) showError(e.message || 'Yuklashda xatolik');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch (err) {
-      const errorMsg = err.message || 'Punkt ma\'lumotlarini yuklashda xatolik';
-      setError(errorMsg);
-      showError(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, punktId]);
 
-  const getStatusBadge = (status) => {
-    const baseClasses = 'px-3 py-1 rounded-full text-sm font-medium';
-    if (status === 'active') {
-      return `${baseClasses} bg-green-100 text-green-800`;
-    }
-    return `${baseClasses} bg-red-100 text-red-800`;
-  };
+  useEffect(() => {
+    if (!open) setData(null);
+  }, [open]);
 
-  if (!punkt) return null;
+  const row = (label, value) => (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-2 border-b border-gray-100">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="sm:col-span-2 text-sm text-gray-900 font-medium break-words">{value ?? '-'}</span>
+    </div>
+  );
+
+  const vil = (d) => d?.viloyat_id ?? d?.region_id;
+  const tum = (d) => d?.tuman_id ?? d?.district_id;
 
   return (
     <AnimatePresence>
-      {open && (
+      {open && punktId && (
         <>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black bg-opacity-50 z-50"
+            className="fixed inset-0 bg-black/50 z-50"
+            style={{ margin: '0' }}
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div
-              className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800">Punkt batafsil ma'lumotlari</h2>
-                <button
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
+            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-bold text-gray-800">Punkt</h2>
+                <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
                   <Close />
                 </button>
               </div>
-
-              {/* Content */}
               <div className="p-6">
-                {error && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{error}</p>
-                  </div>
-                )}
-
                 {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-indigo-600"></div>
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-300 border-t-indigo-600" />
                   </div>
-                ) : punktData ? (
-                  <div className="space-y-6">
-                    {/* Basic Information */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Asosiy ma'lumotlar</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Nomi
-                          </label>
-                          <p className="text-gray-900">{punktData.name || '-'}</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Telefon raqami
-                          </label>
-                          <p className="text-gray-900">{punktData.phone || '-'}</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Viloyat
-                          </label>
-                          <p className="text-gray-900">
-                            {punktData.viloyat ? `${punktData.viloyat.name} (${punktData.viloyat.code})` : '-'}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Tuman
-                          </label>
-                          <p className="text-gray-900">
-                            {punktData.tuman ? `${punktData.tuman.name} (${punktData.tuman.code})` : '-'}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Status
-                          </label>
-                          <span className={getStatusBadge(punktData.status)}>
-                            {punktData.status === 'active' ? 'Faol' : 'Nofaol'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Timestamps */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Vaqt ma'lumotlari</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Yaratilgan
-                          </label>
-                          <p className="text-gray-900">{formatDateTime(punktData.createdAt)}</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Yangilangan
-                          </label>
-                          <p className="text-gray-900">{formatDateTime(punktData.updatedAt)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                ) : data ? (
+                  <>
+                    {row('Nomi', data.name)}
+                    {row('Telefon', data.phone)}
+                    {row('Viloyat', data.region?.name || data.region_name || nameById(regions, vil(data)))}
+                    {row('Tuman', data.district?.name || data.district_name || nameById(districts, tum(data)))}
+                    {row('Status', data.status === 'active' ? 'Faol' : 'Nofaol')}
+                    {row('Parol mavjud', data.has_password ? 'Ha' : 'Yo‘q')}
+                    {row('Parol o‘rnatishga ruxsat', data.password_setup_allowed ? 'Ha' : 'Yo‘q')}
+                    {row('Yaratilgan', formatTableDate(data.createdAt || data.created_at))}
+                  </>
                 ) : (
-                  <p className="text-center text-gray-500 py-8">Ma'lumotlar yuklanmoqda...</p>
+                  <p className="text-center text-gray-500 py-8">Maʼlumot yo‘q</p>
                 )}
-              </div>
-
-              {/* Footer */}
-              <div className="flex justify-end p-6 border-t border-gray-200">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-                >
-                  Yopish
-                </button>
               </div>
             </div>
           </motion.div>
@@ -175,8 +104,3 @@ const ViewPunktModal = ({ open, onClose, punkt }) => {
 };
 
 export default ViewPunktModal;
-
-
-
-
-

@@ -1,195 +1,79 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
-import { regionAPI } from '../../services/api';
-import { useSnackbar } from '../../contexts/SnackbarContext';
+import { formatDate } from '../../utils/dateFormatter';
 
-const ViewRegionModal = ({ open, onClose, region }) => {
-  const { showError } = useSnackbar();
-  const [regionData, setRegionData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (open && region) {
-      fetchRegionDetails();
+const ViewRegionModal = ({ open, onClose, item, regions, districts }) => {
+  const parentText = useMemo(() => {
+    if (!item) return '-';
+    if (item.type === 'district') {
+      const region = regions.find((r) => String(r.id ?? r._id) === String(item.region_id));
+      return region ? `${region.name} (${region.code})` : '-';
     }
-  }, [open, region]);
-
-  const fetchRegionDetails = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await regionAPI.getRegionById(region._id);
-      if (response.success) {
-        // API returns { success: true, data: {...} }
-        setRegionData(response.data);
-      }
-    } catch (err) {
-      const errorMsg = err.message || 'Region ma\'lumotlarini yuklashda xatolik';
-      setError(errorMsg);
-      showError(errorMsg);
-    } finally {
-      setLoading(false);
+    if (item.type === 'mfy') {
+      const district = districts.find((d) => String(d.id ?? d._id) === String(item.district_id));
+      return district ? `${district.name} (${district.code})` : '-';
     }
-  };
+    return '-';
+  }, [item, regions, districts]);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('uz-UZ', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getStatusBadge = (status) => {
-    const baseClasses = 'px-3 py-1 rounded-full text-sm font-medium';
-    if (status === 'active') {
-      return `${baseClasses} bg-green-100 text-green-800`;
-    }
-    return `${baseClasses} bg-red-100 text-red-800`;
-  };
-
-  const getTypeLabel = (type) => {
-    switch (type) {
-      case 'region':
-        return 'Viloyat';
-      case 'district':
-        return 'Tuman';
-      case 'mfy':
-        return 'MFY';
-      default:
-        return type;
-    }
-  };
-
-  if (!region) return null;
+  if (!item) return null;
+  const label = item.type === 'region' ? 'Viloyat' : item.type === 'district' ? 'Tuman' : 'MFY';
 
   return (
     <AnimatePresence>
       {open && (
         <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black bg-opacity-50 z-50"
-          />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black bg-opacity-50 z-50" />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div
-              className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800">Region batafsil ma'lumotlari</h2>
-                <button
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <Close />
-                </button>
+                <h2 className="text-2xl font-bold text-gray-800">{label} batafsil ma'lumotlari</h2>
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Close /></button>
               </div>
-
-              {/* Content */}
               <div className="p-6">
-                {error && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{error}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Nomi</label>
+                    <p className="text-gray-900">{item.name || '-'}</p>
                   </div>
-                )}
-
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-indigo-600"></div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Kodi</label>
+                    <p className="text-gray-900">{item.code || '-'}</p>
                   </div>
-                ) : regionData ? (
-                  <div className="space-y-6">
-                    {/* Basic Information */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Tipi</label>
+                    <p className="text-gray-900">{label}</p>
+                  </div>
+                  {item.type !== 'region' && (
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Asosiy ma'lumotlar</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Nomi
-                          </label>
-                          <p className="text-gray-900">{regionData.name || '-'}</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Kodi
-                          </label>
-                          <p className="text-gray-900">{regionData.code || '-'}</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Tipi
-                          </label>
-                          <p className="text-gray-900">{getTypeLabel(regionData.type)}</p>
-                        </div>
-                        {regionData.parent && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-500 mb-1">
-                              Parent
-                            </label>
-                            <p className="text-gray-900">
-                              {regionData.parent.name} ({regionData.parent.code})
-                            </p>
-                          </div>
-                        )}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Status
-                          </label>
-                          <span className={getStatusBadge(regionData.status)}>
-                            {regionData.status === 'active' ? 'Faol' : 'Nofaol'}
-                          </span>
-                        </div>
-                      </div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">Parent</label>
+                      <p className="text-gray-900">{parentText}</p>
                     </div>
-
-                    {/* Timestamps */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Vaqt ma'lumotlari</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Yaratilgan
-                          </label>
-                          <p className="text-gray-900">{formatDate(regionData.createdAt)}</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Yangilangan
-                          </label>
-                          <p className="text-gray-900">{formatDate(regionData.updatedAt)}</p>
-                        </div>
-                      </div>
-                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Status</label>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${item.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {item.status === 'active' ? 'Faol' : 'Nofaol'}
+                    </span>
                   </div>
-                ) : (
-                  <p className="text-center text-gray-500 py-8">Ma'lumotlar yuklanmoqda...</p>
-                )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Yaratilgan</label>
+                    <p className="text-gray-900">{formatDate(item.createdAt || item.created_at, { includeTime: true })}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Yangilangan</label>
+                    <p className="text-gray-900">{formatDate(item.updatedAt || item.updated_at, { includeTime: true })}</p>
+                  </div>
+                </div>
               </div>
-
-              {/* Footer */}
               <div className="flex justify-end p-6 border-t border-gray-200">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-                >
-                  Yopish
-                </button>
+                <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200">Yopish</button>
               </div>
             </div>
           </motion.div>
@@ -200,6 +84,3 @@ const ViewRegionModal = ({ open, onClose, region }) => {
 };
 
 export default ViewRegionModal;
-
-
-

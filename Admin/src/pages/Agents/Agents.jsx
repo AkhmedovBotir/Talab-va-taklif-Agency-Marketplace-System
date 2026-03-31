@@ -1,365 +1,321 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { agentAPI } from '../../services/api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, Clear, Add } from '@mui/icons-material';
+import { regionAPI, districtAPI, mfyAPI, agentAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import AgentTable from '../../components/Agents/AgentTable';
 import CreateAgentModal from '../../components/Agents/CreateAgentModal';
 import EditAgentModal from '../../components/Agents/EditAgentModal';
 import DeleteAgentModal from '../../components/Agents/DeleteAgentModal';
 import ViewAgentModal from '../../components/Agents/ViewAgentModal';
-import RegionSelect from '../../components/Regions/RegionSelect';
-import { Add, Search, Clear } from '@mui/icons-material';
+import GeoCascadeSearchableFields from '../../components/DistrictContragents/GeoCascadeSearchableFields';
 
 const Agents = () => {
   const { showError } = useSnackbar();
-  const [agents, setAgents] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [regions, setRegions] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [mfys, setMfys] = useState([]);
+  const [geoLoading, setGeoLoading] = useState(false);
+
+  const [items, setItems] = useState([]);
+  const [listLoading, setListLoading] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
     total: 0,
     pages: 0,
   });
-  
-  // Filters
+
   const [filters, setFilters] = useState({
     status: '',
     search: '',
-    viloyat: '',
-    tuman: '',
-    mfy: '',
+    region_id: '',
+    district_id: '',
+    mfy_id: '',
   });
 
-  // Modals
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
 
-  // Fetch agents
-  const fetchAgents = async () => {
-    setLoading(true);
-    setError('');
+  const fetchGeo = useCallback(async () => {
+    setGeoLoading(true);
     try {
-      const params = {
-        page: pagination.page,
-        limit: pagination.limit,
-      };
-
-      if (filters.status) params.status = filters.status;
-      if (filters.viloyat) params.viloyat = filters.viloyat;
-      if (filters.tuman) params.tuman = filters.tuman;
-      if (filters.mfy) params.mfy = filters.mfy;
-
-      const response = await agentAPI.getAllAgents(params);
-
-      if (response.success) {
-        // API returns { success: true, count, total, page, limit, totalPages, data: [...] }
-        setAgents(response.data || []);
-        setPagination({
-          page: response.page || pagination.page,
-          limit: response.limit || pagination.limit,
-          total: response.total || 0,
-          pages: response.totalPages || 0,
-        });
-      }
-    } catch (err) {
-      const errorMsg = err.message || 'Agentlarni yuklashda xatolik yuz berdi';
-      setError(errorMsg);
-      showError(errorMsg);
+      const [r, d, m] = await Promise.all([
+        regionAPI.getAllRegions(),
+        districtAPI.getAllDistricts(),
+        mfyAPI.getAllMFYs(),
+      ]);
+      if (r.success) setRegions(r.data || []);
+      if (d.success) setDistricts(d.data || []);
+      if (m.success) setMfys(m.data || []);
+    } catch (e) {
+      showError(e.message || 'Region maʼlumotlari yuklanmadi');
     } finally {
-      setLoading(false);
+      setGeoLoading(false);
     }
-  };
+  }, [showError]);
+
+  const fetchList = useCallback(async () => {
+    const page = pagination.page;
+    const limit = pagination.limit;
+    setListLoading(true);
+    try {
+      const res = await agentAPI.getAll({ page, limit });
+      if (res.success) {
+        const payload = res.data || {};
+        const list = Array.isArray(payload.items)
+          ? payload.items
+          : Array.isArray(payload)
+            ? payload
+            : [];
+        setItems(list);
+        setPagination((prev) => ({
+          ...prev,
+          page: Number(payload.page) || page,
+          limit: Number(payload.limit) || limit,
+          total: Number(payload.total) || list.length,
+          pages:
+            Number(payload.total_pages) ||
+            Math.ceil((Number(payload.total) || list.length) / (Number(payload.limit) || limit || 1)),
+        }));
+      }
+    } catch (e) {
+      showError(e.message || 'Ro‘yxatni yuklashda xatolik');
+    } finally {
+      setListLoading(false);
+    }
+  }, [pagination.page, pagination.limit, showError]);
 
   useEffect(() => {
-    fetchAgents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, pagination.limit, filters.status, filters.viloyat, filters.tuman, filters.mfy]);
+    fetchGeo();
+  }, [fetchGeo]);
 
-  const handleCreateSuccess = () => {
-    setCreateModalOpen(false);
-    fetchAgents();
+  useEffect(() => {
+    fetchList();
+  }, [fetchList]);
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') {
+      setCreateOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const setGeoFilter = (patch) => {
+    setFilters((f) => ({ ...f, ...patch }));
   };
 
-  const handleEditSuccess = () => {
-    setEditModalOpen(false);
-    setSelectedAgent(null);
-    fetchAgents();
-  };
-
-  const handleDeleteSuccess = () => {
-    setDeleteModalOpen(false);
-    setSelectedAgent(null);
-    fetchAgents();
-  };
+  const filteredItems = useMemo(() => {
+    let list = [...items];
+    if (filters.status) list = list.filter((i) => i.status === filters.status);
+    if (filters.region_id) {
+      const rid = String(filters.region_id);
+      list = list.filter((i) => {
+        const id = i.viloyat_id ?? i.region_id ?? i.region?.id ?? i.region?._id;
+        return id != null && String(id) === rid;
+      });
+    }
+    if (filters.district_id) {
+      const did = String(filters.district_id);
+      list = list.filter((i) => {
+        const id = i.tuman_id ?? i.district_id ?? i.district?.id ?? i.district?._id;
+        return id != null && String(id) === did;
+      });
+    }
+    if (filters.mfy_id) {
+      const mid = String(filters.mfy_id);
+      list = list.filter((i) => {
+        const id = i.mfy_id ?? i.mfy?.id ?? i.mfy?._id;
+        return id != null && String(id) === mid;
+      });
+    }
+    if (filters.search.trim()) {
+      const q = filters.search.toLowerCase();
+      list = list.filter(
+        (i) => i.name?.toLowerCase().includes(q) || String(i.phone || '').includes(q)
+      );
+    }
+    return list;
+  }, [items, filters]);
 
   const handlePageChange = (newPage) => {
-    setPagination({ ...pagination, page: newPage });
+    if (newPage < 1 || newPage > pagination.pages || newPage === pagination.page) return;
+    setPagination((p) => ({ ...p, page: newPage }));
   };
 
-  const handleEdit = (agent) => {
-    setSelectedAgent(agent);
-    setEditModalOpen(true);
+  const clearFilters = () => {
+    setFilters({ status: '', search: '', region_id: '', district_id: '', mfy_id: '' });
+    setPagination((p) => ({ ...p, page: 1 }));
   };
 
-  const handleDelete = (agent) => {
-    setSelectedAgent(agent);
-    setDeleteModalOpen(true);
+  const openEdit = (row) => {
+    setSelectedId(row.id ?? row._id);
+    setEditOpen(true);
   };
 
-  const handleView = (agent) => {
-    setSelectedAgent(agent);
-    setViewModalOpen(true);
+  const openView = (row) => {
+    setSelectedId(row.id ?? row._id);
+    setViewOpen(true);
   };
 
-  // Filter by search (client-side)
-  const filteredAgents = agents.filter((agent) => {
-    if (!filters.search) return true;
-    const search = filters.search.toLowerCase();
-    return (
-      agent.name?.toLowerCase().includes(search) ||
-      agent.phone?.includes(search) ||
-      agent.viloyat?.name?.toLowerCase().includes(search) ||
-      agent.tuman?.name?.toLowerCase().includes(search) ||
-      agent.mfy?.name?.toLowerCase().includes(search)
-    );
-  });
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters({
-      status: '',
-      viloyat: '',
-      tuman: '',
-      mfy: '',
-      search: '',
-    });
-    setPagination({ ...pagination, page: 1 });
-  };
-
-  // Handle region changes
-  const handleViloyatChange = (e) => {
-    const viloyatId = e.target.value;
-    setFilters(prev => ({
-      ...prev,
-      viloyat: viloyatId,
-      tuman: '', // Reset tuman when viloyat changes
-      mfy: '', // Reset mfy when viloyat changes
-    }));
-    setPagination(prev => ({ ...prev, page: 1 }));
-  };
-
-  const handleTumanChange = (e) => {
-    const tumanId = e.target.value;
-    setFilters(prev => ({
-      ...prev,
-      tuman: tumanId,
-      mfy: '', // Reset mfy when tuman changes
-    }));
-    setPagination(prev => ({ ...prev, page: 1 }));
-  };
-
-  const handleMfyChange = (e) => {
-    const mfyId = e.target.value;
-    setFilters(prev => ({
-      ...prev,
-      mfy: mfyId,
-    }));
-    setPagination(prev => ({ ...prev, page: 1 }));
+  const openDelete = (row) => {
+    setSelectedRow(row);
+    setDeleteOpen(true);
   };
 
   return (
-    <div>
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Agentlar</h1>
-            <p className="text-gray-600">Agentlarni boshqarish va ko'rish</p>
-          </div>
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors font-medium"
-          >
-            <Add />
-            <span>Yangi Agent</span>
-          </button>
-        </div>
-      </motion.div>
-
-      {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6"
-      >
+    <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium text-gray-700">Filterlar</h3>
-          <button
-            onClick={handleClearFilters}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <Clear className="w-4 h-4" />
-            <span>Tozalash</span>
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Qidirish..."
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+            >
+              <Clear className="w-4 h-4" />
+              Tozalash
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 font-medium shrink-0"
+            >
+              <Add className="w-4 h-4" />
+              Yangi agent
+            </button>
           </div>
-
-          {/* Status Filter */}
-          <select
-            value={filters.status}
-            onChange={(e) => {
-              setFilters({ ...filters, status: e.target.value });
-              setPagination({ ...pagination, page: 1 });
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">Barcha statuslar</option>
-            <option value="active">Faol</option>
-            <option value="inactive">Nofaol</option>
-          </select>
-
-          {/* Limit */}
-          <select
-            value={pagination.limit}
-            onChange={(e) => {
-              setPagination({ ...pagination, limit: Number(e.target.value), page: 1 });
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="10">10 ta</option>
-            <option value="20">20 ta</option>
-            <option value="50">50 ta</option>
-            <option value="100">100 ta</option>
-          </select>
         </div>
-      </motion.div>
-
-      {/* Region Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-gray-700">Hudud Filterlari</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <RegionSelect
-              name="viloyat"
-              value={filters.viloyat}
-              onChange={handleViloyatChange}
-              label="Viloyat"
-              type="region"
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Qidirish (joriy sahifa)..."
+                value={filters.search}
+                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Barcha statuslar</option>
+              <option value="active">Faol</option>
+              <option value="inactive">Nofaol</option>
+            </select>
+            <select
+              value={pagination.limit}
+              onChange={(e) => setPagination((p) => ({ ...p, limit: Number(e.target.value), page: 1 }))}
+              className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="10">10 ta</option>
+              <option value="20">20 ta</option>
+              <option value="50">50 ta</option>
+              <option value="100">100 ta</option>
+            </select>
           </div>
           <div>
-            <RegionSelect
-              name="tuman"
-              value={filters.tuman}
-              onChange={handleTumanChange}
-              label="Tuman"
-              type="district"
-              parentId={filters.viloyat || undefined}
-              disabled={!filters.viloyat}
-            />
-          </div>
-          <div>
-            <RegionSelect
-              name="mfy"
-              value={filters.mfy}
-              onChange={handleMfyChange}
-              label="MFY"
-              type="mfy"
-              parentId={filters.tuman || undefined}
-              disabled={!filters.tuman}
+            <p className="text-sm font-medium text-gray-700 mb-2">Hudud bo‘yicha (joriy sahifa)</p>
+            <GeoCascadeSearchableFields
+              required={false}
+              allowClear
+              geoLoading={geoLoading}
+              regions={regions}
+              districts={districts}
+              mfys={mfys}
+              values={{
+                region_id: filters.region_id,
+                district_id: filters.district_id,
+                mfy_id: filters.mfy_id,
+              }}
+              onChange={setGeoFilter}
+              disabled={false}
             />
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
-      )}
-
-      {/* Table */}
       <AgentTable
-        agents={filteredAgents}
-        loading={loading}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onView={handleView}
+        rows={filteredItems}
+        loading={listLoading}
+        onEdit={openEdit}
+        onDelete={openDelete}
+        onView={openView}
         pagination={pagination}
         onPageChange={handlePageChange}
-        onStatusChange={fetchAgents}
+        onRefresh={() => fetchList()}
+        regions={regions}
+        districts={districts}
+        mfys={mfys}
       />
 
-      {/* Modals */}
       <CreateAgentModal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onSuccess={handleCreateSuccess}
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={() => {
+          setCreateOpen(false);
+          fetchList();
+        }}
+        regions={regions}
+        districts={districts}
+        mfys={mfys}
       />
 
-      {selectedAgent && (
-        <>
-          <ViewAgentModal
-            open={viewModalOpen}
-            onClose={() => {
-              setViewModalOpen(false);
-              setSelectedAgent(null);
-            }}
-            agent={selectedAgent}
-          />
+      <EditAgentModal
+        open={editOpen}
+        agentId={selectedId}
+        onClose={() => {
+          setEditOpen(false);
+          setSelectedId(null);
+        }}
+        onSuccess={() => {
+          setEditOpen(false);
+          setSelectedId(null);
+          fetchList();
+        }}
+        regions={regions}
+        districts={districts}
+        mfys={mfys}
+      />
 
-          <EditAgentModal
-            open={editModalOpen}
-            onClose={() => {
-              setEditModalOpen(false);
-              setSelectedAgent(null);
-            }}
-            onSuccess={handleEditSuccess}
-            agent={selectedAgent}
-          />
+      <ViewAgentModal
+        open={viewOpen}
+        agentId={selectedId}
+        regions={regions}
+        districts={districts}
+        mfys={mfys}
+        onClose={() => {
+          setViewOpen(false);
+          setSelectedId(null);
+        }}
+      />
 
-          <DeleteAgentModal
-            open={deleteModalOpen}
-            onClose={() => {
-              setDeleteModalOpen(false);
-              setSelectedAgent(null);
-            }}
-            onSuccess={handleDeleteSuccess}
-            agent={selectedAgent}
-          />
-        </>
-      )}
+      <DeleteAgentModal
+        open={deleteOpen}
+        row={selectedRow}
+        onClose={() => {
+          setDeleteOpen(false);
+          setSelectedRow(null);
+        }}
+        onSuccess={() => {
+          setDeleteOpen(false);
+          setSelectedRow(null);
+          fetchList();
+        }}
+      />
     </div>
   );
 };
 
 export default Agents;
-
