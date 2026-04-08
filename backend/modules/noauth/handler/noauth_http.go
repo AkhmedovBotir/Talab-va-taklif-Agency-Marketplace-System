@@ -34,7 +34,14 @@ func (h *NoAuthHandler) RegisterRoutes(api *gin.RouterGroup) {
 		grp.GET("/mfys", h.ListMFYs)
 		grp.GET("/punkts", h.ListPunkts)
 		grp.GET("/agents", h.ListAgents)
+		grp.GET("/managers", h.ListManagers)
 		grp.GET("/marketplace-users", h.ListMarketplaceUsers)
+		grp.GET("/activity-types", h.ListActivityTypes)
+		grp.GET("/local-shops", h.ListLocalShops)
+		grp.GET("/local-shop-products", h.ListLocalShopProducts)
+		grp.GET("/contragent-banners", h.ListContragentBanners)
+		grp.GET("/product-ratings", h.ListProductRatings)
+		grp.GET("/comment-templates", h.ListCommentTemplates)
 	}
 }
 
@@ -279,4 +286,126 @@ func (h *NoAuthHandler) ListMarketplaceUsers(c *gin.Context) {
 		return
 	}
 	response.JSON(c, http.StatusOK, "NoAuth marketplace foydalanuvchilari ro'yxati olindi", paginated(items, total, page, limit), nil)
+}
+
+func (h *NoAuthHandler) ListManagers(c *gin.Context) {
+	page, limit := parsePageLimit(c)
+	items, total, err := h.svc.Managers(page, limit, c.Query("q"))
+	if err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())
+		return
+	}
+	response.JSON(c, http.StatusOK, "NoAuth menejerlar ro'yxati olindi", paginated(items, total, page, limit), nil)
+}
+
+func (h *NoAuthHandler) ListActivityTypes(c *gin.Context) {
+	rows, err := h.svc.ActivityTypes()
+	if err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())
+		return
+	}
+	response.JSON(c, http.StatusOK, "NoAuth faoliyat turlari ro'yxati olindi", rows, nil)
+}
+
+func (h *NoAuthHandler) ListLocalShops(c *gin.Context) {
+	page, limit := parsePageLimit(c)
+	var districtID *uint
+	if v := strings.TrimSpace(c.Query("district_id")); v != "" {
+		id, err := parseUint(v)
+		if err != nil {
+			response.JSON(c, http.StatusBadRequest, "district_id noto'g'ri", nil, nil)
+			return
+		}
+		districtID = &id
+	}
+	var mfyID *uint
+	if v := strings.TrimSpace(c.Query("mfy_id")); v != "" {
+		id, err := parseUint(v)
+		if err != nil {
+			response.JSON(c, http.StatusBadRequest, "mfy_id noto'g'ri", nil, nil)
+			return
+		}
+		mfyID = &id
+	}
+	items, total, err := h.svc.LocalShops(page, limit, c.Query("q"), districtID, mfyID)
+	if err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())
+		return
+	}
+	response.JSON(c, http.StatusOK, "NoAuth maxalla do'konlari ro'yxati olindi", paginated(items, total, page, limit), nil)
+}
+
+func (h *NoAuthHandler) ListLocalShopProducts(c *gin.Context) {
+	page, limit := parsePageLimit(c)
+	var districtID *uint
+	if v := strings.TrimSpace(c.Query("district_id")); v != "" {
+		id, err := parseUint(v)
+		if err != nil {
+			response.JSON(c, http.StatusBadRequest, "district_id noto'g'ri", nil, nil)
+			return
+		}
+		districtID = &id
+	}
+	var mfyID *uint
+	if v := strings.TrimSpace(c.Query("mfy_id")); v != "" {
+		id, err := parseUint(v)
+		if err != nil {
+			response.JSON(c, http.StatusBadRequest, "mfy_id noto'g'ri", nil, nil)
+			return
+		}
+		mfyID = &id
+	}
+	var localShopID *uint
+	if v := strings.TrimSpace(c.Query("local_shop_id")); v != "" {
+		id, err := parseUint(v)
+		if err != nil {
+			response.JSON(c, http.StatusBadRequest, "local_shop_id noto'g'ri", nil, nil)
+			return
+		}
+		localShopID = &id
+	}
+	items, total, err := h.svc.LocalShopProducts(page, limit, c.Query("q"), districtID, mfyID, localShopID)
+	if err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())
+		return
+	}
+	response.JSON(c, http.StatusOK, "NoAuth maxalla do'koni mahsulotlari ro'yxati olindi", paginated(items, total, page, limit), nil)
+}
+
+func (h *NoAuthHandler) ListContragentBanners(c *gin.Context) {
+	items, err := h.svc.ActiveContragentBanners()
+	if err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())
+		return
+	}
+	response.JSON(c, http.StatusOK, "NoAuth contragent bannerlar ro'yxati olindi", items, nil)
+}
+
+func (h *NoAuthHandler) ListProductRatings(c *gin.Context) {
+	v := strings.TrimSpace(c.Query("product_id"))
+	if v == "" {
+		response.JSON(c, http.StatusBadRequest, "product_id majburiy", nil, nil)
+		return
+	}
+	productID, err := parseUint(v)
+	if err != nil || productID == 0 {
+		response.JSON(c, http.StatusBadRequest, "product_id noto'g'ri", nil, nil)
+		return
+	}
+	page, limit := parsePageLimit(c)
+	out, err := h.svc.ProductRatings(productID, page, limit)
+	if err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())
+		return
+	}
+	response.JSON(c, http.StatusOK, "NoAuth mahsulot baholari olindi", out, nil)
+}
+
+func (h *NoAuthHandler) ListCommentTemplates(c *gin.Context) {
+	rows, err := h.svc.CommentTemplates()
+	if err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())
+		return
+	}
+	response.JSON(c, http.StatusOK, "NoAuth kommentariya shablonlari olindi", rows, nil)
 }

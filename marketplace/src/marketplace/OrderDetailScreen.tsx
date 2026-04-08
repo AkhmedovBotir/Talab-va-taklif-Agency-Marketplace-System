@@ -9,13 +9,14 @@ import {
   Image,
   Modal,
   Alert,
+  TextInput,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Package, Ban } from 'lucide-react-native';
+import { ChevronLeft, Package, Ban, Star } from 'lucide-react-native';
 import { api } from '../services/api';
-import type { MarketplaceOrder } from '../types';
+import type { MarketplaceOrder, CommentTemplate, OrderRatingItemPayload } from '../types';
 import {
   orderStatusLabelUz,
   formatOrderAddressSummary,
@@ -27,6 +28,7 @@ import {
 import {
   productImageMapFromList,
   fetchProductImageById,
+  fetchLocalShopProductImageById,
   resolveOrderLineImageUri,
   formatOrderLineQtyLabel,
   formatOrderLineUnitPriceLabel,
@@ -43,8 +45,9 @@ function formatOrderDate(iso: string): string {
 }
 
 export function OrderDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string | string[] }>();
+  const { id, market } = useLocalSearchParams<{ id: string | string[]; market?: string | string[] }>();
   const orderId = Array.isArray(id) ? id[0] : id;
+  const marketScope = (Array.isArray(market) ? market[0] : market) === 'mahalla' ? 'mahalla' : 'bozor';
   const m = useMarketplace();
   const insets = useSafeAreaInsets();
   const topPad = Math.max(insets.top, Platform.OS === 'web' ? 16 : 12);
@@ -54,13 +57,17 @@ export function OrderDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [commentTemplates, setCommentTemplates] = useState<CommentTemplate[]>([]);
+  const [ratingDraft, setRatingDraft] = useState<Record<number, { score: number; comment_template_id?: number; note: string }>>({});
 
   const fetchOne = useCallback(async () => {
     if (!orderId) return;
     setLoading(true);
     setError(null);
     try {
-      const o = await api.orders.get(orderId);
+      const o = marketScope === 'mahalla' ? await api.localShopOrders.get(orderId) : await api.orders.get(orderId);
       setOrder(o);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Yuklanmadi');
@@ -68,13 +75,17 @@ export function OrderDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, marketScope]);
 
   useFocusEffect(
     useCallback(() => {
       void fetchOne();
     }, [fetchOne])
   );
+
+  useEffect(() => {
+    void api.commentTemplates.list().then(setCommentTemplates).catch(() => {});
+  }, []);
 
   const listImgMap = useMemo(() => productImageMapFromList(m.products), [m.products]);
   const [fetchedImages, setFetchedImages] = useState<Record<number, string>>({});
@@ -83,20 +94,29 @@ export function OrderDetailScreen() {
     setFetchedImages({});
   }, [order?.id]);
 
-  const orderItemPids = order?.items?.map((l) => l.product_id).join(',') ?? '';
+  const orderItemPids = order?.items?.map((l) => `${l.product_id}:${l.local_shop_product_id ?? 0}`).join(',') ?? '';
 
   useEffect(() => {
     if (!order?.items?.length) return;
     let cancelled = false;
-    const pids = [...new Set(order.items.map((l) => l.product_id).filter((pid) => pid > 0))];
+    const ids =
+      order.market === 'mahalla'
+        ? [...new Set(order.items.map((l) => l.local_shop_product_id ?? 0).filter((id) => id > 0))]
+        : [...new Set(order.items.map((l) => l.product_id).filter((pid) => pid > 0))];
 
     (async () => {
       const additions: Record<number, string> = {};
-      for (const pid of pids) {
-        const sample = order.items.find((l) => l.product_id === pid);
+      for (const pid of ids) {
+        const sample =
+          order.market === 'mahalla'
+            ? order.items.find((l) => (l.local_shop_product_id ?? 0) === pid)
+            : order.items.find((l) => l.product_id === pid);
         if (sample?.image_url?.trim()) continue;
-        if (listImgMap.has(String(pid))) continue;
-        const url = await fetchProductImageById(pid);
+        if (order.market !== 'mahalla' && listImgMap.has(String(pid))) continue;
+        const url =
+          order.market === 'mahalla'
+            ? await fetchLocalShopProductImageById(pid, order.local_shop_id)
+            : await fetchProductImageById(pid);
         if (url && !cancelled) additions[pid] = url;
       }
       if (!cancelled && Object.keys(additions).length > 0) {
@@ -120,16 +140,81 @@ export function OrderDetailScreen() {
     if (order == null || !order.can_cancel) return;
     setCancelSubmitting(true);
     try {
-      const updated = await api.orders.cancel(order.id);
+      const updated = marketScope === 'mahalla' ? await api.localShopOrders.cancel(order.id) : await api.orders.cancel(order.id);
       setOrder(updated);
       setCancelModalVisible(false);
-      await Promise.all([m.refreshCart(), m.loadProducts(m.search)]);
+      await Promise.all([m.refreshCart(), m.refreshLocalCart(), m.loadProducts(m.search)]);
     } catch (e) {
       Alert.alert('Buyurtma', e instanceof Error ? e.message : 'Bekor qilinmadi');
     } finally {
       setCancelSubmitting(false);
     }
-  }, [order, m]);
+  }, [order, m, marketScope]);
+
+  const openRatingModal = useCallback(() => {
+    if (!order) return;
+    const draft: Record<number, { score: number; comment_template_id?: number; note: string }> = {};
+    for (const line of order.items) {
+      const itemId = Number(line.order_item_id ?? 0);
+      if (itemId > 0) draft[itemId] = { score: 5, note: '' };
+    }
+    setRatingDraft(draft);
+    setRatingModalVisible(true);
+    void (async () => {
+      const updates: Record<number, { score: number; comment_template_id?: number; note: string }> = {};
+      await Promise.all(
+        order.items.map(async (line) => {
+          const itemId = Number(line.order_item_id ?? 0);
+          const pid = Number(line.product_id ?? 0);
+          if (!itemId || !pid) return;
+          try {
+            const res = await api.productRatings.get(pid, { page: 1, limit: 100 });
+            const own = res.items.find((it) => Number(it.order_id) === Number(order.id) && Number(it.order_item_id) === itemId);
+            if (!own) return;
+            updates[itemId] = {
+              score: Math.min(5, Math.max(1, Number(own.score) || 5)),
+              comment_template_id: own.comment_template_id,
+              note: own.note || own.comment_template || '',
+            };
+          } catch {
+            // ignore per-line errors
+          }
+        })
+      );
+      if (Object.keys(updates).length) {
+        setRatingDraft((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+  }, [order]);
+
+  const submitRatings = useCallback(async () => {
+    if (!order) return;
+    const items: OrderRatingItemPayload[] = order.items
+      .map((line) => {
+        const itemId = Number(line.order_item_id ?? 0);
+        const draft = ratingDraft[itemId];
+        if (!itemId || !draft) return null;
+        if (draft.score < 1 || draft.score > 5) return null;
+        return {
+          order_item_id: itemId,
+          score: draft.score,
+          comment_template_id: draft.comment_template_id || undefined,
+          note: draft.note?.trim() || undefined,
+        };
+      })
+      .filter(Boolean) as OrderRatingItemPayload[];
+    if (!items.length) return Alert.alert('Baholash', "Baholash uchun mahsulot topilmadi.");
+    setRatingSubmitting(true);
+    try {
+      await api.orders.rate(order.id, items);
+      setRatingModalVisible(false);
+      Alert.alert('Baholash', 'Rahmat! Baholaringiz saqlandi.');
+    } catch (e) {
+      Alert.alert('Baholash', e instanceof Error ? e.message : "Baholash yuborilmadi");
+    } finally {
+      setRatingSubmitting(false);
+    }
+  }, [order, ratingDraft]);
 
   /** Keng ekran: holat/manzil chapda, mahsulotlar/o‘ngda (RN Web, planshet). */
   const layoutWide = m.windowWidth >= 768;
@@ -278,7 +363,8 @@ export function OrderDetailScreen() {
                     line.product_id,
                     line.image_url,
                     listImgMap,
-                    fetchedImages
+                    fetchedImages,
+                    line.local_shop_product_id ?? line.product_id
                   );
                   return (
                     <View
@@ -341,11 +427,97 @@ export function OrderDetailScreen() {
                 <Text className="text-sm font-black uppercase tracking-wide text-slate-600">Jami</Text>
                 <Text className="text-xl font-black text-slate-900">{order.total_amount.toLocaleString()} so‘m</Text>
               </View>
+              {order.status === 'delivered' && marketScope === 'bozor' ? (
+                <Pressable onPress={openRatingModal} className="rounded-2xl bg-emerald-600 px-4 py-4">
+                  <Text className="text-center text-sm font-black uppercase tracking-wide text-white">Mahsulotlarni baholash</Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         ) : null}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={ratingModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !ratingSubmitting && setRatingModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/45 px-0 md:justify-center md:px-4">
+          <Pressable className="absolute inset-0" onPress={() => !ratingSubmitting && setRatingModalVisible(false)} />
+          <View className="max-h-[90%] w-full rounded-t-3xl bg-white px-4 pb-6 pt-3 md:max-h-[86%] md:max-w-3xl md:self-center md:rounded-3xl">
+            <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+            <Text className="mb-3 text-lg font-black text-slate-900">Mahsulotlarni baholash</Text>
+            <ScrollView>
+              <View className="gap-3">
+                {order?.items.map((line, idx) => {
+                  const itemId = Number(line.order_item_id ?? 0);
+                  if (!itemId) return null;
+                  const draft = ratingDraft[itemId] || { score: 5, note: '' };
+                  return (
+                    <View key={`${itemId}_${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <Text className="font-bold text-slate-800">{line.product_name}</Text>
+                      <Text className="mt-1 text-[11px] font-semibold text-slate-500">Sizning bahongiz: {draft.score} / 5</Text>
+                      <View className="mt-2 flex-row items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((score) => (
+                          <Pressable
+                            key={score}
+                            onPress={() => setRatingDraft((p) => ({ ...p, [itemId]: { ...draft, score } }))}
+                            className="rounded-full p-1"
+                          >
+                            <Star size={22} color={score <= draft.score ? '#f59e0b' : '#cbd5e1'} fill={score <= draft.score ? '#f59e0b' : 'none'} />
+                          </Pressable>
+                        ))}
+                      </View>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2">
+                        <View className="flex-row gap-2">
+                          {commentTemplates.map((tpl) => (
+                            <Pressable
+                              key={tpl.id}
+                              onPress={() =>
+                                setRatingDraft((p) => ({
+                                  ...p,
+                                  [itemId]: {
+                                    ...draft,
+                                    comment_template_id: tpl.id,
+                                    note: draft.note || tpl.comment,
+                                  },
+                                }))
+                              }
+                              className={cn(
+                                'rounded-full border px-3 py-1.5',
+                                draft.comment_template_id === tpl.id ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'
+                              )}
+                            >
+                              <Text className="text-xs font-semibold text-slate-700">{tpl.comment}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </ScrollView>
+                      <TextInput
+                        value={draft.note}
+                        onChangeText={(note) => setRatingDraft((p) => ({ ...p, [itemId]: { ...draft, note } }))}
+                        placeholder="Izoh (ixtiyoriy)"
+                        multiline
+                        className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-800"
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <View className="mt-3 flex-row gap-2">
+              <Pressable onPress={() => !ratingSubmitting && setRatingModalVisible(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-3">
+                <Text className="text-center font-bold text-slate-600">Yopish</Text>
+              </Pressable>
+              <Pressable onPress={() => void submitRatings()} disabled={ratingSubmitting} className="flex-1 rounded-xl bg-emerald-600 py-3 disabled:opacity-60">
+                <Text className="text-center font-bold text-white">{ratingSubmitting ? 'Yuborilmoqda...' : 'Yuborish'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={cancelModalVisible}

@@ -12,7 +12,7 @@ import (
 )
 
 func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int) error {
-	if err := db.AutoMigrate(&domain.VerificationCode{}, &domain.ContragentDeliveryRegion{}, &domain.ContragentDeliveryDistrict{}, &domain.Product{}, &domain.ProductImage{}); err != nil {
+	if err := db.AutoMigrate(&domain.VerificationCode{}, &domain.ContragentDeliveryRegion{}, &domain.ContragentDeliveryDistrict{}, &domain.Product{}, &domain.ProductImage{}, &domain.ContragentNotificationRead{}); err != nil {
 		return err
 	}
 
@@ -30,12 +30,19 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 	productSvc := service.NewContragentProductService(productRepo)
 	punktLineRepo := repository.NewContragentPunktLineRequestRepository(db)
 	punktLineSvc := service.NewContragentPunktLineRequestService(punktLineRepo, orderembed.NewLoader(db))
+	analyticsRepo := repository.NewContragentAnalyticsRepository(db)
+	analyticsSvc := service.NewContragentAnalyticsService(analyticsRepo)
 
 	authHandler := handler.NewContragentAuthHandler(authSvc, jwtSecret)
 	categoryHandler := handler.NewContragentCategoryHandler(categorySvc)
 	regionDeliveryHandler := handler.NewContragentRegionDeliveryHandler(regionDeliverySvc)
 	productHandler := handler.NewContragentProductHandler(productSvc)
 	punktLineHandler := handler.NewContragentPunktLineRequestHandler(punktLineSvc)
+	analyticsHandler := handler.NewContragentAnalyticsHandler(analyticsSvc)
+
+	contragentNotifRepo := repository.NewContragentNotificationRepository(db)
+	contragentNotifSvc := service.NewContragentNotificationService(contragentNotifRepo)
+	contragentNotifHandler := handler.NewContragentNotificationHandler(contragentNotifSvc)
 
 	api := router.Group("/api/v1")
 	authHandler.RegisterPublicAuthRoutes(api)
@@ -46,5 +53,7 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 	regionDeliveryHandler.RegisterMeRoutes(me)
 	productHandler.RegisterMeRoutes(me)
 	punktLineHandler.RegisterMeRoutes(me)
+	analyticsHandler.RegisterMeRoutes(me)
+	contragentNotifHandler.RegisterMeRoutes(me)
 	return nil
 }

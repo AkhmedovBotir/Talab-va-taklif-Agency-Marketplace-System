@@ -677,7 +677,7 @@ export function contragentLogoToImageUri(logo?: string | null): string | undefin
   return `data:image/png;base64,${clean}`;
 }
 
-/** ---- Contragent v1: categories / subcategories / products (8081 /api/v1) ---- */
+/** ---- Contragent v1: categories / subcategories / products (`/api/v1`) ---- */
 
 function extractV1ListPayload(raw: Record<string, unknown>): unknown[] {
   const d = raw.data;
@@ -903,6 +903,47 @@ function buildV1ProductWriteBody(data: {
   return body;
 }
 
+function parseContragentNotificationRow(row: Record<string, unknown>): Notification {
+  const idVal = row.id ?? row._id;
+  const idStr = idVal != null && idVal !== '' ? String(idVal) : '';
+  const typeRaw = String(row.type ?? 'info');
+  const allowed: Notification['type'][] = [
+    'info',
+    'warning',
+    'success',
+    'error',
+    'announcement',
+    'promotion',
+    'update',
+  ];
+  const type = (allowed.includes(typeRaw as Notification['type'])
+    ? typeRaw
+    : 'info') as Notification['type'];
+  const idNum = typeof row.id === 'number' ? row.id : Number(row.id);
+  return {
+    _id: idStr,
+    id: Number.isFinite(idNum) ? idNum : undefined,
+    title: String(row.title ?? ''),
+    message: String(row.message ?? ''),
+    type,
+    targetType: String(row.target_type ?? row.targetType ?? ''),
+    createdAt: String(row.created_at ?? row.createdAt ?? ''),
+    updatedAt:
+      row.updated_at != null && row.updated_at !== ''
+        ? String(row.updated_at)
+        : row.updatedAt != null && row.updatedAt !== ''
+          ? String(row.updatedAt)
+          : undefined,
+    readAt:
+      row.read_at != null && row.read_at !== ''
+        ? String(row.read_at)
+        : row.readAt != null && row.readAt !== ''
+          ? String(row.readAt)
+          : null,
+    isRead: Boolean(row.is_read ?? row.isRead ?? false),
+  };
+}
+
 class ApiService {
   private baseUrl: string;
   private contragentV1Base: string;
@@ -1009,7 +1050,7 @@ class ApiService {
         throw {
           status: 408,
           message:
-            'So‘rov vaqti tugadi. Kompyuter IP (192.168.x) va server (8081) ni tekshiring.',
+            'So‘rov vaqti tugadi. Internet aloqasi va api.ttsa.uz ni tekshiring.',
         };
       }
       const err = error as { status?: number };
@@ -1993,72 +2034,150 @@ class ApiService {
     );
   }
 
-  // Notification methods
+  /** Analytics v1 stats */
+  async getAnalyticsStats(params?: {
+    from?: string;
+    to?: string;
+  }): Promise<ContragentAnalyticsStats> {
+    const qp = new URLSearchParams();
+    if (params?.from) qp.set('from', params.from);
+    if (params?.to) qp.set('to', params.to);
+    const raw = await this.contragentV1Request<Record<string, unknown>>(
+      `/contragents/me/analytics/stats${qp.toString() ? `?${qp}` : ''}`,
+      { method: 'GET' }
+    );
+    const d =
+      raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data)
+        ? (raw.data as Record<string, unknown>)
+        : raw;
+    return {
+      fromUtc: String(d.from_utc ?? d.fromUtc ?? ''),
+      toUtc: String(d.to_utc ?? d.toUtc ?? ''),
+      ordersCount: Number(d.orders_count ?? d.ordersCount ?? 0),
+      linesCount: Number(d.lines_count ?? d.linesCount ?? 0),
+      grossSalesTotal: Number(d.gross_sales_total ?? d.grossSalesTotal ?? 0),
+      costTotal: Number(d.cost_total ?? d.costTotal ?? 0),
+      marginTotal: Number(d.margin_total ?? d.marginTotal ?? 0),
+      kpiPoolTotal: Number(d.kpi_pool_total ?? d.kpiPoolTotal ?? 0),
+      payoutTotal: Number(d.payout_total ?? d.payoutTotal ?? 0),
+    };
+  }
+
+  /** Analytics v1 sales orders */
+  async getAnalyticsSalesOrders(params?: {
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ContragentAnalyticsSalesOrdersResponse> {
+    const qp = new URLSearchParams();
+    qp.set('page', String(params?.page ?? 1));
+    qp.set('limit', String(Math.min(Math.max(1, params?.limit ?? 10), 100)));
+    if (params?.from) qp.set('from', params.from);
+    if (params?.to) qp.set('to', params.to);
+
+    const raw = await this.contragentV1Request<Record<string, unknown>>(
+      `/contragents/me/analytics/sales/orders?${qp}`,
+      { method: 'GET' }
+    );
+    const d =
+      raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data)
+        ? (raw.data as Record<string, unknown>)
+        : raw;
+    const itemsRaw = Array.isArray(d.items) ? d.items : [];
+    const items = itemsRaw.map((x) => {
+      const o = x as Record<string, unknown>;
+      return {
+        orderId: Number(o.order_id ?? o.orderId ?? 0),
+        orderStatus: String(o.order_status ?? o.orderStatus ?? ''),
+        orderUpdatedAt: String(o.order_updated_at ?? o.orderUpdatedAt ?? ''),
+        linesCount: Number(o.lines_count ?? o.linesCount ?? 0),
+        grossSalesTotal: Number(o.gross_sales_total ?? o.grossSalesTotal ?? 0),
+        costTotal: Number(o.cost_total ?? o.costTotal ?? 0),
+        payoutTotal: Number(o.payout_total ?? o.payoutTotal ?? 0),
+      } as ContragentAnalyticsSalesOrderItem;
+    });
+    return {
+      items,
+      total: Number(d.total ?? items.length),
+      page: Number(d.page ?? params?.page ?? 1),
+      limit: Number(d.limit ?? params?.limit ?? 10),
+      totalPages: Number(d.total_pages ?? d.totalPages ?? 1),
+    };
+  }
+
+  // Notification methods (GET /contragents/me/notifications, PATCH read / read-all)
   async getNotifications(params?: {
     page?: number;
     limit?: number;
   }): Promise<NotificationListResponse> {
-    // Vaqtincha o'chirilgan: notification API ga chiqmaymiz.
-    return {
-      success: true,
-      data: [],
-      pagination: {
-        page: params?.page ?? 1,
-        limit: params?.limit ?? 10,
-        total: 0,
-        pages: 0,
-      },
-    };
+    const page = params?.page ?? 1;
+    const limit = params?.limit ?? 20;
+    const qp = new URLSearchParams();
+    qp.set('page', String(page));
+    qp.set('limit', String(limit));
 
-    /*
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    
-    const query = queryParams.toString();
-    return this.request<NotificationListResponse>(
-      `/api/contragents/notifications/list${query ? `?${query}` : ''}`,
+    const raw = await this.contragentV1Request<Record<string, unknown>>(
+      `/contragents/me/notifications?${qp}`,
       { method: 'GET' }
     );
-    */
+
+    const d =
+      raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data)
+        ? (raw.data as Record<string, unknown>)
+        : (raw as Record<string, unknown>);
+
+    const itemsRaw = Array.isArray(d.items) ? d.items : [];
+    const data = itemsRaw.map((x) => parseContragentNotificationRow(x as Record<string, unknown>));
+    const total = Number(d.total ?? data.length);
+    const totalPages = Number(
+      d.total_pages ?? d.totalPages ?? (limit > 0 ? Math.max(1, Math.ceil(total / limit)) : 1)
+    );
+    const unreadCount = Number(d.unread_count ?? d.unreadCount ?? 0);
+
+    return {
+      success: true,
+      data,
+      pagination: {
+        page: Number(d.page ?? page),
+        limit: Number(d.limit ?? limit),
+        total,
+        pages: totalPages,
+      },
+      unreadCount,
+    };
   }
 
   async getUnreadCount(): Promise<UnreadCountResponse> {
-    // Vaqtincha o'chirilgan: doim 0 qaytaramiz.
-    return {
-      success: true,
-      data: { unreadCount: 0 },
-    };
-
-    /*
-    return this.request<UnreadCountResponse>(
-      '/api/contragents/notifications/unread-count',
+    const raw = await this.contragentV1Request<Record<string, unknown>>(
+      '/contragents/me/notifications/unread-count',
       { method: 'GET' }
     );
-    */
+    const d =
+      raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data)
+        ? (raw.data as Record<string, unknown>)
+        : (raw as Record<string, unknown>);
+    const unread = Number(d.unread_count ?? d.unreadCount ?? 0);
+    return {
+      success: true,
+      data: { unreadCount: unread },
+    };
   }
 
   async markNotificationRead(notificationId: string): Promise<{ success: boolean; message: string }> {
-    void notificationId;
-    return { success: true, message: 'Notification API vaqtincha o‘chirilgan' };
-
-    /*
-    return this.request<{ success: boolean; message: string }>(
-      `/api/contragents/notifications/${notificationId}/read`,
-      { method: 'POST' }
+    await this.contragentV1Request<Record<string, unknown>>(
+      `/contragents/me/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: 'PATCH' }
     );
-    */
+    return { success: true, message: 'OK' };
   }
 
   async markAllNotificationsRead(): Promise<{ success: boolean; message: string }> {
-    return { success: true, message: 'Notification API vaqtincha o‘chirilgan' };
-
-    /*
-    return this.request<{ success: boolean; message: string }>(
-      '/api/contragents/notifications/read-all',
-      { method: 'POST' }
+    await this.contragentV1Request<Record<string, unknown>>(
+      '/contragents/me/notifications/read-all',
+      { method: 'PATCH' }
     );
-    */
+    return { success: true, message: 'OK' };
   }
 
   // Payment methods
@@ -2201,14 +2320,47 @@ export interface StatisticsParams {
   endDate?: string;
 }
 
+export interface ContragentAnalyticsStats {
+  fromUtc: string;
+  toUtc: string;
+  ordersCount: number;
+  linesCount: number;
+  grossSalesTotal: number;
+  costTotal: number;
+  marginTotal: number;
+  kpiPoolTotal: number;
+  payoutTotal: number;
+}
+
+export interface ContragentAnalyticsSalesOrderItem {
+  orderId: number;
+  orderStatus: string;
+  orderUpdatedAt: string;
+  linesCount: number;
+  grossSalesTotal: number;
+  costTotal: number;
+  payoutTotal: number;
+}
+
+export interface ContragentAnalyticsSalesOrdersResponse {
+  items: ContragentAnalyticsSalesOrderItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 // Notification interfaces
 export interface Notification {
   _id: string;
+  id?: number;
   title: string;
   message: string;
   type: 'info' | 'warning' | 'success' | 'error' | 'announcement' | 'promotion' | 'update';
   targetType: string;
   createdAt: string;
+  updatedAt?: string;
+  readAt?: string | null;
   isRead: boolean;
 }
 
@@ -2221,6 +2373,8 @@ export interface NotificationListResponse {
     total: number;
     pages: number;
   };
+  /** Serverdagi jami o'qilmaganlar (pagination bo'lsa ham). */
+  unreadCount: number;
 }
 
 export interface UnreadCountResponse {

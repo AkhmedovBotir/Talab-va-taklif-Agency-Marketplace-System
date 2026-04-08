@@ -17,3 +17,5 @@ export function TabRouteShell({ children, stackRoute }: TabRouteShellProps) {
     </View>
   );
 }
+
+export default TabRouteShell;

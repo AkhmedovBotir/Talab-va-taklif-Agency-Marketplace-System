@@ -37,6 +37,31 @@ export interface Product {
   updated_at: string;
 }
 
+export interface LocalShopInfo {
+  id: number;
+  name: string;
+  region_id?: number;
+  district_id?: number;
+  mfy_id?: number;
+  phone?: string;
+}
+
+export interface LocalShopDeliveryArea {
+  mfy_id: number;
+  mfy_name: string;
+}
+
+export interface LocalShopProduct extends Product {
+  local_shop?: LocalShopInfo;
+  local_delivery_areas?: LocalShopDeliveryArea[];
+}
+
+export interface LocalShopCartItem extends LocalShopProduct {
+  quantity: number;
+  availableStock: number;
+  cartLineId: number;
+}
+
 export interface Address {
   id: string | number;
   name: string;
@@ -140,6 +165,7 @@ export interface ContragentBrowseItem {
   phone?: string;
   logo?: string;
   activity_type_id?: number;
+  activity_type_name?: string;
   status?: string;
   region_id?: number;
   district_id?: number;
@@ -147,6 +173,15 @@ export interface ContragentBrowseItem {
   delivery_areas?: { region_ids: number[]; district_ids: number[] };
   products?: Product[];
   category_branches?: Array<{ category: Category; subcategories: Subcategory[] }>;
+}
+
+export interface ContragentBanner {
+  id: number;
+  contragent_id: number;
+  contragent_name: string;
+  contragent_logo?: string;
+  start_at: string;
+  end_at: string;
 }
 
 export interface ContragentsListResponse {
@@ -157,11 +192,53 @@ export interface ContragentsListResponse {
   total_pages: number;
 }
 
+export interface ActivityType {
+  id: number;
+  name: string;
+}
+
+export interface CommentTemplate {
+  id: number;
+  comment: string;
+  sort_order?: number;
+}
+
+export interface PartnerRequestPayload {
+  company_name: string;
+  inn: string;
+  mfo: string;
+  account_number: string;
+  activity_type_id: number;
+  region_id: number;
+  district_id: number;
+  mfy_id: number;
+  phone: string;
+}
+
+export interface PartnerRequest {
+  id: number;
+  company_name: string;
+  inn: string;
+  mfo: string;
+  account_number: string;
+  activity_type_id: number;
+  activity_type_name?: string;
+  region_id: number;
+  district_id: number;
+  mfy_id: number;
+  phone: string;
+  status?: string;
+  created_at?: string;
+}
+
 /** Buyurtma holati (marketplace orders API) */
 export type MarketplaceOrderStatus = 'pending' | 'cancelled' | 'delivered' | string;
 
 export interface MarketplaceOrderItemLine {
+  order_item_id?: number;
   product_id: number;
+  local_shop_product_id?: number;
+  template_id?: number;
   contragent_id: number;
   product_name: string;
   unit_price: number;
@@ -174,6 +251,35 @@ export interface MarketplaceOrderItemLine {
   image_url?: string;
   /** Mahsulot kodi (API `product_code`) */
   product_code?: number;
+}
+
+export interface OrderRatingItemPayload {
+  order_item_id: number;
+  score: number;
+  comment_template_id?: number;
+  note?: string;
+}
+
+export interface ProductRatingItem {
+  id: number;
+  order_id: number;
+  order_item_id: number;
+  score: number;
+  comment_template_id?: number;
+  comment_template?: string;
+  note?: string;
+  created_at?: string;
+}
+
+export interface ProductRatingsResponse {
+  product_id: number;
+  average_score: number;
+  total_ratings: number;
+  score_breakdown: Record<string, number>;
+  items: ProductRatingItem[];
+  page: number;
+  limit: number;
+  total_pages: number;
 }
 
 export interface MarketplaceOrderAddress {
@@ -212,6 +318,8 @@ export interface MarketplaceOrderRoadmap {
 
 export interface MarketplaceOrder {
   id: number;
+  market?: 'bozor' | 'mahalla';
+  local_shop_id?: number;
   status: MarketplaceOrderStatus;
   /** `pending` bo‘lsa bekor qilish mumkin (API `can_cancel` yoki `status` bo‘yicha) */
   can_cancel: boolean;
@@ -240,6 +348,35 @@ export interface CreateOrderPayload {
 export interface OrdersListResult {
   items: MarketplaceOrder[];
   total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+export type MarketplaceNotificationType =
+  | 'info'
+  | 'warning'
+  | 'success'
+  | 'error'
+  | 'update'
+  | 'announcement';
+
+export interface MarketplaceNotification {
+  id: string | number;
+  title: string;
+  message: string;
+  type: MarketplaceNotificationType | string;
+  target_type: string;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarketplaceNotificationsListResult {
+  items: MarketplaceNotification[];
+  total: number;
+  unread_count: number;
   page: number;
   limit: number;
   total_pages: number;

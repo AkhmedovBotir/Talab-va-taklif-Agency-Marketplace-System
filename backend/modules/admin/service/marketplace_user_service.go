@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -177,7 +178,19 @@ func (s *marketplaceUserService) Delete(id uint) error {
 	if row == nil {
 		return ErrMarketplaceUserNotFound
 	}
-	return s.repo.Delete(id)
+	if err = s.repo.Delete(id); err != nil {
+		// FK mavjud bo'lsa (buyurtmalar bilan bog'langan), soft-delete uslubida
+		// foydalanuvchini tizimdan yashiramiz va PII maydonlarini arxiv nomiga o'tkazamiz.
+		if strings.Contains(strings.ToLower(err.Error()), "sqlstate 23503") {
+			row.Status = "deleted"
+			row.FirstName = "Archived"
+			row.LastName = fmt.Sprintf("User-%d", row.ID)
+			row.Phone = fmt.Sprintf("+998%09d", row.ID%1000000000)
+			return s.repo.Update(row)
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *marketplaceUserService) validateLocation(regionID, districtID, mfyID uint) error {

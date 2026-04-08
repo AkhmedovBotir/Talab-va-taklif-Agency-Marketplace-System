@@ -1,0 +1,173 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+import { apiService, LocalShop } from '../services/api';
+import { getDeviceId } from '../utils/deviceId';
+
+interface AuthContextType {
+  user: LocalShop | null;
+  token: string | null;
+  loading: boolean;
+  login: (phone: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  isAuthenticated: boolean;
+  refreshUser: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const TOKEN_KEY = '@maxalla:token';
+const USER_KEY = '@maxalla:user';
+
+// Storage interface - works for both web and native
+const storage = {
+  getItem: async (key: string): Promise<string | null> => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return localStorage.getItem(key);
+    }
+    // For native, use AsyncStorage
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (error) {
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      localStorage.setItem(key, value);
+      return;
+    }
+    // For native, use AsyncStorage
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (error) {
+      // Ignore storage errors
+    }
+  },
+  removeItem: async (key: string): Promise<void> => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      localStorage.removeItem(key);
+      return;
+    }
+    // For native, use AsyncStorage
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (error) {
+      // Ignore storage errors
+    }
+  },
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [user, setUser] = useState<LocalShop | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadStoredAuth();
+  }, []);
+
+  const loadStoredAuth = async () => {
+    try {
+      const [storedToken, storedUser] = await Promise.all([
+        storage.getItem(TOKEN_KEY),
+        storage.getItem(USER_KEY),
+      ]);
+
+      if (storedToken && storedUser) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      // Ignore loading errors
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (phone: string, password: string) => {
+    try {
+      const response = await apiService.login({ phone, password });
+
+      if (response.success && response.data) {
+        const { token: newToken, shop } = response.data;
+
+        setToken(newToken);
+        setUser(shop);
+
+        await Promise.all([
+          storage.setItem(TOKEN_KEY, newToken),
+          storage.setItem(USER_KEY, JSON.stringify(shop)),
+        ]);
+      } else {
+        throw new Error(response.message || 'Login xatosi');
+      }
+    } catch (error: any) {
+      // Re-throw to let the caller handle it
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      // Call logout API if token exists
+      if (token) {
+        try {
+          const deviceId = getDeviceId();
+          await apiService.logout(token, deviceId);
+        } catch (error) {
+          // Continue with logout even if API call fails
+        }
+      }
+
+      // Clear local state and storage
+      setToken(null);
+      setUser(null);
+
+      await Promise.all([
+        storage.removeItem(TOKEN_KEY),
+        storage.removeItem(USER_KEY),
+      ]);
+    } catch (error) {
+      // Ignore logout errors
+    }
+  };
+
+  const refreshUser = async () => {
+    if (!token) return;
+
+    try {
+      const response = await apiService.getMyProfile(token);
+      if (response.success && response.data) {
+        setUser(response.data);
+        await storage.setItem(USER_KEY, JSON.stringify(response.data));
+      }
+    } catch (error) {
+      // Ignore refresh errors
+    }
+  };
+
+  const value: AuthContextType = {
+    user,
+    token,
+    loading,
+    login,
+    logout,
+    isAuthenticated: !!token && !!user,
+    refreshUser,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}

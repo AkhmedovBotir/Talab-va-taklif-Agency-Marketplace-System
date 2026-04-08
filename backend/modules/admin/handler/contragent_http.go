@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"backend/internal/pkg/response"
 	"backend/modules/admin/domain"
@@ -11,11 +12,12 @@ import (
 )
 
 type ContragentHandler struct {
-	service service.ContragentService
+	service    service.ContragentService
+	archiveSvc service.ArchiveService
 }
 
-func NewContragentHandler(s service.ContragentService) *ContragentHandler {
-	return &ContragentHandler{service: s}
+func NewContragentHandler(s service.ContragentService, archiveSvc service.ArchiveService) *ContragentHandler {
+	return &ContragentHandler{service: s, archiveSvc: archiveSvc}
 }
 
 func (h *ContragentHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
@@ -131,6 +133,26 @@ func (h *ContragentHandler) Delete(c *gin.Context) {
 	id, err := parseUintID(c.Param("id"))
 	if err != nil {
 		response.JSON(c, http.StatusBadRequest, "ID noto'g'ri", nil, nil)
+		return
+	}
+	row, err := h.service.GetByID(id)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	adminIDRaw, ok := c.Get("admin_id")
+	adminID, ok2 := adminIDRaw.(uint)
+	if !ok || !ok2 || adminID == 0 {
+		response.JSON(c, http.StatusUnauthorized, "Token yaroqsiz", nil, nil)
+		return
+	}
+	if err = h.archiveSvc.Archive("contragent", id, adminID, gin.H{
+		"action":              "delete",
+		"deleted_at":          time.Now().UTC(),
+		"deleted_by_admin_id": adminID,
+		"snapshot":            row,
+	}); err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Arxivga yozishda xatolik", nil, err.Error())
 		return
 	}
 	if err = h.service.Delete(id); err != nil {

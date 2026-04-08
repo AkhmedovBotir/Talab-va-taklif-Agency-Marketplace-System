@@ -2,12 +2,15 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
 	"backend/internal/pkg/security"
 	"backend/modules/admin/domain"
 	"backend/modules/admin/repository"
+	contrDomain "backend/modules/contragents/domain"
+	"gorm.io/gorm"
 )
 
 var (
@@ -58,14 +61,16 @@ type contragentService struct {
 	repo       repository.ContragentRepository
 	regionRepo repository.RegionRepository
 	ctRepo     repository.ContragentTypeRepository
+	db         *gorm.DB
 }
 
 func NewContragentService(
 	repo repository.ContragentRepository,
 	regionRepo repository.RegionRepository,
 	ctRepo repository.ContragentTypeRepository,
+	db *gorm.DB,
 ) ContragentService {
-	return &contragentService{repo: repo, regionRepo: regionRepo, ctRepo: ctRepo}
+	return &contragentService{repo: repo, regionRepo: regionRepo, ctRepo: ctRepo, db: db}
 }
 
 func (s *contragentService) Create(input ContragentInput) (*domain.Contragent, error) {
@@ -257,7 +262,28 @@ func (s *contragentService) Delete(id uint) error {
 	if row == nil {
 		return ErrContragentNotFound
 	}
-	return s.repo.Delete(id)
+	row.Status = "deleted"
+	row.Name = fmt.Sprintf("Archived Contragent-%d", row.ID)
+	row.INN = fmt.Sprintf("D%011d", row.ID%100000000000)
+	row.Phone = fmt.Sprintf("+998%09d", row.ID%1000000000)
+	row.Logo = ""
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("product_id IN (?)",
+			tx.Model(&contrDomain.Product{}).Select("id").Where("contragent_id = ?", id),
+		).Delete(&contrDomain.ProductImage{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Where("contragent_id = ?", id).Delete(&contrDomain.Product{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Save(row).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (s *contragentService) validateINN(inn string) error {

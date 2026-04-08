@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { apiService } from '../../services/api';
-import type { Agent, KPISummary } from '../../types/api';
+import { agentKpiTodayToSummary, type Agent, type KPISummary } from '../../types/api';
 import { getApiErrorMessage, isLoginPasswordNotSetMessage } from '../../utils/apiError';
 
 interface AgentLocationNames {
@@ -33,6 +33,7 @@ export default function ProfileScreen() {
   const isWeb = Platform.OS === 'web';
   const webContentWidth = isWeb ? Math.min(820, Math.max(320, windowWidth - 40)) : undefined;
   const infoMultiCol = isWeb && windowWidth >= 640;
+  const kpiCardWide = isWeb && windowWidth >= 700;
   const infoItemWidthStyle: ViewStyle | undefined = infoMultiCol
     ? {
         width: windowWidth >= 1080 ? '31%' : '48%',
@@ -173,9 +174,9 @@ export default function ProfileScreen() {
 
   const loadKPISummary = async () => {
     try {
-      const response = await apiService.getKPISummary();
-      if (response.success) {
-        setKpiSummary(response.data);
+      const res = await apiService.getAgentKpiToday();
+      if (res.success && res.data) {
+        setKpiSummary(agentKpiTodayToSummary(res.data));
       }
     } catch (error: any) {
       // Silently fail - KPI is optional
@@ -331,36 +332,66 @@ export default function ProfileScreen() {
 
       {!loadingKPI && kpiSummary && (
         <View style={[styles.kpiSection, isWeb && styles.kpiSectionWeb]}>
-          <Text style={styles.kpiSectionTitle}>KPI Bonus</Text>
-          <View style={styles.kpiCard}>
-            <View style={styles.kpiRow}>
-              <View style={styles.kpiItem}>
-                <Ionicons name="wallet" size={24} color="#007AFF" />
-                <Text style={styles.kpiLabel}>Jami bonus</Text>
-                <Text style={styles.kpiValue}>
-                  {(kpiSummary.totalAmount || 0).toLocaleString()} so'm
-                </Text>
+          <Text style={[styles.kpiSectionTitle, isWeb && windowWidth >= 640 && styles.kpiSectionTitleWeb]}>
+            KPI Bonus
+          </Text>
+          <View style={[styles.kpiCard, isWeb && styles.kpiCardWeb]}>
+            {kpiCardWide ? (
+              <View style={styles.kpiRowWide}>
+                <View style={[styles.kpiItem, styles.kpiItemWide]}>
+                  <Ionicons name="wallet" size={24} color="#007AFF" />
+                  <Text style={styles.kpiLabel}>Jami bonus</Text>
+                  <Text style={styles.kpiValue}>
+                    {(kpiSummary.totalAmount || 0).toLocaleString()} so'm
+                  </Text>
+                </View>
+                <View style={[styles.kpiItem, styles.kpiItemWide]}>
+                  <Ionicons name="checkmark-circle" size={20} color="#34C759" />
+                  <Text style={styles.kpiLabel}>To'langan</Text>
+                  <Text style={[styles.kpiValue, styles.kpiValuePaid]}>
+                    {(kpiSummary.paidAmount || 0).toLocaleString()} so'm
+                  </Text>
+                </View>
+                <View style={[styles.kpiItem, styles.kpiItemWide]}>
+                  <Ionicons name="time" size={20} color="#FF9500" />
+                  <Text style={styles.kpiLabel}>To'lanmagan</Text>
+                  <Text style={[styles.kpiValue, styles.kpiValueUnpaid]}>
+                    {(kpiSummary.unpaidAmount || 0).toLocaleString()} so'm
+                  </Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.kpiRow}>
-              <View style={[styles.kpiItem, styles.kpiItemHalf]}>
-                <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-                <Text style={styles.kpiLabel}>To'langan</Text>
-                <Text style={[styles.kpiValue, styles.kpiValuePaid]}>
-                  {(kpiSummary.paidAmount || 0).toLocaleString()} so'm
-                </Text>
-              </View>
-              <View style={[styles.kpiItem, styles.kpiItemHalf]}>
-                <Ionicons name="time" size={20} color="#FF9500" />
-                <Text style={styles.kpiLabel}>To'lanmagan</Text>
-                <Text style={[styles.kpiValue, styles.kpiValueUnpaid]}>
-                  {(kpiSummary.unpaidAmount || 0).toLocaleString()} so'm
-                </Text>
-              </View>
-            </View>
+            ) : (
+              <>
+                <View style={[styles.kpiRow, isWeb && styles.kpiRowWeb]}>
+                  <View style={styles.kpiItem}>
+                    <Ionicons name="wallet" size={24} color="#007AFF" />
+                    <Text style={styles.kpiLabel}>Jami bonus</Text>
+                    <Text style={styles.kpiValue}>
+                      {(kpiSummary.totalAmount || 0).toLocaleString()} so'm
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.kpiRow, isWeb && styles.kpiRowWeb]}>
+                  <View style={[styles.kpiItem, styles.kpiItemHalf]}>
+                    <Ionicons name="checkmark-circle" size={20} color="#34C759" />
+                    <Text style={styles.kpiLabel}>To'langan</Text>
+                    <Text style={[styles.kpiValue, styles.kpiValuePaid]}>
+                      {(kpiSummary.paidAmount || 0).toLocaleString()} so'm
+                    </Text>
+                  </View>
+                  <View style={[styles.kpiItem, styles.kpiItemHalf]}>
+                    <Ionicons name="time" size={20} color="#FF9500" />
+                    <Text style={styles.kpiLabel}>To'lanmagan</Text>
+                    <Text style={[styles.kpiValue, styles.kpiValueUnpaid]}>
+                      {(kpiSummary.unpaidAmount || 0).toLocaleString()} so'm
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
             <View style={styles.kpiFooter}>
               <Text style={styles.kpiTransactions}>
-                Jami transaksiyalar: {kpiSummary.totalTransactions || 0}
+                Yetkazilgan buyurtmalar (bugun): {kpiSummary.totalTransactions || 0}
               </Text>
             </View>
           </View>
@@ -380,7 +411,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/kpi')}
           >
             <Ionicons name="wallet" size={20} color="#007AFF" />
-            <Text style={styles.kpiButtonText}>KPI transaksiyalarini ko'rish</Text>
+            <Text style={styles.kpiButtonText}>KPI va tarixi</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
         </View>
@@ -709,6 +740,9 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 12,
   },
+  kpiSectionTitleWeb: {
+    fontSize: 20,
+  },
   kpiCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -719,10 +753,26 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  kpiCardWeb: {
+    padding: 20,
+  },
   kpiRow: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 12,
+  },
+  kpiRowWeb: {
+    flexWrap: 'wrap',
+  },
+  kpiRowWide: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 4,
+  },
+  kpiItemWide: {
+    flex: 1,
+    minWidth: 160,
   },
   kpiItem: {
     flex: 1,

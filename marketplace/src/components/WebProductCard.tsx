@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { ShoppingCart, Minus, Plus } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Star } from 'lucide-react';
 import { Product } from '../types';
 import { cn } from '../lib/utils';
+import { api } from '../services/api';
 
 export type WebProductCardProps = {
   product: Product;
@@ -10,6 +11,7 @@ export type WebProductCardProps = {
   onAddToCart: (p: Product) => void;
   onCartDelta: (productId: string, delta: number) => void;
   inCartQty: number;
+  cartDisabled?: boolean;
   className?: string;
 };
 
@@ -19,13 +21,33 @@ export function WebProductCard({
   onAddToCart,
   onCartDelta,
   inCartQty,
+  cartDisabled = false,
   className,
 }: WebProductCardProps) {
   const stock = Math.max(0, Math.floor(Number(product.quantity) || 0));
   const atMax = inCartQty >= stock;
   const outOfStock = stock <= 0;
   const [hoverIndex, setHoverIndex] = useState(0);
+  const [avgScore, setAvgScore] = useState(0);
+  const [totalRatings, setTotalRatings] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const pid = Number(product.id);
+    if (!Number.isFinite(pid) || pid < 1) return;
+    let cancelled = false;
+    void api.productRatings.get(pid, { limit: 1 }).then((res) => {
+      if (cancelled) return;
+      setAvgScore(res.average_score || 0);
+      setTotalRatings(res.total_ratings || 0);
+    }).catch(() => {
+      if (cancelled) return;
+      setAvgScore(0);
+      setTotalRatings(0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [product.id]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current || product.images.length <= 1) return;
@@ -93,6 +115,11 @@ export function WebProductCard({
           <p className="text-xs font-black text-orange-500 md:text-sm">
             {product.price.toLocaleString()} <span className="text-[8px] font-bold md:text-[9px]">so'm</span>
           </p>
+          <div className="mt-1.5 flex items-center gap-1">
+            <Star size={13} className="fill-amber-500 text-amber-500" />
+            <span className="text-[11px] font-black text-slate-700">{avgScore > 0 ? avgScore.toFixed(1) : '0.0'}</span>
+            <span className="text-[10px] font-semibold text-slate-400">({totalRatings})</span>
+          </div>
         </div>
       </button>
 
@@ -101,6 +128,14 @@ export function WebProductCard({
           <div className="flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400">
             Tugagan
           </div>
+        ) : cartDisabled ? (
+          <button
+            type="button"
+            disabled
+            className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-gray-100 py-3 text-[10px] font-black uppercase tracking-wider text-gray-400"
+          >
+            Savat tez kunda
+          </button>
         ) : inCartQty <= 0 ? (
           <button
             type="button"

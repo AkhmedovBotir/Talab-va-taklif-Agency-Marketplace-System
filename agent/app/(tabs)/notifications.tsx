@@ -1,5 +1,5 @@
-// Notifications Screen
-import React, { useState, useEffect, useCallback } from 'react';
+// Notifications Screen — Agent Notifications API + WebSocket
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,66 +12,131 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../../services/api';
+import { getNotificationsWebSocketUrl } from '../../config/api';
+import type { AgentNotification, IntegrationNotificationSocketPayload } from '../../types/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNotificationUnread } from '../../contexts/NotificationUnreadContext';
 
-interface Notification {
-  _id: string;
-  title: string;
-  message: string;
-  type: 'info' | 'warning' | 'success' | 'error' | 'announcement' | 'promotion' | 'update';
-  targetType: string;
-  createdAt: string;
-  isRead: boolean;
-}
+type TypeKey = AgentNotification['type'];
 
-const TYPE_CONFIG = {
+const TYPE_CONFIG: Record<
+  string,
+  { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string }
+> = {
   info: { icon: 'information-circle', color: '#007AFF', bg: '#E3F2FD' },
   warning: { icon: 'warning', color: '#FF9500', bg: '#FFF3E0' },
   success: { icon: 'checkmark-circle', color: '#34C759', bg: '#E8F5E9' },
   error: { icon: 'close-circle', color: '#FF3B30', bg: '#FFEBEE' },
   announcement: { icon: 'megaphone', color: '#5856D6', bg: '#EDE7F6' },
-  promotion: { icon: 'gift', color: '#FF2D55', bg: '#FCE4EC' },
   update: { icon: 'refresh-circle', color: '#00BCD4', bg: '#E0F7FA' },
 };
 
+function typeStyle(t: TypeKey) {
+  return TYPE_CONFIG[String(t)] ?? TYPE_CONFIG.info;
+}
+
+function normalizeSocketNotification(
+  n: NonNullable<IntegrationNotificationSocketPayload['notification']>
+): AgentNotification {
+  return {
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    type: n.type,
+    target_type: n.target_type,
+    is_read: n.is_read ?? false,
+    read_at: n.read_at ?? null,
+    created_at: n.created_at,
+    updated_at: n.updated_at,
+  };
+}
+
 export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { token } = useAuth();
+  const { unreadCount, setUnreadCount, refreshUnreadCount } = useNotificationUnread();
+  const [notifications, setNotifications] = useState<AgentNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<AgentNotification | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const loadNotifications = useCallback(async (pageNum: number = 1, refresh: boolean = false) => {
-    try {
-      if (refresh) setRefreshing(true);
-      else if (pageNum === 1) setLoading(true);
+  const loadNotifications = useCallback(
+    async (pageNum: number = 1, refresh: boolean = false) => {
+      try {
+        if (refresh) setRefreshing(true);
+        else if (pageNum === 1) setLoading(true);
 
-      const response = await apiService.getNotifications({ page: pageNum, limit: 20 });
-      
-      if (response.success) {
-        if (pageNum === 1) {
-          setNotifications(response.data);
-        } else {
-          setNotifications(prev => [...prev, ...response.data]);
+        const response = await apiService.getNotifications({ page: pageNum, limit: 20 });
+
+        if (response.success) {
+          if (pageNum === 1) {
+            setNotifications(response.items);
+            setUnreadCount(response.unread_count);
+          } else {
+            setNotifications(prev => [...prev, ...response.items]);
+          }
+          setHasMore(pageNum < (response.total_pages || 1));
+          setPage(pageNum);
         }
-        setHasMore(response.pagination.page < response.pagination.pages);
-        setPage(pageNum);
+      } catch (error) {
+        console.log('Notifications load error:', error);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.log('Notifications load error:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+    },
+    [setUnreadCount]
+  );
 
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
 
+  useEffect(() => {
+    if (!token) {
+      wsRef.current?.close();
+      wsRef.current = null;
+      return;
+    }
+
+    const url = getNotificationsWebSocketUrl(token);
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+    } catch {
+      return;
+    }
+    wsRef.current = ws;
+
+    ws.onmessage = event => {
+      try {
+        const data = JSON.parse(String(event.data)) as IntegrationNotificationSocketPayload;
+        if (data.event !== 'integration_notification_created' || !data.notification) return;
+        const incoming = normalizeSocketNotification(data.notification);
+        setNotifications(prev => {
+          if (prev.some(x => x.id === incoming.id)) return prev;
+          return [incoming, ...prev];
+        });
+        if (!incoming.is_read) {
+          setUnreadCount(c => c + 1);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    return () => {
+      ws.close();
+      if (wsRef.current === ws) wsRef.current = null;
+    };
+  }, [token, setUnreadCount]);
+
   const handleRefresh = () => {
     loadNotifications(1, true);
+    refreshUnreadCount();
   };
 
   const handleLoadMore = () => {
@@ -80,16 +145,21 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handleNotificationPress = async (notification: Notification) => {
+  const handleNotificationPress = async (notification: AgentNotification) => {
     setSelectedNotification(notification);
     setModalVisible(true);
 
-    if (!notification.isRead) {
+    if (!notification.is_read) {
       try {
-        await apiService.markNotificationRead(notification._id);
-        setNotifications(prev =>
-          prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n)
-        );
+        const r = await apiService.markNotificationRead(notification.id);
+        if (r.success) {
+          setNotifications(prev =>
+            prev.map(n =>
+              n.id === notification.id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
+            )
+          );
+          await refreshUnreadCount();
+        }
       } catch (error) {
         console.log('Mark read error:', error);
       }
@@ -98,8 +168,12 @@ export default function NotificationsScreen() {
 
   const handleMarkAllRead = async () => {
     try {
-      await apiService.markAllNotificationsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      const r = await apiService.markAllNotificationsRead();
+      if (r.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: n.read_at ?? new Date().toISOString() })));
+        setUnreadCount(0);
+        await refreshUnreadCount();
+      }
     } catch (error) {
       console.log('Mark all read error:', error);
     }
@@ -120,26 +194,30 @@ export default function NotificationsScreen() {
     return date.toLocaleDateString('uz-UZ');
   };
 
-  const renderNotification = ({ item }: { item: Notification }) => {
-    const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.info;
+  const renderNotification = ({ item }: { item: AgentNotification }) => {
+    const config = typeStyle(item.type);
 
     return (
       <TouchableOpacity
-        style={[styles.notificationCard, !item.isRead && styles.unreadCard]}
+        style={[styles.notificationCard, !item.is_read && styles.unreadCard]}
         onPress={() => handleNotificationPress(item)}
         activeOpacity={0.7}
       >
         <View style={[styles.iconContainer, { backgroundColor: config.bg }]}>
-          <Ionicons name={config.icon as any} size={24} color={config.color} />
+          <Ionicons name={config.icon} size={24} color={config.color} />
         </View>
         <View style={styles.contentContainer}>
           <View style={styles.headerRow}>
-            <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-            {!item.isRead && <View style={styles.unreadDot} />}
+            <Text style={styles.title} numberOfLines={1}>
+              {item.title}
+            </Text>
+            {!item.is_read && <View style={styles.unreadDot} />}
           </View>
-          <Text style={styles.message} numberOfLines={1}>{item.message}</Text>
+          <Text style={styles.message} numberOfLines={1}>
+            {item.message}
+          </Text>
           <View style={styles.footerRow}>
-            <Text style={styles.time}>{formatDate(item.createdAt)}</Text>
+            <Text style={styles.time}>{formatDate(item.created_at)}</Text>
             <TouchableOpacity style={styles.openButton}>
               <Text style={[styles.openButtonText, { color: config.color }]}>Ochish</Text>
               <Ionicons name="chevron-forward" size={14} color={config.color} />
@@ -157,8 +235,6 @@ export default function NotificationsScreen() {
     </View>
   );
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-
   return (
     <View style={styles.container}>
       {unreadCount > 0 && (
@@ -175,63 +251,54 @@ export default function NotificationsScreen() {
         <FlatList
           data={notifications}
           renderItem={renderNotification}
-          keyExtractor={item => item._id}
+          keyExtractor={item => String(item.id)}
           contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           ListEmptyComponent={renderEmpty}
           ListFooterComponent={
-            loading && page > 1 ? (
-              <ActivityIndicator style={styles.footerLoader} color="#007AFF" />
-            ) : null
+            loading && page > 1 ? <ActivityIndicator style={styles.footerLoader} color="#007AFF" /> : null
           }
         />
       )}
 
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setModalVisible(false)}
-      >
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             {selectedNotification && (
               <>
                 <View style={styles.modalHeader}>
-                  <View style={[
-                    styles.modalIconContainer,
-                    { backgroundColor: TYPE_CONFIG[selectedNotification.type]?.bg || TYPE_CONFIG.info.bg }
-                  ]}>
+                  <View
+                    style={[
+                      styles.modalIconContainer,
+                      { backgroundColor: typeStyle(selectedNotification.type).bg },
+                    ]}
+                  >
                     <Ionicons
-                      name={(TYPE_CONFIG[selectedNotification.type]?.icon || 'information-circle') as any}
+                      name={typeStyle(selectedNotification.type).icon}
                       size={32}
-                      color={TYPE_CONFIG[selectedNotification.type]?.color || '#007AFF'}
+                      color={typeStyle(selectedNotification.type).color}
                     />
                   </View>
-                  <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={() => setModalVisible(false)}
-                  >
+                  <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
                     <Ionicons name="close" size={24} color="#666" />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.modalTitle}>{selectedNotification.title}</Text>
-                <Text style={styles.modalTime}>{formatDate(selectedNotification.createdAt)}</Text>
+                <Text style={styles.modalTime}>{formatDate(selectedNotification.created_at)}</Text>
                 <View style={styles.modalDivider} />
                 <Text style={styles.modalMessage}>{selectedNotification.message}</Text>
-                <View style={[
-                  styles.typeBadge,
-                  { backgroundColor: TYPE_CONFIG[selectedNotification.type]?.bg || TYPE_CONFIG.info.bg }
-                ]}>
-                  <Text style={[
-                    styles.typeBadgeText,
-                    { color: TYPE_CONFIG[selectedNotification.type]?.color || '#007AFF' }
-                  ]}>
-                    {selectedNotification.type.toUpperCase()}
+                <View
+                  style={[
+                    styles.typeBadge,
+                    { backgroundColor: typeStyle(selectedNotification.type).bg },
+                  ]}
+                >
+                  <Text
+                    style={[styles.typeBadgeText, { color: typeStyle(selectedNotification.type).color }]}
+                  >
+                    {String(selectedNotification.type).toUpperCase()}
                   </Text>
                 </View>
               </>
@@ -410,9 +477,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-
-
-
-
-

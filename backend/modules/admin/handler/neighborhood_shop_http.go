@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"backend/internal/pkg/response"
 	"backend/modules/admin/domain"
@@ -11,11 +12,12 @@ import (
 )
 
 type NeighborhoodShopHandler struct {
-	service service.NeighborhoodShopService
+	service    service.NeighborhoodShopService
+	archiveSvc service.ArchiveService
 }
 
-func NewNeighborhoodShopHandler(s service.NeighborhoodShopService) *NeighborhoodShopHandler {
-	return &NeighborhoodShopHandler{service: s}
+func NewNeighborhoodShopHandler(s service.NeighborhoodShopService, archiveSvc service.ArchiveService) *NeighborhoodShopHandler {
+	return &NeighborhoodShopHandler{service: s, archiveSvc: archiveSvc}
 }
 
 func (h *NeighborhoodShopHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
@@ -131,6 +133,26 @@ func (h *NeighborhoodShopHandler) Delete(c *gin.Context) {
 	id, err := parseUintID(c.Param("id"))
 	if err != nil {
 		response.JSON(c, http.StatusBadRequest, "ID noto'g'ri", nil, nil)
+		return
+	}
+	row, err := h.service.GetByID(id)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	adminIDRaw, ok := c.Get("admin_id")
+	adminID, ok2 := adminIDRaw.(uint)
+	if !ok || !ok2 || adminID == 0 {
+		response.JSON(c, http.StatusUnauthorized, "Token yaroqsiz", nil, nil)
+		return
+	}
+	if err = h.archiveSvc.Archive("local-shop", id, adminID, gin.H{
+		"action":              "delete",
+		"deleted_at":          time.Now().UTC(),
+		"deleted_by_admin_id": adminID,
+		"snapshot":            row,
+	}); err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Arxivga yozishda xatolik", nil, err.Error())
 		return
 	}
 	if err = h.service.Delete(id); err != nil {

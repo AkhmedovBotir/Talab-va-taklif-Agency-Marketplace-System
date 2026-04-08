@@ -276,12 +276,14 @@ func (s *marketplaceOrderService) Create(userID uint, input CreateOrderInput) (*
 		lineTotal := p.Price * qty
 		total += lineTotal
 		items = append(items, domain.OrderItem{
-			ProductID:    p.ID,
-			ContragentID: p.ContragentID,
-			ProductName:  p.Name,
-			UnitPrice:    p.Price,
-			Quantity:     qty,
-			Unit:         p.Unit,
+			ProductID:         p.ID,
+			ContragentID:      p.ContragentID,
+			ProductName:       p.Name,
+			UnitPrice:         p.Price,
+			Quantity:          qty,
+			Unit:              p.Unit,
+			UnitOriginalPrice: p.OriginalPrice,
+			KpiBonusPercent:   p.KpiBonusPercent,
 		})
 		deductions = append(deductions, repository.StockDeduction{ProductID: pid, Quantity: qty})
 	}

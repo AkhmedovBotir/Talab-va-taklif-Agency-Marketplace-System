@@ -15,6 +15,7 @@ export const TAB_BAR_BOTTOM_CLEARANCE = 72;
 
 export function BottomTabBar({ stackRoute }: BottomTabBarProps) {
   const m = useMarketplace();
+  const totalCartCount = m.cartCount + m.localCartCount;
   const isProfile = stackRoute === 'profile';
   const isCart = stackRoute === 'cart';
   const isSearch = stackRoute === 'search';
@@ -133,10 +134,10 @@ export function BottomTabBar({ stackRoute }: BottomTabBarProps) {
         >
           <View className="relative">
             <ShoppingCart size={isCart ? 26 : 21} color={isCart ? '#f97316' : '#9ca3af'} />
-            {m.cartCount > 0 ? (
+            {totalCartCount > 0 ? (
               <View className="absolute -right-2 -top-1.5 min-w-[18px] items-center rounded-full bg-orange-500 px-1">
                 <Text className="text-[9px] font-black text-white">
-                  {m.cartCount > 99 ? '99+' : m.cartCount}
+                  {totalCartCount > 99 ? '99+' : totalCartCount}
                 </Text>
               </View>
             ) : null}

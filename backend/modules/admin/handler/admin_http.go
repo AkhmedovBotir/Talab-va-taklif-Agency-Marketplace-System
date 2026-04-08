@@ -191,7 +191,13 @@ func (h *AdminHandler) UpdateStatus(c *gin.Context) {
 
 func (h *AdminHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
+		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
+		if authHeader == "" {
+			// WebSocket klientlar ko'pincha custom header bera olmaydi.
+			if q := strings.TrimSpace(c.Query("token")); q != "" {
+				authHeader = "Bearer " + q
+			}
+		}
 		if authHeader == "" {
 			response.JSON(c, http.StatusUnauthorized, "Authorization header topilmadi", nil, nil)
 			c.Abort()

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, Image } from 'react-native';
-import { ShoppingCart, Minus, Plus } from 'lucide-react-native';
+import { ShoppingCart, Minus, Plus, Star } from 'lucide-react-native';
 import { Product } from '../types';
 import { cn } from '../lib/utils';
+import { api } from '../services/api';
 
 type ProductCardProps = {
   product: Product;
@@ -11,6 +12,7 @@ type ProductCardProps = {
   onCartDelta: (productId: string, delta: number) => void;
   /** Savatdagi soni; 0 bo'lsa faqat "Savatga" */
   inCartQty: number;
+  cartDisabled?: boolean;
   cardWidth: number;
   isSmallWeb: boolean;
 };
@@ -21,9 +23,29 @@ export function ProductCard({
   onAddToCart,
   onCartDelta,
   inCartQty,
+  cartDisabled = false,
   cardWidth,
   isSmallWeb,
 }: ProductCardProps) {
+  const [avgScore, setAvgScore] = useState(0);
+  const [totalRatings, setTotalRatings] = useState(0);
+  useEffect(() => {
+    const pid = Number(product.id);
+    if (!Number.isFinite(pid) || pid < 1) return;
+    let cancelled = false;
+    void api.productRatings.get(pid, { limit: 1 }).then((res) => {
+      if (cancelled) return;
+      setAvgScore(res.average_score || 0);
+      setTotalRatings(res.total_ratings || 0);
+    }).catch(() => {
+      if (cancelled) return;
+      setAvgScore(0);
+      setTotalRatings(0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [product.id]);
   const stock = Math.max(0, Math.floor(Number(product.quantity) || 0));
   const atMax = inCartQty >= stock;
   const outOfStock = stock <= 0;
@@ -55,12 +77,23 @@ export function ProductCard({
         <Text className="text-sm font-black text-orange-500">
           {product.price.toLocaleString()} <Text className="text-[9px] font-bold">so'm</Text>
         </Text>
+        <View className="mt-2 flex-row items-center gap-1">
+          <Star size={13} color="#f59e0b" fill="#f59e0b" />
+          <Text className="text-[11px] font-black text-slate-700">
+            {avgScore > 0 ? avgScore.toFixed(1) : '0.0'}
+          </Text>
+          <Text className="text-[10px] font-semibold text-slate-400">({totalRatings})</Text>
+        </View>
       </Pressable>
 
       <View className="mt-3">
         {outOfStock ? (
           <View className="items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 py-3">
             <Text className="text-[10px] font-black uppercase tracking-wider text-gray-400">Tugagan</Text>
+          </View>
+        ) : cartDisabled ? (
+          <View className="items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 py-3">
+            <Text className="text-[10px] font-black uppercase tracking-wider text-gray-400">Savat tez kunda</Text>
           </View>
         ) : inCartQty <= 0 ? (
           <Pressable

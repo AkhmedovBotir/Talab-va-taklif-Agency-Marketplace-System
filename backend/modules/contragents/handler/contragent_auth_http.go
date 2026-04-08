@@ -202,7 +202,12 @@ func (h *ContragentAuthHandler) UpdateLogo(c *gin.Context) {
 
 func (h *ContragentAuthHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
+		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
+		if authHeader == "" {
+			if q := strings.TrimSpace(c.Query("token")); q != "" {
+				authHeader = "Bearer " + q
+			}
+		}
 		if authHeader == "" {
 			response.JSON(c, http.StatusUnauthorized, "Authorization header topilmadi", nil, nil)
 			c.Abort()

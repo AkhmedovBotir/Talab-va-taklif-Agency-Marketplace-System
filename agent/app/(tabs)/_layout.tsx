@@ -4,11 +4,12 @@ import { Tabs } from 'expo-router';
 import React, { useMemo } from 'react';
 import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NotificationUnreadProvider, useNotificationUnread } from '../../contexts/NotificationUnreadContext';
 
-export default function TabsLayout() {
+function TabsLayoutInner() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const unreadCount = 0;
+  const { unreadCount } = useNotificationUnread();
   const isWeb = Platform.OS === 'web';
 
   const screenOptions = useMemo(() => {
@@ -98,9 +99,9 @@ export default function TabsLayout() {
         name="finance"
         options={{
           headerShown: false,
-          title: 'Moliya',
+          title: 'Analitika',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet" size={size} color={color} />
+            <Ionicons name="stats-chart" size={size} color={color} />
           ),
         }}
       />
@@ -137,6 +138,13 @@ export default function TabsLayout() {
   );
 }
 
+export default function TabsLayout() {
+  return (
+    <NotificationUnreadProvider>
+      <TabsLayoutInner />
+    </NotificationUnreadProvider>
+  );
+}
 
 const styles = StyleSheet.create({
   badge: {

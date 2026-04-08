@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import {
   User,
   Product,
+  LocalShopProduct,
+  LocalShopCartItem,
   Address,
   Region,
   District,
@@ -12,53 +14,34 @@ import {
   UnifiedSearchResponse,
   ContragentsListResponse,
   ContragentBrowseItem,
+  ContragentBanner,
+  ActivityType,
+  CommentTemplate,
+  PartnerRequest,
+  PartnerRequestPayload,
   CreateOrderPayload,
   MarketplaceOrder,
   MarketplaceOrderItemLine,
+  OrderRatingItemPayload,
+  ProductRatingsResponse,
   OrdersListResult,
+  MarketplaceNotification,
+  MarketplaceNotificationsListResult,
 } from '../types';
-import { normalizeMarketplaceProduct } from './normalizeProduct';
+import { normalizeLocalShopProduct, normalizeMarketplaceProduct } from './normalizeProduct';
+import {
+  PARTNER_PHONE_RE,
+  PARTNER_INN_RE,
+  PARTNER_MFO_RE,
+  PARTNER_ACCOUNT_RE,
+  normalizePartnerRequestPayload,
+  validatePartnerRequestPayload,
+} from '../lib/partnerRequestForm';
+import { MARKETPLACE_API_BASE } from '../config/marketplaceApi';
 
-// Mock Data
-export const MOCK_REGIONS: Region[] = [
-  { id: 1, name: 'Toshkent shahri' },
-  { id: 2, name: 'Toshkent viloyati' },
-  { id: 3, name: 'Samarqand viloyati' },
-  { id: 4, name: 'Farg\'ona viloyati' },
-  { id: 5, name: 'Andijon viloyati' },
-];
+export { buildMarketplaceNotificationsWsUrl } from '../config/marketplaceApi';
 
-export const MOCK_DISTRICTS: District[] = [
-  { id: 10, region_id: 1, name: 'Yunusobod tumani' },
-  { id: 11, region_id: 1, name: 'Chilonzor tumani' },
-  { id: 12, region_id: 1, name: 'Mirzo Ulug\'bek tumani' },
-  { id: 20, region_id: 2, name: 'Zangiota tumani' },
-  { id: 21, region_id: 2, name: 'Qibray tumani' },
-];
-
-export const MOCK_MFYS: MFY[] = [
-  { id: 100, district_id: 10, name: 'Minor MFY' },
-  { id: 101, district_id: 10, name: 'Bodomzor MFY' },
-  { id: 110, district_id: 11, name: 'Oqtepa MFY' },
-  { id: 111, district_id: 11, name: 'Qatortol MFY' },
-];
-
-// Mock Data - Categories / Subcategories
-export const MOCK_CATEGORIES: Category[] = [
-  { id: 1, name: 'Elektronika', status: 'active' },
-  { id: 2, name: 'Aksessuarlar', status: 'active' },
-];
-
-export const MOCK_SUBCATEGORIES: Subcategory[] = [
-  { id: 11, parent_id: 1, name: 'Telefonlar', status: 'active' },
-  { id: 12, parent_id: 1, name: 'Noutbuklar', status: 'active' },
-  { id: 21, parent_id: 2, name: 'Quloqchinlar', status: 'active' },
-];
-
-const API_BASE_CANDIDATES =
-  Platform.OS === 'web'
-    ? ['http://localhost:8081/api/v1', 'http://192.168.1.6:8081/api/v1', '/api/v1']
-    : ['http://192.168.1.6:8081/api/v1', 'http://10.0.2.2:8081/api/v1'];
+const API_BASE_CANDIDATES = [MARKETPLACE_API_BASE];
 
 /** Korzinka `product_id` uchun musbat butun son (aks holda `null`). */
 export function parsePositiveProductId(raw: string | number): number | null {
@@ -79,13 +62,23 @@ export function setAuthFailureHandler(handler: AuthFailureHandler | null) {
   authFailureHandler = handler;
 }
 
-async function getMarketplaceToken(): Promise<string | null> {
+/** UI tomonidan auth talab qilinganda (masalan, guest savatga bosganda) chaqiriladi. */
+export function requestAuthLogin() {
+  authFailureHandler?.();
+}
+
+export async function getMarketplaceToken(): Promise<string | null> {
   /** Brauzerda AsyncStorage ba'zan localStorage bilan sinxron bo‘lmasligi mumkin — token yo‘qolmasligi uchun avvalo localStorage. */
   if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
     const ls = localStorage.getItem('token');
     if (ls) return ls;
   }
   return AsyncStorage.getItem('token');
+}
+
+/** Guest rejimda auth endpointlarini chaqirmaslik uchun. */
+export async function hasMarketplaceSession(): Promise<boolean> {
+  return !!(await getMarketplaceToken());
 }
 
 async function clearMarketplaceToken() {
@@ -104,6 +97,8 @@ async function request<T>(path: string, method: HttpMethod = 'GET', body?: unkno
   if (auth) {
     const token = await getMarketplaceToken();
     if (!token) {
+      // Sessiya yo'q bo'lsa UI darhol login oynasiga o'tishi kerak.
+      authFailureHandler?.();
       throw new Error("Savat uchun kirish kerak. Iltimos, avval tizimga kiring yoki sahifani yangilang.");
     }
     headers.Authorization = `Bearer ${token}`;
@@ -226,6 +221,7 @@ type DeliveryAreaPayload = {
   is_default?: boolean;
 };
 
+
 /** `/marketplace/me/cart` javobi — qatorlar + mahsulot (`quantity` — qatordagi dona, `availableStock` — ombor) */
 export type MarketplaceCartItemRow = Omit<Product, 'quantity'> & {
   quantity: number;
@@ -246,6 +242,17 @@ export type MarketplaceCartLineApi = {
 
 export type MarketplaceCartDataApi = {
   items: MarketplaceCartLineApi[];
+  total_lines: number;
+};
+
+export type LocalShopCartLineApi = {
+  id: number;
+  quantity: number;
+  local_shop_product: Record<string, unknown>;
+};
+
+export type LocalShopCartDataApi = {
+  items: LocalShopCartLineApi[];
   total_lines: number;
 };
 
@@ -286,6 +293,54 @@ function parseMarketplaceCartResponse(raw: unknown): MarketplaceCartItemRow[] {
   return out;
 }
 
+function localShopCartPayloadToDataBlock(payload: unknown): LocalShopCartDataApi | null {
+  if (payload == null || typeof payload !== 'object') return null;
+  const first = unwrapData<any>(payload);
+  if (first && typeof first === 'object' && Array.isArray(first.items)) {
+    return first as LocalShopCartDataApi;
+  }
+  if (first?.data && typeof first.data === 'object' && Array.isArray(first.data.items)) {
+    return first.data as LocalShopCartDataApi;
+  }
+  if (Array.isArray(first)) {
+    return { items: first as LocalShopCartLineApi[], total_lines: first.length };
+  }
+  return null;
+}
+
+function parseLocalShopCartResponse(raw: unknown): LocalShopCartItem[] {
+  const block = localShopCartPayloadToDataBlock(raw);
+  const lines = block?.items ?? [];
+  const out: LocalShopCartItem[] = [];
+  for (const row of lines) {
+    const lineId = Number((row as any)?.id ?? (row as any)?.line_id ?? (row as any)?.cart_item_id);
+    if (!Number.isFinite(lineId) || lineId < 1) continue;
+    const productRaw =
+      (row as any)?.local_shop_product ??
+      (row as any)?.localShopProduct ??
+      (row as any)?.product ??
+      (row as any)?.item ??
+      row ??
+      {};
+    const product = normalizeLocalShopProduct(productRaw);
+    const lineQty = Number(row?.quantity ?? 1);
+    const stock = Number(
+      (productRaw as any)?.quantity ??
+      (row as any)?.local_shop_product?.quantity ??
+      (row as any)?.localShopProduct?.quantity ??
+      product.quantity ??
+      0
+    );
+    out.push({
+      ...product,
+      quantity: lineQty,
+      availableStock: stock,
+      cartLineId: lineId,
+    });
+  }
+  return out;
+}
+
 function normalizeAddress(payload: any): Address {
   return {
     id: payload?.id,
@@ -297,6 +352,38 @@ function normalizeAddress(payload: any): Address {
     is_default: !!payload?.is_default,
     created_at: payload?.created_at,
     updated_at: payload?.updated_at,
+  };
+}
+
+function normalizePartnerRequest(payload: any): PartnerRequest {
+  return {
+    id: Number(payload?.id ?? 0),
+    company_name: String(payload?.company_name ?? ''),
+    inn: String(payload?.inn ?? ''),
+    mfo: String(payload?.mfo ?? ''),
+    account_number: String(payload?.account_number ?? ''),
+    activity_type_id: Number(payload?.activity_type_id ?? 0),
+    activity_type_name: payload?.activity_type_name ? String(payload.activity_type_name) : undefined,
+    region_id: Number(payload?.region_id ?? 0),
+    district_id: Number(payload?.district_id ?? 0),
+    mfy_id: Number(payload?.mfy_id ?? 0),
+    phone: String(payload?.phone ?? ''),
+    status: payload?.status ? String(payload.status) : undefined,
+    created_at: payload?.created_at ? String(payload.created_at) : undefined,
+  };
+}
+
+function normalizeMarketplaceNotification(row: any): MarketplaceNotification {
+  return {
+    id: row?.id ?? '',
+    title: String(row?.title ?? ''),
+    message: String(row?.message ?? ''),
+    type: String(row?.type ?? 'info'),
+    target_type: String(row?.target_type ?? ''),
+    is_read: !!row?.is_read,
+    read_at: row?.read_at != null ? String(row.read_at) : null,
+    created_at: String(row?.created_at ?? ''),
+    updated_at: String(row?.updated_at ?? ''),
   };
 }
 
@@ -330,6 +417,7 @@ function normalizeOrderItemLine(row: any): MarketplaceOrderItemLine {
   const nameFromRow = String(row?.product_name ?? '').trim();
   const nameFromProduct = p && typeof p === 'object' ? String(p.name ?? '').trim() : '';
   return {
+    order_item_id: Number(row?.order_item_id ?? row?.id ?? 0) || undefined,
     product_id: Number(row?.product_id ?? p?.id ?? p?.product_id ?? 0),
     contragent_id: Number(row?.contragent_id ?? p?.contragent_id ?? 0),
     product_name: nameFromRow || nameFromProduct,
@@ -340,6 +428,43 @@ function normalizeOrderItemLine(row: any): MarketplaceOrderItemLine {
     line_total: Number(row?.line_total ?? 0),
     image_url: pickOrderLineImageUrl(row),
     product_code: Number.isFinite(codeNum) && codeNum > 0 ? codeNum : undefined,
+  };
+}
+
+function normalizeLocalShopOrderItemLine(row: any): MarketplaceOrderItemLine {
+  const template = row?.template ?? row?.local_shop_product?.template ?? row?.localShopProduct?.template ?? {};
+  const fromArray = (arr: unknown): string | undefined => {
+    if (!Array.isArray(arr) || arr.length === 0) return undefined;
+    const first = arr[0];
+    return first != null ? String(first) : undefined;
+  };
+  const imageUrl =
+    (row?.image_url != null ? String(row.image_url) : undefined) ??
+    (row?.image != null ? String(row.image) : undefined) ??
+    fromArray(row?.images) ??
+    (row?.local_shop_product?.image != null ? String(row.local_shop_product.image) : undefined) ??
+    fromArray(row?.local_shop_product?.images) ??
+    (template?.image != null ? String(template.image) : undefined) ??
+    fromArray(template?.images);
+  const safeName =
+    String(row?.product_name ?? '').trim() ||
+    String(template?.name ?? '').trim() ||
+    `Mahsulot #${row?.local_shop_product_id ?? row?.template_id ?? ''}`;
+
+  return {
+    order_item_id: Number(row?.order_item_id ?? row?.id ?? 0) || undefined,
+    product_id: Number(row?.template_id ?? template?.id ?? 0),
+    local_shop_product_id: Number(row?.local_shop_product_id ?? 0) || undefined,
+    template_id: Number(row?.template_id ?? template?.id ?? 0) || undefined,
+    contragent_id: Number(row?.local_shop_id ?? 0),
+    product_name: safeName,
+    unit_price: Number(row?.unit_price ?? 0),
+    quantity: Number(row?.quantity ?? 0),
+    unit: String(row?.unit ?? template?.unit ?? 'dona'),
+    unit_size: row?.unit_size != null ? String(row.unit_size) : template?.unit_size != null ? String(template.unit_size) : undefined,
+    line_total: Number(row?.line_total ?? 0),
+    image_url: imageUrl,
+    product_code: Number(row?.template_id ?? template?.id ?? 0) || undefined,
   };
 }
 
@@ -376,6 +501,37 @@ function normalizeMarketplaceOrder(raw: any): MarketplaceOrder {
     },
     roadmap,
     items: Array.isArray(row?.items) ? row.items.map(normalizeOrderItemLine) : [],
+    created_at: String(row?.created_at ?? ''),
+    updated_at: String(row?.updated_at ?? ''),
+  };
+}
+
+function normalizeLocalShopOrder(raw: any): MarketplaceOrder {
+  const row = raw && typeof raw === 'object' && 'id' in raw ? raw : unwrapData<any>(raw);
+  const addr = row?.address ?? {};
+  const statusStr = String(row?.status ?? 'pending');
+  const canCancel =
+    typeof row?.can_cancel === 'boolean' ? row.can_cancel : statusStr === 'pending';
+  return {
+    id: Number(row?.id),
+    market: 'mahalla',
+    local_shop_id: row?.local_shop_id != null ? Number(row.local_shop_id) : undefined,
+    status: statusStr,
+    can_cancel: canCancel,
+    total_amount: Number(row?.total_amount ?? 0),
+    extra_phone: row?.extra_phone ? String(row.extra_phone) : undefined,
+    address_note: row?.address_note ? String(row.address_note) : undefined,
+    address: {
+      type: String(addr?.type ?? 'default'),
+      delivery_area_id: addr?.delivery_area_id != null ? Number(addr.delivery_area_id) : undefined,
+      area_name: addr?.area_name != null ? String(addr.area_name) : undefined,
+      region_id: addr?.region_id != null ? Number(addr.region_id) : undefined,
+      district_id: addr?.district_id != null ? Number(addr.district_id) : undefined,
+      mfy_id: addr?.mfy_id != null ? Number(addr.mfy_id) : undefined,
+      custom_text: addr?.custom_text != null ? String(addr.custom_text) : undefined,
+    },
+    roadmap: undefined,
+    items: Array.isArray(row?.items) ? row.items.map(normalizeLocalShopOrderItemLine) : [],
     created_at: String(row?.created_at ?? ''),
     updated_at: String(row?.updated_at ?? ''),
   };
@@ -478,10 +634,9 @@ export const api = {
       try {
         const raw = await request<any>('/noauth/regions');
         const data = unwrapData<any>(raw);
-        const list = extractArray<Region>(data);
-        return list.length ? list : MOCK_REGIONS;
+        return extractArray<Region>(data);
       } catch {
-        return MOCK_REGIONS;
+        return [];
       }
     },
     getDistricts: async (regionId?: number) => {
@@ -489,11 +644,9 @@ export const api = {
         const query = regionId ? `?region_id=${regionId}` : '';
         const raw = await request<any>(`/noauth/districts${query}`);
         const data = unwrapData<any>(raw);
-        const list = extractArray<District>(data);
-        if (!list.length) return regionId ? MOCK_DISTRICTS.filter((d) => d.region_id === regionId) : MOCK_DISTRICTS;
-        return list;
+        return extractArray<District>(data);
       } catch {
-        return regionId ? MOCK_DISTRICTS.filter((d) => d.region_id === regionId) : MOCK_DISTRICTS;
+        return [];
       }
     },
     getMFYs: async (districtId?: number) => {
@@ -501,12 +654,74 @@ export const api = {
         const query = districtId ? `?district_id=${districtId}` : '';
         const raw = await request<any>(`/noauth/mfys${query}`);
         const data = unwrapData<any>(raw);
-        const list = extractArray<MFY>(data);
-        if (!list.length) return districtId ? MOCK_MFYS.filter((m) => m.district_id === districtId) : MOCK_MFYS;
-        return list;
+        return extractArray<MFY>(data);
       } catch {
-        return districtId ? MOCK_MFYS.filter((m) => m.district_id === districtId) : MOCK_MFYS;
+        return [];
       }
+    },
+  },
+
+  activityTypes: {
+    list: async (): Promise<ActivityType[]> => {
+      try {
+        const raw = await request<any>('/noauth/activity-types');
+        const data = unwrapData<any>(raw);
+        const list = extractArray<any>(data).map((row): ActivityType => ({
+          id: Number(row?.id ?? 0),
+          name: String(row?.name ?? ''),
+        }));
+        return list.filter((it) => it.id > 0 && it.name);
+      } catch {
+        return [];
+      }
+    },
+  },
+
+  commentTemplates: {
+    list: async (): Promise<CommentTemplate[]> => {
+      try {
+        const raw = await request<any>('/noauth/comment-templates');
+        const data = unwrapData<any>(raw);
+        return extractArray<any>(data)
+          .map((row): CommentTemplate => ({
+            id: Number(row?.id ?? 0),
+            comment: String(row?.comment ?? ''),
+            sort_order: Number(row?.sort_order ?? 0) || undefined,
+          }))
+          .filter((it) => it.id > 0 && it.comment);
+      } catch {
+        return [];
+      }
+    },
+  },
+
+  productRatings: {
+    get: async (productId: number, params?: { page?: number; limit?: number }): Promise<ProductRatingsResponse> => {
+      const page = params?.page ?? 1;
+      const limit = params?.limit ?? 10;
+      const raw = await request<any>(`/noauth/product-ratings?product_id=${productId}&page=${page}&limit=${limit}`);
+      const data = unwrapData<any>(raw) ?? {};
+      return {
+        product_id: Number(data?.product_id ?? productId),
+        average_score: Number(data?.average_score ?? 0),
+        total_ratings: Number(data?.total_ratings ?? 0),
+        score_breakdown: data?.score_breakdown && typeof data.score_breakdown === 'object' ? data.score_breakdown : {},
+        items: Array.isArray(data?.items)
+          ? data.items.map((row: any) => ({
+              id: Number(row?.id ?? 0),
+              order_id: Number(row?.order_id ?? 0),
+              order_item_id: Number(row?.order_item_id ?? 0),
+              score: Number(row?.score ?? 0),
+              comment_template_id: Number(row?.comment_template_id ?? 0) || undefined,
+              comment_template: row?.comment_template ? String(row.comment_template) : undefined,
+              note: row?.note ? String(row.note) : undefined,
+              created_at: row?.created_at ? String(row.created_at) : undefined,
+            }))
+          : [],
+        page: Number(data?.page ?? page),
+        limit: Number(data?.limit ?? limit),
+        total_pages: Number(data?.total_pages ?? 1),
+      };
     },
   },
 
@@ -584,9 +799,9 @@ export const api = {
           return listAll.length ? listAll : list;
         }
 
-        return list.length ? list : MOCK_CATEGORIES;
+        return list;
       } catch {
-        return MOCK_CATEGORIES.filter((c) => (c.status ?? 'inactive') === 'active');
+        return [];
       }
     },
     getOne: async (id: number) => {
@@ -598,7 +813,7 @@ export const api = {
       } catch {
         // ignore
       }
-      return MOCK_CATEGORIES.find((c) => c.id === id) || ({} as Category);
+      return {} as Category;
     },
   },
 
@@ -622,14 +837,9 @@ export const api = {
           return listAll.length ? listAll : list;
         }
 
-        return list.length
-          ? list
-          : parent
-            ? MOCK_SUBCATEGORIES.filter((s) => s.parent_id === parent && (s.status ?? 'inactive') === 'active')
-            : MOCK_SUBCATEGORIES;
+        return list;
       } catch {
-        const base = parent ? MOCK_SUBCATEGORIES.filter((s) => s.parent_id === parent) : MOCK_SUBCATEGORIES;
-        return base.filter((s) => (s.status ?? 'inactive') === 'active');
+        return [];
       }
     },
     getOne: async (id: number) => {
@@ -641,7 +851,7 @@ export const api = {
       } catch {
         // ignore
       }
-      return MOCK_SUBCATEGORIES.find((s) => s.id === id) || ({} as Subcategory);
+      return {} as Subcategory;
     },
   },
 
@@ -691,6 +901,39 @@ export const api = {
     },
   },
 
+  localShopProducts: {
+    list: async (params?: {
+      page?: number;
+      limit?: number;
+      q?: string;
+      district_id?: number;
+      mfy_id?: number;
+      local_shop_id?: number;
+    }): Promise<LocalShopProduct[]> => {
+      const page = params?.page ?? 1;
+      const limit = Math.min(100, Math.max(1, params?.limit ?? 24));
+      const qs = [
+        `page=${page}`,
+        `limit=${limit}`,
+        params?.q ? `q=${encodeURIComponent(params.q)}` : null,
+        params?.district_id != null ? `district_id=${params.district_id}` : null,
+        params?.mfy_id != null ? `mfy_id=${params.mfy_id}` : null,
+        params?.local_shop_id != null ? `local_shop_id=${params.local_shop_id}` : null,
+      ]
+        .filter(Boolean)
+        .join('&');
+
+      try {
+        const raw = await request<any>(`/noauth/local-shop-products?${qs}`);
+        const data = unwrapData<any>(raw);
+        const items = Array.isArray(data?.items) ? data.items : extractArray<any>(data);
+        return items.map(normalizeLocalShopProduct);
+      } catch {
+        return [];
+      }
+    },
+  },
+
   contragents: {
     list: async (params?: {
       page?: number;
@@ -730,6 +973,23 @@ export const api = {
         return { items: [], total: 0, page: 1, limit, total_pages: 0 };
       }
     },
+    banners: async (): Promise<ContragentBanner[]> => {
+      try {
+        const raw = await request<any>('/noauth/contragent-banners');
+        const data = unwrapData<any>(raw);
+        const items = extractArray<any>(data);
+        return items.map((row: any): ContragentBanner => ({
+          id: Number(row?.id ?? 0),
+          contragent_id: Number(row?.contragent_id ?? 0),
+          contragent_name: String(row?.contragent_name ?? ''),
+          contragent_logo: typeof row?.contragent_logo === 'string' ? row.contragent_logo : undefined,
+          start_at: String(row?.start_at ?? ''),
+          end_at: String(row?.end_at ?? ''),
+        }));
+      } catch {
+        return [];
+      }
+    },
   },
 
   /** Faqat marketplace JWT (`Authorization: Bearer`) bilan */
@@ -753,6 +1013,68 @@ export const api = {
     clear: async (): Promise<MarketplaceCartItemRow[]> => {
       const raw = await request<any>('/marketplace/me/cart', 'DELETE', undefined, true);
       return parseMarketplaceCartResponse(raw);
+    },
+  },
+
+  localShopCart: {
+    get: async (): Promise<LocalShopCartItem[]> => {
+      const raw = await request<any>('/marketplace/me/local-shop-cart', 'GET', undefined, true);
+      return parseLocalShopCartResponse(raw);
+    },
+    addItem: async (localShopProductId: number, quantity: number): Promise<LocalShopCartItem[]> => {
+      const raw = await request<any>(
+        '/marketplace/me/local-shop-cart/items',
+        'POST',
+        { local_shop_product_id: localShopProductId, quantity },
+        true
+      );
+      return parseLocalShopCartResponse(raw);
+    },
+    setLineQuantity: async (lineId: number | string, quantity: number): Promise<LocalShopCartItem[]> => {
+      const raw = await request<any>(`/marketplace/me/local-shop-cart/items/${lineId}`, 'PUT', { quantity }, true);
+      return parseLocalShopCartResponse(raw);
+    },
+    removeLine: async (lineId: number | string): Promise<LocalShopCartItem[]> => {
+      const raw = await request<any>(`/marketplace/me/local-shop-cart/items/${lineId}`, 'DELETE', undefined, true);
+      return parseLocalShopCartResponse(raw);
+    },
+    clear: async (): Promise<LocalShopCartItem[]> => {
+      const raw = await request<any>('/marketplace/me/local-shop-cart', 'DELETE', undefined, true);
+      return parseLocalShopCartResponse(raw);
+    },
+  },
+
+  localShopOrders: {
+    create: async (payload: {
+      local_shop_id: number;
+      address: { type: 'default' } | { type: 'delivery_area'; delivery_area_id: number } | { type: 'extra'; text: string };
+      extra_phone?: string;
+      address_note?: string;
+    }): Promise<MarketplaceOrder> => {
+      const raw = await request<any>('/marketplace/me/local-shop-orders', 'POST', payload, true);
+      return normalizeLocalShopOrder(unwrapData<any>(raw));
+    },
+    list: async (params?: { page?: number; limit?: number }): Promise<OrdersListResult> => {
+      const page = params?.page ?? 1;
+      const limit = Math.min(params?.limit ?? 10, 100);
+      const raw = await request<any>(`/marketplace/me/local-shop-orders?page=${page}&limit=${limit}`, 'GET', undefined, true);
+      const data = unwrapData<any>(raw);
+      const items = Array.isArray(data?.items) ? data.items.map(normalizeLocalShopOrder) : [];
+      return {
+        items,
+        total: Number(data?.total ?? items.length),
+        page: Number(data?.page ?? page),
+        limit: Number(data?.limit ?? limit),
+        total_pages: Number(data?.total_pages ?? 1),
+      };
+    },
+    get: async (id: string | number): Promise<MarketplaceOrder> => {
+      const raw = await request<any>(`/marketplace/me/local-shop-orders/${id}`, 'GET', undefined, true);
+      return normalizeLocalShopOrder(unwrapData<any>(raw));
+    },
+    cancel: async (id: string | number): Promise<MarketplaceOrder> => {
+      const raw = await request<any>(`/marketplace/me/local-shop-orders/${id}/cancel`, 'PATCH', undefined, true);
+      return normalizeLocalShopOrder(unwrapData<any>(raw));
     },
   },
 
@@ -782,6 +1104,67 @@ export const api = {
     cancel: async (id: string | number): Promise<MarketplaceOrder> => {
       const raw = await request<any>(`/marketplace/me/orders/${id}/cancel`, 'PATCH', undefined, true);
       return normalizeMarketplaceOrder(unwrapData<any>(raw));
+    },
+    rate: async (id: string | number, items: OrderRatingItemPayload[]): Promise<boolean> => {
+      await request<any>(`/marketplace/me/orders/${id}/ratings`, 'POST', { items }, true);
+      return true;
+    },
+  },
+
+  notifications: {
+    list: async (params?: { page?: number; limit?: number }): Promise<MarketplaceNotificationsListResult> => {
+      const page = params?.page ?? 1;
+      const limit = Math.min(params?.limit ?? 10, 100);
+      const raw = await request<any>(`/marketplace/me/notifications?page=${page}&limit=${limit}`, 'GET', undefined, true);
+      const data = unwrapData<any>(raw);
+      const items = Array.isArray(data?.items) ? data.items.map(normalizeMarketplaceNotification) : [];
+      return {
+        items,
+        total: Number(data?.total ?? items.length),
+        unread_count: Number(data?.unread_count ?? 0),
+        page: Number(data?.page ?? page),
+        limit: Number(data?.limit ?? limit),
+        total_pages: Number(data?.total_pages ?? 1),
+      };
+    },
+    unreadCount: async (): Promise<number> => {
+      const raw = await request<any>('/marketplace/me/notifications/unread-count', 'GET', undefined, true);
+      const data = unwrapData<any>(raw);
+      return Number(data?.unread_count ?? 0);
+    },
+    markRead: async (id: string | number): Promise<void> => {
+      await request<any>(`/marketplace/me/notifications/${id}/read`, 'PATCH', undefined, true);
+    },
+    markAllRead: async (): Promise<void> => {
+      await request<any>('/marketplace/me/notifications/read-all', 'PATCH', undefined, true);
+    },
+  },
+
+  partnerRequests: {
+    list: async (params?: { page?: number; limit?: number }): Promise<PartnerRequest[]> => {
+      try {
+        const page = params?.page ?? 1;
+        const limit = Math.min(100, Math.max(1, params?.limit ?? 10));
+        const raw = await request<any>(
+          `/marketplace/me/partner-requests?page=${page}&limit=${limit}`,
+          'GET',
+          undefined,
+          true
+        );
+        const data = unwrapData<any>(raw);
+        const items = Array.isArray(data?.items) ? data.items : extractArray<any>(data);
+        return items.map(normalizePartnerRequest);
+      } catch {
+        return [];
+      }
+    },
+    create: async (payload: PartnerRequestPayload): Promise<PartnerRequest> => {
+      const normalized = normalizePartnerRequestPayload(payload);
+      const validationError = validatePartnerRequestPayload(normalized);
+      if (validationError) throw new Error(validationError);
+      const raw = await request<any>('/marketplace/me/partner-requests', 'POST', normalized, true);
+      const data = unwrapData<any>(raw);
+      return normalizePartnerRequest(data);
     },
   },
 

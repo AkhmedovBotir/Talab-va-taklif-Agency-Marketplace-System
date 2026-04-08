@@ -15,6 +15,7 @@ function formatOrderDate(iso: string): string {
 
 export function OrdersPage() {
   const navigate = useNavigate();
+  const [tab, setTab] = useState<'bozor' | 'mahalla'>('bozor');
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -26,7 +27,10 @@ export function OrdersPage() {
     if (append) setLoadingMore(true);
     else setLoading(true);
     try {
-      const res = await api.orders.list({ page: p, limit: 15 });
+      const res =
+        tab === 'bozor'
+          ? await api.orders.list({ page: p, limit: 15 })
+          : await api.localShopOrders.list({ page: p, limit: 15 });
       setTotalPages(Math.max(1, res.total_pages));
       setTotal(res.total);
       setPage(res.page);
@@ -37,7 +41,7 @@ export function OrdersPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
     void load(1, false);
@@ -61,6 +65,24 @@ export function OrdersPage() {
             </p>
           </div>
         </div>
+        <div className="mb-4">
+          <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setTab('bozor')}
+              className={cn('rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider', tab === 'bozor' ? 'bg-white text-slate-900' : 'text-slate-500')}
+            >
+              Bozor
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('mahalla')}
+              className={cn('rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider', tab === 'mahalla' ? 'bg-white text-slate-900' : 'text-slate-500')}
+            >
+              Maxalla
+            </button>
+          </div>
+        </div>
 
         {loading && orders.length === 0 ? (
           <div className="flex justify-center py-16">
@@ -80,7 +102,7 @@ export function OrdersPage() {
               <button
                 key={o.id}
                 type="button"
-                onClick={() => navigate(`/orders/${o.id}`)}
+                onClick={() => navigate(`/orders/${o.id}?market=${tab}`)}
                 className="flex w-full min-w-0 items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-orange-200 md:p-5"
               >
                 <div className="min-w-0 flex-1">

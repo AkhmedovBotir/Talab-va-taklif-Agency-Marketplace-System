@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import React, { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Modal,
   Platform,
   RefreshControl,
@@ -13,65 +15,107 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
 import { DatePickerWeb } from '../../components/DatePickerWeb';
-import { apiService, StatisticsData } from '../../services/api';
+import { PageWidthLayout } from '../../components/PageWidthLayout';
+import { useResponsive } from '../../hooks/useResponsive';
+import {
+  apiService,
+  ContragentAnalyticsSalesOrderItem,
+  ContragentAnalyticsStats,
+} from '../../services/api';
 import { formatNumberDisplay } from '../../utils/formatNumber';
-import PaymentsScreen from './statistika/payments';
-import FinanceScreen from './statistika/finance';
+import { getStatusUz } from '../../utils/statusUz';
 
-type TabType = 'statistics' | 'payments' | 'finance';
+type TabType = 'overview' | 'orders' | 'finance';
 
 export default function StatistikaScreen() {
-  const [activeTab, setActiveTab] = useState<TabType>('statistics');
   const insets = useSafeAreaInsets();
+  const { isWideWeb, isDesktopWeb } = useResponsive();
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [stats, setStats] = useState<ContragentAnalyticsStats | null>(null);
+  const [orders, setOrders] = useState<ContragentAnalyticsSalesOrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [statistics, setStatistics] = useState<StatisticsData | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Date filter states
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<ContragentAnalyticsSalesOrderItem | null>(null);
 
-  const formatDateForApi = (date: Date): string => {
-    return date.toISOString().split('T')[0];
+  const formatDateForApi = (d: Date): string => d.toISOString().split('T')[0];
+  const formatDateDisplay = (d: Date | null): string =>
+    d
+      ? d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : 'Tanlang';
+  const money = (n: number): string => `${formatNumberDisplay(n)} so'm`;
+  const formatDateTime = (s?: string): string => {
+    if (!s) return '—';
+    const t = new Date(s).getTime();
+    if (!Number.isFinite(t)) return '—';
+    return new Date(t).toLocaleString('uz-UZ', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
-  const formatDateDisplay = (date: Date | null): string => {
-    if (!date) return 'Tanlang';
-    return date.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
+  const dateParams = useMemo(() => {
+    const p: { from?: string; to?: string } = {};
+    if (startDate && endDate) {
+      p.from = formatDateForApi(startDate);
+      p.to = formatDateForApi(endDate);
+    }
+    return p;
+  }, [startDate, endDate]);
 
-  const fetchStatistics = async (isRefresh = false) => {
+  const loadAll = useCallback(async (refresh = false) => {
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      if (refresh) setRefreshing(true);
+      else setLoading(true);
       setError(null);
-
-      const params: { startDate?: string; endDate?: string } = {};
-      if (startDate) params.startDate = formatDateForApi(startDate);
-      if (endDate) params.endDate = formatDateForApi(endDate);
-
-      const response = await apiService.getStatistics(params);
-      setStatistics(response.data);
-    } catch (err: any) {
-      setError(err.message || 'Statistikani yuklashda xatolik');
+      const [statsRes, ordersRes] = await Promise.all([
+        apiService.getAnalyticsStats(dateParams),
+        apiService.getAnalyticsSalesOrders({ ...dateParams, page: 1, limit: 20 }),
+      ]);
+      setStats(statsRes);
+      setOrders(ordersRes.items);
+      setPage(1);
+      setHasMore(ordersRes.page < ordersRes.totalPages);
+    } catch (e: any) {
+      setError(e.message || 'Statistikani yuklashda xatolik');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [dateParams]);
+
+  const loadMoreOrders = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    try {
+      setLoadingMore(true);
+      const next = page + 1;
+      const res = await apiService.getAnalyticsSalesOrders({ ...dateParams, page: next, limit: 20 });
+      setOrders((prev) => [...prev, ...res.items]);
+      setPage(next);
+      setHasMore(res.page < res.totalPages);
+    } catch {
+      // footer loading xatosini sokin o'tkazamiz
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, page, dateParams]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchStatistics();
-    }, [startDate, endDate])
+      loadAll();
+    }, [loadAll])
   );
 
   const clearFilters = () => {
@@ -79,121 +123,206 @@ export default function StatistikaScreen() {
     setEndDate(null);
   };
 
-  const formatNumber = (num: number): string => {
-    return formatNumberDisplay(num);
-  };
+  const renderOrderRow = ({ item }: { item: ContragentAnalyticsSalesOrderItem }) => (
+    <TouchableOpacity
+      style={[styles.orderRow, isWideWeb && styles.orderRowWide]}
+      activeOpacity={0.75}
+      onPress={() => setSelectedOrder(item)}
+    >
+      <View style={styles.orderRowTop}>
+        <Text style={styles.orderId}>Buyurtma #{item.orderId}</Text>
+        <View style={styles.orderStatusBadge}>
+          <Text style={styles.orderStatusText}>{getStatusUz(item.orderStatus)}</Text>
+        </View>
+      </View>
+      <Text style={styles.orderMeta}>
+        Qatorlar: {item.linesCount} • {formatDateTime(item.orderUpdatedAt)}
+      </Text>
+      <View style={styles.orderMoneyRow}>
+        <Text style={styles.orderMoneyLabel}>Savdo:</Text>
+        <Text style={styles.orderMoneyValue}>{money(item.grossSalesTotal)}</Text>
+      </View>
+      <View style={styles.orderMoneyRow}>
+        <Text style={styles.orderMoneyLabel}>Tannarx:</Text>
+        <Text style={styles.orderMoneyValue}>{money(item.costTotal)}</Text>
+      </View>
+      <View style={[styles.orderMoneyRow, styles.orderMoneyRowLast]}>
+        <Text style={styles.orderMoneyLabelStrong}>To'lov:</Text>
+        <Text style={styles.orderMoneyValueStrong}>{money(item.payoutTotal)}</Text>
+      </View>
+      <View style={styles.orderTapHint}>
+        <Ionicons name="information-circle-outline" size={14} color="#8E8E93" />
+        <Text style={styles.orderTapHintText}>Batafsil ko'rish</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
-  const formatCurrency = (num: number): string => {
-    return formatNumberDisplay(num) + ' so\'m';
-  };
+  const Header = (
+    <>
+      <View style={styles.headerBar}>
+        <PageWidthLayout flex={false} style={styles.headerInner}>
+          <Text style={styles.headerTitle}>Statistika</Text>
+        </PageWidthLayout>
+      </View>
+      <View style={styles.tabsContainer}>
+        <PageWidthLayout flex={false} style={styles.tabsInner}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
+            onPress={() => setActiveTab('overview')}
+          >
+            <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>Umumiy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'orders' && styles.tabActive]}
+            onPress={() => setActiveTab('orders')}
+          >
+            <Text style={[styles.tabText, activeTab === 'orders' && styles.tabTextActive]}>Buyurtmalar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'finance' && styles.tabActive]}
+            onPress={() => setActiveTab('finance')}
+          >
+            <Text style={[styles.tabText, activeTab === 'finance' && styles.tabTextActive]}>Moliyaviy</Text>
+          </TouchableOpacity>
+        </PageWidthLayout>
+      </View>
+      <View style={styles.filterContainer}>
+        <PageWidthLayout flex={false}>
+          <View style={[styles.filterRow, isWideWeb && styles.filterRowWide]}>
+            <TouchableOpacity style={styles.dateButton} onPress={() => setShowStartPicker(true)}>
+              <Ionicons name="calendar-outline" size={18} color="#007AFF" />
+              <Text style={styles.dateButtonText}>{startDate ? formatDateDisplay(startDate) : 'Boshlanish'}</Text>
+            </TouchableOpacity>
+            <Text style={styles.dateSeparator}>—</Text>
+            <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndPicker(true)}>
+              <Ionicons name="calendar-outline" size={18} color="#007AFF" />
+              <Text style={styles.dateButtonText}>{endDate ? formatDateDisplay(endDate) : 'Tugash'}</Text>
+            </TouchableOpacity>
+            {(startDate || endDate) && (
+              <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
+                <Ionicons name="close-circle" size={22} color="#FF3B30" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </PageWidthLayout>
+      </View>
+    </>
+  );
 
-  const getMonthName = (month: number): string => {
-    const months = [
-      'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
-      'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'
-    ];
-    return months[month - 1] || '';
-  };
-
-  if (loading) {
+  if (loading && !refreshing) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Yuklanmoqda...</Text>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        {Header}
+        <PageWidthLayout style={styles.centered}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Yuklanmoqda...</Text>
+        </PageWidthLayout>
       </View>
     );
   }
 
-  if (error) {
+  if (error && !stats) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Ionicons name="alert-circle-outline" size={64} color="#FF3B30" />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => fetchStatistics()}>
-          <Text style={styles.retryButtonText}>Qayta urinish</Text>
-        </TouchableOpacity>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        {Header}
+        <PageWidthLayout style={styles.centered}>
+          <Ionicons name="alert-circle-outline" size={64} color="#FF3B30" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => loadAll()}>
+            <Text style={styles.retryButtonText}>Qayta urinish</Text>
+          </TouchableOpacity>
+        </PageWidthLayout>
       </View>
     );
   }
-
-  const summary = statistics?.summary;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Statistika</Text>
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'statistics' && styles.tabActive]}
-          onPress={() => setActiveTab('statistics')}
-        >
-          <Text style={[styles.tabText, activeTab === 'statistics' && styles.tabTextActive]}>
-            Statistika
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'payments' && styles.tabActive]}
-          onPress={() => setActiveTab('payments')}
-        >
-          <Text style={[styles.tabText, activeTab === 'payments' && styles.tabTextActive]}>
-            To'lovlarim
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'finance' && styles.tabActive]}
-          onPress={() => setActiveTab('finance')}
-        >
-          <Text style={[styles.tabText, activeTab === 'finance' && styles.tabTextActive]}>
-            Moliya
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeTab === 'payments' ? (
-        <PaymentsScreen />
-      ) : activeTab === 'finance' ? (
-        <FinanceScreen />
-      ) : (
-        <>
-          {/* Date Filter */}
-          <View style={styles.filterContainer}>
-        <View style={styles.filterRow}>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowStartPicker(true)}
+      {Header}
+      <PageWidthLayout style={styles.contentFlex}>
+        {activeTab === 'orders' ? (
+          <FlatList
+            data={orders}
+            keyExtractor={(item) => `analytics-order-${item.orderId}-${item.orderUpdatedAt}`}
+            renderItem={renderOrderRow}
+            contentContainerStyle={styles.listContent}
+            numColumns={isDesktopWeb ? 2 : 1}
+            key={`orders-${isDesktopWeb ? '2' : '1'}`}
+            columnWrapperStyle={isDesktopWeb ? styles.orderColumns : undefined}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true)} />}
+            onEndReached={loadMoreOrders}
+            onEndReachedThreshold={0.4}
+            ListEmptyComponent={
+              <View style={styles.emptyBox}>
+                <Ionicons name="receipt-outline" size={56} color="#ccc" />
+                <Text style={styles.emptyText}>Buyurtmalar topilmadi</Text>
+              </View>
+            }
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.footerLoader}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                </View>
+              ) : null
+            }
+          />
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.listContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAll(true)} />}
           >
-            <Ionicons name="calendar-outline" size={18} color="#007AFF" />
-            <Text style={styles.dateButtonText}>
-              {startDate ? formatDateDisplay(startDate) : 'Boshlanish'}
-            </Text>
-          </TouchableOpacity>
+            {activeTab === 'overview' ? (
+              <>
+                <View style={styles.grid}>
+                  <View style={[styles.metricCard, styles.metricBlue]}>
+                    <Text style={styles.metricValue}>{formatNumberDisplay(stats?.ordersCount || 0)}</Text>
+                    <Text style={styles.metricLabel}>Buyurtmalar soni</Text>
+                  </View>
+                  <View style={[styles.metricCard, styles.metricGreen]}>
+                    <Text style={styles.metricValue}>{formatNumberDisplay(stats?.linesCount || 0)}</Text>
+                    <Text style={styles.metricLabel}>Qatorlar soni</Text>
+                  </View>
+                </View>
+                <View style={styles.mainCard}>
+                  <Text style={styles.mainTitle}>Savdo va marja</Text>
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Umumiy savdo</Text>
+                    <Text style={styles.rowValue}>{money(stats?.grossSalesTotal || 0)}</Text>
+                  </View>
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Tannarx</Text>
+                    <Text style={styles.rowValue}>{money(stats?.costTotal || 0)}</Text>
+                  </View>
+                  <View style={[styles.row, styles.rowLast]}>
+                    <Text style={styles.rowLabelStrong}>Marja</Text>
+                    <Text style={styles.rowValueStrong}>{money(stats?.marginTotal || 0)}</Text>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <View style={styles.mainCard}>
+                <Text style={styles.mainTitle}>Moliyaviy ko'rsatkichlar</Text>
+                <View style={styles.row}>
+                  <Text style={styles.rowLabel}>KPI fondi</Text>
+                  <Text style={styles.rowValue}>{money(stats?.kpiPoolTotal || 0)}</Text>
+                </View>
+                <View style={[styles.row, styles.rowLast]}>
+                  <Text style={styles.rowLabelStrong}>To'lov (payout)</Text>
+                  <Text style={styles.rowValueStrong}>{money(stats?.payoutTotal || 0)}</Text>
+                </View>
+                <View style={styles.periodBox}>
+                  <Text style={styles.periodText}>
+                    Davr: {stats?.fromUtc || '—'} → {stats?.toUtc || '—'}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        )}
+      </PageWidthLayout>
 
-          <Text style={styles.dateSeparator}>—</Text>
-
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowEndPicker(true)}
-          >
-            <Ionicons name="calendar-outline" size={18} color="#007AFF" />
-            <Text style={styles.dateButtonText}>
-              {endDate ? formatDateDisplay(endDate) : 'Tugash'}
-            </Text>
-          </TouchableOpacity>
-
-          {(startDate || endDate) && (
-            <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
-              <Ionicons name="close-circle" size={24} color="#FF3B30" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Date Pickers */}
-      {showStartPicker && (
-        Platform.OS === 'web' ? (
+      {showStartPicker &&
+        (Platform.OS === 'web' ? (
           <DatePickerWeb
             visible
             value={startDate || new Date()}
@@ -202,6 +331,7 @@ export default function StatistikaScreen() {
             onConfirm={(date) => {
               setStartDate(date);
               setShowStartPicker(false);
+              if (endDate && date > endDate) setEndDate(date);
             }}
             onClose={() => setShowStartPicker(false)}
           />
@@ -219,7 +349,12 @@ export default function StatistikaScreen() {
                   value={startDate || new Date()}
                   mode="date"
                   display="spinner"
-                  onChange={(_, date) => date && setStartDate(date)}
+                  onChange={(_, date) => {
+                    if (date) {
+                      setStartDate(date);
+                      if (endDate && date > endDate) setEndDate(date);
+                    }
+                  }}
                   maximumDate={endDate || new Date()}
                 />
               </View>
@@ -232,15 +367,17 @@ export default function StatistikaScreen() {
             display="default"
             onChange={(_, date) => {
               setShowStartPicker(false);
-              if (date) setStartDate(date);
+              if (date) {
+                setStartDate(date);
+                if (endDate && date > endDate) setEndDate(date);
+              }
             }}
             maximumDate={endDate || new Date()}
           />
-        )
-      )}
+        ))}
 
-      {showEndPicker && (
-        Platform.OS === 'web' ? (
+      {showEndPicker &&
+        (Platform.OS === 'web' ? (
           <DatePickerWeb
             visible
             value={endDate || new Date()}
@@ -250,6 +387,7 @@ export default function StatistikaScreen() {
             onConfirm={(date) => {
               setEndDate(date);
               setShowEndPicker(false);
+              if (startDate && date < startDate) setStartDate(date);
             }}
             onClose={() => setShowEndPicker(false)}
           />
@@ -267,7 +405,12 @@ export default function StatistikaScreen() {
                   value={endDate || new Date()}
                   mode="date"
                   display="spinner"
-                  onChange={(_, date) => date && setEndDate(date)}
+                  onChange={(_, date) => {
+                    if (date) {
+                      setEndDate(date);
+                      if (startDate && date < startDate) setStartDate(date);
+                    }
+                  }}
                   minimumDate={startDate || undefined}
                   maximumDate={new Date()}
                 />
@@ -281,293 +424,106 @@ export default function StatistikaScreen() {
             display="default"
             onChange={(_, date) => {
               setShowEndPicker(false);
-              if (date) setEndDate(date);
+              if (date) {
+                setEndDate(date);
+                if (startDate && date < startDate) setStartDate(date);
+              }
             }}
             minimumDate={startDate || undefined}
             maximumDate={new Date()}
           />
-        )
-      )}
+        ))}
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => fetchStatistics(true)} />
-        }
+      {/* Buyurtma detail modal */}
+      <Modal
+        visible={selectedOrder != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedOrder(null)}
       >
-        {/* Summary Cards */}
-        <View style={styles.summaryGrid}>
-          <View style={[styles.summaryCard, styles.cardBlue]}>
-            <Ionicons name="cart-outline" size={28} color="#007AFF" />
-            <Text style={styles.cardValue}>{formatNumber(summary?.totalOrders || 0)}</Text>
-            <Text style={styles.cardLabel}>Jami buyurtmalar</Text>
-          </View>
-
-          <View style={[styles.summaryCard, styles.cardGreen]}>
-            <Ionicons name="checkmark-circle-outline" size={28} color="#34C759" />
-            <Text style={styles.cardValue}>{formatNumber(summary?.acceptedOrders || 0)}</Text>
-            <Text style={styles.cardLabel}>Qabul qilingan</Text>
-          </View>
-
-          <View style={[styles.summaryCard, styles.cardOrange]}>
-            <Ionicons name="time-outline" size={28} color="#FF9500" />
-            <Text style={styles.cardValue}>{formatNumber(summary?.pendingOrders || 0)}</Text>
-            <Text style={styles.cardLabel}>Kutilayotgan</Text>
-          </View>
-
-          <View style={[styles.summaryCard, styles.cardRed]}>
-            <Ionicons name="close-circle-outline" size={28} color="#FF3B30" />
-            <Text style={styles.cardValue}>{formatNumber(summary?.rejectedOrders || 0)}</Text>
-            <Text style={styles.cardLabel}>Rad etilgan</Text>
-          </View>
-        </View>
-
-        {/* Revenue Card */}
-        <View style={styles.revenueCard}>
-          <View style={styles.revenueHeader}>
-            <Ionicons name="wallet-outline" size={24} color="#007AFF" />
-            <Text style={styles.revenueTitle}>Jami daromad</Text>
-          </View>
-          <Text style={styles.revenueValue}>{formatCurrency(summary?.totalRevenue || 0)}</Text>
-          <View style={styles.revenueStats}>
-            <View style={styles.revenueStat}>
-              <Text style={styles.revenueStatValue}>{formatNumber(summary?.totalItems || 0)}</Text>
-              <Text style={styles.revenueStatLabel}>Jami mahsulotlar</Text>
+        <View style={styles.orderDetailOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSelectedOrder(null)} />
+          <View style={styles.orderDetailSheet}>
+            <View style={styles.orderDetailHeader}>
+              <Text style={styles.orderDetailTitle}>
+                Buyurtma #{selectedOrder?.orderId ?? '—'}
+              </Text>
+              <TouchableOpacity onPress={() => setSelectedOrder(null)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
             </View>
-            <View style={styles.revenueDivider} />
-            <View style={styles.revenueStat}>
-              <Text style={styles.revenueStatValue}>{formatNumber(summary?.deliveredOrders || 0)}</Text>
-              <Text style={styles.revenueStatLabel}>Yetkazilgan</Text>
-            </View>
-            <View style={styles.revenueDivider} />
-            <View style={styles.revenueStat}>
-              <Text style={styles.revenueStatValue}>{summary?.acceptanceRate || '0'}%</Text>
-              <Text style={styles.revenueStatLabel}>Qabul foizi</Text>
-            </View>
-          </View>
-        </View>
 
-        {/* Monthly Statistics */}
-        {statistics?.monthly && statistics.monthly.length > 0 && (
-          <View style={styles.monthlySection}>
-            <Text style={styles.sectionTitle}>Oylik statistika</Text>
-            {statistics.monthly.map((item, index) => (
-              <View key={index} style={styles.monthlyCard}>
-                <View style={styles.monthlyLeft}>
-                  <Text style={styles.monthlyMonth}>{getMonthName(item.month)} {item.year}</Text>
-                  <Text style={styles.monthlyOrders}>{formatNumber(item.orders)} buyurtma</Text>
-                </View>
-                <Text style={styles.monthlyRevenue}>{formatCurrency(item.revenue)}</Text>
+            <View style={styles.orderDetailStatusWrap}>
+              <View style={styles.orderStatusBadge}>
+                <Text style={styles.orderStatusText}>
+                  {getStatusUz(selectedOrder?.orderStatus)}
+                </Text>
               </View>
-            ))}
+              <Text style={styles.orderDetailDate}>
+                {formatDateTime(selectedOrder?.orderUpdatedAt)}
+              </Text>
+            </View>
+
+            <View style={styles.orderDetailRows}>
+              <View style={styles.orderDetailRow}>
+                <Text style={styles.orderDetailLabel}>Qatorlar soni</Text>
+                <Text style={styles.orderDetailValue}>{selectedOrder?.linesCount ?? 0}</Text>
+              </View>
+              <View style={styles.orderDetailRow}>
+                <Text style={styles.orderDetailLabel}>Umumiy savdo</Text>
+                <Text style={styles.orderDetailValue}>{money(selectedOrder?.grossSalesTotal ?? 0)}</Text>
+              </View>
+              <View style={styles.orderDetailRow}>
+                <Text style={styles.orderDetailLabel}>Tannarx</Text>
+                <Text style={styles.orderDetailValue}>{money(selectedOrder?.costTotal ?? 0)}</Text>
+              </View>
+              <View style={[styles.orderDetailRow, styles.orderDetailRowLast]}>
+                <Text style={styles.orderDetailLabelStrong}>To'lov (payout)</Text>
+                <Text style={styles.orderDetailValueStrong}>{money(selectedOrder?.payoutTotal ?? 0)}</Text>
+              </View>
+            </View>
           </View>
-        )}
-      </ScrollView>
-        </>
-      )}
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f7fa',
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
+  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  contentFlex: { flex: 1, paddingHorizontal: 0 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  headerBar: {
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+  headerInner: { paddingVertical: 14 },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: '#1a1a1a' },
+  tabsContainer: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  scrollView: {
+  tabsInner: { flexDirection: 'row' },
+  tab: {
     flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#FF3B30',
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  summaryCard: {
-    width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardBlue: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-  },
-  cardGreen: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#34C759',
-  },
-  cardOrange: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9500',
-  },
-  cardRed: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF3B30',
-  },
-  cardValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginTop: 8,
-  },
-  cardLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  revenueCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  revenueHeader: {
-    flexDirection: 'row',
+    paddingVertical: 14,
     alignItems: 'center',
-    gap: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  revenueTitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-  revenueValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  revenueStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    paddingTop: 16,
-  },
-  revenueStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  revenueDivider: {
-    width: 1,
-    backgroundColor: '#f0f0f0',
-  },
-  revenueStatValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  revenueStatLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  monthlySection: {
-    marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
-  monthlyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  monthlyLeft: {},
-  monthlyMonth: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  monthlyOrders: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  monthlyRevenue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#34C759',
-  },
+  tabActive: { borderBottomColor: '#007AFF' },
+  tabText: { fontSize: 15, color: '#666', fontWeight: '500' },
+  tabTextActive: { color: '#007AFF', fontWeight: '700' },
   filterContainer: {
     backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    paddingVertical: 10,
   },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterRowWide: { maxWidth: 680 },
   dateButton: {
     flex: 1,
     flexDirection: 'row',
@@ -580,17 +536,104 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  dateButtonText: {
-    fontSize: 14,
-    color: '#333',
+  dateButtonText: { fontSize: 14, color: '#333' },
+  dateSeparator: { fontSize: 16, color: '#999' },
+  clearButton: { padding: 4 },
+  listContent: { paddingVertical: 16, paddingHorizontal: 16, paddingBottom: 28 },
+  grid: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    borderLeftWidth: 4,
   },
-  dateSeparator: {
-    fontSize: 16,
-    color: '#999',
+  metricBlue: { borderLeftColor: '#007AFF' },
+  metricGreen: { borderLeftColor: '#34C759' },
+  metricValue: { fontSize: 24, fontWeight: '700', color: '#1a1a1a' },
+  metricLabel: { fontSize: 13, color: '#666', marginTop: 4 },
+  mainCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
   },
-  clearButton: {
-    padding: 4,
+  mainTitle: { fontSize: 17, fontWeight: '700', color: '#1a1a1a', marginBottom: 10 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
+  rowLast: { borderBottomWidth: 0 },
+  rowLabel: { fontSize: 14, color: '#666' },
+  rowValue: { fontSize: 14, color: '#333', fontWeight: '500' },
+  rowLabelStrong: { fontSize: 15, color: '#333', fontWeight: '700' },
+  rowValueStrong: { fontSize: 16, color: '#007AFF', fontWeight: '800' },
+  periodBox: {
+    marginTop: 10,
+    backgroundColor: '#F2F8FF',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  periodText: { fontSize: 13, color: '#3c4a5f' },
+  orderRow: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+  },
+  orderRowWide: {
+    flex: 1,
+  },
+  orderColumns: {
+    gap: 10,
+  },
+  orderRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  orderId: { fontSize: 15, fontWeight: '700', color: '#1C1C1E' },
+  orderStatusBadge: {
+    backgroundColor: '#EEF5FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  orderStatusText: { fontSize: 12, color: '#007AFF', fontWeight: '700' },
+  orderMeta: { fontSize: 12, color: '#666', marginTop: 6, marginBottom: 8 },
+  orderMoneyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  orderMoneyRowLast: { marginTop: 2, borderTopWidth: 1, borderTopColor: '#f1f1f1', paddingTop: 8 },
+  orderMoneyLabel: { fontSize: 13, color: '#666' },
+  orderMoneyValue: { fontSize: 13, color: '#333', fontWeight: '500' },
+  orderMoneyLabelStrong: { fontSize: 14, color: '#333', fontWeight: '700' },
+  orderMoneyValueStrong: { fontSize: 15, color: '#007AFF', fontWeight: '800' },
+  orderTapHint: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  orderTapHintText: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  emptyBox: { paddingVertical: 64, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { marginTop: 12, color: '#888', fontSize: 15 },
+  footerLoader: { paddingVertical: 14, alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 16, color: '#666' },
+  errorText: { marginTop: 12, fontSize: 16, color: '#FF3B30', textAlign: 'center' },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+  },
+  retryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -610,39 +653,81 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  modalDone: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  tab: {
+  modalTitle: { fontSize: 18, fontWeight: '600', color: '#1a1a1a' },
+  modalDone: { fontSize: 16, fontWeight: '600', color: '#007AFF' },
+
+  orderDetailOverlay: {
     flex: 1,
-    paddingVertical: 16,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    padding: 16,
   },
-  tabActive: {
-    borderBottomColor: '#007AFF',
+  orderDetailSheet: {
+    width: '100%',
+    maxWidth: 520,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 10,
   },
-  tabText: {
-    fontSize: 16,
+  orderDetailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  orderDetailTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  orderDetailStatusWrap: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  orderDetailDate: {
+    fontSize: 12,
     color: '#666',
-    fontWeight: '500',
   },
-  tabTextActive: {
-    color: '#007AFF',
+  orderDetailRows: {
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  orderDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  orderDetailRowLast: {
+    borderBottomWidth: 0,
+  },
+  orderDetailLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  orderDetailValue: {
+    fontSize: 14,
+    color: '#333',
     fontWeight: '600',
+  },
+  orderDetailLabelStrong: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '700',
+  },
+  orderDetailValueStrong: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '800',
   },
 });

@@ -1,8 +1,15 @@
 import React, { createContext, useContext, useCallback, useEffect, useRef, useState, ReactNode } from 'react';
-import { Alert, Platform, Text, useWindowDimensions } from 'react-native';
+import { Alert, AppState, AppStateStatus, Platform, Text, useWindowDimensions } from 'react-native';
 import { Dimensions } from 'react-native';
-import { api, MOCK_REGIONS, MOCK_DISTRICTS, MOCK_MFYS, parsePositiveProductId } from '../services/api';
-import { Product, Region, District, MFY, Address } from '../types';
+import {
+  api,
+  parsePositiveProductId,
+  requestAuthLogin,
+  hasMarketplaceSession,
+  getMarketplaceToken,
+  buildMarketplaceNotificationsWsUrl,
+} from '../services/api';
+import { Product, Region, District, MFY, Address, LocalShopCartItem, MarketplaceNotification } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -42,7 +49,11 @@ export interface MarketplaceContextValue {
   regionSelectorStep: 'region' | 'district' | 'mfy';
   setRegionSelectorStep: (s: 'region' | 'district' | 'mfy') => void;
   cart: CartItem[];
+  localCart: LocalShopCartItem[];
   notificationsCount: number;
+  notificationsInboxOpen: boolean;
+  setNotificationsInboxOpen: (open: boolean) => void;
+  refreshNotificationsUnread: () => Promise<void>;
   activeImageIndex: number;
   userAddresses: Address[];
   loadAddresses: () => Promise<void>;
@@ -65,17 +76,24 @@ export interface MarketplaceContextValue {
   refreshHomeScreen: () => Promise<void>;
   /** Savatni serverdan qayta yuklash */
   refreshCart: () => Promise<void>;
+  refreshLocalCart: () => Promise<void>;
   handleRegionSelect: (region: Region) => Promise<void>;
   handleDistrictSelect: (district: District) => Promise<void>;
   handleMFYSelect: (mfy: MFY) => void;
   goPrevImage: () => void;
   goNextImage: () => void;
   addToCart: (product: Product) => void;
+  addLocalToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
+  removeLocalFromCart: (productId: string) => void;
   clearCart: () => void;
+  clearLocalCart: () => void;
   updateQuantity: (productId: string, delta: number) => void;
+  updateLocalQuantity: (productId: string, delta: number) => void;
   cartTotal: number;
   cartCount: number;
+  localCartTotal: number;
+  localCartCount: number;
   isTabletUpWeb: boolean;
   containerMaxWidth: number;
   contentWidth: number;
@@ -113,29 +131,183 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
   const [regionSelectorStep, setRegionSelectorStep] = useState<'region' | 'district' | 'mfy'>('region');
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [localCart, setLocalCart] = useState<LocalShopCartItem[]>([]);
   const cartRef = useRef<CartItem[]>([]);
+  const localCartRef = useRef<LocalShopCartItem[]>([]);
   cartRef.current = cart;
-  const [notificationsCount] = useState(3);
+  localCartRef.current = localCart;
+  const [notificationsCount, setNotificationsCount] = useState(0);
+  const [notificationsInboxOpen, setNotificationsInboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
+  const refreshNotificationsUnread = useCallback(async () => {
+    if (!(await hasMarketplaceSession())) {
+      setNotificationsCount(0);
+      return;
+    }
+    try {
+      const n = await api.notifications.unreadCount();
+      setNotificationsCount(Number.isFinite(n) && n >= 0 ? n : 0);
+    } catch {
+      setNotificationsCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshNotificationsUnread();
+  }, [refreshNotificationsUnread]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') void refreshNotificationsUnread();
+    });
+    return () => sub.remove();
+  }, [refreshNotificationsUnread]);
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const attachHandlers = (socket: WebSocket) => {
+      socket.onmessage = (ev) => {
+        const raw = typeof ev.data === 'string' ? ev.data : '';
+        let n: MarketplaceNotification | null = null;
+        try {
+          const msg = JSON.parse(raw) as Record<string, unknown>;
+          const event = String(msg?.event ?? msg?.type ?? '');
+          if (event !== 'integration_notification_created') return;
+          const row = (msg?.data ?? msg?.payload ?? msg?.notification) as Record<string, unknown> | undefined;
+          if (!row || typeof row !== 'object') return;
+          const targetType = String((row as { target_type?: string }).target_type ?? '').toLowerCase();
+          if (targetType !== 'all' && targetType !== 'marketplace') return;
+          n = {
+            id: (row as { id?: string | number }).id ?? '',
+            title: String((row as { title?: string }).title ?? ''),
+            message: String((row as { message?: string }).message ?? ''),
+            type: String((row as { type?: string }).type ?? 'info'),
+            target_type: String((row as { target_type?: string }).target_type ?? ''),
+            is_read: !!(row as { is_read?: boolean }).is_read,
+            read_at: (row as { read_at?: string | null }).read_at != null ? String((row as { read_at?: string }).read_at) : null,
+            created_at: String((row as { created_at?: string }).created_at ?? ''),
+            updated_at: String((row as { updated_at?: string }).updated_at ?? ''),
+          };
+        } catch {
+          return;
+        }
+        if (!n) return;
+        setNotificationsCount((c) => (n!.is_read ? c : c + 1));
+      };
+      socket.onclose = () => {
+        ws = null;
+        if (cancelled) return;
+        retryTimer = setTimeout(() => void tryConnect(), 5000);
+      };
+      socket.onerror = () => {
+        try {
+          socket.close();
+        } catch {
+          /* ignore */
+        }
+      };
+    };
+
+    const tryConnect = async () => {
+      if (cancelled) return;
+      if (ws && ws.readyState === WebSocket.OPEN) return;
+      if (ws) {
+        try {
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+        ws = null;
+      }
+      if (!(await hasMarketplaceSession())) return;
+      const token = await getMarketplaceToken();
+      if (!token || cancelled) return;
+      try {
+        const url = buildMarketplaceNotificationsWsUrl(token);
+        const socket = new WebSocket(url);
+        ws = socket;
+        attachHandlers(socket);
+      } catch {
+        ws = null;
+      }
+    };
+
+    void tryConnect();
+    const poll = setInterval(() => {
+      if (cancelled) return;
+      if (ws && ws.readyState === WebSocket.OPEN) return;
+      void tryConnect();
+    }, 4000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+      if (retryTimer) clearTimeout(retryTimer);
+      try {
+        ws?.close();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
+
   const [userAddresses, setUserAddresses] = useState<Address[]>([]);
+  const maybeTriggerAuth = (error: unknown) => {
+    const msg = error instanceof Error ? error.message : '';
+    if (/kirish kerak|token/i.test(msg)) requestAuthLogin();
+  };
 
   const searchRef = useRef(search);
   searchRef.current = search;
 
   useEffect(() => {
-    loadProducts();
-    loadRegions();
-    loadAddresses();
-    loadCart();
+    void (async () => {
+      await loadProducts();
+      await loadRegions();
+      await loadAddresses();
+      await loadCart();
+      await loadLocalCart();
+    })();
   }, []);
 
+  const clearGuestDeliverySelection = () => {
+    setUserAddresses([]);
+    setSelectedRegion(null);
+    setSelectedDistrict(null);
+    setSelectedMFY(null);
+    setDistricts([]);
+    setMfys([]);
+    setIsRegionSelectorOpen(false);
+    setRegionSelectorStep('region');
+  };
+
   const loadCart = async () => {
+    if (!(await hasMarketplaceSession())) {
+      setCart([]);
+      return;
+    }
     try {
       const rows = await api.cart.get();
       setCart(rows);
     } catch {
       setCart([]);
+    }
+  };
+
+  const loadLocalCart = async () => {
+    if (!(await hasMarketplaceSession())) {
+      setLocalCart([]);
+      return;
+    }
+    try {
+      const rows = await api.localShopCart.get();
+      setLocalCart(rows);
+    } catch {
+      setLocalCart([]);
     }
   };
 
@@ -152,30 +324,36 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
   }, [selectedProduct]);
 
   const loadAddresses = async () => {
-    const res = await api.addresses.list();
-    setUserAddresses(res);
-    const def = res.find((a) => a.is_default);
-    if (def) {
-      await applyUserAddress(def);
+    if (!(await hasMarketplaceSession())) {
+      clearGuestDeliverySelection();
+      return;
+    }
+    try {
+      const res = await api.addresses.list();
+      setUserAddresses(res);
+      const def = res.find((a) => a.is_default);
+      if (def) {
+        await applyUserAddress(def);
+      }
+    } catch {
+      setUserAddresses([]);
     }
   };
 
   const applyUserAddress = async (address: Address) => {
     const regionList = regions.length ? regions : await api.regions.getRegions();
     if (!regions.length && regionList.length) setRegions(regionList);
-    const region =
-      regionList.find((r) => r.id === address.region_id) || MOCK_REGIONS.find((r) => r.id === address.region_id) || null;
+    const region = regionList.find((r) => r.id === address.region_id) || null;
     setSelectedRegion(region);
 
     const ds = await api.regions.getDistricts(address.region_id);
     setDistricts(ds);
-    const district =
-      ds.find((d) => d.id === address.district_id) || MOCK_DISTRICTS.find((d) => d.id === address.district_id) || null;
+    const district = ds.find((d) => d.id === address.district_id) || null;
     setSelectedDistrict(district);
 
     const ms = await api.regions.getMFYs(address.district_id);
     setMfys(ms);
-    const mfy = ms.find((m) => m.id === address.mfy_id) || MOCK_MFYS.find((m) => m.id === address.mfy_id) || null;
+    const mfy = ms.find((m) => m.id === address.mfy_id) || null;
     setSelectedMFY(mfy);
   };
 
@@ -212,11 +390,28 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
   };
 
   const refreshCart = useCallback(async () => {
+    if (!(await hasMarketplaceSession())) {
+      setCart([]);
+      return;
+    }
     try {
       const rows = await api.cart.get();
       setCart(rows);
     } catch {
       setCart([]);
+    }
+  }, []);
+
+  const refreshLocalCart = useCallback(async () => {
+    if (!(await hasMarketplaceSession())) {
+      setLocalCart([]);
+      return;
+    }
+    try {
+      const rows = await api.localShopCart.get();
+      setLocalCart(rows);
+    } catch {
+      setLocalCart([]);
     }
   }, []);
 
@@ -234,9 +429,10 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
     } finally {
       setLoading(false);
     }
-    await Promise.all([refreshCart(), loadRegionsRef.current()]);
+    await Promise.all([refreshCart(), refreshLocalCart(), loadRegionsRef.current()]);
     await loadAddressesRef.current();
-  }, [refreshCart]);
+    await refreshNotificationsUnread();
+  }, [refreshCart, refreshLocalCart, refreshNotificationsUnread]);
 
   const handleRegionSelect = async (region: Region) => {
     setSelectedRegion(region);
@@ -286,6 +482,7 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
         const next = await api.cart.addItem(pid, 1);
         setCart(next);
       } catch (e) {
+        maybeTriggerAuth(e);
         const msg = e instanceof Error ? e.message : "Savatga qo'shib bo'lmadi";
         Alert.alert('Savat', msg);
       }
@@ -303,6 +500,46 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
         const next = await api.cart.removeLine(line.cartLineId);
         setCart(next);
       } catch (e) {
+        maybeTriggerAuth(e);
+        Alert.alert('Savat', e instanceof Error ? e.message : "O'chirib bo'lmadi");
+      }
+    })();
+  };
+
+  const addLocalToCart = (product: Product) => {
+    void (async () => {
+      try {
+        if ((Number(product.quantity) || 0) <= 0) {
+          Alert.alert('Mahsulot', 'Omborda mavjud emas.');
+          return;
+        }
+        const pid = parsePositiveProductId(product.id);
+        if (pid == null) {
+          Alert.alert('Mahsulot', 'Mahsulot identifikatori noto‘g‘ri.');
+          return;
+        }
+        const next = await api.localShopCart.addItem(pid, 1);
+        setLocalCart(next);
+      } catch (e) {
+        maybeTriggerAuth(e);
+        const msg = e instanceof Error ? e.message : "Mahalla savatiga qo'shib bo'lmadi";
+        Alert.alert('Savat', msg);
+      }
+    })();
+  };
+
+  const removeLocalFromCart = (productId: string) => {
+    void (async () => {
+      try {
+        const line = localCartRef.current.find((item) => String(item.id) === String(productId));
+        if (line?.cartLineId == null) {
+          Alert.alert('Savat', "Mahalla savat qatori topilmadi.");
+          return;
+        }
+        const next = await api.localShopCart.removeLine(line.cartLineId);
+        setLocalCart(next);
+      } catch (e) {
+        maybeTriggerAuth(e);
         Alert.alert('Savat', e instanceof Error ? e.message : "O'chirib bo'lmadi");
       }
     })();
@@ -313,8 +550,21 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
       try {
         const next = await api.cart.clear();
         setCart(next);
-      } catch {
+      } catch (e) {
+        maybeTriggerAuth(e);
         setCart([]);
+      }
+    })();
+  };
+
+  const clearLocalCart = () => {
+    void (async () => {
+      try {
+        const next = await api.localShopCart.clear();
+        setLocalCart(next);
+      } catch (e) {
+        maybeTriggerAuth(e);
+        setLocalCart([]);
       }
     })();
   };
@@ -336,6 +586,30 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
         const next = await api.cart.setLineQuantity(line.cartLineId, newQty);
         setCart(next);
       } catch (e) {
+        maybeTriggerAuth(e);
+        Alert.alert('Savat', e instanceof Error ? e.message : 'Miqdorni yangilab bo‘lmadi');
+      }
+    })();
+  };
+
+  const updateLocalQuantity = (productId: string, delta: number) => {
+    void (async () => {
+      try {
+        const line = localCartRef.current.find((item) => String(item.id) === String(productId));
+        if (line?.cartLineId == null) {
+          Alert.alert('Savat', "Mahalla savat qatori topilmadi.");
+          return;
+        }
+        const newQty = line.quantity + delta;
+        if (newQty < 1) {
+          const next = await api.localShopCart.removeLine(line.cartLineId);
+          setLocalCart(next);
+          return;
+        }
+        const next = await api.localShopCart.setLineQuantity(line.cartLineId, newQty);
+        setLocalCart(next);
+      } catch (e) {
+        maybeTriggerAuth(e);
         Alert.alert('Savat', e instanceof Error ? e.message : 'Miqdorni yangilab bo‘lmadi');
       }
     })();
@@ -343,6 +617,8 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const localCartTotal = localCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const localCartCount = localCart.reduce((sum, item) => sum + item.quantity, 0);
   const isTabletUpWeb = Platform.OS === 'web' && windowWidth >= 768;
   const containerMaxWidth = 1280;
   const contentWidth = isTabletUpWeb ? Math.min(windowWidth, containerMaxWidth) : windowWidth;
@@ -434,7 +710,11 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
     regionSelectorStep,
     setRegionSelectorStep,
     cart,
+    localCart,
     notificationsCount,
+    notificationsInboxOpen,
+    setNotificationsInboxOpen,
+    refreshNotificationsUnread,
     activeImageIndex,
     userAddresses,
     loadAddresses,
@@ -446,17 +726,24 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
     loadProducts,
     refreshHomeScreen,
     refreshCart,
+    refreshLocalCart,
     handleRegionSelect,
     handleDistrictSelect,
     handleMFYSelect,
     goPrevImage,
     goNextImage,
     addToCart,
+    addLocalToCart,
     removeFromCart,
+    removeLocalFromCart,
     clearCart,
+    clearLocalCart,
     updateQuantity,
+    updateLocalQuantity,
     cartTotal,
     cartCount,
+    localCartTotal,
+    localCartCount,
     isTabletUpWeb,
     containerMaxWidth,
     contentWidth,

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Search,
@@ -15,23 +15,27 @@ import {
   ChevronLeft,
   CheckCircle2,
 } from 'lucide-react';
-import { api } from '../services/api';
-import { Product, Region, District, MFY, Address } from '../types';
-import { cn, pickRandomSlice } from '../lib/utils';
-import { MOCK_REGIONS, MOCK_DISTRICTS, MOCK_MFYS } from '../services/api';
+import { api, hasMarketplaceSession } from '../services/api';
+import { useWebNotifications } from '../hooks/useWebNotifications';
+import {
+  Region,
+  District,
+  MFY,
+  Address,
+  ContragentBanner,
+  ContragentBrowseItem,
+  ActivityType,
+  PartnerRequestPayload,
+} from '../types';
+import { cn } from '../lib/utils';
+import { writeWebDelivery } from '../lib/webDeliverySelection';
 import { useWebCart } from '../hooks/useWebCart';
-import { WebProductCard } from '../components/WebProductCard';
-import { WebProductDetailOverlay } from '../components/WebProductDetailOverlay';
+import { digitsOnly, normalizePartnerRequestPayload, sanitizePhoneInput, validatePartnerRequestPayload } from '../lib/partnerRequestForm';
 
-const HOME_PREVIEW_COUNT = 6;
+const PARTNER_REQUEST_FLAG_KEY = 'marketplace_partner_request_sent_v1';
 
 export function HomePage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [homePreviewSeed, setHomePreviewSeed] = useState(0);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   
   // Region Selection State
   const [regions, setRegions] = useState<Region[]>([]);
@@ -43,24 +47,109 @@ export function HomePage() {
   const [isRegionSelectorOpen, setIsRegionSelectorOpen] = useState(false);
   const [regionSelectorStep, setRegionSelectorStep] = useState<'region' | 'district' | 'mfy'>('region');
 
-  const { cart, addToCart, removeFromCart, updateQuantity, cartTotal, cartCount } = useWebCart();
-  const cartQtyByProductId = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const it of cart) m.set(String(it.id), it.quantity);
-    return m;
-  }, [cart]);
+  const {
+    cart,
+    localCart,
+    removeFromCart,
+    updateQuantity,
+    removeLocalFromCart,
+    updateLocalQuantity,
+    cartTotal,
+    cartCount,
+    localCartTotal,
+    localCartCount,
+  } = useWebCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [notificationsCount, setNotificationsCount] = useState(3);
+  const [cartTab, setCartTab] = useState<'bozor' | 'mahalla'>('bozor');
+  const [shopPickerOpen, setShopPickerOpen] = useState(false);
+  const [shopSubmitting, setShopSubmitting] = useState(false);
+  const [selectedLocalShopId, setSelectedLocalShopId] = useState<number | null>(null);
+  const { notificationsCount, setNotificationsInboxOpen } = useWebNotifications();
+  const [banners, setBanners] = useState<Array<ContragentBanner & { activityType?: string }>>([]);
+  const [activeBanner, setActiveBanner] = useState(0);
 
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [userAddresses, setUserAddresses] = useState<Address[]>([]);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [hasPartnerRequest, setHasPartnerRequest] = useState(false);
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
+  const [partnerSubmitting, setPartnerSubmitting] = useState(false);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [partnerForm, setPartnerForm] = useState<PartnerRequestPayload>({
+    company_name: '',
+    inn: '',
+    mfo: '',
+    account_number: '',
+    activity_type_id: 0,
+    region_id: 0,
+    district_id: 0,
+    mfy_id: 0,
+    phone: '',
+  });
+  const [partnerDistricts, setPartnerDistricts] = useState<District[]>([]);
+  const [partnerMfys, setPartnerMfys] = useState<MFY[]>([]);
 
   useEffect(() => {
-    loadProducts();
     loadRegions();
     loadAddresses();
+    void (async () => {
+      const [types, requests] = await Promise.all([api.activityTypes.list(), api.partnerRequests.list()]);
+      setActivityTypes(types);
+      if (types[0]) {
+        setPartnerForm((prev) => ({ ...prev, activity_type_id: prev.activity_type_id || types[0].id }));
+      }
+      const hasLocal = typeof localStorage !== 'undefined' && localStorage.getItem(PARTNER_REQUEST_FLAG_KEY) === '1';
+      setHasPartnerRequest(hasLocal || requests.length > 0);
+    })();
   }, []);
+
+  useEffect(() => {
+    const loadBanners = async () => {
+      const [bannerRows, contragentsRes] = await Promise.all([
+        api.contragents.banners(),
+        api.contragents.list({ limit: 100, include: 'categories' }),
+      ]);
+      const details = new Map<number, ContragentBrowseItem>(
+        contragentsRes.items.map((row) => [Number(row.id), row])
+      );
+      const filtered = bannerRows
+        .map((row) => {
+          const c = details.get(Number(row.contragent_id));
+          const categoryName = c?.category_branches?.[0]?.category?.name;
+          const activityType = c?.activity_type_name || categoryName;
+          return { ...row, activityType, detail: c };
+        })
+        .filter((row) => {
+          if (!row.detail) return false;
+          if (!selectedRegion && !selectedDistrict && !selectedMFY) return true;
+          if (selectedMFY?.id && row.detail.mfy_id != null) return Number(row.detail.mfy_id) === selectedMFY.id;
+          if (selectedDistrict?.id && row.detail.district_id != null) return Number(row.detail.district_id) === selectedDistrict.id;
+          if (selectedDistrict?.id && row.detail.delivery_areas?.district_ids?.length) {
+            return row.detail.delivery_areas.district_ids.includes(selectedDistrict.id);
+          }
+          if (selectedRegion?.id && row.detail.region_id != null) return Number(row.detail.region_id) === selectedRegion.id;
+          return false;
+        })
+        .map(({ detail, ...rest }) => rest);
+      setBanners(filtered);
+      setActiveBanner(0);
+    };
+    void loadBanners();
+  }, [selectedRegion?.id, selectedDistrict?.id, selectedMFY?.id]);
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveBanner((prev) => (prev + 1) % banners.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [banners.length]);
+
+  useEffect(() => {
+    writeWebDelivery({
+      district_id: selectedDistrict?.id ?? null,
+      mfy_id: selectedMFY?.id ?? null,
+    });
+  }, [selectedDistrict?.id, selectedMFY?.id]);
 
   const loadAddresses = async () => {
     const res = await api.addresses.list();
@@ -68,30 +157,20 @@ export function HomePage() {
     // Set default region/district/mfy from default address if exists
     const def = res.find(a => a.is_default);
     if (def) {
-      const r = MOCK_REGIONS.find(reg => reg.id === def.region_id);
-      const d = MOCK_DISTRICTS.find(dis => dis.id === def.district_id);
-      const m = MOCK_MFYS.find(mfy => mfy.id === def.mfy_id);
+      const regionList = regions.length ? regions : await api.regions.getRegions();
+      if (!regions.length) setRegions(regionList);
+      const r = regionList.find(reg => reg.id === def.region_id);
+      const districtList = await api.regions.getDistricts(def.region_id);
+      setDistricts(districtList);
+      const d = districtList.find(dis => dis.id === def.district_id);
+      const mfyList = await api.regions.getMFYs(def.district_id);
+      setMfys(mfyList);
+      const m = mfyList.find(mfy => mfy.id === def.mfy_id);
       if (r) setSelectedRegion(r);
       if (d) setSelectedDistrict(d);
       if (m) setSelectedMFY(m);
     }
   };
-
-  const loadProducts = async (q?: string) => {
-    setLoading(true);
-    const res = await api.products.list({ q, limit: q ? 50 : 100 });
-    setProducts(res);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    setHomePreviewSeed((s) => s + 1);
-  }, [location.pathname, location.key]);
-
-  const homePreviewProducts = useMemo(
-    () => pickRandomSlice(products, HOME_PREVIEW_COUNT),
-    [products, homePreviewSeed]
-  );
 
   const loadRegions = async () => {
     const res = await api.regions.getRegions();
@@ -129,6 +208,76 @@ export function HomePage() {
     await api.addresses.delete(id);
     loadAddresses();
   };
+
+  const openPartnerModal = async () => {
+    const regionId = selectedRegion?.id ?? regions[0]?.id ?? 0;
+    const districtList = regionId ? await api.regions.getDistricts(regionId) : [];
+    const districtId = selectedDistrict?.id ?? districtList[0]?.id ?? 0;
+    const mfyList = districtId ? await api.regions.getMFYs(districtId) : [];
+    const mfyId = selectedMFY?.id ?? mfyList[0]?.id ?? 0;
+    setPartnerDistricts(districtList);
+    setPartnerMfys(mfyList);
+    setPartnerForm((prev) => ({
+      ...prev,
+      region_id: regionId,
+      district_id: districtId,
+      mfy_id: mfyId,
+      activity_type_id: prev.activity_type_id || activityTypes[0]?.id || 0,
+      phone: prev.phone || '+998',
+    }));
+    setIsPartnerModalOpen(true);
+  };
+
+  const submitPartnerRequest = async () => {
+    const normalized = normalizePartnerRequestPayload(partnerForm);
+    const validationError = validatePartnerRequestPayload(normalized);
+    if (validationError) return window.alert(validationError);
+    setPartnerSubmitting(true);
+    try {
+      await api.partnerRequests.create(normalized);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(PARTNER_REQUEST_FLAG_KEY, '1');
+      }
+      setHasPartnerRequest(true);
+      setIsPartnerModalOpen(false);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "So'rov yuborilmadi");
+    } finally {
+      setPartnerSubmitting(false);
+    }
+  };
+
+  const localShopOptions = Array.from(
+    new Map(
+      localCart
+        .filter((it) => it.local_shop?.id != null)
+        .map((it) => [Number(it.local_shop!.id), it.local_shop?.name || `Do'kon #${it.local_shop?.id}`])
+    )
+  ).map(([id, name]) => ({ id, name }));
+  const localItemsFiltered =
+    selectedLocalShopId == null
+      ? localCart
+      : localCart.filter((it) => Number(it.local_shop?.id ?? 0) === selectedLocalShopId);
+  const localShops = Array.from(
+    localCart.reduce(
+      (acc, it) => {
+        const id = Number(it.local_shop?.id ?? 0);
+        if (!id) return acc;
+        const prev = acc.get(id) ?? {
+          id,
+          name: it.local_shop?.name || `Do'kon #${id}`,
+          phone: it.local_shop?.phone,
+          itemCount: 0,
+          total: 0,
+        };
+        prev.itemCount += it.quantity;
+        prev.total += it.price * it.quantity;
+        acc.set(id, prev);
+        return acc;
+      },
+      new Map<number, { id: number; name: string; phone?: string; itemCount: number; total: number }>()
+    ).values()
+  );
 
   return (
     <div className="pb-24 bg-gray-50 min-h-screen font-['Plus_Jakarta_Sans']">
@@ -294,6 +443,13 @@ export function HomePage() {
 
             <button
               type="button"
+              onClick={async () => {
+                if (!(await hasMarketplaceSession())) {
+                  navigate('/login');
+                  return;
+                }
+                setNotificationsInboxOpen(true);
+              }}
               className="group relative h-12 w-12 flex-shrink-0 rounded-2xl border border-orange-200 bg-orange-50 text-orange-500 shadow-sm transition-all hover:bg-orange-100 lg:hidden"
             >
               <Bell size={22} className="group-hover:rotate-12 transition-transform" />
@@ -316,6 +472,13 @@ export function HomePage() {
             </button>
             <button
               type="button"
+              onClick={async () => {
+                if (!(await hasMarketplaceSession())) {
+                  navigate('/login');
+                  return;
+                }
+                setNotificationsInboxOpen(true);
+              }}
               className="group relative hidden h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-2xl border border-orange-200 bg-orange-50 text-orange-500 shadow-sm transition-all hover:bg-orange-100 lg:flex"
             >
               <Bell size={22} className="group-hover:rotate-12 transition-transform" />
@@ -339,9 +502,9 @@ export function HomePage() {
               className="group relative flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-2xl bg-gray-900 text-white shadow-lg shadow-gray-200 transition-all hover:bg-orange-500 active:scale-95"
             >
               <ShoppingCart size={20} className="group-hover:rotate-12 transition-transform" />
-              {cartCount > 0 && (
+              {cartCount + localCartCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-6 h-6 bg-orange-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                  {cartCount}
+                  {cartCount + localCartCount}
                 </span>
               )}
             </button>
@@ -351,40 +514,188 @@ export function HomePage() {
 
       {/* Products preview (max 6, random set) */}
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        <div className="flex flex-wrap justify-around gap-x-4 gap-y-6 md:gap-x-6 md:gap-y-8">
-          {loading
-            ? Array(HOME_PREVIEW_COUNT)
-                .fill(0)
-                .map((_, i) => (
-                  <div key={i} className="w-[240px] sm:w-[260px] md:w-[300px] flex-shrink-0">
-                    <div className="h-80 animate-pulse rounded-[32px] border border-gray-100 bg-white" />
+        {banners.length > 0 ? (
+          <section className="mb-7">
+            <div className="overflow-hidden rounded-3xl">
+              <motion.div
+                className="flex"
+                animate={{ x: `-${activeBanner * 100}%` }}
+                transition={{ duration: 0.45, ease: 'easeInOut' }}
+              >
+                {banners.map((b) => (
+                  <div
+                    key={b.id}
+                    className="w-full min-w-full rounded-3xl border border-orange-100 bg-orange-50/50 p-4 md:p-5"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-16 w-16 overflow-hidden rounded-2xl border border-orange-100 bg-white">
+                        {b.contragent_logo ? (
+                          <img src={b.contragent_logo} alt={b.contragent_name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xl font-black text-orange-500">
+                            {b.contragent_name.slice(0, 1)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-black text-gray-900 md:text-lg">{b.contragent_name}</p>
+                        <p className="mt-1 truncate text-[11px] font-black uppercase tracking-wider text-orange-600">
+                          {b.activityType || 'Faol kontragent'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate('/search', {
+                            state: { contragentId: b.contragent_id },
+                          })
+                        }
+                        className="rounded-xl bg-orange-500 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-orange-600"
+                      >
+                        O&apos;tish
+                      </button>
+                    </div>
                   </div>
-                ))
-            : homePreviewProducts.map((product) => (
-                <div key={product.id} className="w-[240px] sm:w-[260px] md:w-[300px] flex-shrink-0">
-                  <WebProductCard
-                    product={product}
-                    onSelect={setSelectedProduct}
-                    onAddToCart={addToCart}
-                    onCartDelta={updateQuantity}
-                    inCartQty={cartQtyByProductId.get(String(product.id)) ?? 0}
+                ))}
+              </motion.div>
+            </div>
+            {banners.length > 1 ? (
+              <div className="mt-3 flex justify-center gap-1.5">
+                {banners.map((b, idx) => (
+                  <button
+                    key={`dot-${b.id}`}
+                    type="button"
+                    aria-label={`banner-${idx + 1}`}
+                    onClick={() => setActiveBanner(idx)}
+                    className={cn('h-2 rounded-full transition-all', idx === activeBanner ? 'w-6 bg-orange-500' : 'w-2 bg-orange-200')}
                   />
-                </div>
-              ))}
-        </div>
-        {!loading && products.length > 0 ? (
-          <div className="mt-10 flex justify-center">
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+        <section className={cn('grid grid-cols-1 gap-4', hasPartnerRequest ? 'md:grid-cols-2' : 'md:grid-cols-3')}>
+          <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-widest text-orange-500">Bozorda</p>
+            <p className="mt-2 text-xl font-black text-gray-900">Yirik kontragent mahsulotlari</p>
+            <p className="mt-2 text-sm font-semibold text-gray-500">
+              Bozor bo&apos;limidagi mahsulotlarni ko&apos;ring va filtrlab xarid qiling.
+            </p>
             <button
               type="button"
-              onClick={() => navigate('/products')}
-              className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-8 py-4 text-sm font-black uppercase tracking-widest text-gray-800 shadow-sm transition hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600"
+              onClick={() => navigate('/search', { state: { marketTab: 'bozor' } })}
+              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-500"
             >
-              Barchasini ko&apos;rish
-              <ChevronRight size={18} />
+              O&apos;tish
+              <ChevronRight size={16} />
             </button>
           </div>
-        ) : null}
+          <div className="relative rounded-3xl border border-orange-200 bg-orange-50/60 p-5 shadow-sm">
+            <span className="absolute right-4 top-4 rounded-md bg-orange-500 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white">
+              Tezkor
+            </span>
+            <p className="text-[11px] font-black uppercase tracking-widest text-orange-600">Maxallada</p>
+            <p className="mt-2 text-xl font-black text-gray-900">Yaqin do&apos;kon mahsulotlari</p>
+            <p className="mt-2 text-sm font-semibold text-gray-600">
+              Hududingizga mos do&apos;konlardan tezkor mahsulotlarni toping.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/search', { state: { marketTab: 'mahalla' } })}
+              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-orange-600"
+            >
+              O&apos;tish
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          {!hasPartnerRequest ? (
+            <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+              <p className="text-[11px] font-black uppercase tracking-widest text-emerald-600">Hamkorlik</p>
+              <p className="mt-2 text-xl font-black text-gray-900">Hamkor bo&apos;lish uchun so&apos;rov</p>
+              <p className="mt-2 text-sm font-semibold text-gray-600">
+                Kompaniya ma&apos;lumotlarini yuboring va hamkorlik jarayonini boshlang.
+              </p>
+              <button
+                type="button"
+                onClick={() => void openPartnerModal()}
+                className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:bg-emerald-700"
+              >
+                So&apos;rov yuborish
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          ) : null}
+        </section>
       </main>
+
+      <AnimatePresence>
+        {isPartnerModalOpen ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setIsPartnerModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              className="w-full max-w-xl rounded-3xl border border-gray-200 bg-white p-5 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-black text-gray-900">Hamkorlik so&apos;rovi</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsPartnerModalOpen(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold" placeholder="Kompaniya nomi" value={partnerForm.company_name} onChange={(e) => setPartnerForm((p) => ({ ...p, company_name: e.target.value }))} />
+                <input className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold" inputMode="numeric" maxLength={9} placeholder="INN (9 raqam)" value={partnerForm.inn} onChange={(e) => setPartnerForm((p) => ({ ...p, inn: digitsOnly(e.target.value, 9) }))} />
+                <input className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold" inputMode="numeric" maxLength={5} placeholder="MFO (5 raqam)" value={partnerForm.mfo} onChange={(e) => setPartnerForm((p) => ({ ...p, mfo: digitsOnly(e.target.value, 5) }))} />
+                <input className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold" inputMode="numeric" maxLength={20} placeholder="Hisob raqam (20 raqam)" value={partnerForm.account_number} onChange={(e) => setPartnerForm((p) => ({ ...p, account_number: digitsOnly(e.target.value, 20) }))} />
+                <select className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold sm:col-span-2" value={partnerForm.activity_type_id} onChange={(e) => setPartnerForm((p) => ({ ...p, activity_type_id: Number(e.target.value) }))}>
+                  {activityTypes.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                </select>
+                <select className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold" value={partnerForm.region_id} onChange={async (e) => {
+                  const regionId = Number(e.target.value);
+                  const ds = await api.regions.getDistricts(regionId);
+                  const districtId = ds[0]?.id ?? 0;
+                  const ms = districtId ? await api.regions.getMFYs(districtId) : [];
+                  setPartnerDistricts(ds);
+                  setPartnerMfys(ms);
+                  setPartnerForm((p) => ({ ...p, region_id: regionId, district_id: districtId, mfy_id: ms[0]?.id ?? 0 }));
+                }}>
+                  {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+                <select className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold" value={partnerForm.district_id} onChange={async (e) => {
+                  const districtId = Number(e.target.value);
+                  const ms = await api.regions.getMFYs(districtId);
+                  setPartnerMfys(ms);
+                  setPartnerForm((p) => ({ ...p, district_id: districtId, mfy_id: ms[0]?.id ?? 0 }));
+                }}>
+                  {partnerDistricts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+                <select className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold sm:col-span-2" value={partnerForm.mfy_id} onChange={(e) => setPartnerForm((p) => ({ ...p, mfy_id: Number(e.target.value) }))}>
+                  {partnerMfys.map((mfy) => <option key={mfy.id} value={mfy.id}>{mfy.name}</option>)}
+                </select>
+                <input className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-semibold sm:col-span-2" inputMode="tel" maxLength={13} placeholder="+998901234567" value={partnerForm.phone} onChange={(e) => setPartnerForm((p) => ({ ...p, phone: sanitizePhoneInput(e.target.value) }))} />
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsPartnerModalOpen(false)} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600">Bekor</button>
+                <button type="button" onClick={() => void submitPartnerRequest()} disabled={partnerSubmitting} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+                  {partnerSubmitting ? 'Yuborilmoqda...' : 'Yuborish'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {/* Address Management Modal */}
       <AnimatePresence>
@@ -447,7 +758,8 @@ export function HomePage() {
                     </div>
                     <p className="font-bold text-gray-900 text-lg mb-1">{addr.description}</p>
                     <p className="text-sm text-gray-500 font-medium">
-                      {MOCK_REGIONS.find(r => r.id === addr.region_id)?.name}, {MOCK_DISTRICTS.find(d => d.id === addr.district_id)?.name}
+                      {regions.find((r) => r.id === addr.region_id)?.name || `Viloyat #${addr.region_id}`},{' '}
+                      {districts.find((d) => d.id === addr.district_id)?.name || `Tuman #${addr.district_id}`}
                     </p>
                   </div>
                 ))}
@@ -463,16 +775,6 @@ export function HomePage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {selectedProduct ? (
-        <WebProductDetailOverlay
-          product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          onAddToCart={addToCart}
-          onCartDelta={updateQuantity}
-          inCartQty={cartQtyByProductId.get(String(selectedProduct.id)) ?? 0}
-        />
-      ) : null}
 
       {/* Cart Drawer */}
       <AnimatePresence>
@@ -501,9 +803,37 @@ export function HomePage() {
                   <X size={20} />
                 </button>
               </div>
+              <div className="px-6 pt-4">
+                <div className="flex rounded-xl border border-gray-200 bg-gray-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setCartTab('bozor')}
+                    className={cn('flex-1 rounded-lg py-2 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5', cartTab === 'bozor' ? 'bg-white text-gray-900' : 'text-gray-500')}
+                  >
+                    Bozor
+                    {cartCount > 0 ? (
+                      <span className="min-w-[18px] rounded-full bg-orange-500 px-1 text-[9px] font-black text-white text-center">
+                        {cartCount > 99 ? '99+' : cartCount}
+                      </span>
+                    ) : null}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCartTab('mahalla')}
+                    className={cn('flex-1 rounded-lg py-2 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5', cartTab === 'mahalla' ? 'bg-white text-gray-900' : 'text-gray-500')}
+                  >
+                    Maxalla
+                    {localCartCount > 0 ? (
+                      <span className="min-w-[18px] rounded-full bg-orange-500 px-1 text-[9px] font-black text-white text-center">
+                        {localCartCount > 99 ? '99+' : localCartCount}
+                      </span>
+                    ) : null}
+                  </button>
+                </div>
+              </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {cart.length === 0 ? (
+                {(cartTab === 'bozor' ? cart : localItemsFiltered).length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
                     <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
                       <ShoppingCart size={48} />
@@ -514,7 +844,7 @@ export function HomePage() {
                     </div>
                   </div>
                 ) : (
-                  cart.map((item) => (
+                  (cartTab === 'bozor' ? cart : localItemsFiltered).map((item) => (
                     <div
                       key={item.cartLineId != null ? `line-${item.cartLineId}` : item.id}
                       className="flex gap-4 group"
@@ -526,7 +856,7 @@ export function HomePage() {
                         <div className="flex justify-between items-start">
                           <h4 className="font-bold text-gray-900 line-clamp-1 text-base">{item.name}</h4>
                           <button 
-                            onClick={() => removeFromCart(item.id)}
+                            onClick={() => (cartTab === 'bozor' ? removeFromCart(item.id) : removeLocalFromCart(item.id))}
                             className="text-gray-300 hover:text-red-500 transition-colors p-1"
                           >
                             <Trash2 size={18} />
@@ -538,7 +868,7 @@ export function HomePage() {
                           </p>
                           <div className="flex items-center bg-gray-50 rounded-xl p-1 gap-3 border border-gray-100">
                             <button 
-                              onClick={() => updateQuantity(item.id, -1)}
+                              onClick={() => (cartTab === 'bozor' ? updateQuantity(item.id, -1) : updateLocalQuantity(item.id, -1))}
                               className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-white rounded-lg transition-all"
                             >
                               <Minus size={16} />
@@ -548,7 +878,10 @@ export function HomePage() {
                               type="button"
                               onClick={() => {
                                 const max = item.availableStock ?? Infinity;
-                                if (item.quantity < max) updateQuantity(item.id, 1);
+                                if (item.quantity < max) {
+                                  if (cartTab === 'bozor') updateQuantity(item.id, 1);
+                                  else updateLocalQuantity(item.id, 1);
+                                }
                               }}
                               disabled={item.quantity >= (item.availableStock ?? Infinity)}
                               className={cn(
@@ -568,32 +901,167 @@ export function HomePage() {
                 )}
               </div>
 
-              {cart.length > 0 && (
+              {(cartTab === 'bozor' ? cart : localItemsFiltered).length > 0 && (
                 <div className="p-8 bg-gray-50 rounded-t-[48px] space-y-6 shadow-[0_-20px_60px_rgba(0,0,0,0.08)] border-t border-white">
+                  {cartTab === 'mahalla' && localShopOptions.length > 1 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {localShopOptions.map((shop) => (
+                        <button
+                          key={shop.id}
+                          type="button"
+                          onClick={() => setSelectedLocalShopId(shop.id)}
+                          className={cn(
+                            'rounded-xl border px-3 py-1.5 text-[11px] font-bold',
+                            selectedLocalShopId === shop.id
+                              ? 'border-orange-400 bg-orange-50 text-orange-700'
+                              : 'border-gray-200 bg-white text-gray-600'
+                          )}
+                        >
+                          {shop.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="space-y-3">
                     <div className="flex justify-between text-gray-400 text-sm font-bold uppercase tracking-wider">
-                      <span>Mahsulotlar ({cartCount})</span>
-                      <span>{cartTotal.toLocaleString()} so'm</span>
+                      <span>
+                        Mahsulotlar (
+                        {cartTab === 'bozor'
+                          ? cartCount
+                          : localItemsFiltered.reduce((sum, it) => sum + it.quantity, 0)}
+                        )
+                      </span>
+                      <span>
+                        {(cartTab === 'bozor'
+                          ? cartTotal
+                          : localItemsFiltered.reduce((sum, it) => sum + it.price * it.quantity, 0)
+                        ).toLocaleString()}{' '}
+                        so'm
+                      </span>
                     </div>
                     <div className="flex justify-between text-gray-900 text-2xl font-black">
                       <span>Jami</span>
-                      <span>{cartTotal.toLocaleString()} so'm</span>
+                      <span>
+                        {(cartTab === 'bozor'
+                          ? cartTotal
+                          : localItemsFiltered.reduce((sum, it) => sum + it.price * it.quantity, 0)
+                        ).toLocaleString()}{' '}
+                        so'm
+                      </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (cart.length === 0) return;
-                      setIsCartOpen(false);
-                      navigate('/checkout');
-                    }}
-                    className="w-full bg-gray-900 text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-orange-500 transition-all shadow-2xl shadow-gray-200 active:scale-[0.98] border-2 border-transparent hover:border-white/20"
-                  >
-                    Buyurtma berish
-                    <ChevronRight size={22} />
-                  </button>
+                  {cartTab === 'bozor' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (cart.length === 0) return;
+                        setIsCartOpen(false);
+                        navigate('/checkout');
+                      }}
+                      className="w-full bg-gray-900 text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-orange-500 transition-all shadow-2xl shadow-gray-200 active:scale-[0.98] border-2 border-transparent hover:border-white/20"
+                    >
+                      Buyurtma berish
+                      <ChevronRight size={22} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShopPickerOpen(true);
+                      }}
+                      className="w-full bg-gray-900 text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-orange-500 transition-all shadow-2xl shadow-gray-200 active:scale-[0.98] border-2 border-transparent hover:border-white/20"
+                    >
+                      Maxalla buyurtma berish
+                      <ChevronRight size={22} />
+                    </button>
+                  )}
                 </div>
               )}
+
+              <AnimatePresence>
+                {shopPickerOpen ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
+                  >
+                    <motion.div
+                      initial={{ scale: 0.96, y: 10 }}
+                      animate={{ scale: 1, y: 0 }}
+                      exit={{ scale: 0.96, y: 10 }}
+                      className="w-full max-w-sm rounded-3xl bg-white p-4 shadow-2xl"
+                    >
+                      <h3 className="text-center text-base font-black text-gray-900">Do'konni tanlang</h3>
+                      <p className="mt-1 text-center text-xs text-gray-500">
+                        Buyurtmaga faqat tanlangan do‘kondagi mahsulotlar kiradi
+                      </p>
+                      <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+                        {localShops.map((shop) => (
+                          <button
+                            key={shop.id}
+                            type="button"
+                            onClick={() => setSelectedLocalShopId(shop.id)}
+                            className={cn(
+                              'w-full rounded-2xl border px-3 py-2 text-left',
+                              selectedLocalShopId === shop.id
+                                ? 'border-orange-400 bg-orange-50'
+                                : 'border-gray-200 bg-gray-50'
+                            )}
+                          >
+                            <p className="text-sm font-black text-gray-900">{shop.name}</p>
+                            {shop.phone ? <p className="mt-0.5 text-xs text-gray-500">{shop.phone}</p> : null}
+                            <p className="mt-1 text-[11px] font-semibold text-gray-600">
+                              {shop.itemCount} dona · {shop.total.toLocaleString()} so'm
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShopPickerOpen(false)}
+                          className="flex-1 rounded-2xl border border-gray-200 bg-gray-50 py-2.5 text-sm font-bold text-gray-700"
+                        >
+                          Bekor
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const shopId = selectedLocalShopId ?? localShopOptions[0]?.id;
+                            if (!shopId) return;
+                            setShopSubmitting(true);
+                            void (async () => {
+                              try {
+                                const order = await api.localShopOrders.create({
+                                  local_shop_id: shopId,
+                                  address: { type: 'default' },
+                                });
+                                setShopPickerOpen(false);
+                                setIsCartOpen(false);
+                                navigate(`/orders/${order.id}?market=mahalla`);
+                              } catch (e) {
+                                if (typeof window !== 'undefined') {
+                                  window.alert(e instanceof Error ? e.message : 'Buyurtma yuborilmadi');
+                                }
+                              } finally {
+                                setShopSubmitting(false);
+                              }
+                            })();
+                          }}
+                          disabled={shopSubmitting || localShops.length === 0}
+                          className={cn(
+                            'flex-1 rounded-2xl bg-gray-900 py-2.5 text-sm font-black text-white',
+                            (shopSubmitting || localShops.length === 0) && 'opacity-50'
+                          )}
+                        >
+                          {shopSubmitting ? 'Yuborilmoqda...' : 'Buyurtma berish'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
             </motion.div>
           </motion.div>
         )}

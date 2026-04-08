@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { apiService } from '../../services/api';
-import type { AgentMeOrderListItem, KPISummary } from '../../types/api';
+import { agentKpiTodayToSummary, type AgentMeOrderListItem, type KPISummary } from '../../types/api';
 import { isAgentOrderTimestampSet } from '../../utils/agentMeOrder';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -60,6 +60,7 @@ export default function OrdersScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
   const shellWidth = isWeb ? Math.min(WEB_MAX_WIDTH, Math.max(320, windowWidth - 40)) : undefined;
+  const showKpiDividers = !isWeb || windowWidth >= 520;
 
   const [orders, setOrders] = useState<AgentMeOrderListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,10 +108,9 @@ export default function OrdersScreen() {
 
   const loadKPIBalance = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await apiService.getKPISummary({ date: today });
-      if (response.success && response.data) {
-        setKpiBalance(response.data);
+      const res = await apiService.getAgentKpiToday();
+      if (res.success && res.data) {
+        setKpiBalance(agentKpiTodayToSummary(res.data));
       }
     } catch {
       // KPI ixtiyoriy
@@ -218,28 +218,34 @@ export default function OrdersScreen() {
           </View>
 
           {!loadingKPI && kpiBalance && (
-            <TouchableOpacity style={styles.kpiBalanceCard} onPress={() => router.push('/kpi')} accessibilityRole="button">
+            <TouchableOpacity
+              style={[styles.kpiBalanceCard, isWeb && styles.kpiBalanceCardWeb]}
+              onPress={() => router.push('/kpi')}
+              accessibilityRole="button"
+            >
               <View style={styles.kpiBalanceHeader}>
                 <Ionicons name="wallet" size={20} color="#007AFF" />
-                <Text style={styles.kpiBalanceTitle}>Kunlik KPI balansi</Text>
+                <Text style={[styles.kpiBalanceTitle, isWeb && windowWidth >= 640 && styles.kpiBalanceTitleWeb]}>
+                  Kunlik KPI balansi
+                </Text>
                 <Ionicons name="chevron-forward" size={20} color="#666" style={styles.kpiBalanceArrow} />
               </View>
-              <View style={styles.kpiBalanceRow}>
-                <View style={styles.kpiBalanceItem}>
+              <View style={[styles.kpiBalanceRow, isWeb && styles.kpiBalanceRowWeb]}>
+                <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
                   <Text style={styles.kpiBalanceLabel}>Jami</Text>
                   <Text style={styles.kpiBalanceValue}>
                     {`${(kpiBalance.totalAmount ?? 0).toLocaleString()} so'm`}
                   </Text>
                 </View>
-                <View style={styles.kpiBalanceDivider} />
-                <View style={styles.kpiBalanceItem}>
+                {showKpiDividers ? <View style={styles.kpiBalanceDivider} /> : null}
+                <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
                   <Text style={styles.kpiBalanceLabel}>{"To'langan"}</Text>
                   <Text style={[styles.kpiBalanceValue, styles.kpiBalancePaid]}>
                     {`${(kpiBalance.paidAmount ?? 0).toLocaleString()} so'm`}
                   </Text>
                 </View>
-                <View style={styles.kpiBalanceDivider} />
-                <View style={styles.kpiBalanceItem}>
+                {showKpiDividers ? <View style={styles.kpiBalanceDivider} /> : null}
+                <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
                   <Text style={styles.kpiBalanceLabel}>{"To'lanmagan"}</Text>
                   <Text style={[styles.kpiBalanceValue, styles.kpiBalanceUnpaid]}>
                     {`${(kpiBalance.unpaidAmount ?? 0).toLocaleString()} so'm`}
@@ -509,6 +515,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  kpiBalanceCardWeb: {
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+  },
   kpiBalanceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -523,16 +533,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  kpiBalanceTitleWeb: {
+    fontSize: 17,
+  },
   kpiBalanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
+  kpiBalanceRowWeb: {
+    justifyContent: 'space-around',
+    gap: 8,
+    rowGap: 12,
+  },
   kpiBalanceItem: {
     flex: 1,
     alignItems: 'center',
     minWidth: 88,
+  },
+  kpiBalanceItemWeb: {
+    minWidth: 112,
+    flexGrow: 1,
   },
   kpiBalanceLabel: {
     fontSize: 12,

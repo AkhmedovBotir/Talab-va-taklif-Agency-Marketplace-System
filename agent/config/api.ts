@@ -1,18 +1,23 @@
 // API Configuration
-import { Platform } from 'react-native';
 
-/** Web: backend on same machine. Native: LAN IP for phone/emulator. */
-const API_HOST_WEB = 'http://localhost:8081';
-const API_HOST_NATIVE = 'http://192.168.1.6:8081';
+/** Production API (web va native bir xil). */
+const API_ORIGIN = 'https://api.ttsa.uz';
 const API_VERSION_PREFIX = '/api/v1';
 
 export function getApiBaseUrl(): string {
-  const host = Platform.OS === 'web' ? API_HOST_WEB : API_HOST_NATIVE;
-  return `${host}${API_VERSION_PREFIX}`;
+  return `${API_ORIGIN}${API_VERSION_PREFIX}`;
 }
 
 /** `false` bo‘lsa, bildirishnoma endpointlariga HTTP yuborilmaydi */
-export const NOTIFICATIONS_API_ENABLED = false;
+export const NOTIFICATIONS_API_ENABLED = true;
+
+/** WebSocket: `GET .../agents/me/notifications/ws?token=` */
+export function getNotificationsWebSocketUrl(token: string): string {
+  const http = getApiBaseUrl();
+  const wsRoot =
+    http.startsWith('https://') ? http.replace('https://', 'wss://') : http.replace('http://', 'ws://');
+  return `${wsRoot}/agents/me/notifications/ws?token=${encodeURIComponent(token)}`;
+}
 
 export const API_BASE_URL = getApiBaseUrl();
 
@@ -28,19 +33,18 @@ export const API_ENDPOINTS = {
   // Agent marketplace buyurtmalar (docs: Agent buyurtmalar API)
   AGENT_ME_ORDERS_ACTIVE: '/agents/me/orders/active',
   AGENT_ME_ORDERS_HISTORY: '/agents/me/orders/history',
+  AGENT_ME_ORDERS_ANALYTICS: '/agents/me/orders/analytics',
   AGENT_ME_ORDER_BY_ID: (id: string) => `/agents/me/orders/${id}`,
   AGENT_ME_ORDER_PAYMENT_TO_PUNKT: (id: string) => `/agents/me/orders/${id}/payment-to-punkt`,
   AGENT_ME_ORDER_DELIVER: (id: string) => `/agents/me/orders/${id}/deliver`,
-  // KPI
-  AGENT_KPI_SUMMARY: '/agent/kpi/summary',
-  AGENT_KPI_TRANSACTIONS: '/agent/kpi/transactions',
-  AGENT_KPI_BALANCE: '/agent/kpi/balance',
-  AGENT_KPI_DAILY_REPORT: '/agent/kpi/reports/daily',
-  // Notifications
-  AGENT_NOTIFICATIONS: '/agents/notifications/list',
-  AGENT_NOTIFICATIONS_UNREAD_COUNT: '/agents/notifications/unread-count',
-  AGENT_NOTIFICATION_READ: (id: string) => `/agents/notifications/${id}/read`,
-  AGENT_NOTIFICATIONS_READ_ALL: '/agents/notifications/read-all',
+  // Agent KPI (docs: Agent KPI API) — faqat GET
+  AGENT_ME_KPI_TODAY: '/agents/me/kpi/today',
+  AGENT_ME_KPI_HISTORY: '/agents/me/kpi/history',
+  // Agent notifications (docs: Agent Notifications API)
+  AGENT_ME_NOTIFICATIONS: '/agents/me/notifications',
+  AGENT_ME_NOTIFICATIONS_UNREAD_COUNT: '/agents/me/notifications/unread-count',
+  AGENT_ME_NOTIFICATION_READ: (id: number | string) => `/agents/me/notifications/${id}/read`,
+  AGENT_ME_NOTIFICATIONS_READ_ALL: '/agents/me/notifications/read-all',
   // Agent Payments
   AGENT_ORDERS_FOR_PAYMENT: '/agents/payments/orders-for-payment',
   AGENT_PAY_PUNKT: (orderId: string) => `/agents/payments/pay-to-punkt/${orderId}`,

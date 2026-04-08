@@ -82,6 +82,10 @@ type OrderItem struct {
 	UnitPrice    float64 `gorm:"not null" json:"unit_price"`
 	Quantity     float64 `gorm:"not null" json:"quantity"`
 	Unit         string  `gorm:"size:16;not null" json:"unit"`
+	// UnitOriginalPrice — buyurtma vaqtidagi asl narx (mahsulot original_price snapshot).
+	UnitOriginalPrice float64 `gorm:"not null;default:0" json:"unit_original_price"`
+	// KpiBonusPercent — kontragent KPI havzasi foizi (0–100), marginning qaysi qismi KPI ga ketadi.
+	KpiBonusPercent float64 `gorm:"not null;default:0" json:"kpi_bonus_percent"`
 	// Shu qator umumiy summasidan kontragentga berilgan foiz (0–100), punkt belgilaydi.
 	PunktContragentPayoutPercent *float64 `json:"-"`
 

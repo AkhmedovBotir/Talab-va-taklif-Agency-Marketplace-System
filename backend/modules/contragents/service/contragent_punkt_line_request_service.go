@@ -107,6 +107,11 @@ func (s *ContragentPunktLineRequestService) List(contragentID uint, page, limit 
 	}
 	items := make([]LineRequestListItemOut, 0, len(rows))
 	for _, row := range rows {
+		unitPrice := row.UnitPrice
+		if row.PayoutPercent != nil && row.Quantity > 0 {
+			linePaid := row.UnitPrice * row.Quantity * (*row.PayoutPercent) / 100
+			unitPrice = math.Round((linePaid/row.Quantity)*100) / 100
+		}
 		var ag *orderembed.AgentBrief
 		if row.AssignedAgentID != nil {
 			ag = orderembed.AgentPtr(agents, *row.AssignedAgentID)
@@ -123,7 +128,7 @@ func (s *ContragentPunktLineRequestService) List(contragentID uint, page, limit 
 			ProductName:       row.ProductName,
 			Quantity:          row.Quantity,
 			Unit:              row.Unit,
-			UnitPrice:         row.UnitPrice,
+			UnitPrice:         unitPrice,
 			CreatedAt:         row.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:         row.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		})
@@ -169,11 +174,19 @@ func (s *ContragentPunktLineRequestService) GetByID(contragentID, id uint) (*Lin
 		Status:      d.Order.Status,
 		TotalAmount: d.Order.TotalAmount,
 	}
+	if total, err := s.repo.SumOrderTotalForContragent(d.Order.ID, contragentID); err == nil {
+		orderOut.TotalAmount = math.Round(total*100) / 100
+	}
 	if d.Order.AssignedPunktID != nil {
 		orderOut.AssignedPunkt = orderembed.PunktPtr(punkts, *d.Order.AssignedPunktID)
 	}
 	if d.Order.AssignedAgentID != nil {
 		orderOut.AssignedAgent = orderembed.AgentPtr(agents, *d.Order.AssignedAgentID)
+	}
+	unitPrice := d.Item.UnitPrice
+	if d.Item.PunktContragentPayoutPercent != nil && d.Item.Quantity > 0 {
+		linePaid := d.Item.UnitPrice * d.Item.Quantity * (*d.Item.PunktContragentPayoutPercent) / 100
+		unitPrice = math.Round((linePaid/d.Item.Quantity)*100) / 100
 	}
 	return &LineRequestDetailOut{
 		ID:                r.ID,
@@ -186,7 +199,7 @@ func (s *ContragentPunktLineRequestService) GetByID(contragentID, id uint) (*Lin
 		ProductName:       d.Item.ProductName,
 		Quantity:          d.Item.Quantity,
 		Unit:              d.Item.Unit,
-		UnitPrice:         d.Item.UnitPrice,
+		UnitPrice:         unitPrice,
 		CreatedAt:         r.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         r.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
 	}, nil

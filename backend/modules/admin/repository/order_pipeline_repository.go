@@ -14,6 +14,10 @@ type orderPipelinePostgresRepository struct {
 	db *gorm.DB
 }
 
+func onlyActiveMarketplaceUsers(q *gorm.DB) *gorm.DB {
+	return q.Where("user_id IN (SELECT id FROM marketplace_users WHERE status <> ?)", "deleted")
+}
+
 func NewOrderPipelineRepository(db *gorm.DB) OrderPipelineRepository {
 	return &orderPipelinePostgresRepository{db: db}
 }
@@ -59,19 +63,19 @@ func (r *orderPipelinePostgresRepository) ListByStage(stage string, page, limit 
 	if limit > 100 {
 		limit = 100
 	}
-	base := applyStage(r.db.Model(&mpdomain.Order{}), stage)
+	base := applyStage(onlyActiveMarketplaceUsers(r.db.Model(&mpdomain.Order{})), stage)
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	offset := (page - 1) * limit
 	var rows []mpdomain.Order
-	err := applyStage(r.db, stage).Preload("Items").Order("id desc").Offset(offset).Limit(limit).Find(&rows).Error
+	err := applyStage(onlyActiveMarketplaceUsers(r.db), stage).Preload("Items").Order("id desc").Offset(offset).Limit(limit).Find(&rows).Error
 	return rows, total, err
 }
 
 func (r *orderPipelinePostgresRepository) CountByStage(stage string) (int64, error) {
 	var n int64
-	err := applyStage(r.db.Model(&mpdomain.Order{}), stage).Count(&n).Error
+	err := applyStage(onlyActiveMarketplaceUsers(r.db.Model(&mpdomain.Order{})), stage).Count(&n).Error
 	return n, err
 }

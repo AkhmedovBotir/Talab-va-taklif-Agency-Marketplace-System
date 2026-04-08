@@ -112,6 +112,7 @@ export default function OrdersScreen() {
         <KpiBalanceCard
           onPress={() => router.push('/kpi')}
           refreshTrigger={kpiRefreshTrigger}
+          maxWidth={isWeb ? listMaxWidth : undefined}
         />
       </View>
 

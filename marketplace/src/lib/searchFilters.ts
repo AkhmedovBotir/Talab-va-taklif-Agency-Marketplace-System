@@ -26,6 +26,16 @@ export function filtersActive(f: ProductFilters): boolean {
   );
 }
 
+/** Maxalla mahsulotlarida kontragent filtri ishlatilmaydi */
+export function filtersActiveMahalla(f: ProductFilters): boolean {
+  return (
+    f.categoryId != null ||
+    f.subcategoryId != null ||
+    f.minPrice != null ||
+    f.maxPrice != null
+  );
+}
+
 export function filterProductsByFilters(products: Product[], f: ProductFilters): Product[] {
   return products.filter((p) => {
     if (f.contragentId != null && Number(p.contragent_id) !== f.contragentId) return false;

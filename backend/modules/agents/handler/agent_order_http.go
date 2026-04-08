@@ -21,6 +21,7 @@ func NewAgentOrderHandler(svc *service.AgentOrderService) *AgentOrderHandler {
 func (h *AgentOrderHandler) RegisterMeRoutes(me *gin.RouterGroup) {
 	me.GET("/orders/active", h.ListActive)
 	me.GET("/orders/history", h.ListHistory)
+	me.GET("/orders/analytics", h.Analytics)
 	me.GET("/orders/:id", h.GetByID)
 	me.POST("/orders/:id/payment-to-punkt", h.DeclarePaymentToPunkt)
 	me.POST("/orders/:id/deliver", h.Deliver)
@@ -103,6 +104,26 @@ func (h *AgentOrderHandler) Deliver(c *gin.Context) {
 		return
 	}
 	response.JSON(c, http.StatusOK, "Buyurtma yetkazildi deb belgilandi", nil, nil)
+}
+
+func (h *AgentOrderHandler) Analytics(c *gin.Context) {
+	agentID, ok := agentIDFromContext(c)
+	if !ok {
+		response.JSON(c, http.StatusUnauthorized, "Token yaroqsiz", nil, nil)
+		return
+	}
+	out, err := h.svc.Analytics(agentID, c.Query("from"), c.Query("to"))
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrAgentAnalyticsDateInvalid),
+			errors.Is(err, service.ErrAgentAnalyticsDateRangeInvalid):
+			response.JSON(c, http.StatusBadRequest, err.Error(), nil, nil)
+		default:
+			response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())
+		}
+		return
+	}
+	response.JSON(c, http.StatusOK, "Agent analitikasi olindi", out, nil)
 }
 
 func (h *AgentOrderHandler) mapErr(c *gin.Context, err error) {

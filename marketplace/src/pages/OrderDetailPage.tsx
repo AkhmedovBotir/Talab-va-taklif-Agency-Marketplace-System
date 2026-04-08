@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Loader2, Package, Ban } from 'lucide-react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, Loader2, Package, Ban, Star, X } from 'lucide-react';
 import { api } from '../services/api';
 import { useWebCart } from '../hooks/useWebCart';
 import { cn } from '../lib/utils';
-import type { MarketplaceOrder } from '../types';
+import type { MarketplaceOrder, CommentTemplate, OrderRatingItemPayload } from '../types';
 import {
   orderStatusLabelUz,
   formatOrderAddressSummary,
@@ -14,6 +14,7 @@ import {
 } from '../lib/orders';
 import {
   fetchProductImageById,
+  fetchLocalShopProductImageById,
   resolveOrderLineImageUri,
   formatOrderLineQtyLabel,
   formatOrderLineUnitPriceLabel,
@@ -28,20 +29,26 @@ function formatOrderDate(iso: string): string {
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { refreshCart } = useWebCart();
+  const market = new URLSearchParams(location.search).get('market') === 'mahalla' ? 'mahalla' : 'bozor';
   const [order, setOrder] = useState<MarketplaceOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [commentTemplates, setCommentTemplates] = useState<CommentTemplate[]>([]);
+  const [ratingDraft, setRatingDraft] = useState<Record<number, { score: number; comment_template_id?: number; note: string }>>({});
 
   const fetchOne = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setError(null);
     try {
-      const o = await api.orders.get(id);
+      const o = market === 'mahalla' ? await api.localShopOrders.get(id) : await api.orders.get(id);
       setOrder(o);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Yuklanmadi');
@@ -49,11 +56,15 @@ export function OrderDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, market]);
 
   useEffect(() => {
     void fetchOne();
   }, [fetchOne]);
+
+  useEffect(() => {
+    void api.commentTemplates.list().then(setCommentTemplates).catch(() => {});
+  }, []);
 
   const listImgMap = useMemo(() => new Map<string, string>(), []);
   const [fetchedImages, setFetchedImages] = useState<Record<number, string>>({});
@@ -62,20 +73,29 @@ export function OrderDetailPage() {
     setFetchedImages({});
   }, [order?.id]);
 
-  const orderItemPids = order?.items?.map((l) => l.product_id).join(',') ?? '';
+  const orderItemPids = order?.items?.map((l) => `${l.product_id}:${l.local_shop_product_id ?? 0}`).join(',') ?? '';
 
   useEffect(() => {
     if (!order?.items?.length) return;
     let cancelled = false;
-    const pids = [...new Set(order.items.map((l) => l.product_id).filter((pid) => pid > 0))];
+    const ids =
+      order.market === 'mahalla'
+        ? [...new Set(order.items.map((l) => l.local_shop_product_id ?? 0).filter((id) => id > 0))]
+        : [...new Set(order.items.map((l) => l.product_id).filter((pid) => pid > 0))];
 
     (async () => {
       const additions: Record<number, string> = {};
-      for (const pid of pids) {
-        const sample = order.items.find((l) => l.product_id === pid);
+      for (const pid of ids) {
+        const sample =
+          order.market === 'mahalla'
+            ? order.items.find((l) => (l.local_shop_product_id ?? 0) === pid)
+            : order.items.find((l) => l.product_id === pid);
         if (sample?.image_url?.trim()) continue;
-        if (listImgMap.has(String(pid))) continue;
-        const url = await fetchProductImageById(pid);
+        if (order.market !== 'mahalla' && listImgMap.has(String(pid))) continue;
+        const url =
+          order.market === 'mahalla'
+            ? await fetchLocalShopProductImageById(pid, order.local_shop_id)
+            : await fetchProductImageById(pid);
         if (url && !cancelled) additions[pid] = url;
       }
       if (!cancelled && Object.keys(additions).length > 0) {
@@ -99,7 +119,7 @@ export function OrderDetailPage() {
     if (order == null || !order.can_cancel) return;
     setCancelSubmitting(true);
     try {
-      const updated = await api.orders.cancel(order.id);
+      const updated = market === 'mahalla' ? await api.localShopOrders.cancel(order.id) : await api.orders.cancel(order.id);
       setOrder(updated);
       setCancelModalVisible(false);
       await refreshCart();
@@ -110,7 +130,70 @@ export function OrderDetailPage() {
     } finally {
       setCancelSubmitting(false);
     }
-  }, [order, refreshCart]);
+  }, [order, refreshCart, market]);
+
+  const openRatingModal = useCallback(() => {
+    if (!order) return;
+    const draft: Record<number, { score: number; comment_template_id?: number; note: string }> = {};
+    for (const line of order.items) {
+      const itemId = Number(line.order_item_id ?? 0);
+      if (itemId > 0) draft[itemId] = { score: 5, note: '' };
+    }
+    setRatingDraft(draft);
+    setRatingModalOpen(true);
+    void (async () => {
+      const updates: Record<number, { score: number; comment_template_id?: number; note: string }> = {};
+      await Promise.all(
+        order.items.map(async (line) => {
+          const itemId = Number(line.order_item_id ?? 0);
+          const pid = Number(line.product_id ?? 0);
+          if (!itemId || !pid) return;
+          try {
+            const res = await api.productRatings.get(pid, { page: 1, limit: 100 });
+            const own = res.items.find((it) => Number(it.order_id) === Number(order.id) && Number(it.order_item_id) === itemId);
+            if (!own) return;
+            updates[itemId] = {
+              score: Math.min(5, Math.max(1, Number(own.score) || 5)),
+              comment_template_id: own.comment_template_id,
+              note: own.note || own.comment_template || '',
+            };
+          } catch {
+            // ignore per-line errors
+          }
+        })
+      );
+      if (Object.keys(updates).length) setRatingDraft((prev) => ({ ...prev, ...updates }));
+    })();
+  }, [order]);
+
+  const submitRatings = useCallback(async () => {
+    if (!order) return;
+    const items: OrderRatingItemPayload[] = order.items
+      .map((line) => {
+        const itemId = Number(line.order_item_id ?? 0);
+        const draft = ratingDraft[itemId];
+        if (!itemId || !draft) return null;
+        if (draft.score < 1 || draft.score > 5) return null;
+        return {
+          order_item_id: itemId,
+          score: draft.score,
+          comment_template_id: draft.comment_template_id || undefined,
+          note: draft.note?.trim() || undefined,
+        };
+      })
+      .filter(Boolean) as OrderRatingItemPayload[];
+    if (!items.length) return window.alert("Baholash uchun mahsulot topilmadi");
+    setRatingSubmitting(true);
+    try {
+      await api.orders.rate(order.id, items);
+      setRatingModalOpen(false);
+      window.alert('Rahmat! Baholaringiz saqlandi.');
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Baholash yuborilmadi");
+    } finally {
+      setRatingSubmitting(false);
+    }
+  }, [order, ratingDraft]);
 
   const roadmapStages = getOrderRoadmapStages(order?.roadmap);
 
@@ -222,7 +305,8 @@ export function OrderDetailPage() {
                       line.product_id,
                       line.image_url,
                       listImgMap,
-                      fetchedImages
+                      fetchedImages,
+                      line.local_shop_product_id ?? line.product_id
                     );
                     return (
                       <li
@@ -282,10 +366,78 @@ export function OrderDetailPage() {
                 <span className="text-sm font-black uppercase tracking-wide text-slate-600">Jami</span>
                 <span className="text-xl font-black text-slate-900 lg:text-2xl">{order.total_amount.toLocaleString()} so&apos;m</span>
               </div>
+              {order.status === 'delivered' && market === 'bozor' ? (
+                <button onClick={() => openRatingModal()} className="w-full rounded-2xl bg-emerald-600 px-4 py-4 text-sm font-black uppercase tracking-wide text-white">
+                  Mahsulotlarni baholash
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
       </div>
+
+      {ratingModalOpen ? (
+        <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/45 p-0 md:items-center md:p-4" onClick={() => !ratingSubmitting && setRatingModalOpen(false)}>
+          <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-white p-4 md:max-w-3xl md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-lg font-black text-slate-900">Mahsulotlarni baholash</h3>
+              <button onClick={() => !ratingSubmitting && setRatingModalOpen(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {order?.items.map((line, idx) => {
+                const itemId = Number(line.order_item_id ?? 0);
+                if (!itemId) return null;
+                const draft = ratingDraft[itemId] || { score: 5, note: '' };
+                return (
+                  <div key={`${itemId}_${idx}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="font-bold text-slate-800">{line.product_name}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-slate-500">Sizning bahongiz: {draft.score} / 5</p>
+                    <div className="mt-2 flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((score) => (
+                        <button key={score} onClick={() => setRatingDraft((p) => ({ ...p, [itemId]: { ...draft, score } }))} className="rounded p-1">
+                          <Star size={22} className={score <= draft.score ? 'fill-amber-500 text-amber-500' : 'text-slate-300'} />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {commentTemplates.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          onClick={() =>
+                            setRatingDraft((p) => ({
+                              ...p,
+                              [itemId]: { ...draft, comment_template_id: tpl.id, note: draft.note || tpl.comment },
+                            }))
+                          }
+                          className={cn(
+                            'rounded-full border px-3 py-1.5 text-xs font-semibold',
+                            draft.comment_template_id === tpl.id ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-700'
+                          )}
+                        >
+                          {tpl.comment}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={draft.note}
+                      onChange={(e) => setRatingDraft((p) => ({ ...p, [itemId]: { ...draft, note: e.target.value } }))}
+                      placeholder="Izoh (ixtiyoriy)"
+                      rows={2}
+                      className="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => !ratingSubmitting && setRatingModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-3 font-bold text-slate-600">Yopish</button>
+              <button onClick={() => void submitRatings()} disabled={ratingSubmitting} className="flex-1 rounded-xl bg-emerald-600 py-3 font-bold text-white disabled:opacity-60">{ratingSubmitting ? 'Yuborilmoqda...' : 'Yuborish'}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {cancelModalVisible ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-5">

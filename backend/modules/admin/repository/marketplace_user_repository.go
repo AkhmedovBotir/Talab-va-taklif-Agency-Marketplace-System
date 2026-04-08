@@ -41,7 +41,7 @@ func (r *marketplaceUserPostgresRepository) GetPaginated(page, limit int, filter
 	var rows []mpDomain.User
 	var total int64
 
-	q := r.db.Model(&mpDomain.User{})
+	q := r.db.Model(&mpDomain.User{}).Where("status <> ?", "deleted")
 	if filter.Status != nil {
 		q = q.Where("status = ?", *filter.Status)
 	}
@@ -75,7 +75,7 @@ func (r *marketplaceUserPostgresRepository) GetPaginated(page, limit int, filter
 
 func (r *marketplaceUserPostgresRepository) GetByID(id uint) (*mpDomain.User, error) {
 	var row mpDomain.User
-	err := r.db.First(&row, id).Error
+	err := r.db.Where("id = ?", id).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -95,7 +95,7 @@ func (r *marketplaceUserPostgresRepository) Delete(id uint) error {
 
 func (r *marketplaceUserPostgresRepository) ExistsByPhone(phone string, exceptID uint) (bool, error) {
 	var count int64
-	q := r.db.Model(&mpDomain.User{}).Where("phone = ?", phone)
+	q := r.db.Model(&mpDomain.User{}).Where("phone = ? AND status <> ?", phone, "deleted")
 	if exceptID > 0 {
 		q = q.Where("id <> ?", exceptID)
 	}

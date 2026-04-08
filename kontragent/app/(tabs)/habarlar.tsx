@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiService, Notification } from '../../services/api';
+import { subscribeContragentNotificationInbox } from '../../services/contragentNotificationEvents';
 
 const TYPE_CONFIG: Record<string, { icon: string; color: string; bgColor: string; label: string }> = {
   info: { icon: 'information-circle', color: '#007AFF', bgColor: '#E3F2FD', label: 'Ma\'lumot' },
@@ -33,6 +34,7 @@ export default function HabarlarScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [serverUnreadCount, setServerUnreadCount] = useState(0);
 
   const fetchNotifications = useCallback(async (pageNum: number = 1, refresh: boolean = false) => {
     try {
@@ -45,6 +47,7 @@ export default function HabarlarScreen() {
         }
         setHasMore(pageNum < response.pagination.pages);
         setPage(pageNum);
+        setServerUnreadCount(response.unreadCount);
       }
     } catch (error) {
       // Ignore notification fetching errors
@@ -57,6 +60,12 @@ export default function HabarlarScreen() {
 
   useEffect(() => {
     fetchNotifications();
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    return subscribeContragentNotificationInbox(() => {
+      void fetchNotifications(1, true);
+    });
   }, [fetchNotifications]);
 
   const onRefresh = () => {
@@ -81,6 +90,7 @@ export default function HabarlarScreen() {
         setNotifications(prev =>
           prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n)
         );
+        setServerUnreadCount(c => Math.max(0, c - 1));
       } catch (error) {
         // Ignore marking notification read errors
       }
@@ -91,6 +101,7 @@ export default function HabarlarScreen() {
     try {
       await apiService.markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setServerUnreadCount(0);
     } catch (error) {
       // Ignore marking all read errors
     }
@@ -162,13 +173,11 @@ export default function HabarlarScreen() {
     );
   }
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-
   return (
     <View style={[styles.container]}>
-      {unreadCount > 0 && (
+      {serverUnreadCount > 0 && (
         <View style={styles.topBar}>
-          <Text style={styles.unreadText}>Yangi {unreadCount} ta habar</Text>
+          <Text style={styles.unreadText}>Yangi {serverUnreadCount} ta habar</Text>
           <TouchableOpacity onPress={handleMarkAllRead}>
             <Text style={styles.markAllText}>Barchasini o'qilgan deb belgilash</Text>
           </TouchableOpacity>

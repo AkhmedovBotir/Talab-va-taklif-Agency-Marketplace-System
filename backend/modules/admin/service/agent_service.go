@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"backend/internal/pkg/security"
@@ -222,7 +223,10 @@ func (s *agentService) Delete(id uint) error {
 	if row == nil {
 		return ErrAgentNotFound
 	}
-	return s.repo.Delete(id)
+	row.Status = "deleted"
+	row.Name = fmt.Sprintf("Archived Agent-%d", row.ID)
+	row.Phone = fmt.Sprintf("+998%09d", row.ID%1000000000)
+	return s.repo.Update(row)
 }
 
 func validateAgentPhone(phone string) error {

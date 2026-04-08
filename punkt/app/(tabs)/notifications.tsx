@@ -13,27 +13,40 @@ import {
 } from 'react-native';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { FEATURE_NOTIFICATIONS_ENABLED } from '../config/features';
-import { apiService, Notification } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { apiService, PunktMeNotificationItem } from '../services/api';
+import { requestNotificationInboxSync } from '../services/notificationInboxSync';
+import { subscribePunktNotificationRealtime } from '../services/punktNotificationRealtime';
 
-type NotificationType = 'info' | 'warning' | 'success' | 'error' | 'announcement' | 'promotion' | 'update';
+type NotificationVisualType =
+  | 'info'
+  | 'warning'
+  | 'success'
+  | 'error'
+  | 'announcement'
+  | 'update';
 
-const typeConfig: Record<NotificationType, { icon: string; color: string; bgColor: string; label: string }> = {
-  info: { icon: 'information-circle', color: '#007AFF', bgColor: '#E3F2FD', label: 'Ma\'lumot' },
+const typeConfig: Record<
+  NotificationVisualType,
+  { icon: string; color: string; bgColor: string; label: string }
+> = {
+  info: { icon: 'information-circle', color: '#007AFF', bgColor: '#E3F2FD', label: "Ma'lumot" },
   warning: { icon: 'warning', color: '#FF9500', bgColor: '#FFF3E0', label: 'Ogohlantirish' },
   success: { icon: 'checkmark-circle', color: '#34C759', bgColor: '#E8F5E9', label: 'Muvaffaqiyat' },
   error: { icon: 'close-circle', color: '#FF3B30', bgColor: '#FFEBEE', label: 'Xatolik' },
-  announcement: { icon: 'megaphone', color: '#5856D6', bgColor: '#EDE7F6', label: 'E\'lon' },
-  promotion: { icon: 'gift', color: '#FF2D55', bgColor: '#FCE4EC', label: 'Aksiya' },
+  announcement: { icon: 'megaphone', color: '#5856D6', bgColor: '#EDE7F6', label: "E'lon" },
   update: { icon: 'refresh-circle', color: '#00C7BE', bgColor: '#E0F7FA', label: 'Yangilanish' },
 };
 
 export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { token } = useAuth();
+  const [notifications, setNotifications] = useState<PunktMeNotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [serverUnreadCount, setServerUnreadCount] = useState(0);
+  const [selectedNotification, setSelectedNotification] = useState<PunktMeNotificationItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   const loadNotifications = useCallback(async (pageNum = 1, reset = false) => {
@@ -43,19 +56,28 @@ export default function NotificationsScreen() {
       return;
     }
     try {
-      const response = await apiService.getNotifications({
+      const response = await apiService.getPunktMeNotifications({
         page: pageNum,
         limit: 20,
       });
 
+      const payload = response.data;
+      const items = payload?.items ?? [];
+
       if (reset) {
-        setNotifications(response.data);
+        setNotifications(items);
       } else {
-        setNotifications((prev) => [...prev, ...response.data]);
+        setNotifications((prev) => [...prev, ...items]);
       }
 
-      setHasMore(response.page < response.totalPages);
-    } catch (error: any) {
+      setServerUnreadCount(payload?.unread_count ?? 0);
+      const totalPages = payload?.total_pages ?? 1;
+      const currentPage = payload?.page ?? pageNum;
+      setHasMore(currentPage < totalPages);
+      if (reset) {
+        requestNotificationInboxSync();
+      }
+    } catch (error: unknown) {
       console.error('Error loading notifications:', error);
     } finally {
       setLoading(false);
@@ -68,31 +90,52 @@ export default function NotificationsScreen() {
       setLoading(false);
       return;
     }
-    loadNotifications(1, true);
+    void loadNotifications(1, true);
   }, [loadNotifications]);
+
+  useEffect(() => {
+    if (!FEATURE_NOTIFICATIONS_ENABLED || !token) {
+      return;
+    }
+    const unsub = subscribePunktNotificationRealtime(token, true, {
+      onNew: (n) => {
+        setNotifications((prev) => {
+          if (prev.some((x) => x.id === n.id)) return prev;
+          return [n, ...prev];
+        });
+        if (!n.is_read) {
+          setServerUnreadCount((c) => c + 1);
+        }
+        requestNotificationInboxSync();
+      },
+    });
+    return unsub;
+  }, [token]);
 
   const handleRefresh = () => {
     setRefreshing(true);
     setPage(1);
-    loadNotifications(1, true);
+    void loadNotifications(1, true);
   };
 
   const loadMore = () => {
     if (!loading && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      loadNotifications(nextPage, false);
+      void loadNotifications(nextPage, false);
     }
   };
 
-  const handleMarkAsRead = async (notificationId: string) => {
+  const handleMarkAsRead = async (notificationId: number) => {
     try {
-      await apiService.markNotificationAsRead(notificationId);
+      await apiService.markPunktMeNotificationRead(notificationId);
       setNotifications((prev) =>
         prev.map((n) =>
-          n._id === notificationId ? { ...n, isRead: true } : n
+          n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
         )
       );
+      setServerUnreadCount((c) => Math.max(0, c - 1));
+      requestNotificationInboxSync();
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -100,18 +143,20 @@ export default function NotificationsScreen() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await apiService.markAllNotificationsAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      await apiService.markPunktMeNotificationsReadAll();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setServerUnreadCount(0);
+      requestNotificationInboxSync();
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
   };
 
-  const openNotificationDetail = (notification: Notification) => {
+  const openNotificationDetail = (notification: PunktMeNotificationItem) => {
     setSelectedNotification(notification);
     setModalVisible(true);
-    if (!notification.isRead) {
-      handleMarkAsRead(notification._id);
+    if (!notification.is_read) {
+      void handleMarkAsRead(notification.id);
     }
   };
 
@@ -127,31 +172,31 @@ export default function NotificationsScreen() {
   };
 
   const getTypeConfig = (type: string) => {
-    return typeConfig[type as NotificationType] || typeConfig.info;
+    return typeConfig[type as NotificationVisualType] || typeConfig.info;
   };
 
-  const renderNotification = ({ item }: { item: Notification }) => {
+  const renderNotification = ({ item }: { item: PunktMeNotificationItem }) => {
     const config = getTypeConfig(item.type);
-    
+
     return (
       <TouchableOpacity
         style={[
           styles.notificationCard,
           { borderLeftColor: config.color },
-          !item.isRead && { backgroundColor: config.bgColor },
+          !item.is_read && { backgroundColor: config.bgColor },
         ]}
         onPress={() => openNotificationDetail(item)}
       >
         <View style={styles.notificationHeader}>
           <View style={[styles.iconContainer, { backgroundColor: config.bgColor }]}>
-            <Ionicons name={config.icon as any} size={24} color={config.color} />
+            <Ionicons name={config.icon as never} size={24} color={config.color} />
           </View>
           <View style={styles.notificationContent}>
             <View style={styles.titleRow}>
-              <Text style={[styles.notificationTitle, !item.isRead && styles.unreadTitle]} numberOfLines={1}>
+              <Text style={[styles.notificationTitle, !item.is_read && styles.unreadTitle]} numberOfLines={1}>
                 {item.title}
               </Text>
-              {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: config.color }]} />}
+              {!item.is_read && <View style={[styles.unreadDot, { backgroundColor: config.color }]} />}
             </View>
             <Text style={styles.notificationMessage} numberOfLines={1}>
               {item.message}
@@ -160,7 +205,7 @@ export default function NotificationsScreen() {
               <View style={[styles.typeBadge, { backgroundColor: config.color + '20' }]}>
                 <Text style={[styles.typeText, { color: config.color }]}>{config.label}</Text>
               </View>
-              <Text style={styles.notificationDate}>{formatDate(item.createdAt)}</Text>
+              <Text style={styles.notificationDate}>{formatDate(item.created_at)}</Text>
             </View>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
@@ -176,9 +221,7 @@ export default function NotificationsScreen() {
         <View style={styles.disabledWrap}>
           <Ionicons name="notifications-off-outline" size={64} color="#CCC" />
           <Text style={styles.disabledTitle}>Xabarlar o‘chirilgan</Text>
-          <Text style={styles.disabledSubtitle}>
-            Bu bo‘lim vaqtincha ishlamaydi.
-          </Text>
+          <Text style={styles.disabledSubtitle}>Bu bo‘lim vaqtincha ishlamaydi.</Text>
         </View>
       </>
     );
@@ -193,7 +236,6 @@ export default function NotificationsScreen() {
     );
   }
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
   const selectedConfig = selectedNotification ? getTypeConfig(selectedNotification.type) : typeConfig.info;
 
   return (
@@ -202,8 +244,8 @@ export default function NotificationsScreen() {
         options={{
           title: 'Xabarlar',
           headerRight: () =>
-            unreadCount > 0 ? (
-              <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
+            serverUnreadCount > 0 ? (
+              <TouchableOpacity onPress={() => void handleMarkAllAsRead()} style={styles.markAllButton}>
                 <Text style={styles.markAllText}>Barchasini o'qish</Text>
               </TouchableOpacity>
             ) : null,
@@ -213,11 +255,9 @@ export default function NotificationsScreen() {
         <FlatList
           data={notifications}
           renderItem={renderNotification}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
           ListEmptyComponent={
@@ -240,16 +280,13 @@ export default function NotificationsScreen() {
             <View style={[styles.modalHeader, { backgroundColor: selectedConfig.bgColor }]}>
               <View style={styles.modalHeaderContent}>
                 <View style={[styles.modalIconContainer, { backgroundColor: selectedConfig.color + '30' }]}>
-                  <Ionicons name={selectedConfig.icon as any} size={32} color={selectedConfig.color} />
+                  <Ionicons name={selectedConfig.icon as never} size={32} color={selectedConfig.color} />
                 </View>
                 <View style={[styles.modalTypeBadge, { backgroundColor: selectedConfig.color }]}>
                   <Text style={styles.modalTypeText}>{selectedConfig.label}</Text>
                 </View>
               </View>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setModalVisible(false)}
-              >
+              <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
@@ -257,7 +294,7 @@ export default function NotificationsScreen() {
             <ScrollView style={styles.modalBody}>
               <Text style={styles.modalTitle}>{selectedNotification?.title}</Text>
               <Text style={styles.modalDate}>
-                {selectedNotification && formatDate(selectedNotification.createdAt)}
+                {selectedNotification && formatDate(selectedNotification.created_at)}
               </Text>
               <View style={styles.divider} />
               <Text style={styles.modalMessage}>{selectedNotification?.message}</Text>

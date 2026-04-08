@@ -10,21 +10,28 @@ import {
   ArrowLeft,
   Filter,
   X,
+  Store,
+  MapPin,
+  Zap,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { normalizeMarketplaceProduct } from '../services/normalizeProduct';
 import type { Product, UnifiedSearchResponse } from '../types';
+import type { LocalShopProduct } from '../types';
 import { useWebCart } from '../hooks/useWebCart';
 import { WebProductCard } from '../components/WebProductCard';
 import { WebProductDetailOverlay } from '../components/WebProductDetailOverlay';
+import { WebLocalProductDetailOverlay } from '../components/WebLocalProductDetailOverlay';
 import { WebCustomSelect, type WebSelectOption } from '../components/WebCustomSelect';
 import { formatSomDigits, parseSomDigitsFromInput } from '../lib/formatSom';
 import {
   EMPTY_PRODUCT_FILTERS,
   filtersActive,
+  filtersActiveMahalla,
   filterProductsByFilters,
   type ProductFilters,
 } from '../lib/searchFilters';
+import { readWebDelivery } from '../lib/webDeliverySelection';
 import { cn } from '../lib/utils';
 
 const EMPTY: UnifiedSearchResponse = {
@@ -35,6 +42,7 @@ const EMPTY: UnifiedSearchResponse = {
   subcategories: [],
   contragents: [],
 };
+type SearchMarketTab = 'bozor' | 'mahalla';
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
@@ -138,12 +146,17 @@ export function SearchPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
-  const { addToCart, updateQuantity, cart } = useWebCart();
+  const { addToCart, updateQuantity, cart, localCart, addLocalToCart, updateLocalQuantity } = useWebCart();
   const cartQtyByProductId = useMemo(() => {
     const m = new Map<string, number>();
     for (const it of cart) m.set(String(it.id), it.quantity);
     return m;
   }, [cart]);
+  const localCartQtyByProductId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const it of localCart) m.set(String(it.id), it.quantity);
+    return m;
+  }, [localCart]);
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
   const [loading, setLoading] = useState(false);
@@ -151,12 +164,19 @@ export function SearchPage() {
   const [browseProducts, setBrowseProducts] = useState<Product[]>([]);
   const [browseLoading, setBrowseLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedLocalProduct, setSelectedLocalProduct] = useState<LocalShopProduct | null>(null);
+  const [activeTab, setActiveTab] = useState<SearchMarketTab>('bozor');
   const [filterOpen, setFilterOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<ProductFilters>(EMPTY_PRODUCT_FILTERS);
   const [draftFilters, setDraftFilters] = useState<ProductFilters>(EMPTY_PRODUCT_FILTERS);
   const [categoryOptions, setCategoryOptions] = useState<WebSelectOption<number>[]>([]);
   const [contragentOptions, setContragentOptions] = useState<WebSelectOption<number>[]>([]);
   const [subcategoryOptions, setSubcategoryOptions] = useState<WebSelectOption<number>[]>([]);
+  const [localProducts, setLocalProducts] = useState<LocalShopProduct[]>([]);
+  const [localLoading, setLocalLoading] = useState(false);
+  const [deliveryRev, setDeliveryRev] = useState(0);
+  const [deliverySnap, setDeliverySnap] = useState(() => readWebDelivery());
+  const [filterModalDesktop, setFilterModalDesktop] = useState(false);
 
   const filterOpenRef = useRef(false);
   useEffect(() => {
@@ -171,9 +191,28 @@ export function SearchPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const filterActive = filtersActive(appliedFilters);
+  const filterTabActive =
+    activeTab === 'mahalla' ? filtersActiveMahalla(appliedFilters) : filtersActive(appliedFilters);
 
-  const [filterModalDesktop, setFilterModalDesktop] = useState(false);
+  useEffect(() => {
+    if (activeTab !== 'mahalla') return;
+    setAppliedFilters((f) => (f.contragentId != null ? { ...f, contragentId: null } : f));
+    setDraftFilters((f) => (f.contragentId != null ? { ...f, contragentId: null } : f));
+  }, [activeTab]);
+
+  useEffect(() => {
+    const h = () => {
+      setDeliveryRev((r) => r + 1);
+      setDeliverySnap(readWebDelivery());
+    };
+    window.addEventListener('marketplace-delivery', h);
+    return () => window.removeEventListener('marketplace-delivery', h);
+  }, []);
+
+  useEffect(() => {
+    setDeliverySnap(readWebDelivery());
+  }, [location.key]);
+
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia('(min-width: 768px)');
@@ -184,13 +223,26 @@ export function SearchPage() {
   }, []);
 
   useEffect(() => {
-    const s = location.state as { focusSearch?: boolean; openFilter?: boolean } | null;
-    if (!s?.focusSearch && !s?.openFilter) return;
+    const s = location.state as {
+      focusSearch?: boolean;
+      openFilter?: boolean;
+      contragentId?: number;
+      marketTab?: SearchMarketTab;
+    } | null;
+    if (!s?.focusSearch && !s?.openFilter && s?.contragentId == null && !s?.marketTab) return;
     if (s.focusSearch) {
       requestAnimationFrame(() => inputRef.current?.focus());
     }
     if (s.openFilter) {
       setFilterOpen(true);
+    }
+    if (s.contragentId != null) {
+      setActiveTab('bozor');
+      setAppliedFilters((prev) => ({ ...prev, contragentId: Number(s.contragentId) }));
+      setDraftFilters((prev) => ({ ...prev, contragentId: Number(s.contragentId) }));
+    }
+    if (s.marketTab === 'bozor' || s.marketTab === 'mahalla') {
+      setActiveTab(s.marketTab);
     }
     navigate(location.pathname, { replace: true });
   }, [location.pathname, location.state, navigate]);
@@ -202,7 +254,7 @@ export function SearchPage() {
   }, []);
 
   useEffect(() => {
-    if (!filterOpen) return;
+    if (!filterOpen || activeTab !== 'bozor') return;
     let cancelled = false;
     (async () => {
       const res = await api.contragents.list({ page: 1, limit: 100 });
@@ -213,7 +265,7 @@ export function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [filterOpen]);
+  }, [filterOpen, activeTab]);
 
   useEffect(() => {
     if (!filterOpen || !draftFilters.categoryId) {
@@ -257,6 +309,31 @@ export function SearchPage() {
     };
   }, [debounced, appliedFilters.categoryId, appliedFilters.subcategoryId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLocalLoading(true);
+    (async () => {
+      try {
+        const snap = readWebDelivery();
+        const list = await api.localShopProducts.list({
+          page: 1,
+          limit: 200,
+          q: debounced || undefined,
+          district_id: snap.district_id ?? undefined,
+          mfy_id: snap.mfy_id ?? undefined,
+        });
+        if (!cancelled) setLocalProducts(list);
+      } catch {
+        if (!cancelled) setLocalProducts([]);
+      } finally {
+        if (!cancelled) setLocalLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debounced, deliveryRev]);
+
   const runSearch = useCallback(async (query: string) => {
     if (!query) {
       setData(EMPTY);
@@ -297,6 +374,14 @@ export function SearchPage() {
   const displayedSearchProducts = useMemo(
     () => filterProductsByFilters(data.products, appliedFilters),
     [data.products, appliedFilters]
+  );
+  const displayedLocalProducts = useMemo(
+    () =>
+      filterProductsByFilters(localProducts, {
+        ...appliedFilters,
+        contragentId: null,
+      }),
+    [localProducts, appliedFilters]
   );
 
   const hasAny = useMemo(
@@ -350,9 +435,49 @@ export function SearchPage() {
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-black text-gray-900 md:text-3xl">Qidiruv</h1>
               <p className="mt-1 text-xs font-bold uppercase tracking-widest text-gray-400">
-                Mahsulotlar va kategoriyalar
+                Bozor va maxalla mahsulotlari
               </p>
             </div>
+          </div>
+          <div className="flex rounded-2xl border border-gray-200/80 bg-gradient-to-b from-gray-100 to-gray-100/90 p-1.5 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setActiveTab('bozor')}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-black uppercase tracking-wider transition md:py-2.5',
+                activeTab === 'bozor'
+                  ? 'bg-white text-gray-900 shadow-md shadow-gray-200/80 ring-1 ring-gray-100'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              <Store
+                size={18}
+                strokeWidth={2.25}
+                className={activeTab === 'bozor' ? 'text-orange-500' : 'text-gray-400'}
+              />
+              Bozorda
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('mahalla')}
+              className={cn(
+                'relative flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-black uppercase tracking-wider transition md:py-2.5',
+                activeTab === 'mahalla'
+                  ? 'bg-white text-gray-900 shadow-md shadow-gray-200/80 ring-1 ring-gray-100'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              <MapPin
+                size={18}
+                strokeWidth={2.25}
+                className={activeTab === 'mahalla' ? 'text-orange-500' : 'text-gray-400'}
+              />
+              Maxallada
+              <span className="pointer-events-none absolute -right-0.5 -top-1 flex items-center gap-0.5 rounded-md bg-orange-500 px-1.5 py-0.5 shadow-sm">
+                <Zap size={10} className="text-white" fill="currentColor" />
+                <span className="text-[8px] font-black uppercase leading-none text-white">Tezkor</span>
+              </span>
+            </button>
           </div>
           <div className="flex w-full items-stretch overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-sm transition focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500">
             <div className="relative min-w-0 flex-1">
@@ -371,12 +496,12 @@ export function SearchPage() {
               onClick={() => setFilterOpen(true)}
               className={cn(
                 'relative flex h-[52px] w-12 flex-shrink-0 items-center justify-center border-l border-gray-200 bg-white/90 text-gray-600 transition hover:bg-white',
-                filterActive && 'text-orange-500'
+                filterTabActive && 'text-orange-500'
               )}
               aria-label="Filtr"
             >
               <Filter size={20} />
-              {filterActive ? (
+              {filterTabActive ? (
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-orange-500" />
               ) : null}
             </button>
@@ -385,7 +510,54 @@ export function SearchPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 md:px-6">
-        {!debounced ? (
+        {activeTab === 'mahalla' ? (
+          <section>
+            <SectionTitle icon={<Layers size={18} />} title="Maxalla mahsulotlari" />
+            {localLoading ? (
+              <div className="flex flex-wrap justify-around gap-x-4 gap-y-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-80 w-[240px] flex-shrink-0 animate-pulse rounded-[32px] border border-gray-100 bg-white sm:w-[260px] md:w-[280px]"
+                  />
+                ))}
+              </div>
+            ) : deliverySnap.district_id == null && deliverySnap.mfy_id == null ? (
+              <div className="rounded-3xl border border-dashed border-orange-200 bg-orange-50/40 px-5 py-10 text-center">
+                <MapPin className="mx-auto mb-3 text-orange-500" size={36} strokeWidth={2} />
+                <p className="text-sm font-bold text-gray-700">
+                  Maxalla mahsulotlari yetkazib berish manzilingiz (tuman / MFY) bo&apos;yicha ko&apos;rsatiladi.
+                </p>
+                <p className="mt-2 text-xs font-semibold text-gray-500">
+                  Bosh sahifada hududni tanlang, keyin bu yerga qayting.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/')}
+                  className="mt-5 rounded-2xl bg-orange-500 px-6 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-orange-500/25 transition hover:bg-orange-600"
+                >
+                  Manzilni tanlash
+                </button>
+              </div>
+            ) : displayedLocalProducts.length === 0 ? (
+              <p className="py-8 text-center text-sm font-bold text-gray-400">Mahalla mahsulotlari topilmadi</p>
+            ) : (
+              <div className="flex flex-wrap justify-around gap-x-4 gap-y-6">
+                {displayedLocalProducts.map((product) => (
+                  <div key={product.id} className="w-[240px] flex-shrink-0 sm:w-[260px] md:w-[280px]">
+                    <WebProductCard
+                      product={product}
+                      onSelect={() => setSelectedLocalProduct(product)}
+                      onAddToCart={addLocalToCart}
+                      onCartDelta={updateLocalQuantity}
+                      inCartQty={localCartQtyByProductId.get(String(product.id)) ?? 0}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : !debounced ? (
           <section>
             <SectionTitle icon={<Layers size={18} />} title="Barcha mahsulotlar" />
             {browseLoading ? (
@@ -646,13 +818,15 @@ export function SearchPage() {
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                   <div className="flex flex-col gap-5">
-                    <WebCustomSelect<number>
-                      label="Kontragent"
-                      value={draftFilters.contragentId}
-                      options={contragentOptions}
-                      onChange={(v) => setDraftFilters((d) => ({ ...d, contragentId: v }))}
-                      placeholder="Tanlang"
-                    />
+                    {activeTab === 'bozor' ? (
+                      <WebCustomSelect<number>
+                        label="Kontragent"
+                        value={draftFilters.contragentId}
+                        options={contragentOptions}
+                        onChange={(v) => setDraftFilters((d) => ({ ...d, contragentId: v }))}
+                        placeholder="Tanlang"
+                      />
+                    ) : null}
                     <WebCustomSelect<number>
                       label="Kategoriya"
                       value={draftFilters.categoryId}
@@ -708,9 +882,18 @@ export function SearchPage() {
         <WebProductDetailOverlay
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onAddToCart={addToCart}
-          onCartDelta={updateQuantity}
-          inCartQty={cartQtyByProductId.get(String(selectedProduct.id)) ?? 0}
+          onAddToCart={activeTab === 'mahalla' ? () => {} : addToCart}
+          onCartDelta={activeTab === 'mahalla' ? () => {} : updateQuantity}
+          inCartQty={activeTab === 'mahalla' ? 0 : (cartQtyByProductId.get(String(selectedProduct.id)) ?? 0)}
+        />
+      ) : null}
+      {selectedLocalProduct ? (
+        <WebLocalProductDetailOverlay
+          product={selectedLocalProduct}
+          onClose={() => setSelectedLocalProduct(null)}
+          onAddToCart={addLocalToCart}
+          onCartDelta={updateLocalQuantity}
+          inCartQty={localCartQtyByProductId.get(String(selectedLocalProduct.id)) ?? 0}
         />
       ) : null}
     </div>

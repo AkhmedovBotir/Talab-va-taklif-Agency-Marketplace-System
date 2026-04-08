@@ -2,6 +2,7 @@ package punkts
 
 import (
 	"backend/internal/pkg/orderembed"
+	coreRepo "backend/modules/core/repository"
 	"backend/modules/eskiz"
 	"backend/modules/punkts/domain"
 	"backend/modules/punkts/handler"
@@ -12,7 +13,7 @@ import (
 )
 
 func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int) error {
-	if err := db.AutoMigrate(&domain.VerificationCode{}, &domain.PunktContragentLineRequest{}, &domain.PunktOrderTransfer{}, &domain.PunktOrderTransferItem{}); err != nil {
+	if err := db.AutoMigrate(&domain.VerificationCode{}, &domain.PunktContragentLineRequest{}, &domain.PunktOrderTransfer{}, &domain.PunktOrderTransferItem{}, &domain.PunktKPIPayout{}, &domain.PunktNotificationRead{}); err != nil {
 		return err
 	}
 
@@ -35,6 +36,15 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 	agentDirSvc := service.NewPunktAgentDirectoryService(agentListRepo)
 	punktAgentsHandler := handler.NewPunktAgentsHandler(agentDirSvc)
 
+	orderKPIRepo := coreRepo.NewMarketplaceOrderKPIRepository(db)
+	payoutRepo := repository.NewPunktKPIPayoutRepository(db)
+	punktKPISvc := service.NewPunktKPIService(orderKPIRepo, payoutRepo)
+	punktKPIHandler := handler.NewPunktKPIHandler(punktKPISvc)
+
+	punktNotifRepo := repository.NewPunktNotificationRepository(db)
+	punktNotifSvc := service.NewPunktNotificationService(punktNotifRepo)
+	punktNotifHandler := handler.NewPunktNotificationHandler(punktNotifSvc)
+
 	api := router.Group("/api/v1")
 	authHandler.RegisterRoutes(api)
 
@@ -45,6 +55,8 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 		punktOrderHandler.RegisterMeRoutes(me)
 		transferHandler.RegisterMeRoutes(me)
 		punktAgentsHandler.RegisterMeRoutes(me)
+		punktKPIHandler.RegisterMeRoutes(me)
+		punktNotifHandler.RegisterMeRoutes(me)
 	}
 	return nil
 }

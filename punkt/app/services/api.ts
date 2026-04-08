@@ -1,24 +1,14 @@
-import { Platform } from 'react-native';
-
-/** Web: brauzer `localhost` da ochilganda */
-const API_HOST_WEB = 'http://localhost:8081';
-/** Mobil qurilma: kompyuter IP (tarmoqda backend) */
-const API_HOST_NATIVE = 'http://192.168.1.6:8081';
+import { API_BASE_URL } from '../config/api';
 
 export function getApiBaseUrl(): string {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const { protocol, hostname, port } = window.location;
-    // LAN orqali (masalan http://192.168.1.6:8084) — API ham shu mashinada, 8081
-    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return `${protocol}//${hostname}:8081/api/v1`;
-    }
-    // Ba’zi dev sozlamalarda frontend boshqa portda — baribir backend 8081
-    if (port && port !== '8081') {
-      return `${protocol}//${hostname}:8081/api/v1`;
-    }
-  }
-  const host = Platform.OS === 'web' ? API_HOST_WEB : API_HOST_NATIVE;
-  return `${host}/api/v1`;
+  return API_BASE_URL;
+}
+
+/** Punkt notification WebSocket (token query — brauzer uchun) */
+export function getPunktNotificationsWebSocketUrl(token: string): string {
+  const base = getApiBaseUrl();
+  const wsBase = base.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
+  return `${wsBase}/punkts/me/notifications/ws?token=${encodeURIComponent(token)}`;
 }
 
 /** Global snackbar: server `message` maydoni (xatoliklar uchun) */
@@ -946,31 +936,87 @@ export interface KpiDailyReportResponse {
   };
 }
 
-export interface Notification {
-  _id: string;
+/** GET `/punkts/me/kpi/today` — UTC kalendary kuni bo‘yicha bugungi KPI */
+export interface PunktKpiTodayData {
+  date_utc: string;
+  allocation_note: string;
+  punkt_kpi_total: number;
+  total_kpi_pool: number;
+  delivered_orders: number;
+  paid_total_today: number;
+  payout_entries_today: number;
+  unpaid_today: number;
+}
+
+export interface PunktKpiTodayResponse {
+  message?: string;
+  data: PunktKpiTodayData;
+}
+
+/** GET `/punkts/me/kpi/history` — kunlar bo‘yicha (UTC) */
+export interface PunktKpiHistoryDay {
+  date_utc: string;
+  punkt_kpi_accrued: number;
+  total_kpi_pool: number;
+  delivered_orders: number;
+  paid_total: number;
+  unpaid: number;
+}
+
+export interface PunktKpiHistoryData {
+  from_utc: string;
+  to_utc: string;
+  days: PunktKpiHistoryDay[];
+}
+
+export interface PunktKpiHistoryResponse {
+  message?: string;
+  data: PunktKpiHistoryData;
+}
+
+/** GET `/punkts/me/notifications` — inbox elementi */
+export interface PunktMeNotificationItem {
+  id: number;
   title: string;
   message: string;
   type: string;
-  targetType: string;
-  createdAt: string;
-  isRead: boolean;
+  target_type: string;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface NotificationsResponse {
-  success: boolean;
-  count: number;
+export interface PunktMeNotificationsListData {
+  items: PunktMeNotificationItem[];
   total: number;
+  unread_count: number;
   page: number;
   limit: number;
-  totalPages: number;
-  data: Notification[];
+  total_pages: number;
 }
 
-export interface UnreadCountResponse {
-  success: boolean;
+export interface PunktMeNotificationsListResponse {
+  message?: string;
+  data: PunktMeNotificationsListData;
+}
+
+export interface PunktMeNotificationsUnreadCountResponse {
+  message?: string;
   data: {
-    unreadCount: number;
+    unread_count: number;
   };
+}
+
+/** Socket `integration_notification_created` — to‘liq maydonlar backendga qarab */
+export interface PunktMeNotificationSocketPayload {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  target_type: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface MarkReadResponse {
@@ -2081,11 +2127,26 @@ class ApiService {
     );
   }
 
-  async getNotifications(params?: {
+  async getPunktKpiToday(): Promise<PunktKpiTodayResponse> {
+    return this.request<PunktKpiTodayResponse>('/punkts/me/kpi/today', {}, { skipErrorNotifier: true });
+  }
+
+  async getPunktKpiHistory(params?: { from?: string; to?: string }): Promise<PunktKpiHistoryResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.from) queryParams.append('from', params.from);
+    if (params?.to) queryParams.append('to', params.to);
+    const query = queryParams.toString();
+    return this.request<PunktKpiHistoryResponse>(
+      `/punkts/me/kpi/history${query ? `?${query}` : ''}`,
+      {},
+      { skipErrorNotifier: true }
+    );
+  }
+
+  async getPunktMeNotifications(params?: {
     page?: number;
     limit?: number;
-    read?: boolean;
-  }): Promise<NotificationsResponse> {
+  }): Promise<PunktMeNotificationsListResponse> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -2095,22 +2156,30 @@ class ApiService {
       });
     }
     const query = queryParams.toString();
-    return this.request<NotificationsResponse>(`/punkts/notifications/list${query ? `?${query}` : ''}`);
+    return this.request<PunktMeNotificationsListResponse>(
+      `/punkts/me/notifications${query ? `?${query}` : ''}`,
+      {},
+      { skipErrorNotifier: true }
+    );
   }
 
-  async getUnreadNotificationsCount(): Promise<UnreadCountResponse> {
-    return this.request<UnreadCountResponse>('/punkts/notifications/unread-count');
+  async getPunktMeNotificationsUnreadCount(): Promise<PunktMeNotificationsUnreadCountResponse> {
+    return this.request<PunktMeNotificationsUnreadCountResponse>(
+      '/punkts/me/notifications/unread-count',
+      {},
+      { skipErrorNotifier: true }
+    );
   }
 
-  async markNotificationAsRead(notificationId: string): Promise<MarkReadResponse> {
-    return this.request<MarkReadResponse>(`/punkts/notifications/${notificationId}/read`, {
-      method: 'POST',
+  async markPunktMeNotificationRead(notificationId: number | string): Promise<MarkReadResponse> {
+    return this.request<MarkReadResponse>(`/punkts/me/notifications/${notificationId}/read`, {
+      method: 'PATCH',
     });
   }
 
-  async markAllNotificationsAsRead(): Promise<MarkReadResponse> {
-    return this.request<MarkReadResponse>('/punkts/notifications/read-all', {
-      method: 'POST',
+  async markPunktMeNotificationsReadAll(): Promise<MarkReadResponse> {
+    return this.request<MarkReadResponse>('/punkts/me/notifications/read-all', {
+      method: 'PATCH',
     });
   }
 

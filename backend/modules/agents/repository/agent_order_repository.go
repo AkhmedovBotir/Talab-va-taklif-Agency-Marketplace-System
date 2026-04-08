@@ -22,10 +22,23 @@ type AgentOrderRepository interface {
 	GetByIDForAgent(orderID, agentID uint) (*mpdomain.Order, error)
 	DeclarePaymentToPunkt(orderID, agentID uint) error
 	MarkDeliveredByAgent(orderID, agentID uint) error
+	GetAnalytics(agentID uint, from, to *time.Time) (*AgentOrderAnalyticsRow, error)
 }
 
 type agentOrderPostgresRepository struct {
 	db *gorm.DB
+}
+
+type AgentOrderAnalyticsRow struct {
+	TotalOrders               int64
+	TotalAmount               float64
+	DeliveredOrders           int64
+	DeliveredAmount           float64
+	PendingOrders             int64
+	PendingAmount             float64
+	DeclaredToPunktAmount     float64
+	ConfirmedByPunktAmount    float64
+	UnconfirmedDeclaredAmount float64
 }
 
 func NewAgentOrderRepository(db *gorm.DB) AgentOrderRepository {
@@ -131,4 +144,30 @@ func (r *agentOrderPostgresRepository) MarkDeliveredByAgent(orderID, agentID uin
 		}
 		return tx.Model(&mpdomain.Order{}).Where("id = ?", ord.ID).Update("status", mpdomain.OrderStatusDelivered).Error
 	})
+}
+
+func (r *agentOrderPostgresRepository) GetAnalytics(agentID uint, from, to *time.Time) (*AgentOrderAnalyticsRow, error) {
+	q := r.db.Table("marketplace_orders").Where("assigned_agent_id = ?", agentID)
+	if from != nil {
+		q = q.Where("created_at >= ?", *from)
+	}
+	if to != nil {
+		q = q.Where("created_at <= ?", *to)
+	}
+	var out AgentOrderAnalyticsRow
+	err := q.Select(`
+		COUNT(*) as total_orders,
+		COALESCE(SUM(total_amount), 0) as total_amount,
+		COALESCE(SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END), 0) as delivered_orders,
+		COALESCE(SUM(CASE WHEN status = 'delivered' THEN total_amount ELSE 0 END), 0) as delivered_amount,
+		COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending_orders,
+		COALESCE(SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END), 0) as pending_amount,
+		COALESCE(SUM(CASE WHEN agent_declared_payment_to_punkt_at IS NOT NULL THEN total_amount ELSE 0 END), 0) as declared_to_punkt_amount,
+		COALESCE(SUM(CASE WHEN punkt_confirmed_agent_payment_at IS NOT NULL THEN total_amount ELSE 0 END), 0) as confirmed_by_punkt_amount,
+		COALESCE(SUM(CASE WHEN agent_declared_payment_to_punkt_at IS NOT NULL AND punkt_confirmed_agent_payment_at IS NULL THEN total_amount ELSE 0 END), 0) as unconfirmed_declared_amount
+	`).Scan(&out).Error
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }

@@ -16,9 +16,12 @@ import {
   MapPin,
   X,
   Package,
+  BriefcaseBusiness,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { District, MFY, Region, User } from '../types';
+import { useWebNotifications } from '../hooks/useWebNotifications';
+import { ActivityType, District, MFY, PartnerRequest, PartnerRequestPayload, Region, User } from '../types';
+import { digitsOnly, normalizePartnerRequestPayload, sanitizePhoneInput, validatePartnerRequestPayload } from '../lib/partnerRequestForm';
 
 type SelectorType = 'region' | 'district' | 'mfy' | null;
 
@@ -49,7 +52,10 @@ function ProfileBlurOrbs() {
 
 export function ProfilePage({ onLogout }: { onLogout: () => void }) {
   const navigate = useNavigate();
+  const { setNotificationsInboxOpen, refreshNotificationsUnread } = useWebNotifications();
   const [user, setUser] = useState<User | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [regions, setRegions] = useState<Region[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [mfys, setMfys] = useState<MFY[]>([]);
@@ -59,6 +65,21 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [selector, setSelector] = useState<SelectorType>(null);
   const [selectorQuery, setSelectorQuery] = useState('');
+  const [partnerModalOpen, setPartnerModalOpen] = useState(false);
+  const [partnerRequests, setPartnerRequests] = useState<PartnerRequest[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [partnerSubmitting, setPartnerSubmitting] = useState(false);
+  const [partnerForm, setPartnerForm] = useState<PartnerRequestPayload>({
+    company_name: '',
+    inn: '',
+    mfo: '',
+    account_number: '',
+    activity_type_id: 0,
+    region_id: 0,
+    district_id: 0,
+    mfy_id: 0,
+    phone: '+998',
+  });
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
@@ -71,26 +92,59 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => {
     (async () => {
+      setProfileError(null);
       try {
         const profile = await api.profile.get();
         setUser(profile);
-        const [regionList, districtList, mfyList, avatarRes] = await Promise.all([
+        const [regionList, districtList, mfyList] = await Promise.all([
           api.regions.getRegions(),
           api.regions.getDistricts(profile.region_id),
           api.regions.getMFYs(profile.district_id),
-          api.profile.getAvatar(),
         ]);
         setRegions(regionList);
         setDistricts(districtList);
         setMfys(mfyList);
-        setAvatar(avatarRes?.has_avatar ? normalizeAvatar(avatarRes.avatar) : '');
+        void api.profile.getAvatar().then((avatarRes) => {
+          setAvatar(avatarRes?.has_avatar ? normalizeAvatar(avatarRes.avatar) : '');
+        }).catch(() => {});
+        void api.partnerRequests.list().then((requests) => {
+          setPartnerRequests(requests);
+        }).catch(() => {});
+        void api.activityTypes.list().then((types) => {
+          setActivityTypes(types);
+          if (types[0]) {
+            setPartnerForm((prev) => ({ ...prev, activity_type_id: prev.activity_type_id || types[0].id }));
+          }
+        }).catch(() => {});
       } catch {
         setUser(null);
+        setProfileError("Profil ma'lumotlarini yuklab bo'lmadi");
+      } finally {
+        setLoadingProfile(false);
       }
     })();
   }, []);
 
-  if (!user) return null;
+  if (loadingProfile) {
+    return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm font-bold text-slate-500">Yuklanmoqda...</div>;
+  }
+  if (!user) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-100 px-4">
+        <p className="text-sm font-bold text-slate-600">{profileError || "Profil ochilmadi"}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadingProfile(true);
+            window.location.reload();
+          }}
+          className="mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white"
+        >
+          Qayta urinish
+        </button>
+      </div>
+    );
+  }
 
   const regionName = regions.find((r) => r.id === user.region_id)?.name || `Viloyat #${user.region_id}`;
   const districtName = districts.find((d) => d.id === user.district_id)?.name || `Tuman #${user.district_id}`;
@@ -194,6 +248,38 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
     }
   };
 
+  const openPartnerModal = async () => {
+    const regionId = user.region_id || regions[0]?.id || 0;
+    const districtId = user.district_id || 0;
+    const mfyId = user.mfy_id || 0;
+    setPartnerForm((prev) => ({
+      ...prev,
+      region_id: regionId,
+      district_id: districtId,
+      mfy_id: mfyId,
+      phone: prev.phone || user.phone || '+998',
+      activity_type_id: prev.activity_type_id || activityTypes[0]?.id || 0,
+    }));
+    setPartnerModalOpen(true);
+  };
+
+  const submitPartnerRequest = async () => {
+    const normalized = normalizePartnerRequestPayload(partnerForm);
+    const validationError = validatePartnerRequestPayload(normalized);
+    if (validationError) return window.alert(validationError);
+    setPartnerSubmitting(true);
+    try {
+      await api.partnerRequests.create(normalized);
+      const requests = await api.partnerRequests.list();
+      setPartnerRequests(requests);
+      setPartnerModalOpen(false);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "So'rov yuborilmadi");
+    } finally {
+      setPartnerSubmitting(false);
+    }
+  };
+
   const selectorData = selector === 'region' ? regions : selector === 'district' ? districts : selector === 'mfy' ? mfys : [];
   const filteredSelectorData = selectorData.filter((item) =>
     item.name.toLowerCase().includes(selectorQuery.trim().toLowerCase())
@@ -264,7 +350,16 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
                 label="Buyurtmalarim"
                 onClick={() => navigate('/orders')}
               />
-              <MenuItem icon={<Bell className="text-orange-500" />} label="Bildirishnomalar" />
+              <MenuItem
+                icon={<BriefcaseBusiness className="text-emerald-700" />}
+                label="Hamkorlik so'rovlari"
+                onClick={() => navigate('/partner-requests')}
+              />
+              <MenuItem
+                icon={<Bell className="text-orange-500" />}
+                label="Bildirishnomalar"
+                onClick={() => setNotificationsInboxOpen(true)}
+              />
             </div>
 
             <div className="rounded-[24px] border border-slate-200/90 bg-slate-50 p-2 shadow-sm sm:rounded-[28px]">
@@ -274,7 +369,10 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
 
             <button
               type="button"
-              onClick={onLogout}
+              onClick={() => {
+                onLogout();
+                void refreshNotificationsUnread();
+              }}
               className="flex w-full items-center justify-center gap-2 rounded-[24px] border border-rose-200/80 bg-rose-100/60 py-4 font-bold text-rose-600 transition-transform active:scale-[0.98] sm:rounded-[28px] sm:py-5"
             >
               <LogOut size={20} />
@@ -425,6 +523,61 @@ export function ProfilePage({ onLogout }: { onLogout: () => void }) {
               {filteredSelectorData.length === 0 ? (
                 <p className="py-4 text-center text-sm font-semibold text-slate-400">Hech narsa topilmadi</p>
               ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {partnerModalOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 px-4">
+          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-base font-black text-slate-900">Hamkorlik so&apos;rovlari</h4>
+              <button type="button" onClick={() => setPartnerModalOpen(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50">
+                <X className="h-4 w-4 text-slate-500" />
+              </button>
+            </div>
+            <div className="mb-4 max-h-40 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              {partnerRequests.length === 0 ? (
+                <p className="text-sm font-semibold text-slate-500">Hozircha so&apos;rov yuborilmagan.</p>
+              ) : (
+                partnerRequests.map((r) => (
+                  <div key={r.id} className="mb-2 rounded-xl border border-slate-200 bg-white p-2">
+                    <p className="text-sm font-black text-slate-800">{r.company_name}</p>
+                    <p className="text-xs font-semibold text-slate-500">{r.phone} · {r.status || 'pending'}</p>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <input value={partnerForm.company_name} onChange={(e) => setPartnerForm((p) => ({ ...p, company_name: e.target.value }))} placeholder="Kompaniya nomi" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800" />
+              <input value={partnerForm.inn} onChange={(e) => setPartnerForm((p) => ({ ...p, inn: digitsOnly(e.target.value, 9) }))} inputMode="numeric" maxLength={9} placeholder="INN (9 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800" />
+              <input value={partnerForm.mfo} onChange={(e) => setPartnerForm((p) => ({ ...p, mfo: digitsOnly(e.target.value, 5) }))} inputMode="numeric" maxLength={5} placeholder="MFO (5 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800" />
+              <input value={partnerForm.account_number} onChange={(e) => setPartnerForm((p) => ({ ...p, account_number: digitsOnly(e.target.value, 20) }))} inputMode="numeric" maxLength={20} placeholder="Hisob raqam (20 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800" />
+              <select value={partnerForm.activity_type_id} onChange={(e) => setPartnerForm((p) => ({ ...p, activity_type_id: Number(e.target.value) }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800 sm:col-span-2">
+                {activityTypes.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+              </select>
+              <select value={partnerForm.region_id} onChange={(e) => {
+                const id = Number(e.target.value);
+                setPartnerForm((p) => ({ ...p, region_id: id }));
+              }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800">
+                {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+              <select value={partnerForm.district_id} onChange={(e) => {
+                const id = Number(e.target.value);
+                setPartnerForm((p) => ({ ...p, district_id: id }));
+              }} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800">
+                {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+              <select value={partnerForm.mfy_id} onChange={(e) => setPartnerForm((p) => ({ ...p, mfy_id: Number(e.target.value) }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800 sm:col-span-2">
+                {mfys.map((mfy) => <option key={mfy.id} value={mfy.id}>{mfy.name}</option>)}
+              </select>
+              <input value={partnerForm.phone} onChange={(e) => setPartnerForm((p) => ({ ...p, phone: sanitizePhoneInput(e.target.value) }))} inputMode="tel" maxLength={13} placeholder="+998901234567" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 font-semibold text-slate-800 sm:col-span-2" />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setPartnerModalOpen(false)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600">Yopish</button>
+              <button type="button" onClick={() => void submitPartnerRequest()} disabled={partnerSubmitting} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+                {partnerSubmitting ? 'Yuborilmoqda...' : "Yangi so'rov yuborish"}
+              </button>
             </div>
           </div>
         </div>

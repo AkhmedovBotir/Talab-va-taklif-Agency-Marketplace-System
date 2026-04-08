@@ -9,6 +9,9 @@ import (
 	"backend/modules/admin"
 	"backend/modules/agents"
 	"backend/modules/contragents"
+	"backend/modules/deliveryproviders"
+	"backend/modules/localshops"
+	"backend/modules/managers"
 	"backend/modules/marketplace"
 	"backend/modules/noauth"
 	"backend/modules/punkts"
@@ -33,6 +36,12 @@ func main() {
 	if err = contragents.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
 		log.Fatalf("Contragent auth router ulashda xatolik: %v", err)
 	}
+	if err = localshops.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
+		log.Fatalf("Local shop auth router ulashda xatolik: %v", err)
+	}
+	if err = deliveryproviders.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
+		log.Fatalf("Delivery provider auth router ulashda xatolik: %v", err)
+	}
 	if err = marketplace.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
 		log.Fatalf("Marketplace auth router ulashda xatolik: %v", err)
 	}
@@ -41,6 +50,9 @@ func main() {
 	}
 	if err = agents.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
 		log.Fatalf("Agent auth router ulashda xatolik: %v", err)
+	}
+	if err = managers.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
+		log.Fatalf("Manager auth router ulashda xatolik: %v", err)
 	}
 	if err = noauth.RegisterRoutes(router, db); err != nil {
 		log.Fatalf("NoAuth router ulashda xatolik: %v", err)

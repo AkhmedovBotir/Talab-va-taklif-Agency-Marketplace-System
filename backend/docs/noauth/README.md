@@ -6,4 +6,5 @@
 - `docs/noauth/regions-api.md`
 - `docs/noauth/punkts-api.md`
 - `docs/noauth/agents-api.md`
+- `docs/noauth/managers-api.md`
 - `docs/noauth/marketplace-users-api.md`

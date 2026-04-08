@@ -1,7 +1,9 @@
 package service
 
 import (
+	"errors"
 	"math"
+	"strings"
 	"time"
 
 	"backend/internal/pkg/orderembed"
@@ -14,6 +16,8 @@ var (
 	ErrAgentOrderNotDeliverable       = repository.ErrAgentOrderNotDeliverable
 	ErrAgentOrderSettlementWrongState = repository.ErrAgentOrderSettlementWrongState
 	ErrAgentOrderSettlementIncomplete = repository.ErrAgentOrderSettlementIncomplete
+	ErrAgentAnalyticsDateInvalid      = errors.New("sana formati noto'g'ri, YYYY-MM-DD ishlating")
+	ErrAgentAnalyticsDateRangeInvalid = errors.New("from sanasi to sanasidan katta bo'lmasligi kerak")
 )
 
 type AgentOrderItemOut struct {
@@ -71,6 +75,20 @@ type PaginatedAgentOrders struct {
 type AgentOrderService struct {
 	repo  repository.AgentOrderRepository
 	embed *orderembed.Loader
+}
+
+type AgentOrderAnalyticsOutput struct {
+	From                      string  `json:"from,omitempty"`
+	To                        string  `json:"to,omitempty"`
+	TotalOrders               int64   `json:"total_orders"`
+	TotalAmount               float64 `json:"total_amount"`
+	DeliveredOrders           int64   `json:"delivered_orders"`
+	DeliveredAmount           float64 `json:"delivered_amount"`
+	PendingOrders             int64   `json:"pending_orders"`
+	PendingAmount             float64 `json:"pending_amount"`
+	DeclaredToPunktAmount     float64 `json:"declared_to_punkt_amount"`
+	ConfirmedByPunktAmount    float64 `json:"confirmed_by_punkt_amount"`
+	UnconfirmedDeclaredAmount float64 `json:"unconfirmed_declared_amount"`
 }
 
 func NewAgentOrderService(repo repository.AgentOrderRepository, embed *orderembed.Loader) *AgentOrderService {
@@ -243,4 +261,50 @@ func formatAgentTimePtr(t *time.Time) string {
 		return ""
 	}
 	return t.UTC().Format("2006-01-02T15:04:05Z07:00")
+}
+
+func (s *AgentOrderService) Analytics(agentID uint, fromRaw, toRaw string) (*AgentOrderAnalyticsOutput, error) {
+	var from *time.Time
+	var to *time.Time
+	if v := strings.TrimSpace(fromRaw); v != "" {
+		t, err := time.Parse("2006-01-02", v)
+		if err != nil {
+			return nil, ErrAgentAnalyticsDateInvalid
+		}
+		utc := t.UTC()
+		from = &utc
+	}
+	if v := strings.TrimSpace(toRaw); v != "" {
+		t, err := time.Parse("2006-01-02", v)
+		if err != nil {
+			return nil, ErrAgentAnalyticsDateInvalid
+		}
+		end := t.UTC().Add(24*time.Hour - time.Nanosecond)
+		to = &end
+	}
+	if from != nil && to != nil && from.After(*to) {
+		return nil, ErrAgentAnalyticsDateRangeInvalid
+	}
+	row, err := s.repo.GetAnalytics(agentID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	out := &AgentOrderAnalyticsOutput{
+		TotalOrders:               row.TotalOrders,
+		TotalAmount:               row.TotalAmount,
+		DeliveredOrders:           row.DeliveredOrders,
+		DeliveredAmount:           row.DeliveredAmount,
+		PendingOrders:             row.PendingOrders,
+		PendingAmount:             row.PendingAmount,
+		DeclaredToPunktAmount:     row.DeclaredToPunktAmount,
+		ConfirmedByPunktAmount:    row.ConfirmedByPunktAmount,
+		UnconfirmedDeclaredAmount: row.UnconfirmedDeclaredAmount,
+	}
+	if from != nil {
+		out.From = from.UTC().Format("2006-01-02")
+	}
+	if to != nil {
+		out.To = to.UTC().Format("2006-01-02")
+	}
+	return out, nil
 }

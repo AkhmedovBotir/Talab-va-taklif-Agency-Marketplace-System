@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FEATURE_NOTIFICATIONS_ENABLED } from '../config/features';
 import { apiService } from '../services/api';
+import { subscribePunktNotificationRealtime } from '../services/punktNotificationRealtime';
+import { subscribeNotificationInboxSync } from '../services/notificationInboxSync';
 import { useAuth } from '../contexts/AuthContext';
+
+const POLL_FALLBACK_MS = 90_000;
 
 export function useUnreadNotifications() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
 
   const fetchUnreadCount = useCallback(async () => {
     if (!FEATURE_NOTIFICATIONS_ENABLED || !isAuthenticated) {
@@ -14,10 +18,11 @@ export function useUnreadNotifications() {
     }
 
     try {
-      const response = await apiService.getUnreadNotificationsCount();
-      setUnreadCount(response.data.unreadCount);
-    } catch (error: any) {
-      if (error?.message !== 'Logging out...') {
+      const response = await apiService.getPunktMeNotificationsUnreadCount();
+      setUnreadCount(response.data?.unread_count ?? 0);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      if (err?.message !== 'Logging out...') {
         console.error('Error fetching unread count:', error);
       }
     } finally {
@@ -32,23 +37,34 @@ export function useUnreadNotifications() {
       return;
     }
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !token) {
       setUnreadCount(0);
       setLoading(false);
       return;
     }
 
-    fetchUnreadCount();
+    void fetchUnreadCount();
 
-    const interval = setInterval(fetchUnreadCount, 1000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount, isAuthenticated]);
+    const unsubSocket = subscribePunktNotificationRealtime(token, true, {
+      onUnread: () => {
+        void fetchUnreadCount();
+      },
+    });
+
+    const unsubManual = subscribeNotificationInboxSync(() => {
+      void fetchUnreadCount();
+    });
+
+    const interval = setInterval(() => {
+      void fetchUnreadCount();
+    }, POLL_FALLBACK_MS);
+
+    return () => {
+      unsubSocket();
+      unsubManual();
+      clearInterval(interval);
+    };
+  }, [fetchUnreadCount, isAuthenticated, token]);
 
   return { unreadCount, loading, refetch: fetchUnreadCount };
 }
-
-
-
-
-
-

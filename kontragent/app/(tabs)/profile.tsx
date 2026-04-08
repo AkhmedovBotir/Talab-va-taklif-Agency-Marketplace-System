@@ -26,6 +26,7 @@ import {
   contragentLogoToImageUri,
   ContragentDeliveryAreaRow,
 } from '../../services/api';
+import { subscribeContragentNotificationInbox } from '../../services/contragentNotificationEvents';
 
 const isValidPickedImageDataUrl = (value?: string) =>
   !!value && /^data:image\/(jpeg|png|jpg|webp);base64,/i.test(value);
@@ -57,7 +58,7 @@ export default function ProfileScreen() {
   const contragentIdLabel =
     contragent?.id != null ? String(contragent.id) : contragent?._id || '';
 
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
     try {
       const response = await apiService.getUnreadCount();
       if (response.success) {
@@ -66,7 +67,7 @@ export default function ProfileScreen() {
     } catch {
       // ignore
     }
-  };
+  }, []);
 
   const loadDeliveryRegions = useCallback(async () => {
     try {
@@ -87,7 +88,11 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     fetchUnreadCount();
-  }, []);
+  }, [fetchUnreadCount]);
+
+  useEffect(() => {
+    return subscribeContragentNotificationInbox(fetchUnreadCount);
+  }, [fetchUnreadCount]);
 
   useFocusEffect(
     useCallback(() => {

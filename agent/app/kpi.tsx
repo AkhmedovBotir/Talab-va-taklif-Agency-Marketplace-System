@@ -1,8 +1,8 @@
-// KPI Transactions Screen
+// Agent KPI — GET /agents/me/kpi/today va /agents/me/kpi/history
 import { Ionicons } from '@expo/vector-icons';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Stack, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { Stack } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,192 +12,274 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { DatePickerField } from '../components/DatePickerField';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { apiService } from '../services/api';
-import type { GetKPIParams, KPISummaryResponse, KPITransaction } from '../types/api';
+import type { AgentKpiHistoryDay, AgentKpiToday } from '../types/api';
+import { getApiErrorMessage } from '../utils/apiError';
 
-type PaymentFilter = 'all' | 'paid' | 'unpaid';
+const WEB_MAX_WIDTH = 820;
+
+function toUtcYmd(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function historyDayLabel(day: AgentKpiHistoryDay, index: number): string {
+  const raw = day.date_utc ?? day.date;
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  return `Kun ${index + 1}`;
+}
 
 export default function KPIScreen() {
-  const [transactions, setTransactions] = useState<KPITransaction[]>([]);
-  const [summary, setSummary] = useState<KPISummaryResponse['data'] | null>(null);
+  const { width: windowWidth } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+  const shellWidth = isWeb ? Math.min(WEB_MAX_WIDTH, Math.max(320, windowWidth - 40)) : undefined;
+
+  const [today, setToday] = useState<AgentKpiToday | null>(null);
+  const [days, setDays] = useState<AgentKpiHistoryDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filters, setFilters] = useState<GetKPIParams>({
-    page: 1,
-    limit: 20,
-  });
-  const [totalPages, setTotalPages] = useState(1);
-  const [currentPage, setCurrentPage] = useState(1);
-  const router = useRouter();
   const { showSnackbar } = useSnackbar();
 
-  // Filter states
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  const buildQueryParams = useCallback((): GetKPIParams => {
-    const params: GetKPIParams = {
-      ...filters,
-    };
-    if (startDate) {
-      params.startDate = startDate.toISOString();
-    }
-    if (endDate) {
-      params.endDate = endDate.toISOString();
-    }
-    if (paymentFilter === 'paid') {
-      params.isPaid = true;
-    } else if (paymentFilter === 'unpaid') {
-      params.isPaid = false;
-    }
-    return params;
-  }, [filters, startDate, endDate, paymentFilter]);
+  const hasActiveFilters = Boolean(startDate && endDate);
 
-  const loadTransactions = useCallback(async (params?: GetKPIParams) => {
-    try {
-      const queryParams: GetKPIParams = {
-        ...buildQueryParams(),
-        ...params,
-      };
-      
-      const response = await apiService.getKPITransactions(queryParams);
-      if (response.success) {
-        setTransactions(response.data);
-        setTotalPages(response.totalPages);
-        setCurrentPage(response.page);
+  const loadKpiData = useCallback(
+    async (historyRange?: { from: string; to: string }) => {
+      try {
+        const [todayRes, histRes] = await Promise.all([
+          apiService.getAgentKpiToday(),
+          apiService.getAgentKpiHistory(historyRange),
+        ]);
+        if (todayRes.success && todayRes.data) {
+          setToday(todayRes.data);
+        } else {
+          setToday(null);
+        }
+        if (histRes.success) {
+          setDays(histRes.days);
+        } else {
+          setDays([]);
+        }
+      } catch (error: unknown) {
+        showSnackbar(getApiErrorMessage(error, 'KPI maʼlumotlarini yuklashda xatolik'), { variant: 'error' });
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error: any) {
-      showSnackbar(error.response?.data?.message || 'KPI transaksiyalarni yuklashda xatolik', { variant: 'error' });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [buildQueryParams, showSnackbar]);
-
-  const loadSummary = useCallback(async () => {
-    try {
-      const params: GetKPIParams = {};
-      if (startDate) params.startDate = startDate.toISOString();
-      if (endDate) params.endDate = endDate.toISOString();
-      if (paymentFilter === 'paid') params.isPaid = true;
-      else if (paymentFilter === 'unpaid') params.isPaid = false;
-
-      const response = await apiService.getKPISummary(params);
-      if (response.success) {
-        setSummary(response.data);
-      }
-    } catch (error) {
-      console.log('Summary error:', error);
-    }
-  }, [startDate, endDate, paymentFilter]);
+    },
+    [showSnackbar]
+  );
 
   useEffect(() => {
-    loadTransactions();
-    loadSummary();
-  }, [loadTransactions, loadSummary]);
+    loadKpiData(undefined);
+  }, [loadKpiData]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadTransactions({ page: 1 });
-    loadSummary();
+    if (startDate && endDate) {
+      void loadKpiData({ from: toUtcYmd(startDate), to: toUtcYmd(endDate) });
+    } else {
+      void loadKpiData(undefined);
+    }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('uz-UZ', {
+  const formatDate = (date: Date) =>
+    date.toLocaleDateString('uz-UZ', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     });
-  };
 
   const handleStartDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowStartPicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setStartDate(selectedDate);
-    }
+    if (selectedDate) setStartDate(selectedDate);
   };
 
   const handleEndDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowEndPicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setEndDate(selectedDate);
-    }
+    if (selectedDate) setEndDate(selectedDate);
   };
 
   const applyFilters = () => {
+    if (!startDate || !endDate) {
+      showSnackbar('Boshlanish va tugash sanasini tanlang', { variant: 'error' });
+      return;
+    }
+    if (toUtcYmd(startDate) > toUtcYmd(endDate)) {
+      showSnackbar("Sana oralig'i noto'g'ri", { variant: 'error' });
+      return;
+    }
     setShowFilterModal(false);
     setLoading(true);
-    loadTransactions({ page: 1 });
-    loadSummary();
+    void loadKpiData({ from: toUtcYmd(startDate), to: toUtcYmd(endDate) });
   };
 
   const clearFilters = () => {
     setStartDate(null);
     setEndDate(null);
-    setPaymentFilter('all');
     setShowFilterModal(false);
-    setFilters({ ...filters, page: 1 });
+    setLoading(true);
+    void loadKpiData(undefined);
   };
 
-  const hasActiveFilters = startDate || endDate || paymentFilter !== 'all';
+  const dayCellStyle = isWeb
+    ? windowWidth >= 1000
+      ? [styles.dayCell, styles.dayCellWeb5]
+      : windowWidth >= 640
+        ? [styles.dayCell, styles.dayCellWeb3]
+        : styles.dayCell
+    : styles.dayCell;
 
-  const renderTransactionItem = ({ item }: { item: KPITransaction }) => (
-    <TouchableOpacity style={styles.transactionCard}>
-      <View style={styles.transactionHeader}>
-        <View style={styles.transactionHeaderLeft}>
-          <Ionicons 
-            name={item.isPaid ? "checkmark-circle" : "time"} 
-            size={24} 
-            color={item.isPaid ? "#34C759" : "#FF9500"} 
-          />
-          <View style={styles.transactionInfo}>
-            <Text style={styles.orderNumber}>#{item.order.orderNumber}</Text>
-          </View>
+  const aggregate = useMemo(() => {
+    return days.reduce(
+      (acc, d) => {
+        acc.agentKpi += d.agent_kpi_accrued ?? 0;
+        acc.kpiPool += d.total_kpi_pool ?? 0;
+        acc.delivered += d.delivered_orders ?? 0;
+        acc.paid += d.paid_total ?? 0;
+        acc.unpaid += d.unpaid ?? 0;
+        return acc;
+      },
+      { agentKpi: 0, kpiPool: 0, delivered: 0, paid: 0, unpaid: 0 }
+    );
+  }, [days]);
+
+  const showKpiDividers = !isWeb || windowWidth >= 520;
+
+  const renderDayItem = ({ item, index }: { item: AgentKpiHistoryDay; index: number }) => (
+    <View style={styles.dayCard}>
+      <Text style={styles.dayTitle}>{historyDayLabel(item, index)}</Text>
+      <View style={styles.dayGrid}>
+        <View style={dayCellStyle}>
+          <Text style={styles.dayLabel}>Agent KPI</Text>
+          <Text style={styles.dayValue}>{(item.agent_kpi_accrued ?? 0).toLocaleString()} so'm</Text>
         </View>
-        <View style={styles.amountContainer}>
-          <Text style={[styles.amount, item.isPaid && styles.amountPaid]}>
-            {(item.amount || 0).toLocaleString()} so'm
-          </Text>
-          <View style={[styles.statusBadge, item.isPaid ? styles.statusPaid : styles.statusUnpaid]}>
-            <Text style={styles.statusText}>
-              {item.isPaid ? 'To\'langan' : 'To\'lanmagan'}
-            </Text>
-          </View>
+        <View style={dayCellStyle}>
+          <Text style={styles.dayLabel}>KPI havzasi</Text>
+          <Text style={styles.dayValueMuted}>{(item.total_kpi_pool ?? 0).toLocaleString()} so'm</Text>
+        </View>
+        <View style={dayCellStyle}>
+          <Text style={styles.dayLabel}>Yetkazilgan</Text>
+          <Text style={styles.dayValueSmall}>{item.delivered_orders ?? 0} ta</Text>
+        </View>
+        <View style={dayCellStyle}>
+          <Text style={styles.dayLabel}>To'langan</Text>
+          <Text style={[styles.dayValueSmall, styles.paid]}>{(item.paid_total ?? 0).toLocaleString()} so'm</Text>
+        </View>
+        <View style={dayCellStyle}>
+          <Text style={styles.dayLabel}>To'lanmagan</Text>
+          <Text style={[styles.dayValueSmall, styles.unpaid]}>{(item.unpaid ?? 0).toLocaleString()} so'm</Text>
         </View>
       </View>
-
-      <View style={styles.transactionDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar" size={16} color="#666" />
-          <Text style={styles.detailLabel}>Sana:</Text>
-          <Text style={styles.detailValue}>
-            {new Date(item.createdAt).toLocaleDateString('uz-UZ')}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+    </View>
   );
 
-  if (loading && transactions.length === 0) {
+  const listHeader = (
+    <>
+      {today && (
+        <View style={[styles.kpiBalanceCard, isWeb && styles.kpiBalanceCardWeb]}>
+          <View style={styles.kpiBalanceHeader}>
+            <Ionicons name="wallet" size={20} color="#007AFF" />
+            <Text style={[styles.kpiBalanceTitle, isWeb && windowWidth >= 640 && styles.kpiBalanceTitleWeb]}>
+              Bugungi KPI (UTC: {today.date_utc})
+            </Text>
+          </View>
+          <View style={[styles.kpiBalanceRow, isWeb && styles.kpiBalanceRowWeb]}>
+            <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
+              <Text style={styles.kpiBalanceLabel}>Agent KPI</Text>
+              <Text style={styles.kpiBalanceValue}>{(today.agent_kpi_total ?? 0).toLocaleString()} so'm</Text>
+            </View>
+            {showKpiDividers ? <View style={styles.kpiBalanceDivider} /> : null}
+            <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
+              <Text style={styles.kpiBalanceLabel}>To'langan</Text>
+              <Text style={[styles.kpiBalanceValue, styles.kpiBalancePaid]}>
+                {(today.paid_total_today ?? 0).toLocaleString()} so'm
+              </Text>
+            </View>
+            {showKpiDividers ? <View style={styles.kpiBalanceDivider} /> : null}
+            <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
+              <Text style={styles.kpiBalanceLabel}>To'lanmagan</Text>
+              <Text style={[styles.kpiBalanceValue, styles.kpiBalanceUnpaid]}>
+                {(today.unpaid_today ?? 0).toLocaleString()} so'm
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.kpiMetaText}>
+            KPI havzasi: {(today.total_kpi_pool ?? 0).toLocaleString()} so'm · Yetkazilgan: {today.delivered_orders ?? 0}
+            {' · '}
+            To'lov yozuvlari: {today.payout_entries_today ?? 0}
+          </Text>
+          {today.allocation_note ? <Text style={styles.kpiMetaText}>{today.allocation_note}</Text> : null}
+        </View>
+      )}
+
+      <View style={[styles.kpiBalanceCard, isWeb && styles.kpiBalanceCardWeb]}>
+        <View style={styles.kpiBalanceHeader}>
+          <Ionicons name="stats-chart" size={20} color="#007AFF" />
+          <Text style={[styles.kpiBalanceTitle, isWeb && windowWidth >= 640 && styles.kpiBalanceTitleWeb]}>
+            Barcha KPI hisobi
+          </Text>
+        </View>
+        <View style={[styles.kpiBalanceRow, isWeb && styles.kpiBalanceRowWeb]}>
+          <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
+            <Text style={styles.kpiBalanceLabel}>Agent KPI</Text>
+            <Text style={styles.kpiBalanceValue}>{aggregate.agentKpi.toLocaleString()} so'm</Text>
+          </View>
+          {showKpiDividers ? <View style={styles.kpiBalanceDivider} /> : null}
+          <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
+            <Text style={styles.kpiBalanceLabel}>To'langan</Text>
+            <Text style={[styles.kpiBalanceValue, styles.kpiBalancePaid]}>{aggregate.paid.toLocaleString()} so'm</Text>
+          </View>
+          {showKpiDividers ? <View style={styles.kpiBalanceDivider} /> : null}
+          <View style={[styles.kpiBalanceItem, isWeb && styles.kpiBalanceItemWeb]}>
+            <Text style={styles.kpiBalanceLabel}>To'lanmagan</Text>
+            <Text style={[styles.kpiBalanceValue, styles.kpiBalanceUnpaid]}>{aggregate.unpaid.toLocaleString()} so'm</Text>
+          </View>
+        </View>
+        <Text style={styles.kpiMetaText}>
+          KPI havzasi: {aggregate.kpiPool.toLocaleString()} so'm · Yetkazilgan: {aggregate.delivered} ta
+          {hasActiveFilters ? ' (tanlangan oralig‘ida)' : ' (oxirgi davr bo‘yicha)'}
+        </Text>
+      </View>
+
+      {hasActiveFilters && (
+        <View style={[styles.filterHint, isWeb && styles.filterHintWeb]}>
+          <Ionicons name="calendar-outline" size={16} color="#666" style={styles.filterHintIcon} />
+          <Text style={styles.filterHintText}>
+            {formatDate(startDate!)} — {formatDate(endDate!)} (UTC: {toUtcYmd(startDate!)} … {toUtcYmd(endDate!)})
+          </Text>
+        </View>
+      )}
+
+      <Text style={styles.sectionTitle}>Kunlar bo'yicha tarix</Text>
+    </>
+  );
+
+  if (loading && !today && days.length === 0) {
     return (
       <>
         <Stack.Screen
           options={{
-            title: 'KPI Bonus',
+            title: 'KPI',
             headerShown: true,
             headerBackTitle: 'Orqaga',
           }}
         />
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+        <View style={[styles.pageOuter, isWeb && styles.pageOuterWeb]}>
+          <View style={[styles.shell, shellWidth ? { width: shellWidth, maxWidth: '100%' as const } : styles.shellFlex]}>
+            <View style={styles.centerContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+            </View>
+          </View>
         </View>
       </>
     );
@@ -207,89 +289,64 @@ export default function KPIScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'KPI Bonus',
+          title: 'KPI',
           headerShown: true,
           headerBackTitle: 'Orqaga',
           headerRight: () => (
             <TouchableOpacity onPress={() => setShowFilterModal(true)} style={styles.headerButton}>
-              <Ionicons 
-                name="filter" 
-                size={24} 
-                color={hasActiveFilters ? "#007AFF" : "#333"} 
-              />
+              <Ionicons name="filter" size={24} color={hasActiveFilters ? '#007AFF' : '#333'} />
               {hasActiveFilters && <View style={styles.filterBadge} />}
             </TouchableOpacity>
           ),
         }}
       />
-      <View style={styles.container}>
-        {/* Summary Card */}
-        {summary && (
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>Umumiy ma'lumot</Text>
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Jami</Text>
-                <Text style={styles.summaryValue}>{(summary.totalAmount || 0).toLocaleString()} so'm</Text>
+      <View style={[styles.pageOuter, isWeb && styles.pageOuterWeb]}>
+        <View
+          style={[
+            styles.shell,
+            styles.shellFlex,
+            shellWidth ? { width: shellWidth, maxWidth: '100%' as const } : null,
+          ]}
+        >
+          <FlatList
+            data={days}
+            renderItem={renderDayItem}
+            keyExtractor={(item, index) => String(item.date_utc ?? item.date ?? index)}
+            style={styles.listFlex}
+            contentContainerStyle={[styles.listContent, isWeb && styles.listContentWeb]}
+            ListHeaderComponent={listHeader}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="stats-chart-outline" size={64} color="#ccc" />
+                <Text style={styles.emptyText}>Tarix bo'sh yoki ma'lumot yo'q</Text>
               </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>To'langan</Text>
-                <Text style={[styles.summaryValue, { color: '#34C759' }]}>{(summary.paidAmount || 0).toLocaleString()} so'm</Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>To'lanmagan</Text>
-                <Text style={[styles.summaryValue, { color: '#FF9500' }]}>{(summary.unpaidAmount || 0).toLocaleString()} so'm</Text>
-              </View>
-            </View>
-            {hasActiveFilters && (
-              <View style={styles.activeFiltersRow}>
-                <Ionicons name="funnel" size={14} color="#666" />
-                <Text style={styles.activeFiltersText}>
-                  {startDate && `${formatDate(startDate)}`}
-                  {startDate && endDate && ' - '}
-                  {endDate && `${formatDate(endDate)}`}
-                  {paymentFilter !== 'all' && ` | ${paymentFilter === 'paid' ? "To'langan" : "To'lanmagan"}`}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+            }
+          />
+        </View>
 
-        {/* Filter Modal */}
         <Modal
           visible={showFilterModal}
-          animationType="slide"
-          transparent={true}
+          animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+          transparent
           onRequestClose={() => setShowFilterModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          <View style={[styles.modalOverlay, Platform.OS === 'web' && styles.modalOverlayWeb]}>
+            <View style={[styles.modalContent, Platform.OS === 'web' && styles.modalContentWeb]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Filterlar</Text>
+                <Text style={styles.modalTitle}>Tarix oralig'i (UTC)</Text>
                 <TouchableOpacity onPress={() => setShowFilterModal(false)}>
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-
-              {/* Date Filters */}
-              <Text style={styles.filterLabel}>Boshlanish sanasi</Text>
+              <Text style={styles.filterLabel}>Boshlanish</Text>
               {Platform.OS === 'web' ? (
-                <DatePickerField
-                  value={startDate}
-                  onChange={handleStartDateChange}
-                  visible
-                  maximumDate={endDate || new Date()}
-                />
+                <DatePickerField value={startDate} onChange={handleStartDateChange} visible maximumDate={endDate || new Date()} />
               ) : (
                 <>
-                  <TouchableOpacity 
-                    style={styles.dateButton} 
-                    onPress={() => setShowStartPicker(true)}
-                  >
+                  <TouchableOpacity style={styles.dateButton} onPress={() => setShowStartPicker(true)}>
                     <Ionicons name="calendar" size={20} color="#666" />
-                    <Text style={styles.dateButtonText}>
-                      {startDate ? formatDate(startDate) : 'Tanlang'}
-                    </Text>
+                    <Text style={styles.dateButtonText}>{startDate ? formatDate(startDate) : 'Tanlang'}</Text>
                     {startDate && (
                       <TouchableOpacity onPress={() => setStartDate(null)}>
                         <Ionicons name="close-circle" size={20} color="#999" />
@@ -305,7 +362,7 @@ export default function KPIScreen() {
                 </>
               )}
 
-              <Text style={styles.filterLabel}>Tugash sanasi</Text>
+              <Text style={styles.filterLabel}>Tugash</Text>
               {Platform.OS === 'web' ? (
                 <DatePickerField
                   value={endDate}
@@ -316,14 +373,9 @@ export default function KPIScreen() {
                 />
               ) : (
                 <>
-                  <TouchableOpacity 
-                    style={styles.dateButton} 
-                    onPress={() => setShowEndPicker(true)}
-                  >
+                  <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndPicker(true)}>
                     <Ionicons name="calendar" size={20} color="#666" />
-                    <Text style={styles.dateButtonText}>
-                      {endDate ? formatDate(endDate) : 'Tanlang'}
-                    </Text>
+                    <Text style={styles.dateButtonText}>{endDate ? formatDate(endDate) : 'Tanlang'}</Text>
                     {endDate && (
                       <TouchableOpacity onPress={() => setEndDate(null)}>
                         <Ionicons name="close-circle" size={20} color="#999" />
@@ -340,33 +392,11 @@ export default function KPIScreen() {
                 </>
               )}
 
-              {/* Payment Status Filter */}
-              <Text style={styles.filterLabel}>To'lov holati</Text>
-              <View style={styles.paymentFilterRow}>
-                <TouchableOpacity
-                  style={[styles.paymentFilterButton, paymentFilter === 'all' && styles.paymentFilterActive]}
-                  onPress={() => setPaymentFilter('all')}
-                >
-                  <Text style={[styles.paymentFilterText, paymentFilter === 'all' && styles.paymentFilterTextActive]}>Barchasi</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.paymentFilterButton, paymentFilter === 'paid' && styles.paymentFilterActive]}
-                  onPress={() => setPaymentFilter('paid')}
-                >
-                  <Text style={[styles.paymentFilterText, paymentFilter === 'paid' && styles.paymentFilterTextActive]}>To'langan</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.paymentFilterButton, paymentFilter === 'unpaid' && styles.paymentFilterActive]}
-                  onPress={() => setPaymentFilter('unpaid')}
-                >
-                  <Text style={[styles.paymentFilterText, paymentFilter === 'unpaid' && styles.paymentFilterTextActive]}>To'lanmagan</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.modalHint}>Backendga `from` / `to` sifatida UTC kalendary kuni (YYYY-MM-DD) yuboriladi.</Text>
 
-              {/* Action Buttons */}
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
-                  <Text style={styles.clearButtonText}>Tozalash</Text>
+                  <Text style={styles.clearButtonText}>Standart (30 kun)</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
                   <Text style={styles.applyButtonText}>Qo'llash</Text>
@@ -375,81 +405,33 @@ export default function KPIScreen() {
             </View>
           </View>
         </Modal>
-
-        {/* Date Pickers (native only) */}
-        <DatePickerField
-          value={startDate}
-          onChange={handleStartDateChange}
-          visible={showStartPicker}
-          maximumDate={endDate || new Date()}
-        />
-        <DatePickerField
-          value={endDate}
-          onChange={handleEndDateChange}
-          visible={showEndPicker}
-          minimumDate={startDate || undefined}
-          maximumDate={new Date()}
-        />
-
-        <FlatList
-          data={transactions}
-          renderItem={renderTransactionItem}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="wallet-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>KPI transaksiyalari topilmadi</Text>
-            </View>
-          }
-        />
-
-        {totalPages > 1 && (
-          <View style={styles.pagination}>
-            <TouchableOpacity
-              style={[styles.pageButton, currentPage === 1 && styles.pageButtonDisabled]}
-              onPress={() => {
-                if (currentPage > 1) {
-                  loadTransactions({ page: currentPage - 1 });
-                }
-              }}
-              disabled={currentPage === 1}
-            >
-              <Text style={styles.pageButtonText}>Oldingi</Text>
-            </TouchableOpacity>
-            <Text style={styles.pageInfo}>
-              {currentPage} / {totalPages}
-            </Text>
-            <TouchableOpacity
-              style={[styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled]}
-              onPress={() => {
-                if (currentPage < totalPages) {
-                  loadTransactions({ page: currentPage + 1 });
-                }
-              }}
-              disabled={currentPage === totalPages}
-            >
-              <Text style={styles.pageButtonText}>Keyingi</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  pageOuter: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  pageOuterWeb: {
+    alignItems: 'center',
+  },
+  shell: {
+    width: '100%',
+  },
+  shellFlex: {
+    flex: 1,
+  },
+  listFlex: {
+    flex: 1,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: 200,
   },
   headerButton: {
     padding: 8,
@@ -464,9 +446,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#FF3B30',
   },
-  summaryCard: {
+  kpiBalanceCard: {
     backgroundColor: '#fff',
-    margin: 16,
+    marginHorizontal: 0,
+    marginTop: 16,
     marginBottom: 8,
     padding: 16,
     borderRadius: 12,
@@ -476,47 +459,195 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+  kpiBalanceCardWeb: {
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+  },
+  kpiBalanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 12,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  kpiBalanceTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
-  summaryItem: {
+  kpiBalanceTitleWeb: {
+    fontSize: 17,
+  },
+  kpiBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  kpiBalanceRowWeb: {
+    justifyContent: 'space-around',
+    rowGap: 12,
+  },
+  kpiBalanceItem: {
     alignItems: 'center',
     flex: 1,
+    minWidth: 88,
   },
-  summaryLabel: {
+  kpiBalanceItemWeb: {
+    minWidth: 112,
+    flexGrow: 1,
+  },
+  kpiBalanceLabel: {
     fontSize: 12,
     color: '#666',
     marginBottom: 4,
   },
-  summaryValue: {
+  kpiBalanceValue: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#007AFF',
+    textAlign: 'center',
   },
-  activeFiltersRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    gap: 6,
+  kpiBalancePaid: {
+    color: '#34C759',
   },
-  activeFiltersText: {
+  kpiBalanceUnpaid: {
+    color: '#FF9500',
+  },
+  kpiBalanceDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#eee',
+    marginHorizontal: 4,
+  },
+  kpiMetaText: {
+    marginTop: 10,
     fontSize: 12,
     color: '#666',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  paid: {
+    color: '#34C759',
+  },
+  unpaid: {
+    color: '#FF9500',
+  },
+  filterHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginHorizontal: 0,
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+  },
+  filterHintWeb: {
+    maxWidth: '100%',
+  },
+  filterHintIcon: {
+    marginTop: 2,
+  },
+  filterHintText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#1565C0',
+    lineHeight: 16,
+    flexShrink: 1,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginHorizontal: 0,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingBottom: 48,
+    flexGrow: 1,
+  },
+  listContentWeb: {
+    width: '100%',
+  },
+  dayCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  dayTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 10,
+  },
+  dayGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  dayCell: {
+    width: '47%',
+    minWidth: 140,
+  },
+  dayCellWeb3: {
+    width: '31%',
+    minWidth: 120,
+  },
+  dayCellWeb5: {
+    width: '18%',
+    minWidth: 88,
+  },
+  dayLabel: {
+    fontSize: 11,
+    color: '#888',
+    marginBottom: 2,
+  },
+  dayValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#333',
+  },
+  dayValueMuted: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  dayValueSmall: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: '#999',
+    marginTop: 12,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  modalOverlayWeb: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
   modalContent: {
     backgroundColor: '#fff',
@@ -525,11 +656,20 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
+  modalContentWeb: {
+    width: '100%',
+    maxWidth: 480,
+    borderRadius: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: 640,
+    paddingBottom: 24,
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 18,
@@ -541,7 +681,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-    marginTop: 16,
+    marginTop: 12,
   },
   dateButton: {
     flexDirection: 'row',
@@ -556,33 +696,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
   },
-  paymentFilterRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  paymentFilterButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
-  },
-  paymentFilterActive: {
-    backgroundColor: '#007AFF',
-  },
-  paymentFilterText: {
-    fontSize: 13,
-    color: '#333',
-    fontWeight: '500',
-  },
-  paymentFilterTextActive: {
-    color: '#fff',
+  modalHint: {
+    marginTop: 12,
+    fontSize: 12,
+    color: '#888',
+    lineHeight: 16,
   },
   modalActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
-    marginTop: 24,
+    marginTop: 20,
   },
   clearButton: {
     flex: 1,
@@ -592,9 +716,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clearButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
     fontWeight: '600',
+    textAlign: 'center',
   },
   applyButton: {
     flex: 1,
@@ -608,131 +733,4 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  listContent: {
-    padding: 16,
-    paddingTop: 8,
-    paddingBottom: 80,
-  },
-  transactionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  transactionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  transactionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    flex: 1,
-  },
-  transactionInfo: {
-    flex: 1,
-  },
-  orderNumber: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  productName: {
-    fontSize: 14,
-    color: '#666',
-  },
-  amountContainer: {
-    alignItems: 'flex-end',
-  },
-  amount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FF9500',
-    marginBottom: 4,
-  },
-  amountPaid: {
-    color: '#34C759',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusPaid: {
-    backgroundColor: '#E8F5E9',
-  },
-  statusUnpaid: {
-    backgroundColor: '#FFF3E0',
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#333',
-  },
-  transactionDetails: {
-    gap: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: '#666',
-    minWidth: 80,
-  },
-  detailValue: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    marginTop: 16,
-  },
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  pageButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-  },
-  pageButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  pageButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  pageInfo: {
-    fontSize: 14,
-    color: '#666',
-  },
 });
-

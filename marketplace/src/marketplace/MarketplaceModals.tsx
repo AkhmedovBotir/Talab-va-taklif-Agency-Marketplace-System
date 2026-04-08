@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Image, TextInput, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, TextInput, Platform, ActivityIndicator } from 'react-native';
 import { MotiView, AnimatePresence } from 'moti';
 import {
   ShoppingCart,
@@ -13,11 +13,30 @@ import {
   Star,
   Plus,
   Minus,
+  Bell,
+  CheckCheck,
 } from 'lucide-react-native';
 import { cn } from '../lib/utils';
 import { useMarketplace } from './MarketplaceContext';
 import { api } from '../services/api';
-import type { Product } from '../types';
+import type { Product, ProductRatingItem, MarketplaceNotification } from '../types';
+
+function notificationTypeDotColor(type: string): string {
+  switch (type) {
+    case 'error':
+      return '#dc2626';
+    case 'warning':
+      return '#d97706';
+    case 'success':
+      return '#16a34a';
+    case 'update':
+      return '#2563eb';
+    case 'announcement':
+      return '#7c3aed';
+    default:
+      return '#f97316';
+  }
+}
 
 function ProductDetailCartActionsNative({
   product,
@@ -88,6 +107,17 @@ export function MarketplaceModals() {
   const [formPicker, setFormPicker] = useState<'region' | 'district' | 'mfy' | null>(null);
   const [allDistricts, setAllDistricts] = useState<{ id: number; name: string }[]>([]);
   const [allMfys, setAllMfys] = useState<{ id: number; name: string }[]>([]);
+  const [selectedProductRating, setSelectedProductRating] = useState<{ average: number; total: number; items: ProductRatingItem[] }>({
+    average: 0,
+    total: 0,
+    items: [],
+  });
+  const [notifItems, setNotifItems] = useState<MarketplaceNotification[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifPage, setNotifPage] = useState(1);
+  const [notifTotalPages, setNotifTotalPages] = useState(1);
+  const [notifMarkAllBusy, setNotifMarkAllBusy] = useState(false);
+  const [notifLoadingMore, setNotifLoadingMore] = useState(false);
   const isWeb = Platform.OS === 'web';
   /** Webda planshetdan kichik: mahsulot modali butun ekranni egallaydi. */
   const productModalFullScreenWeb = isWeb && !m.isTabletUpWeb;
@@ -130,6 +160,55 @@ export function MarketplaceModals() {
       active = false;
     };
   }, [m.isRegionSelectorOpen]);
+
+  useEffect(() => {
+    const pid = Number(m.selectedProduct?.id ?? 0);
+    if (!pid) {
+      setSelectedProductRating({ average: 0, total: 0, items: [] });
+      return;
+    }
+    let cancelled = false;
+    void api.productRatings.get(pid, { limit: 10 }).then((res) => {
+      if (cancelled) return;
+      setSelectedProductRating({
+        average: res.average_score || 0,
+        total: res.total_ratings || 0,
+        items: res.items || [],
+      });
+    }).catch(() => {
+      if (cancelled) return;
+      setSelectedProductRating({ average: 0, total: 0, items: [] });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [m.selectedProduct?.id]);
+
+  useEffect(() => {
+    if (!m.notificationsInboxOpen) return;
+    let alive = true;
+    setNotifLoading(true);
+    void api.notifications
+      .list({ page: 1, limit: 20 })
+      .then((res) => {
+        if (!alive) return;
+        setNotifItems(res.items);
+        setNotifPage(1);
+        setNotifTotalPages(Math.max(1, res.total_pages));
+        void m.refreshNotificationsUnread();
+      })
+      .catch(() => {
+        if (!alive) return;
+        setNotifItems([]);
+        setNotifTotalPages(1);
+      })
+      .finally(() => {
+        if (alive) setNotifLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [m.notificationsInboxOpen, m.refreshNotificationsUnread]);
 
   const addressMeta = useMemo(
     () =>
@@ -599,6 +678,29 @@ export function MarketplaceModals() {
                           </Text>
                         </View>
                       </View>
+                      <View className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <View className="flex-row items-center gap-2">
+                          <Star size={16} color="#f59e0b" fill="#f59e0b" />
+                          <Text className="text-sm font-black text-slate-800">
+                            {selectedProductRating.average > 0 ? selectedProductRating.average.toFixed(1) : '0.0'}
+                          </Text>
+                          <Text className="text-xs font-semibold text-slate-400">({selectedProductRating.total} baho)</Text>
+                        </View>
+                        {selectedProductRating.items.length > 0 ? (
+                          <View className="mt-3 gap-2">
+                            {selectedProductRating.items.slice(0, 3).map((r) => (
+                              <View key={r.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                <View className="flex-row items-center gap-1">
+                                  {[1, 2, 3, 4, 5].map((i) => (
+                                    <Star key={i} size={12} color={i <= r.score ? '#f59e0b' : '#cbd5e1'} fill={i <= r.score ? '#f59e0b' : 'none'} />
+                                  ))}
+                                </View>
+                                <Text className="mt-1 text-xs font-semibold text-slate-600">{r.note || r.comment_template || 'Izoh qoldirilmagan'}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : null}
+                      </View>
                     </ScrollView>
                     <View className="absolute bottom-0 left-0 right-0 border-t border-gray-100 bg-white p-6">
                       <View className="mb-6 flex-row items-center justify-between">
@@ -714,6 +816,29 @@ export function MarketplaceModals() {
                         </Text>
                       </View>
                     </View>
+                    <View className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <View className="flex-row items-center gap-2">
+                        <Star size={16} color="#f59e0b" fill="#f59e0b" />
+                        <Text className="text-sm font-black text-slate-800">
+                          {selectedProductRating.average > 0 ? selectedProductRating.average.toFixed(1) : '0.0'}
+                        </Text>
+                        <Text className="text-xs font-semibold text-slate-400">({selectedProductRating.total} baho)</Text>
+                      </View>
+                      {selectedProductRating.items.length > 0 ? (
+                        <View className="mt-3 gap-2">
+                          {selectedProductRating.items.slice(0, 3).map((r) => (
+                            <View key={r.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                              <View className="flex-row items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((i) => (
+                                  <Star key={i} size={12} color={i <= r.score ? '#f59e0b' : '#cbd5e1'} fill={i <= r.score ? '#f59e0b' : 'none'} />
+                                ))}
+                              </View>
+                              <Text className="mt-1 text-xs font-semibold text-slate-600">{r.note || r.comment_template || 'Izoh qoldirilmagan'}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
 
                     {m.isSmallWeb && (
                       <View className="border-t border-gray-100 pt-2">
@@ -764,6 +889,161 @@ export function MarketplaceModals() {
                 </View>
               )}
             </MotiView>
+          </View>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {m.notificationsInboxOpen && (
+          <View className="absolute inset-0 z-[70]">
+            <Pressable className="absolute inset-0 bg-black/60" onPress={() => m.setNotificationsInboxOpen(false)} />
+            <View
+              className={cn('absolute inset-0', useCenteredRegionModal ? 'items-center justify-center px-4' : 'justify-end')}
+              pointerEvents="box-none"
+              style={useCenteredRegionModal && isWeb ? { paddingHorizontal: webModalOuterPadding } : undefined}
+            >
+              <MotiView
+                from={useCenteredRegionModal ? { opacity: 0, scale: 0.95 } : { translateY: m.SCREEN_HEIGHT }}
+                animate={useCenteredRegionModal ? { opacity: 1, scale: 1 } : { translateY: 0 }}
+                exit={useCenteredRegionModal ? { opacity: 0, scale: 0.95 } : { translateY: m.SCREEN_HEIGHT }}
+                transition={{ type: 'timing', duration: 140 }}
+                className={cn(
+                  'overflow-hidden bg-white shadow-2xl',
+                  useCenteredRegionModal ? 'border border-slate-200' : 'h-[85%] w-full rounded-t-[40px]'
+                )}
+                style={
+                  useCenteredRegionModal
+                    ? {
+                        width: Math.min(m.windowWidth - webModalOuterPadding * 2, 440),
+                        maxHeight: Math.min(Math.round(m.windowHeight * 0.85), 640),
+                        backgroundColor: '#ffffff',
+                        borderRadius: regionModalRadius,
+                      }
+                    : undefined
+                }
+              >
+                <View className="flex-row items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <View className="flex-row items-center gap-2">
+                    <Bell size={20} color="#f97316" />
+                    <Text className="text-lg font-black text-slate-900">Bildirishnomalar</Text>
+                  </View>
+                  <View className="flex-row items-center gap-2">
+                    <Pressable
+                      onPress={() => {
+                        if (notifMarkAllBusy) return;
+                        setNotifMarkAllBusy(true);
+                        void api.notifications
+                          .markAllRead()
+                          .then(() => {
+                            setNotifItems((rows) =>
+                              rows.map((r) => ({ ...r, is_read: true, read_at: r.read_at || new Date().toISOString() }))
+                            );
+                            void m.refreshNotificationsUnread();
+                          })
+                          .finally(() => setNotifMarkAllBusy(false));
+                      }}
+                      disabled={notifMarkAllBusy}
+                      className="flex-row items-center gap-1 rounded-xl border border-orange-100 bg-orange-50 px-3 py-2 active:opacity-80"
+                    >
+                      <CheckCheck size={16} color="#ea580c" />
+                      <Text className="text-xs font-bold text-orange-600">Hammasini o&apos;qilgan</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => m.setNotificationsInboxOpen(false)}
+                      className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+                    >
+                      <X size={22} color="#111827" />
+                    </Pressable>
+                  </View>
+                </View>
+                {notifLoading ? (
+                  <View className="items-center justify-center py-16">
+                    <ActivityIndicator size="large" color="#f97316" />
+                  </View>
+                ) : (
+                  <ScrollView className="max-h-[480px] px-3 py-2" keyboardShouldPersistTaps="handled">
+                    {notifItems.length === 0 ? (
+                      <Text className="py-10 text-center text-sm font-semibold text-slate-400">Xabarlar yo&apos;q</Text>
+                    ) : (
+                      notifItems.map((item) => (
+                        <Pressable
+                          key={String(item.id)}
+                          onPress={() => {
+                            if (item.is_read) return;
+                            void api.notifications.markRead(item.id).then(() => {
+                              setNotifItems((rows) =>
+                                rows.map((r) =>
+                                  String(r.id) === String(item.id)
+                                    ? { ...r, is_read: true, read_at: new Date().toISOString() }
+                                    : r
+                                )
+                              );
+                              void m.refreshNotificationsUnread();
+                            });
+                          }}
+                          className={cn(
+                            'mb-2 rounded-2xl border px-3 py-3 active:opacity-90',
+                            item.is_read ? 'border-slate-100 bg-slate-50' : 'border-orange-100 bg-orange-50/40'
+                          )}
+                        >
+                          <View className="mb-1 flex-row items-center gap-2">
+                            <View
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: notificationTypeDotColor(String(item.type)) }}
+                            />
+                            <Text className="flex-1 text-sm font-black text-slate-900" numberOfLines={2}>
+                              {item.title || 'Xabar'}
+                            </Text>
+                            {!item.is_read ? (
+                              <View className="h-2 w-2 rounded-full bg-orange-500" />
+                            ) : null}
+                          </View>
+                          <Text className="text-xs font-medium leading-relaxed text-slate-600">{item.message}</Text>
+                          <Text className="mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                            {item.created_at ? String(item.created_at).slice(0, 16).replace('T', ' ') : ''}
+                          </Text>
+                        </Pressable>
+                      ))
+                    )}
+                    {notifPage < notifTotalPages ? (
+                      <Pressable
+                        onPress={() => {
+                          if (notifLoadingMore) return;
+                          const next = notifPage + 1;
+                          setNotifLoadingMore(true);
+                          void api.notifications
+                            .list({ page: next, limit: 20 })
+                            .then((res) => {
+                              setNotifItems((prev) => {
+                                const seen = new Set(prev.map((x) => String(x.id)));
+                                const merged = [...prev];
+                                for (const row of res.items) {
+                                  if (!seen.has(String(row.id))) {
+                                    seen.add(String(row.id));
+                                    merged.push(row);
+                                  }
+                                }
+                                return merged;
+                              });
+                              setNotifPage(next);
+                              setNotifTotalPages(Math.max(1, res.total_pages));
+                            })
+                            .finally(() => setNotifLoadingMore(false));
+                        }}
+                        disabled={notifLoadingMore}
+                        className="mb-4 mt-2 items-center rounded-xl border border-slate-200 py-3 active:bg-slate-50"
+                      >
+                        {notifLoadingMore ? (
+                          <ActivityIndicator color="#64748b" />
+                        ) : (
+                          <Text className="text-sm font-bold text-slate-600">Yana yuklash</Text>
+                        )}
+                      </Pressable>
+                    ) : null}
+                  </ScrollView>
+                )}
+              </MotiView>
+            </View>
           </View>
         )}
       </AnimatePresence>

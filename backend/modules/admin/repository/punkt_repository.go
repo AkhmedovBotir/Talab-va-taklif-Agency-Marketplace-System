@@ -33,12 +33,12 @@ func (r *punktPostgresRepository) GetPaginated(page, limit int) ([]domain.Punkt,
 	var rows []domain.Punkt
 	var total int64
 
-	if err := r.db.Model(&domain.Punkt{}).Count(&total).Error; err != nil {
+	if err := r.db.Model(&domain.Punkt{}).Where("status <> ?", "deleted").Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	offset := (page - 1) * limit
-	err := r.db.Order("id asc").Offset(offset).Limit(limit).Find(&rows).Error
+	err := r.db.Where("status <> ?", "deleted").Order("id asc").Offset(offset).Limit(limit).Find(&rows).Error
 	if err != nil {
 		return nil, 0, err
 	}
@@ -67,7 +67,7 @@ func (r *punktPostgresRepository) Delete(id uint) error {
 
 func (r *punktPostgresRepository) ExistsByPhone(phone string, exceptID uint) (bool, error) {
 	var count int64
-	q := r.db.Model(&domain.Punkt{}).Where("phone = ?", phone)
+	q := r.db.Model(&domain.Punkt{}).Where("phone = ? AND status <> ?", phone, "deleted")
 	if exceptID > 0 {
 		q = q.Where("id <> ?", exceptID)
 	}

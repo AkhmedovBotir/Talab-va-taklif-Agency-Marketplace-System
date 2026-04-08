@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Platform, ActivityIndicator, Image, Modal, TextInput, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, Platform, ActivityIndicator, Image, Modal, TextInput, RefreshControl, Alert } from 'react-native';
 import {
   User,
   ChevronRight,
@@ -16,12 +16,14 @@ import {
   MapPin,
   X,
   Package,
+  BriefcaseBusiness,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../services/api';
-import { User as AppUser, Region, District, MFY } from '../types';
+import { User as AppUser, Region, District, MFY, ActivityType, PartnerRequest, PartnerRequestPayload } from '../types';
 import { useMarketplace } from './MarketplaceContext';
+import { digitsOnly, normalizePartnerRequestPayload, sanitizePhoneInput, validatePartnerRequestPayload } from '../lib/partnerRequestForm';
 
 const MOBILE_REFRESH_TINT = '#f97316';
 
@@ -40,8 +42,10 @@ function ProfileMenuItem({ icon, label, onPress }: { icon: React.ReactNode; labe
 }
 
 export function ProfileMarketplaceScreen() {
-  const { onLogout } = useMarketplace();
+  const { onLogout, setNotificationsInboxOpen, refreshNotificationsUnread } = useMarketplace();
   const [user, setUser] = useState<AppUser | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [regions, setRegions] = useState<Region[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [mfys, setMfys] = useState<MFY[]>([]);
@@ -50,6 +54,24 @@ export function ProfileMarketplaceScreen() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [selector, setSelector] = useState<SelectorType>(null);
+  const [partnerModalOpen, setPartnerModalOpen] = useState(false);
+  const [partnerRequests, setPartnerRequests] = useState<PartnerRequest[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [partnerSubmitting, setPartnerSubmitting] = useState(false);
+  const [partnerPicker, setPartnerPicker] = useState<'activity' | 'region' | 'district' | 'mfy' | null>(null);
+  const [partnerDistricts, setPartnerDistricts] = useState<Array<{ id: number; name: string }>>([]);
+  const [partnerMfys, setPartnerMfys] = useState<Array<{ id: number; name: string }>>([]);
+  const [partnerForm, setPartnerForm] = useState<PartnerRequestPayload>({
+    company_name: '',
+    inn: '',
+    mfo: '',
+    account_number: '',
+    activity_type_id: 0,
+    region_id: 0,
+    district_id: 0,
+    mfy_id: 0,
+    phone: '+998',
+  });
   const [editForm, setEditForm] = useState({
     first_name: '',
     last_name: '',
@@ -62,21 +84,35 @@ export function ProfileMarketplaceScreen() {
   const [pullRefreshing, setPullRefreshing] = useState(false);
 
   const loadProfileData = useCallback(async (clearOnError: boolean) => {
+    setProfileError(null);
     try {
       const profile = await api.profile.get();
       setUser(profile);
-      const [regionList, districtList, mfyList, avatarRes] = await Promise.all([
+      const [regionList, districtList, mfyList] = await Promise.all([
         api.regions.getRegions(),
         api.regions.getDistricts(profile.region_id),
         api.regions.getMFYs(profile.district_id),
-        api.profile.getAvatar(),
       ]);
       setRegions(regionList);
       setDistricts(districtList);
       setMfys(mfyList);
-      setAvatar(avatarRes?.has_avatar ? normalizeAvatar(avatarRes.avatar) : '');
+      void api.profile.getAvatar().then((avatarRes) => {
+        setAvatar(avatarRes?.has_avatar ? normalizeAvatar(avatarRes.avatar) : '');
+      }).catch(() => {});
+      void api.partnerRequests.list().then((requests) => {
+        setPartnerRequests(requests);
+      }).catch(() => {});
+      void api.activityTypes.list().then((types) => {
+        setActivityTypes(types);
+        if (types[0]) {
+          setPartnerForm((prev) => ({ ...prev, activity_type_id: prev.activity_type_id || types[0].id }));
+        }
+      }).catch(() => {});
     } catch {
       if (clearOnError) setUser(null);
+      setProfileError("Profil ma'lumotlarini yuklab bo'lmadi");
+    } finally {
+      setLoadingProfile(false);
     }
   }, []);
 
@@ -93,10 +129,26 @@ export function ProfileMarketplaceScreen() {
     }
   }, [loadProfileData]);
 
-  if (!user) {
+  if (loadingProfile) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
         <ActivityIndicator size="large" color="#f97316" />
+      </View>
+    );
+  }
+  if (!user) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 px-5">
+        <Text className="text-center text-sm font-bold text-gray-600">{profileError || "Profil ochilmadi"}</Text>
+        <Pressable
+          onPress={() => {
+            setLoadingProfile(true);
+            void loadProfileData(true);
+          }}
+          className="mt-4 rounded-xl bg-gray-900 px-5 py-3"
+        >
+          <Text className="font-black text-white">Qayta urinish</Text>
+        </Pressable>
       </View>
     );
   }
@@ -204,6 +256,53 @@ export function ProfileMarketplaceScreen() {
     }
   };
 
+  const openPartnerModal = async () => {
+    const regionId = user.region_id || regions[0]?.id || 0;
+    const districtId = user.district_id || 0;
+    const mfyId = user.mfy_id || 0;
+    const ds = regionId ? await api.regions.getDistricts(regionId) : [];
+    const ms = districtId ? await api.regions.getMFYs(districtId) : [];
+    setPartnerDistricts(ds);
+    setPartnerMfys(ms);
+    setPartnerForm((prev) => ({
+      ...prev,
+      region_id: regionId,
+      district_id: districtId,
+      mfy_id: mfyId,
+      phone: prev.phone || user.phone || '+998',
+      activity_type_id: prev.activity_type_id || activityTypes[0]?.id || 0,
+    }));
+    setPartnerModalOpen(true);
+  };
+
+  const submitPartnerRequest = async () => {
+    const normalized = normalizePartnerRequestPayload(partnerForm);
+    const validationError = validatePartnerRequestPayload(normalized);
+    if (validationError) return Alert.alert('Xatolik', validationError);
+    setPartnerSubmitting(true);
+    try {
+      await api.partnerRequests.create(normalized);
+      const requests = await api.partnerRequests.list();
+      setPartnerRequests(requests);
+      setPartnerModalOpen(false);
+    } catch (e) {
+      Alert.alert('Xatolik', e instanceof Error ? e.message : "So'rov yuborilmadi");
+    } finally {
+      setPartnerSubmitting(false);
+    }
+  };
+
+  const partnerPickerOptions =
+    partnerPicker === 'activity'
+      ? activityTypes.map((it) => ({ value: it.id, label: it.name }))
+      : partnerPicker === 'region'
+        ? regions.map((it) => ({ value: it.id, label: it.name }))
+        : partnerPicker === 'district'
+          ? partnerDistricts.map((it) => ({ value: it.id, label: it.name }))
+          : partnerPicker === 'mfy'
+            ? partnerMfys.map((it) => ({ value: it.id, label: it.name }))
+            : [];
+
   return (
     <ScrollView
       className="flex-1 bg-slate-100"
@@ -286,14 +385,25 @@ export function ProfileMarketplaceScreen() {
               label="Buyurtmalarim"
               onPress={() => router.push('/orders')}
             />
-            <ProfileMenuItem icon={<Bell size={20} color="#f97316" />} label="Bildirishnomalar" />
+            <ProfileMenuItem
+              icon={<BriefcaseBusiness size={20} color="#047857" />}
+              label="Hamkorlik so'rovlari"
+              onPress={() => router.push('/partner-requests')}
+            />
+            <ProfileMenuItem
+              icon={<Bell size={20} color="#f97316" />}
+              label="Bildirishnomalar"
+              onPress={() => setNotificationsInboxOpen(true)}
+            />
           </View>
           <View className="my-3 rounded-[24px] border border-slate-200/90 bg-slate-50 p-2 shadow-sm">
             <ProfileMenuItem icon={<HelpCircle size={20} color="#9ca3af" />} label="Yordam markazi" />
             <ProfileMenuItem icon={<Settings size={20} color="#9ca3af" />} label="Sozlamalar" />
           </View>
           <Pressable
-            onPress={onLogout}
+            onPress={() => {
+              void Promise.resolve(onLogout()).then(() => refreshNotificationsUnread());
+            }}
             className="w-full flex-row items-center justify-center gap-2 rounded-[24px] border border-rose-200 bg-rose-100/60 py-4"
           >
             <LogOut size={20} color="#ef4444" />
@@ -410,6 +520,101 @@ export function ProfileMarketplaceScreen() {
                   className="border-b border-slate-100 py-3.5"
                 >
                   <Text className="font-semibold text-slate-800">{item.name}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={partnerModalOpen} transparent animationType="slide" onRequestClose={() => setPartnerModalOpen(false)}>
+        <View className="flex-1 justify-end bg-black/45">
+          <Pressable className="absolute inset-0" onPress={() => setPartnerModalOpen(false)} />
+          <View className="max-h-[90%] rounded-t-3xl bg-white px-4 pb-6 pt-3">
+            <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+            <Text className="mb-3 text-lg font-black text-gray-900">Hamkorlik so&apos;rovlari</Text>
+            <View className="mb-3 max-h-28 rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <ScrollView>
+                {partnerRequests.length === 0 ? (
+                  <Text className="text-sm font-semibold text-slate-500">Hozircha so&apos;rov yuborilmagan.</Text>
+                ) : (
+                  partnerRequests.map((r) => (
+                    <View key={r.id} className="mb-2 rounded-lg border border-slate-200 bg-white p-2">
+                      <Text className="font-black text-slate-800">{r.company_name}</Text>
+                      <Text className="text-xs font-semibold text-slate-500">{r.phone} · {r.status || 'pending'}</Text>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+            <ScrollView>
+              <View className="gap-2">
+                <TextInput value={partnerForm.company_name} onChangeText={(v) => setPartnerForm((p) => ({ ...p, company_name: v }))} placeholder="Kompaniya nomi" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
+                <TextInput value={partnerForm.inn} onChangeText={(v) => setPartnerForm((p) => ({ ...p, inn: digitsOnly(v, 9) }))} keyboardType="number-pad" maxLength={9} placeholder="INN (9 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
+                <TextInput value={partnerForm.mfo} onChangeText={(v) => setPartnerForm((p) => ({ ...p, mfo: digitsOnly(v, 5) }))} keyboardType="number-pad" maxLength={5} placeholder="MFO (5 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
+                <TextInput value={partnerForm.account_number} onChangeText={(v) => setPartnerForm((p) => ({ ...p, account_number: digitsOnly(v, 20) }))} keyboardType="number-pad" maxLength={20} placeholder="Hisob raqam (20 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
+                <Text className="mt-1 text-xs font-black uppercase tracking-widest text-slate-500">Faoliyat turi</Text>
+                <Pressable onPress={() => setPartnerPicker('activity')} className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <Text className="font-semibold text-slate-700">{activityTypes.find((it) => it.id === partnerForm.activity_type_id)?.name || 'Tanlang'}</Text>
+                  <ChevronRight size={16} color="#94a3b8" />
+                </Pressable>
+                <Text className="mt-1 text-xs font-black uppercase tracking-widest text-slate-500">Viloyat / tuman / MFY</Text>
+                <Pressable onPress={() => setPartnerPicker('region')} className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <Text className="font-semibold text-slate-700">{regions.find((it) => it.id === partnerForm.region_id)?.name || 'Viloyatni tanlang'}</Text>
+                  <ChevronRight size={16} color="#94a3b8" />
+                </Pressable>
+                <Pressable onPress={() => partnerForm.region_id && setPartnerPicker('district')} className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <Text className="font-semibold text-slate-700">{partnerDistricts.find((it) => it.id === partnerForm.district_id)?.name || 'Tumanni tanlang'}</Text>
+                  <ChevronRight size={16} color="#94a3b8" />
+                </Pressable>
+                <Pressable onPress={() => partnerForm.district_id && setPartnerPicker('mfy')} className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <Text className="font-semibold text-slate-700">{partnerMfys.find((it) => it.id === partnerForm.mfy_id)?.name || 'MFY ni tanlang'}</Text>
+                  <ChevronRight size={16} color="#94a3b8" />
+                </Pressable>
+                <TextInput value={partnerForm.phone} onChangeText={(v) => setPartnerForm((p) => ({ ...p, phone: sanitizePhoneInput(v) }))} keyboardType="phone-pad" maxLength={13} placeholder="+998901234567" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
+              </View>
+            </ScrollView>
+            <View className="mt-3 flex-row gap-2">
+              <Pressable onPress={() => setPartnerModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-3">
+                <Text className="text-center font-bold text-slate-600">Yopish</Text>
+              </Pressable>
+              <Pressable onPress={() => void submitPartnerRequest()} disabled={partnerSubmitting} className="flex-1 rounded-xl bg-emerald-600 py-3 disabled:opacity-60">
+                <Text className="text-center font-bold text-white">{partnerSubmitting ? 'Yuborilmoqda...' : "Yangi so'rov yuborish"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={partnerPicker !== null} transparent animationType="slide" onRequestClose={() => setPartnerPicker(null)}>
+        <View className="flex-1 justify-end bg-black/35">
+          <Pressable className="absolute inset-0" onPress={() => setPartnerPicker(null)} />
+          <View className="max-h-[65%] rounded-t-3xl bg-white px-4 pb-6 pt-3">
+            <View className="mb-3 h-1.5 w-12 self-center rounded-full bg-slate-300" />
+            <Text className="mb-2 text-base font-black text-slate-900">
+              {partnerPicker === 'activity' ? 'Faoliyat turi' : partnerPicker === 'region' ? 'Viloyat' : partnerPicker === 'district' ? 'Tuman' : 'MFY'}
+            </Text>
+            <ScrollView>
+              {partnerPickerOptions.map((opt) => (
+                <Pressable
+                  key={`${partnerPicker}-${opt.value}`}
+                  onPress={async () => {
+                    if (partnerPicker === 'activity') {
+                      setPartnerForm((p) => ({ ...p, activity_type_id: opt.value }));
+                    } else if (partnerPicker === 'region') {
+                      const ds = await api.regions.getDistricts(opt.value);
+                      setPartnerDistricts(ds);
+                      setPartnerForm((p) => ({ ...p, region_id: opt.value, district_id: ds[0]?.id ?? 0, mfy_id: 0 }));
+                    } else if (partnerPicker === 'district') {
+                      const ms = await api.regions.getMFYs(opt.value);
+                      setPartnerMfys(ms);
+                      setPartnerForm((p) => ({ ...p, district_id: opt.value, mfy_id: ms[0]?.id ?? 0 }));
+                    } else {
+                      setPartnerForm((p) => ({ ...p, mfy_id: opt.value }));
+                    }
+                    setPartnerPicker(null);
+                  }}
+                  className="border-b border-slate-100 py-3.5"
+                >
+                  <Text className="font-semibold text-slate-800">{opt.label}</Text>
                 </Pressable>
               ))}
             </ScrollView>

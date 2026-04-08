@@ -10,10 +10,12 @@ import {
   Maximize2,
   Minus,
   Plus,
+  Star,
 } from 'lucide-react';
 import { Product } from '../types';
 import { cn } from '../lib/utils';
 import { renderProductDescriptionWeb } from '../lib/renderProductDescriptionWeb';
+import { api } from '../services/api';
 
 type Props = {
   product: Product | null;
@@ -27,6 +29,11 @@ type Props = {
 export function WebProductDetailOverlay({ product, onClose, onAddToCart, onCartDelta, inCartQty }: Props) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState<{ average: number; total: number; items: Array<{ id: number; score: number; note?: string; comment_template?: string }> }>({
+    average: 0,
+    total: 0,
+    items: [],
+  });
 
   useEffect(() => {
     setActiveImageIndex(0);
@@ -40,6 +47,27 @@ export function WebProductDetailOverlay({ product, onClose, onAddToCart, onCartD
     }, 3000);
     return () => clearInterval(t);
   }, [product, isLightboxOpen]);
+
+  useEffect(() => {
+    if (!product) return;
+    const pid = Number(product.id);
+    if (!Number.isFinite(pid) || pid < 1) return;
+    let cancelled = false;
+    void api.productRatings.get(pid, { limit: 10 }).then((res) => {
+      if (cancelled) return;
+      setRatingSummary({
+        average: res.average_score || 0,
+        total: res.total_ratings || 0,
+        items: res.items || [],
+      });
+    }).catch(() => {
+      if (cancelled) return;
+      setRatingSummary({ average: 0, total: 0, items: [] });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.id]);
 
   if (!product) return null;
 
@@ -164,6 +192,30 @@ export function WebProductDetailOverlay({ product, onClose, onAddToCart, onCartD
                       {product.unit_size} {product.unit}
                     </p>
                   </div>
+                </div>
+
+                <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-2">
+                    <Star size={16} className="fill-amber-500 text-amber-500" />
+                    <span className="text-sm font-black text-slate-800">
+                      {ratingSummary.average > 0 ? ratingSummary.average.toFixed(1) : '0.0'}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-400">({ratingSummary.total} baho)</span>
+                  </div>
+                  {ratingSummary.items.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {ratingSummary.items.slice(0, 4).map((r) => (
+                        <div key={r.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <Star key={i} size={12} className={i <= r.score ? 'fill-amber-500 text-amber-500' : 'text-slate-300'} />
+                            ))}
+                          </div>
+                          <p className="mt-1 text-xs font-semibold text-slate-600">{r.note || r.comment_template || 'Izoh qoldirilmagan'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

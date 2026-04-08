@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,619 +10,631 @@ import {
   Modal,
   Platform,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { WebDateInput } from './components/WebDateInput';
 import { useDialog } from './contexts/DialogContext';
-import { apiService, KpiTransaction } from './services/api';
+import {
+  apiService,
+  PunktKpiHistoryDay,
+  PunktKpiTodayData,
+} from './services/api';
+import { useScreenContentWidth } from './hooks/useScreenContentWidth';
 
-type PaymentFilter = 'all' | 'paid' | 'unpaid';
+function formatYmdUTC(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function utcDateFromYmd(ymd: string): Date {
+  const [y, m, day] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, day));
+}
+
+function defaultHistoryRange(): { from: string; to: string } {
+  const now = new Date();
+  const to = formatYmdUTC(now);
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  start.setUTCDate(start.getUTCDate() - 29);
+  const from = formatYmdUTC(start);
+  return { from, to };
+}
 
 export default function KPIScreen() {
   const { showAlert } = useDialog();
-  const [transactions, setTransactions] = useState<KpiTransaction[]>([]);
+  const initialRange = useMemo(() => defaultHistoryRange(), []);
+  const { windowWidth, isWeb, horizontalPad, contentMaxWidth } = useScreenContentWidth(960);
+  const numColumns = isWeb && windowWidth >= 840 ? 2 : 1;
+  // KPI kartalarini webda ham mobil ko‘rinishda (vertikal) ushlab turamiz
+  const stackToday = isWeb || windowWidth < 520;
+
+  const [today, setToday] = useState<PunktKpiTodayData | null>(null);
+  const [days, setDays] = useState<PunktKpiHistoryDay[]>([]);
+  const [rangeMeta, setRangeMeta] = useState<{ from: string; to: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const router = useRouter();
 
-  // Filter states
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
+  const [appliedFrom, setAppliedFrom] = useState(initialRange.from);
+  const [appliedTo, setAppliedTo] = useState(initialRange.to);
+
+  const [draftFrom, setDraftFrom] = useState<Date | null>(() => utcDateFromYmd(initialRange.from));
+  const [draftTo, setDraftTo] = useState<Date | null>(() => utcDateFromYmd(initialRange.to));
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [showFilterModal, setShowFilterModal] = useState(false);
 
-  const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
-  };
-
-  const formatDisplayDate = (date: Date | null) => {
-    if (!date) return 'Tanlash';
-    return date.toLocaleDateString('uz-UZ');
-  };
-
-  const loadTransactions = useCallback(async (pageNum = 1) => {
+  const loadData = useCallback(async () => {
     try {
-      const params: any = {
-        page: pageNum,
-        limit: 20,
-      };
-      
-      if (startDate) {
-        params.startDate = formatDate(startDate);
-      }
-      if (endDate) {
-        params.endDate = formatDate(endDate);
-      }
-      if (paymentFilter !== 'all') {
-        params.isPaid = paymentFilter === 'paid';
-      }
-
-      const response = await apiService.getKpiTransactions(params);
-
-      if (response.success) {
-        if (pageNum === 1) {
-          setTransactions(response.data);
-        } else {
-          setTransactions((prev) => [...prev, ...response.data]);
-        }
-        setTotalPages(response.totalPages);
-        setPage(response.page);
-      }
+      const [todayRes, histRes] = await Promise.all([
+        apiService.getPunktKpiToday(),
+        apiService.getPunktKpiHistory({ from: appliedFrom, to: appliedTo }),
+      ]);
+      setToday(todayRes.data ?? null);
+      const list = histRes.data?.days ?? [];
+      setDays(list);
+      setRangeMeta({
+        from: histRes.data?.from_utc ?? appliedFrom,
+        to: histRes.data?.to_utc ?? appliedTo,
+      });
     } catch (error: unknown) {
       const msg =
-        error instanceof Error
-          ? error.message
-          : 'KPI transaksiyalarni yuklashda xatolik';
-      await showAlert({
-        title: 'Xatolik',
-        message: msg || 'KPI transaksiyalarni yuklashda xatolik',
-      });
+        error instanceof Error ? error.message : 'KPI ma’lumotlarini yuklashda xatolik';
+      await showAlert({ title: 'Xatolik', message: msg });
+      setToday(null);
+      setDays([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [startDate, endDate, paymentFilter, showAlert]);
+  }, [appliedFrom, appliedTo, showAlert]);
 
   useEffect(() => {
-    loadTransactions(1);
-  }, [loadTransactions]);
+    loadData();
+  }, [loadData]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadTransactions(1);
+    loadData();
+  };
+
+  const sortedDays = useMemo(
+    () => [...days].sort((a, b) => b.date_utc.localeCompare(a.date_utc)),
+    [days]
+  );
+  const rangeTotals = useMemo(() => {
+    return sortedDays.reduce(
+      (acc, day) => {
+        acc.punktKpi += day.punkt_kpi_accrued;
+        acc.paid += day.paid_total;
+        acc.unpaid += day.unpaid;
+        acc.pool += day.total_kpi_pool;
+        acc.delivered += day.delivered_orders;
+        return acc;
+      },
+      {
+        punktKpi: 0,
+        paid: 0,
+        unpaid: 0,
+        pool: 0,
+        delivered: 0,
+      }
+    );
+  }, [sortedDays]);
+
+  const hasActiveFilters =
+    appliedFrom !== initialRange.from || appliedTo !== initialRange.to;
+
+  const openFilterModal = () => {
+    setDraftFrom(utcDateFromYmd(appliedFrom));
+    setDraftTo(utcDateFromYmd(appliedTo));
+    setShowFilterModal(true);
   };
 
   const applyFilters = () => {
+    if (!draftFrom || !draftTo) {
+      void showAlert({ title: 'Xato', message: 'Ikkala sanani ham tanlang.' });
+      return;
+    }
+    const f = formatYmdUTC(draftFrom);
+    const t = formatYmdUTC(draftTo);
+    if (f > t) {
+      void showAlert({ title: 'Xato', message: 'Boshlanish sanasi tugashdan katta bo‘lmasin.' });
+      return;
+    }
+    setAppliedFrom(f);
+    setAppliedTo(t);
     setShowFilterModal(false);
     setLoading(true);
-    loadTransactions(1);
   };
 
   const clearFilters = () => {
-    setStartDate(null);
-    setEndDate(null);
-    setPaymentFilter('all');
+    setAppliedFrom(initialRange.from);
+    setAppliedTo(initialRange.to);
+    setDraftFrom(utcDateFromYmd(initialRange.from));
+    setDraftTo(utcDateFromYmd(initialRange.to));
     setShowFilterModal(false);
     setLoading(true);
   };
 
-  const hasActiveFilters = startDate !== null || endDate !== null || paymentFilter !== 'all';
-
-  const loadMore = () => {
-    if (!loading && page < totalPages) {
-      loadTransactions(page + 1);
-    }
+  const formatDisplayDate = (date: Date | null) => {
+    if (!date) return 'Tanlash';
+    return date.toLocaleDateString('uz-UZ', { timeZone: 'UTC' });
   };
 
-  const renderTransactionItem = ({ item }: { item: KpiTransaction }) => (
-    <TouchableOpacity style={styles.transactionCard}>
-      <View style={styles.transactionHeader}>
-        <View style={styles.transactionHeaderLeft}>
-          <Ionicons
-            name={item.isPaid ? 'checkmark-circle' : 'time'}
-            size={24}
-            color={item.isPaid ? '#34C759' : '#FF9500'}
-          />
-          <View style={styles.transactionInfo}>
-            <Text style={styles.orderNumber}>#{item.order.orderNumber}</Text>
-            <Text style={styles.productName}>{item.orderItem.product.name}</Text>
+  const renderDay = useCallback(
+    ({ item }: { item: PunktKpiHistoryDay }) => (
+      <View style={numColumns > 1 ? styles.historyGridCell : styles.historyListCell}>
+        <View style={[styles.dayCard, isWeb && styles.dayCardWeb]}>
+          <Text style={styles.dayTitle}>{item.date_utc}</Text>
+          <View style={styles.dayRow}>
+            <Text style={styles.dayLabel}>Punkt KPI (hisoblangan)</Text>
+            <Text style={styles.dayValue}>{item.punkt_kpi_accrued.toLocaleString('uz-UZ')} so‘m</Text>
           </View>
-        </View>
-        <View style={styles.amountContainer}>
-          <Text style={[styles.amount, item.isPaid && styles.amountPaid]}>
-            {item.punktAmount.toLocaleString()} so'm
-          </Text>
-          <View style={[styles.statusBadge, item.isPaid ? styles.statusPaid : styles.statusUnpaid]}>
-            <Text style={styles.statusText}>
-              {item.isPaid ? "To'langan" : "To'lanmagan"}
+          <View style={styles.dayRow}>
+            <Text style={styles.dayLabel}>KPI havzasi</Text>
+            <Text style={styles.dayValueMuted}>{item.total_kpi_pool.toLocaleString('uz-UZ')} so‘m</Text>
+          </View>
+          <View style={styles.dayRow}>
+            <Text style={styles.dayLabel}>Yetkazilgan buyurtmalar</Text>
+            <Text style={styles.dayValueMuted}>{item.delivered_orders}</Text>
+          </View>
+          <View style={styles.dayRow}>
+            <Text style={styles.dayLabel}>To‘langan</Text>
+            <Text style={[styles.dayValue, styles.dayPaid]}>
+              {item.paid_total.toLocaleString('uz-UZ')} so‘m
+            </Text>
+          </View>
+          <View style={styles.dayRow}>
+            <Text style={styles.dayLabel}>To‘lanmagan</Text>
+            <Text style={[styles.dayValue, styles.dayUnpaid]}>
+              {item.unpaid.toLocaleString('uz-UZ')} so‘m
             </Text>
           </View>
         </View>
       </View>
-      <View style={styles.transactionDetails}>
-        <View style={styles.detailRow}>
-          <Ionicons name="cube" size={16} color="#666" />
-          <Text style={styles.detailLabel}>Miqdor:</Text>
-          <Text style={styles.detailValue}>{item.orderItem.quantity} dona</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="cash" size={16} color="#666" />
-          <Text style={styles.detailLabel}>Narx:</Text>
-          <Text style={styles.detailValue}>{item.orderItem.price.toLocaleString()} so'm</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="percent" size={16} color="#666" />
-          <Text style={styles.detailLabel}>KPI foizi:</Text>
-          <Text style={styles.detailValue}>%{item.orderItem.kpiBonusPercent}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="calendar" size={16} color="#666" />
-          <Text style={styles.detailLabel}>Sana:</Text>
-          <Text style={styles.detailValue}>
-            {new Date(item.createdAt).toLocaleDateString('uz-UZ')}
-          </Text>
-        </View>
-        {item.bonusType !== 'regular' && (
-          <View style={styles.detailRow}>
-            <Ionicons
-              name={item.bonusType === 'from_punkt' ? 'arrow-forward' : 'arrow-back'}
-              size={16}
-              color="#666"
-            />
-            <Text style={styles.detailLabel}>Bonus turi:</Text>
-            <Text style={styles.detailValue}>
-              {item.bonusType === 'from_punkt'
-                ? 'Yuborilgan (from_punkt)'
-                : 'Qabul qilingan (to_punkt)'}
-            </Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
+    ),
+    [numColumns, isWeb]
   );
-
-  if (loading && transactions.length === 0) {
-    return (
-      <>
-        <Stack.Screen
-          options={{
-            title: 'KPI Bonus',
-            headerShown: true,
-            headerBackTitle: 'Orqaga',
-          }}
-        />
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-        </View>
-      </>
-    );
-  }
 
   const renderFilterModal = () => (
     <Modal
       visible={showFilterModal}
-      animationType="slide"
-      transparent={true}
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      transparent
       onRequestClose={() => setShowFilterModal(false)}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+      <View style={[styles.modalOverlay, Platform.OS === 'web' && styles.modalOverlayWeb]}>
+        <View style={[styles.modalContent, Platform.OS === 'web' && styles.modalContentWeb]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Filtrlar</Text>
+            <Text style={styles.modalTitle}>Tarix oralig‘i (UTC)</Text>
             <TouchableOpacity onPress={() => setShowFilterModal(false)}>
               <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
-
-          {/* Date Range */}
-          <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>Sana oralig'i</Text>
-            <View style={styles.dateRow}>
-              {Platform.OS === 'web' ? (
-                <>
-                  <View style={styles.webDateWrap}>
-                    <WebDateInput
-                      value={startDate}
-                      onChange={setStartDate}
-                      maximumDate={endDate || undefined}
-                    />
-                  </View>
-                  <Text style={styles.dateSeparator}>—</Text>
-                  <View style={styles.webDateWrap}>
-                    <WebDateInput
-                      value={endDate}
-                      onChange={setEndDate}
-                      minimumDate={startDate || undefined}
-                      maximumDate={new Date()}
-                    />
-                  </View>
-                </>
-              ) : (
-                <>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => setShowStartPicker(true)}
-                  >
-                    <Ionicons name="calendar-outline" size={18} color="#007AFF" />
-                    <Text style={styles.dateButtonText}>
-                      {formatDisplayDate(startDate)}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.dateSeparator}>—</Text>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => setShowEndPicker(true)}
-                  >
-                    <Ionicons name="calendar-outline" size={18} color="#007AFF" />
-                    <Text style={styles.dateButtonText}>
-                      {formatDisplayDate(endDate)}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
+          <Text style={styles.modalHint}>
+            Sanalar serverda UTC kalendary kun bo‘yicha qo‘llanadi.
+          </Text>
+          <View
+            style={[
+              styles.dateRow,
+              Platform.OS === 'web' &&
+                (windowWidth < 520 ? styles.dateRowWebStack : styles.dateRowWeb),
+            ]}
+          >
+            {Platform.OS === 'web' ? (
+              <>
+                <View style={styles.webDateWrap}>
+                  <WebDateInput
+                    value={draftFrom}
+                    onChange={setDraftFrom}
+                    maximumDate={draftTo || undefined}
+                  />
+                </View>
+                <Text style={styles.dateSeparator}>—</Text>
+                <View style={styles.webDateWrap}>
+                  <WebDateInput
+                    value={draftTo}
+                    onChange={setDraftTo}
+                    minimumDate={draftFrom || undefined}
+                    maximumDate={new Date()}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity style={styles.dateButton} onPress={() => setShowStartPicker(true)}>
+                  <Ionicons name="calendar-outline" size={18} color="#007AFF" />
+                  <Text style={styles.dateButtonText}>{formatDisplayDate(draftFrom)}</Text>
+                </TouchableOpacity>
+                <Text style={styles.dateSeparator}>—</Text>
+                <TouchableOpacity style={styles.dateButton} onPress={() => setShowEndPicker(true)}>
+                  <Ionicons name="calendar-outline" size={18} color="#007AFF" />
+                  <Text style={styles.dateButtonText}>{formatDisplayDate(draftTo)}</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-
-          {/* Payment Status */}
-          <View style={styles.filterSection}>
-            <Text style={styles.filterLabel}>To'lov holati</Text>
-            <View style={styles.filterButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip,
-                  paymentFilter === 'all' && styles.filterChipActive,
-                ]}
-                onPress={() => setPaymentFilter('all')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    paymentFilter === 'all' && styles.filterChipTextActive,
-                  ]}
-                >
-                  Barchasi
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip,
-                  paymentFilter === 'paid' && styles.filterChipActive,
-                ]}
-                onPress={() => setPaymentFilter('paid')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    paymentFilter === 'paid' && styles.filterChipTextActive,
-                  ]}
-                >
-                  To'langan
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip,
-                  paymentFilter === 'unpaid' && styles.filterChipActive,
-                ]}
-                onPress={() => setPaymentFilter('unpaid')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    paymentFilter === 'unpaid' && styles.filterChipTextActive,
-                  ]}
-                >
-                  To'lanmagan
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Action Buttons */}
           <View style={styles.modalActions}>
             <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
-              <Text style={styles.clearButtonText}>Tozalash</Text>
+              <Text style={styles.clearButtonText}>Standart (30 kun)</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
-              <Text style={styles.applyButtonText}>Qo'llash</Text>
+              <Text style={styles.applyButtonText}>Qo‘llash</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
-
-      {/* Date Pickers (native only; web uses WebDateInput) */}
       {Platform.OS !== 'web' && showStartPicker && (
         <DateTimePicker
-          value={startDate || new Date()}
+          value={draftFrom || new Date()}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, date) => {
+          onChange={(e, date) => {
             setShowStartPicker(false);
-            if (date) setStartDate(date);
+            if (date) setDraftFrom(date);
           }}
-          maximumDate={endDate || new Date()}
+          maximumDate={draftTo || new Date()}
         />
       )}
       {Platform.OS !== 'web' && showEndPicker && (
         <DateTimePicker
-          value={endDate || new Date()}
+          value={draftTo || new Date()}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, date) => {
+          onChange={(e, date) => {
             setShowEndPicker(false);
-            if (date) setEndDate(date);
+            if (date) setDraftTo(date);
           }}
-          minimumDate={startDate || undefined}
+          minimumDate={draftFrom || undefined}
           maximumDate={new Date()}
         />
       )}
     </Modal>
   );
 
+  const ListHeader = useMemo(() => {
+    const rowStyle = stackToday ? styles.kpiRowStack : styles.kpiRow;
+    const showSummaryCard = sortedDays.length > 0;
+
+    return (
+      <View>
+        {today ? (
+          <View style={[styles.kpiCard, isWeb && styles.kpiCardWeb]}>
+            <View style={styles.kpiHeader}>
+              <Ionicons name="wallet" size={20} color="#007AFF" />
+              <View style={styles.kpiHeaderTitleBlock}>
+                <Text style={styles.kpiHeaderTitle}>Bugungi KPI</Text>
+                <Text style={styles.kpiHeaderSubtitle}>UTC kun: {today.date_utc}</Text>
+              </View>
+            </View>
+            <View style={rowStyle}>
+              <View style={[styles.kpiItem, stackToday && styles.kpiItemStack]}>
+                <Text style={[styles.kpiLabel, stackToday && styles.kpiLabelStack]}>Punkt KPI (jami)</Text>
+                <Text style={[styles.kpiValue, stackToday && styles.kpiValueStack]}>
+                  {today.punkt_kpi_total.toLocaleString('uz-UZ')} so‘m
+                </Text>
+              </View>
+              {!stackToday ? <View style={styles.kpiDivider} /> : <View style={styles.kpiDividerH} />}
+              <View style={[styles.kpiItem, stackToday && styles.kpiItemStack]}>
+                <Text style={[styles.kpiLabel, stackToday && styles.kpiLabelStack]}>To‘langan</Text>
+                <Text style={[styles.kpiValue, styles.kpiPaid, stackToday && styles.kpiValueStack]}>
+                  {today.paid_total_today.toLocaleString('uz-UZ')} so‘m
+                </Text>
+              </View>
+              {!stackToday ? <View style={styles.kpiDivider} /> : <View style={styles.kpiDividerH} />}
+              <View style={[styles.kpiItem, stackToday && styles.kpiItemStack]}>
+                <Text style={[styles.kpiLabel, stackToday && styles.kpiLabelStack]}>To‘lanmagan</Text>
+                <Text style={[styles.kpiValue, styles.kpiUnpaid, stackToday && styles.kpiValueStack]}>
+                  {today.unpaid_today.toLocaleString('uz-UZ')} so‘m
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.kpiMeta}>
+              KPI havzasi: {today.total_kpi_pool.toLocaleString('uz-UZ')} so‘m · Yetkazilgan:{' '}
+              {today.delivered_orders} · To‘lov yozuvlari: {today.payout_entries_today}
+            </Text>
+          </View>
+        ) : null}
+        {showSummaryCard ? (
+          <View style={[styles.kpiCard, isWeb && styles.kpiCardWeb]}>
+            <View style={styles.kpiHeader}>
+              <Ionicons name="stats-chart" size={20} color="#007AFF" />
+              <View style={styles.kpiHeaderTitleBlock}>
+                <Text style={styles.kpiHeaderTitle}>Umumiy KPI hisobi</Text>
+                <Text style={styles.kpiHeaderSubtitle}>
+                  UTC oralig‘i: {appliedFrom} — {appliedTo}
+                </Text>
+              </View>
+            </View>
+            <View style={rowStyle}>
+              <View style={[styles.kpiItem, stackToday && styles.kpiItemStack]}>
+                <Text style={[styles.kpiLabel, stackToday && styles.kpiLabelStack]}>Punkt KPI (jami)</Text>
+                <Text style={[styles.kpiValue, stackToday && styles.kpiValueStack]}>
+                  {rangeTotals.punktKpi.toLocaleString('uz-UZ')} so‘m
+                </Text>
+              </View>
+              {!stackToday ? <View style={styles.kpiDivider} /> : <View style={styles.kpiDividerH} />}
+              <View style={[styles.kpiItem, stackToday && styles.kpiItemStack]}>
+                <Text style={[styles.kpiLabel, stackToday && styles.kpiLabelStack]}>To‘langan</Text>
+                <Text style={[styles.kpiValue, styles.kpiPaid, stackToday && styles.kpiValueStack]}>
+                  {rangeTotals.paid.toLocaleString('uz-UZ')} so‘m
+                </Text>
+              </View>
+              {!stackToday ? <View style={styles.kpiDivider} /> : <View style={styles.kpiDividerH} />}
+              <View style={[styles.kpiItem, stackToday && styles.kpiItemStack]}>
+                <Text style={[styles.kpiLabel, stackToday && styles.kpiLabelStack]}>To‘lanmagan</Text>
+                <Text style={[styles.kpiValue, styles.kpiUnpaid, stackToday && styles.kpiValueStack]}>
+                  {rangeTotals.unpaid.toLocaleString('uz-UZ')} so‘m
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.kpiMeta}>
+              KPI havzasi: {rangeTotals.pool.toLocaleString('uz-UZ')} so‘m · Yetkazilgan:{' '}
+              {rangeTotals.delivered}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }, [today, sortedDays.length, stackToday, isWeb, appliedFrom, appliedTo, rangeTotals]);
+
+  if (loading && !today && sortedDays.length === 0) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            title: 'Punkt KPI',
+            headerShown: true,
+            headerBackTitle: 'Orqaga',
+            headerRight: () => (
+              <TouchableOpacity style={styles.filterHeaderButton} onPress={openFilterModal}>
+                <Ionicons name="filter" size={22} color="#333" />
+              </TouchableOpacity>
+            ),
+          }}
+        />
+        <View style={[styles.centerContainer, isWeb && styles.centerContainerWeb]}>
+          <View style={[isWeb && { width: '100%', maxWidth: contentMaxWidth, paddingHorizontal: horizontalPad }]}>
+            <ActivityIndicator size="large" color="#007AFF" />
+          </View>
+        </View>
+      </>
+    );
+  }
+
   return (
     <>
       <Stack.Screen
         options={{
-          title: 'KPI Bonus',
+          title: 'Punkt KPI',
           headerShown: true,
           headerBackTitle: 'Orqaga',
           headerRight: () => (
-            <TouchableOpacity
-              style={styles.filterHeaderButton}
-              onPress={() => setShowFilterModal(true)}
-            >
-              <Ionicons
-                name="filter"
-                size={22}
-                color={hasActiveFilters ? '#007AFF' : '#333'}
-              />
-              {hasActiveFilters && <View style={styles.filterBadge} />}
+            <TouchableOpacity style={styles.filterHeaderButton} onPress={openFilterModal}>
+              <Ionicons name="filter" size={22} color={hasActiveFilters ? '#007AFF' : '#333'} />
+              {hasActiveFilters ? <View style={styles.filterBadge} /> : null}
             </TouchableOpacity>
           ),
         }}
       />
       {renderFilterModal()}
-      <View style={styles.container}>
-        {/* Active Filters Display */}
-        {hasActiveFilters && (
-          <View style={styles.activeFiltersBar}>
-            {startDate && (
-              <View style={styles.activeFilterTag}>
-                <Text style={styles.activeFilterText}>
-                  Dan: {formatDisplayDate(startDate)}
-                </Text>
-                <TouchableOpacity onPress={() => setStartDate(null)}>
-                  <Ionicons name="close-circle" size={16} color="#666" />
-                </TouchableOpacity>
-              </View>
-            )}
-            {endDate && (
-              <View style={styles.activeFilterTag}>
-                <Text style={styles.activeFilterText}>
-                  Gacha: {formatDisplayDate(endDate)}
-                </Text>
-                <TouchableOpacity onPress={() => setEndDate(null)}>
-                  <Ionicons name="close-circle" size={16} color="#666" />
-                </TouchableOpacity>
-              </View>
-            )}
-            {paymentFilter !== 'all' && (
-              <View style={styles.activeFilterTag}>
-                <Text style={styles.activeFilterText}>
-                  {paymentFilter === 'paid' ? "To'langan" : "To'lanmagan"}
-                </Text>
-                <TouchableOpacity onPress={() => setPaymentFilter('all')}>
-                  <Ionicons name="close-circle" size={16} color="#666" />
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-        <FlatList
-          data={transactions}
-          renderItem={renderTransactionItem}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="wallet-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>KPI transaksiyalari topilmadi</Text>
-            </View>
-          }
-          ListFooterComponent={
-            loading && transactions.length > 0 ? (
-              <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#007AFF" />
-              </View>
-            ) : null
-          }
-        />
-        {totalPages > 1 && (
-          <View style={styles.pagination}>
-            <TouchableOpacity
-              style={[styles.pageButton, page === 1 && styles.pageButtonDisabled]}
-              onPress={() => {
-                if (page > 1) {
-                  loadTransactions(page - 1);
-                }
-              }}
-              disabled={page === 1}
-            >
-              <Text style={styles.pageButtonText}>Oldingi</Text>
-            </TouchableOpacity>
-            <Text style={styles.pageInfo}>
-              {page} / {totalPages}
+      <View style={[styles.container, isWeb && styles.containerWeb]}>
+        <View
+          style={[
+            styles.shell,
+            {
+              maxWidth: isWeb ? contentMaxWidth : undefined,
+              width: '100%',
+              paddingHorizontal: horizontalPad,
+              ...(Platform.OS === 'web' ? { minHeight: 0, flex: 1 } : { flex: 1 }),
+            },
+          ]}
+        >
+          {rangeMeta ? (
+            <Text style={styles.rangeBanner}>
+              Tarix: {rangeMeta.from} — {rangeMeta.to} (UTC)
             </Text>
-            <TouchableOpacity
-              style={[styles.pageButton, page === totalPages && styles.pageButtonDisabled]}
-              onPress={() => {
-                if (page < totalPages) {
-                  loadTransactions(page + 1);
-                }
-              }}
-              disabled={page === totalPages}
-            >
-              <Text style={styles.pageButtonText}>Keyingi</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          ) : null}
+          <FlatList
+            key={numColumns > 1 ? 'kpi-grid' : 'kpi-list'}
+            data={sortedDays}
+            numColumns={numColumns}
+            renderItem={renderDay}
+            keyExtractor={(item) => item.date_utc}
+            columnWrapperStyle={numColumns > 1 ? styles.historyRow : undefined}
+            ListHeaderComponent={
+              <View>
+                {ListHeader}
+                <Text style={styles.sectionTitle}>Kunlar bo‘yicha</Text>
+              </View>
+            }
+            style={Platform.OS === 'web' ? { flex: 1, minHeight: 0 } : { flex: 1 }}
+            contentContainerStyle={styles.listContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="calendar-outline" size={56} color="#ccc" />
+                <Text style={styles.emptyText}>Tanlangan oralig‘da kunlar yo‘q</Text>
+              </View>
+            }
+          />
+        </View>
       </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  containerWeb: {
     alignItems: 'center',
   },
-  listContent: {
-    padding: 16,
-    paddingBottom: 80,
+  shell: {
+    alignSelf: 'center',
   },
-  transactionCard: {
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  centerContainerWeb: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  rangeBanner: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    fontSize: 12,
+    color: '#666',
+    backgroundColor: '#E8F4FF',
+    borderRadius: 8,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  listContent: { paddingBottom: 32, paddingTop: 4 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 10,
+    marginTop: 8,
+  },
+  kpiCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  transactionHeader: {
+  kpiCardWeb: Platform.select({
+    web: { boxShadow: '0 2px 12px rgba(0,0,0,0.08)' } as object,
+    default: {},
+  }),
+  kpiHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
   },
-  transactionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+  kpiHeaderTitleBlock: {
     flex: 1,
   },
-  transactionInfo: {
-    flex: 1,
-  },
-  orderNumber: {
+  kpiHeaderTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    fontWeight: '600',
+    color: '#000',
   },
-  productName: {
-    fontSize: 14,
+  kpiHeaderSubtitle: {
+    fontSize: 11,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  kpiRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  kpiRowStack: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 0,
+  },
+  kpiItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  kpiItemStack: {
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    flex: 0,
+  },
+  kpiLabel: {
+    fontSize: 12,
     color: '#666',
-  },
-  amountContainer: {
-    alignItems: 'flex-end',
-  },
-  amount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FF9500',
     marginBottom: 4,
   },
-  amountPaid: {
+  kpiLabelStack: {
+    alignSelf: 'flex-start',
+  },
+  kpiValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#007AFF',
+    textAlign: 'center',
+  },
+  kpiValueStack: {
+    textAlign: 'left',
+    alignSelf: 'flex-start',
+  },
+  kpiPaid: {
     color: '#34C759',
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+  kpiUnpaid: {
+    color: '#FF9500',
   },
-  statusPaid: {
-    backgroundColor: '#E8F5E9',
+  kpiDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E5E5EA',
+    marginHorizontal: 8,
   },
-  statusUnpaid: {
-    backgroundColor: '#FFF3E0',
+  kpiDividerH: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E5E5EA',
+    marginVertical: 4,
   },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#333',
-  },
-  transactionDetails: {
-    gap: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  detailLabel: {
+  kpiMeta: {
+    marginTop: 10,
     fontSize: 12,
     color: '#666',
-    minWidth: 80,
+    lineHeight: 17,
   },
-  detailValue: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '600',
+  historyGridCell: {
+    flex: 1,
+    paddingHorizontal: 6,
+    marginBottom: 10,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
+  historyListCell: {
+    width: '100%',
+    marginBottom: 10,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    marginTop: 16,
+  historyRow: {
+    justifyContent: 'flex-start',
+    gap: 0,
   },
-  footerLoader: {
-    paddingVertical: 16,
-    alignItems: 'center',
+  dayCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    flex: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E5EA',
   },
-  pagination: {
+  dayCardWeb: Platform.select({
+    web: { boxShadow: '0 1px 8px rgba(0,0,0,0.06)' } as object,
+    default: {},
+  }),
+  dayTitle: { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 10 },
+  dayRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    marginBottom: 6,
   },
-  pageButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-  },
-  pageButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  pageButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  pageInfo: {
-    fontSize: 14,
-    color: '#666',
-  },
-  filterHeaderButton: {
-    padding: 8,
-    marginRight: 8,
-    position: 'relative',
-  },
+  dayLabel: { fontSize: 13, color: '#666', flex: 1 },
+  dayValue: { fontSize: 13, fontWeight: '600', color: '#111' },
+  dayValueMuted: { fontSize: 13, color: '#555' },
+  dayPaid: { color: '#34C759' },
+  dayUnpaid: { color: '#FF9500' },
+  emptyContainer: { alignItems: 'center', paddingVertical: 48 },
+  emptyText: { fontSize: 15, color: '#999', marginTop: 12 },
+  filterHeaderButton: { padding: 8, marginRight: 8, position: 'relative' },
   filterBadge: {
     position: 'absolute',
     top: 6,
@@ -632,30 +644,15 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#FF3B30',
   },
-  activeFiltersBar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 12,
-    paddingBottom: 0,
-    gap: 8,
-  },
-  activeFilterTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
-  },
-  activeFilterText: {
-    fontSize: 12,
-    color: '#1976D2',
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  modalOverlayWeb: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
   modalContent: {
     backgroundColor: '#fff',
@@ -664,34 +661,30 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
+  modalContentWeb: Platform.select({
+    web: {
+      width: '100%',
+      maxWidth: 480,
+      borderRadius: 16,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      paddingBottom: 24,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    } as object,
+    default: {},
+  }),
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 8,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  filterSection: {
-    marginBottom: 20,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 10,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  webDateWrap: {
-    flex: 1,
-  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  modalHint: { fontSize: 12, color: '#888', marginBottom: 16, lineHeight: 17 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  dateRowWeb: { flexWrap: 'wrap' },
+  dateRowWebStack: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
+  webDateWrap: { flex: 1, minWidth: 120 },
   dateButton: {
     flex: 1,
     flexDirection: 'row',
@@ -703,45 +696,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  dateButtonText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  dateSeparator: {
-    fontSize: 16,
-    color: '#999',
-  },
-  filterButtons: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  filterChip: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  filterChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  filterChipText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  filterChipTextActive: {
-    color: '#fff',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 10,
-  },
+  dateButtonText: { fontSize: 14, color: '#333' },
+  dateSeparator: { fontSize: 16, color: '#999' },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 16 },
   clearButton: {
     flex: 1,
     paddingVertical: 14,
@@ -749,11 +706,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
   },
-  clearButtonText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '600',
-  },
+  clearButtonText: { fontSize: 15, color: '#666', fontWeight: '600' },
   applyButton: {
     flex: 1,
     paddingVertical: 14,
@@ -761,10 +714,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     alignItems: 'center',
   },
-  applyButtonText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
-  },
+  applyButtonText: { fontSize: 15, color: '#fff', fontWeight: '600' },
 });
-

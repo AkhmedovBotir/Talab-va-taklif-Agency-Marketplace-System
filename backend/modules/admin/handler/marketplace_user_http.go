@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"backend/internal/pkg/response"
 	"backend/modules/admin/repository"
@@ -12,15 +13,16 @@ import (
 )
 
 type MarketplaceUserHandler struct {
-	service service.MarketplaceUserService
+	service    service.MarketplaceUserService
+	archiveSvc service.ArchiveService
 }
 
 type marketplaceUserStatusRequest struct {
 	Status string `json:"status"`
 }
 
-func NewMarketplaceUserHandler(s service.MarketplaceUserService) *MarketplaceUserHandler {
-	return &MarketplaceUserHandler{service: s}
+func NewMarketplaceUserHandler(s service.MarketplaceUserService, archiveSvc service.ArchiveService) *MarketplaceUserHandler {
+	return &MarketplaceUserHandler{service: s, archiveSvc: archiveSvc}
 }
 
 func (h *MarketplaceUserHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
@@ -148,6 +150,26 @@ func (h *MarketplaceUserHandler) Delete(c *gin.Context) {
 	id, err := parseUintID(c.Param("id"))
 	if err != nil {
 		response.JSON(c, http.StatusBadRequest, "ID noto'g'ri", nil, nil)
+		return
+	}
+	row, err := h.service.GetByID(id)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	adminIDRaw, ok := c.Get("admin_id")
+	adminID, ok2 := adminIDRaw.(uint)
+	if !ok || !ok2 || adminID == 0 {
+		response.JSON(c, http.StatusUnauthorized, "Token yaroqsiz", nil, nil)
+		return
+	}
+	if err = h.archiveSvc.Archive("marketplace-user", id, adminID, gin.H{
+		"action":              "delete",
+		"deleted_at":          time.Now().UTC(),
+		"deleted_by_admin_id": adminID,
+		"snapshot":            row,
+	}); err != nil {
+		response.JSON(c, http.StatusInternalServerError, "Arxivga yozishda xatolik", nil, err.Error())
 		return
 	}
 	if err = h.service.Delete(id); err != nil {

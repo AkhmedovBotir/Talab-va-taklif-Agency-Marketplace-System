@@ -4,17 +4,17 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 import { getApiBaseUrl, API_ENDPOINTS, NOTIFICATIONS_API_ENABLED } from '../config/api';
 import type {
   Agent,
+  AgentKpiHistoryDay,
+  AgentKpiToday,
+  AgentNotification,
+  AgentNotificationsListData,
+  AgentOrdersAnalytics,
   AgentMeOrderDetail,
   AgentMeOrderListItem,
   AgentProfileResponse,
   ApiEnvelope,
   ApiError,
-  GetKPIParams,
   GetPaymentTransactionsParams,
-  KPIDailyBalanceResponse,
-  KPIDailyReportResponse,
-  KPISummaryResponse,
-  KPITransactionsResponse,
   LoginRequest,
   LoginResponse,
   OrdersForPaymentResponse,
@@ -79,6 +79,17 @@ export interface AgentMeOrdersPageResult {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface AgentNotificationsListResult {
+  success: boolean;
+  items: AgentNotification[];
+  total: number;
+  unread_count: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  message?: string;
 }
 
 export interface NoAuthLookupItem {
@@ -286,6 +297,20 @@ class ApiService {
     return parseAgentMeOrdersPage(response.data);
   }
 
+  /** GET /agents/me/orders/analytics?from=&to= */
+  async getMyOrdersAnalytics(params?: {
+    from?: string;
+    to?: string;
+  }): Promise<{ success: boolean; data: AgentOrdersAnalytics | null }> {
+    const response = await this.api.get<ApiEnvelope<AgentOrdersAnalytics>>(
+      API_ENDPOINTS.AGENT_ME_ORDERS_ANALYTICS,
+      { params }
+    );
+    const body = response.data;
+    const data = body?.data ?? null;
+    return { success: !!data && body?.error == null, data };
+  }
+
   /** GET /agents/me/orders/{id} */
   async getMyOrderById(id: string): Promise<{ success: boolean; data: AgentMeOrderDetail | null }> {
     const response = await this.api.get<ApiEnvelope<AgentMeOrderDetail>>(
@@ -365,80 +390,114 @@ class ApiService {
     return { message: msg || 'Buyurtma yetkazildi deb belgilandi' };
   }
 
-  // Get KPI Summary
-  async getKPISummary(params?: GetKPIParams): Promise<KPISummaryResponse> {
-    const response = await this.api.get<KPISummaryResponse>(
-      API_ENDPOINTS.AGENT_KPI_SUMMARY,
-      { params }
-    );
-    return response.data;
+  /** GET /agents/me/kpi/today — bugungi KPI (UTC kun) */
+  async getAgentKpiToday(): Promise<{ success: boolean; data: AgentKpiToday | null }> {
+    const response = await this.api.get<ApiEnvelope<AgentKpiToday>>(API_ENDPOINTS.AGENT_ME_KPI_TODAY);
+    const body = response.data;
+    const data = body?.data ?? null;
+    const ok = data != null && body?.error == null;
+    return { success: ok, data };
   }
 
-  // Get KPI Transactions
-  async getKPITransactions(params?: GetKPIParams): Promise<KPITransactionsResponse> {
-    const response = await this.api.get<KPITransactionsResponse>(
-      API_ENDPOINTS.AGENT_KPI_TRANSACTIONS,
+  /** GET /agents/me/kpi/history?from=&to= (YYYY-MM-DD, UTC) */
+  async getAgentKpiHistory(params?: {
+    from?: string;
+    to?: string;
+  }): Promise<{ success: boolean; days: AgentKpiHistoryDay[] }> {
+    const response = await this.api.get<ApiEnvelope<{ days?: AgentKpiHistoryDay[] }>>(
+      API_ENDPOINTS.AGENT_ME_KPI_HISTORY,
       { params }
     );
-    return response.data;
+    const body = response.data;
+    const raw = body?.data as { days?: AgentKpiHistoryDay[] } | AgentKpiHistoryDay[] | null | undefined;
+    const days = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.days)
+        ? raw.days
+        : [];
+    const ok = body?.error == null;
+    return { success: ok, days };
   }
 
-  // Get KPI Daily Balance
-  async getKPIDailyBalance(date?: string): Promise<KPIDailyBalanceResponse> {
-    const params = date ? { date } : {};
-    const response = await this.api.get<KPIDailyBalanceResponse>(
-      API_ENDPOINTS.AGENT_KPI_BALANCE,
-      { params }
-    );
-    return response.data;
-  }
-
-  // Get KPI Daily Report
-  async getKPIDailyReport(date?: string): Promise<KPIDailyReportResponse> {
-    const params = date ? { date } : {};
-    const response = await this.api.get<KPIDailyReportResponse>(
-      API_ENDPOINTS.AGENT_KPI_DAILY_REPORT,
-      { params }
-    );
-    return response.data;
-  }
-
-  // Get Notifications (API o‘chirilgan bo‘lsa — tarmoqqa chiqmaydi)
-  async getNotifications(params?: { page?: number; limit?: number }): Promise<any> {
+  /** GET /agents/me/notifications */
+  async getNotifications(params?: { page?: number; limit?: number }): Promise<AgentNotificationsListResult> {
+    const page = params?.page ?? 1;
+    const limit = params?.limit ?? 20;
     if (!NOTIFICATIONS_API_ENABLED) {
-      const page = params?.page ?? 1;
       return {
         success: true,
-        data: [],
-        pagination: { page, pages: 1, limit: params?.limit ?? 20 },
+        items: [],
+        total: 0,
+        unread_count: 0,
+        page,
+        limit,
+        total_pages: 0,
       };
     }
-    const response = await this.api.get(API_ENDPOINTS.AGENT_NOTIFICATIONS, { params });
-    return response.data;
+    const response = await this.api.get<ApiEnvelope<AgentNotificationsListData>>(
+      API_ENDPOINTS.AGENT_ME_NOTIFICATIONS,
+      { params: { page, limit } }
+    );
+    const body = response.data;
+    const d = body?.data;
+    if (!d || body?.error != null) {
+      return {
+        success: false,
+        items: [],
+        total: 0,
+        unread_count: 0,
+        page,
+        limit,
+        total_pages: 0,
+        message: typeof body?.message === 'string' ? body.message : undefined,
+      };
+    }
+    return {
+      success: true,
+      items: d.items ?? [],
+      total: d.total ?? 0,
+      unread_count: d.unread_count ?? 0,
+      page: d.page ?? page,
+      limit: d.limit ?? limit,
+      total_pages: d.total_pages ?? 0,
+    };
   }
 
-  async getUnreadNotificationsCount(): Promise<any> {
-    if (!NOTIFICATIONS_API_ENABLED) {
-      return { success: true, data: { unreadCount: 0 } };
-    }
-    const response = await this.api.get(API_ENDPOINTS.AGENT_NOTIFICATIONS_UNREAD_COUNT);
-    return response.data;
+  /** GET /agents/me/notifications/unread-count */
+  async getAgentNotificationsUnreadCount(): Promise<number> {
+    if (!NOTIFICATIONS_API_ENABLED) return 0;
+    const response = await this.api.get<ApiEnvelope<{ unread_count: number }>>(
+      API_ENDPOINTS.AGENT_ME_NOTIFICATIONS_UNREAD_COUNT
+    );
+    return response.data?.data?.unread_count ?? 0;
   }
 
-  async markNotificationRead(_notificationId: string): Promise<any> {
-    if (!NOTIFICATIONS_API_ENABLED) {
-      return { success: true };
+  /** PATCH /agents/me/notifications/:id/read */
+  async markNotificationRead(notificationId: number | string): Promise<{ success: boolean; message?: string }> {
+    if (!NOTIFICATIONS_API_ENABLED) return { success: true };
+    try {
+      const response = await this.api.patch<ApiEnvelope<unknown>>(
+        API_ENDPOINTS.AGENT_ME_NOTIFICATION_READ(notificationId)
+      );
+      const body = response.data;
+      return { success: body?.error == null, message: typeof body?.message === 'string' ? body.message : undefined };
+    } catch {
+      return { success: false };
     }
-    const response = await this.api.post(API_ENDPOINTS.AGENT_NOTIFICATION_READ(_notificationId));
-    return response.data;
   }
 
-  async markAllNotificationsRead(): Promise<any> {
-    if (!NOTIFICATIONS_API_ENABLED) {
-      return { success: true };
+  /** PATCH /agents/me/notifications/read-all */
+  async markAllNotificationsRead(): Promise<{ success: boolean; message?: string }> {
+    if (!NOTIFICATIONS_API_ENABLED) return { success: true };
+    try {
+      const response = await this.api.patch<ApiEnvelope<unknown>>(
+        API_ENDPOINTS.AGENT_ME_NOTIFICATIONS_READ_ALL
+      );
+      const body = response.data;
+      return { success: body?.error == null, message: typeof body?.message === 'string' ? body.message : undefined };
+    } catch {
+      return { success: false };
     }
-    const response = await this.api.post(API_ENDPOINTS.AGENT_NOTIFICATIONS_READ_ALL);
-    return response.data;
   }
 
   // Get Orders For Payment

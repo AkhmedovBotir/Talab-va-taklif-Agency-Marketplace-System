@@ -26,6 +26,7 @@ export function OrdersScreen() {
   const topPad = Math.max(insets.top, Platform.OS === 'web' ? 16 : 12);
 
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
+  const [tab, setTab] = useState<'bozor' | 'mahalla'>('bozor');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -37,7 +38,10 @@ export function OrdersScreen() {
     if (append) setLoadingMore(true);
     else setLoading(true);
     try {
-      const res = await api.orders.list({ page: p, limit: 15 });
+      const res =
+        tab === 'bozor'
+          ? await api.orders.list({ page: p, limit: 15 })
+          : await api.localShopOrders.list({ page: p, limit: 15 });
       setTotalPages(Math.max(1, res.total_pages));
       setTotal(res.total);
       setPage(res.page);
@@ -49,7 +53,7 @@ export function OrdersScreen() {
       setLoadingMore(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [tab]);
 
   useFocusEffect(
     useCallback(() => {
@@ -91,6 +95,26 @@ export function OrdersScreen() {
           </View>
         </View>
       </View>
+      <View className="px-4 pt-3">
+        <View className="mx-auto w-full max-w-[560px] flex-row rounded-2xl border border-slate-200 bg-slate-100 p-1">
+          <Pressable
+            onPress={() => setTab('bozor')}
+            className={cn('flex-1 items-center rounded-xl py-2.5', tab === 'bozor' && 'bg-white')}
+          >
+            <Text className={cn('text-xs font-black uppercase tracking-wider', tab === 'bozor' ? 'text-slate-900' : 'text-slate-500')}>
+              Bozor
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setTab('mahalla')}
+            className={cn('flex-1 items-center rounded-xl py-2.5', tab === 'mahalla' && 'bg-white')}
+          >
+            <Text className={cn('text-xs font-black uppercase tracking-wider', tab === 'mahalla' ? 'text-slate-900' : 'text-slate-500')}>
+              Maxalla
+            </Text>
+          </Pressable>
+        </View>
+      </View>
 
       <ScrollView
         className="flex-1"
@@ -126,7 +150,7 @@ export function OrdersScreen() {
             {orders.map((o) => (
               <Pressable
                 key={o.id}
-                onPress={() => router.push(`/orders/${o.id}`)}
+                onPress={() => router.push({ pathname: '/orders/[id]', params: { id: String(o.id), market: tab } })}
                 className="flex-row items-center justify-between rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm active:opacity-90"
               >
                 <View className="min-w-0 flex-1">

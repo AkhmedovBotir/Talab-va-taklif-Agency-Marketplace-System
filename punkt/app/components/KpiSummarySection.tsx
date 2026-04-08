@@ -1,47 +1,60 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useKpiSummary } from '../hooks/useKpiSummary';
 
 export function KpiSummarySection() {
   const { summary, loading } = useKpiSummary();
+  const { width } = useWindowDimensions();
+  const stackPaidRow = width < 400;
 
   if (loading || !summary) {
     return null;
   }
 
+  const cardShadow =
+    Platform.OS === 'web'
+      ? ({ boxShadow: '0 2px 12px rgba(0,0,0,0.08)' } as object)
+      : null;
+
   return (
     <View style={styles.kpiSection}>
-      <Text style={styles.kpiSectionTitle}>KPI Bonus</Text>
-      <View style={styles.kpiCard}>
+      <Text style={styles.kpiSectionTitle}>Bugungi KPI</Text>
+      {summary.dateUtc ? (
+        <Text style={styles.kpiDateHint}>Hisob UTC kuni: {summary.dateUtc}</Text>
+      ) : null}
+      <View style={[styles.kpiCard, cardShadow]}>
         <View style={styles.kpiRow}>
           <View style={styles.kpiItem}>
             <Ionicons name="wallet" size={24} color="#007AFF" />
-            <Text style={styles.kpiLabel}>Jami bonus</Text>
+            <Text style={styles.kpiLabel}>Punkt KPI (jami)</Text>
             <Text style={styles.kpiValue}>
-              {summary.totalAmount.toLocaleString()} so'm
+              {summary.totalAmount.toLocaleString('uz-UZ')} so‘m
             </Text>
           </View>
         </View>
-        <View style={styles.kpiRow}>
-          <View style={[styles.kpiItem, styles.kpiItemHalf]}>
+        <View style={[styles.kpiRow, stackPaidRow && styles.kpiRowStack]}>
+          <View style={[styles.kpiItem, styles.kpiItemHalf, stackPaidRow && styles.kpiItemFull]}>
             <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-            <Text style={styles.kpiLabel}>To'langan</Text>
+            <Text style={styles.kpiLabel}>To‘langan</Text>
             <Text style={[styles.kpiValue, styles.kpiValuePaid]}>
-              {summary.paidAmount.toLocaleString()} so'm
+              {summary.paidAmount.toLocaleString('uz-UZ')} so‘m
             </Text>
           </View>
-          <View style={[styles.kpiItem, styles.kpiItemHalf]}>
+          <View style={[styles.kpiItem, styles.kpiItemHalf, stackPaidRow && styles.kpiItemFull]}>
             <Ionicons name="time" size={20} color="#FF9500" />
-            <Text style={styles.kpiLabel}>To'lanmagan</Text>
+            <Text style={styles.kpiLabel}>To‘lanmagan</Text>
             <Text style={[styles.kpiValue, styles.kpiValueUnpaid]}>
-              {summary.unpaidAmount.toLocaleString()} so'm
+              {summary.unpaidAmount.toLocaleString('uz-UZ')} so‘m
             </Text>
           </View>
         </View>
         <View style={styles.kpiFooter}>
           <Text style={styles.kpiTransactions}>
-            Jami transaksiyalar: {summary.totalTransactions}
+            Yetkazilgan buyurtmalar: {summary.totalTransactions}
+            {summary.totalKpiPool != null
+              ? ` · KPI havzasi: ${summary.totalKpiPool.toLocaleString('uz-UZ')} so‘m`
+              : ''}
           </Text>
         </View>
       </View>
@@ -57,7 +70,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 12,
+    marginBottom: 4,
+  },
+  kpiDateHint: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginBottom: 10,
   },
   kpiCard: {
     backgroundColor: '#FFF',
@@ -77,6 +95,9 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
+  kpiRowStack: {
+    flexDirection: 'column',
+  },
   kpiItem: {
     flex: 1,
     alignItems: 'center',
@@ -86,6 +107,10 @@ const styles = StyleSheet.create({
   },
   kpiItemHalf: {
     flex: 0.5,
+  },
+  kpiItemFull: {
+    flex: 0,
+    width: '100%',
   },
   kpiLabel: {
     fontSize: 12,
@@ -116,4 +141,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

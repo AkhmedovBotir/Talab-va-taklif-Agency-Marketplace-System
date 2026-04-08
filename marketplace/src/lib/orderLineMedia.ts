@@ -34,14 +34,39 @@ export async function fetchProductImageById(productId: number): Promise<string |
   }
 }
 
+/** Maxalla order qatori uchun rasm olish (`local_shop_product_id` orqali). */
+export async function fetchLocalShopProductImageById(
+  localShopProductId: number,
+  localShopId?: number
+): Promise<string | undefined> {
+  if (!localShopProductId) return undefined;
+  try {
+    const list = await api.localShopProducts.list({
+      page: 1,
+      limit: 100,
+      local_shop_id: localShopId,
+    });
+    const item = list.find((p) => Number(p.id) === Number(localShopProductId));
+    if (!item) return undefined;
+    for (const u of item.images ?? []) {
+      if (u && typeof u === 'string' && !u.includes('placehold.co')) return u;
+    }
+    return item.images?.[0];
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolveOrderLineImageUri(
   productId: number,
   lineImageUrl: string | undefined,
   listMap: Map<string, string>,
-  fetched: Record<number, string>
+  fetched: Record<number, string>,
+  lookupId?: number
 ): string | undefined {
   if (lineImageUrl?.trim()) return lineImageUrl.trim();
-  return listMap.get(String(productId)) ?? fetched[productId];
+  const key = lookupId ?? productId;
+  return listMap.get(String(productId)) ?? fetched[key];
 }
 
 export function formatOrderLineQtyLabel(line: MarketplaceOrderItemLine): string {

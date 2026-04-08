@@ -238,6 +238,20 @@ export interface AgentMeOrdersPageData {
   total_pages: number;
 }
 
+export interface AgentOrdersAnalytics {
+  from?: string;
+  to?: string;
+  total_orders: number;
+  total_amount: number;
+  delivered_orders: number;
+  delivered_amount: number;
+  pending_orders: number;
+  pending_amount: number;
+  declared_to_punkt_amount: number;
+  confirmed_by_punkt_amount: number;
+  unconfirmed_declared_amount: number;
+}
+
 export interface AgentMeOrderLineItem {
   product_id?: number;
   product_name?: string;
@@ -301,75 +315,43 @@ export interface GetOrdersHistoryParams {
   limit?: number;
 }
 
-// KPI Bonus Types
-export type KPISummary = KPISummaryResponse['data'];
+// Agent KPI (`GET /agents/me/kpi/today`, `GET /agents/me/kpi/history`)
+export interface AgentKpiToday {
+  date_utc: string;
+  allocation_note?: string;
+  agent_kpi_total: number;
+  total_kpi_pool: number;
+  delivered_orders: number;
+  paid_total_today: number;
+  payout_entries_today?: number;
+  unpaid_today: number;
+}
 
-export interface KPISummaryResponse {
-  success: boolean;
-  data: {
-    totalTransactions: number;
-    totalAmount: number;
-    paidAmount: number;
-    unpaidAmount: number;
-    startDate?: string;
-    endDate?: string;
+export interface AgentKpiHistoryDay {
+  date?: string;
+  date_utc?: string;
+  agent_kpi_accrued: number;
+  total_kpi_pool: number;
+  delivered_orders: number;
+  paid_total: number;
+  unpaid: number;
+}
+
+/** Eski UI bilan moslash uchun bugungi KPI (profil / ish navbati kartochkasi) */
+export type KPISummary = {
+  totalAmount: number;
+  paidAmount: number;
+  unpaidAmount: number;
+  totalTransactions: number;
+};
+
+export function agentKpiTodayToSummary(today: AgentKpiToday): KPISummary {
+  return {
+    totalAmount: today.agent_kpi_total,
+    paidAmount: today.paid_total_today,
+    unpaidAmount: today.unpaid_today,
+    totalTransactions: today.delivered_orders,
   };
-}
-
-export interface KPITransaction {
-  _id: string;
-  order: {
-    _id: string;
-    orderNumber: string;
-  };
-  amount: number;
-  isPaid: boolean;
-  createdAt: string;
-}
-
-export interface KPITransactionsResponse {
-  success: boolean;
-  count: number;
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  data: KPITransaction[];
-}
-
-export interface KPIDailyBalanceResponse {
-  success: boolean;
-  data: {
-    date: string;
-    totalAmount: number;
-    paidAmount: number;
-    unpaidAmount: number;
-  };
-}
-
-export interface KPIDailyReportResponse {
-  success: boolean;
-  report: {
-    id: string;
-    date: string;
-    totalAmount: number;
-    paidAmount: number;
-    unpaidAmount: number;
-    transactions: Array<{
-      _id: string;
-      orderNumber: string;
-      amount: number;
-    }>;
-  };
-}
-
-export interface GetKPIParams {
-  startDate?: string;
-  endDate?: string;
-  isPaid?: boolean;
-  page?: number;
-  limit?: number;
-  date?: string; // For daily balance (YYYY-MM-DD format)
 }
 
 export interface AgentProfileResponse {
@@ -473,5 +455,53 @@ export interface GetPaymentTransactionsParams {
   endDate?: string;
   page?: number;
   limit?: number;
+}
+
+/** Agent Notifications API — `/agents/me/notifications` */
+export type AgentNotificationType =
+  | 'info'
+  | 'warning'
+  | 'success'
+  | 'error'
+  | 'update'
+  | 'announcement'
+  | string;
+
+export interface AgentNotification {
+  id: number;
+  title: string;
+  message: string;
+  type: AgentNotificationType;
+  target_type: string;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentNotificationsListData {
+  items: AgentNotification[];
+  total: number;
+  unread_count: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+/** WebSocket: `integration_notification_created` */
+export interface IntegrationNotificationSocketPayload {
+  event: string;
+  notification?: {
+    id: number;
+    title: string;
+    message: string;
+    type: string;
+    target_type: string;
+    created_at: string;
+    updated_at: string;
+    is_read?: boolean;
+    read_at?: string | null;
+  };
+  sent_at?: string;
 }
 

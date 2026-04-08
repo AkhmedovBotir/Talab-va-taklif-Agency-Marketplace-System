@@ -14,7 +14,7 @@ import (
 )
 
 func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int) error {
-	if err := db.AutoMigrate(&domain.User{}, &domain.VerificationCode{}, &domain.DeliveryArea{}, &domain.CartItem{}, &domain.Order{}, &domain.OrderItem{}); err != nil {
+	if err := db.AutoMigrate(&domain.User{}, &domain.VerificationCode{}, &domain.DeliveryArea{}, &domain.CartItem{}, &domain.LocalShopCartItem{}, &domain.Order{}, &domain.OrderItem{}, &domain.LocalShopOrder{}, &domain.LocalShopOrderItem{}, &domain.PartnerRequest{}, &domain.ProductRating{}, &domain.MarketplaceNotificationRead{}); err != nil {
 		return err
 	}
 	// Legacy schema compatibility: old versions had password NOT NULL.
@@ -36,23 +36,49 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 	cartRepo := repository.NewMarketplaceCartRepository(db)
 	cartSvc := service.NewMarketplaceCartService(cartRepo, productRepo)
 	cartHandler := handler.NewCartHandler(cartSvc)
+	localShopCartRepo := repository.NewLocalShopCartRepository(db)
+	localShopCartSvc := service.NewLocalShopCartService(localShopCartRepo)
+	localShopCartHandler := handler.NewLocalShopCartHandler(localShopCartSvc)
 	orderRepo := repository.NewMarketplaceOrderRepository(db)
 	punktLookupRepo := repository.NewPunktLookupRepository(db)
 	orderSvc := service.NewMarketplaceOrderService(orderRepo, productRepo, deliveryRepo, punktLookupRepo)
 	orderHandler := handler.NewOrderHandler(orderSvc)
+	localShopOrderRepo := repository.NewLocalShopOrderRepository(db)
+	localShopOrderSvc := service.NewLocalShopOrderService(localShopOrderRepo, localShopCartRepo, deliveryRepo)
+	localShopOrderHandler := handler.NewLocalShopOrderHandler(localShopOrderSvc)
+	partnerReqRepo := repository.NewPartnerRequestRepository(db)
+	partnerReqSvc := service.NewPartnerRequestService(partnerReqRepo)
+	partnerReqHandler := handler.NewPartnerRequestHandler(partnerReqSvc)
+	ratingRepo := repository.NewProductRatingRepository(db)
+	ratingSvc := service.NewProductRatingService(ratingRepo)
+	ratingHandler := handler.NewProductRatingHandler(ratingSvc)
+
+	mpNotifRepo := repository.NewMarketplaceNotificationRepository(db)
+	mpNotifSvc := service.NewMarketplaceNotificationService(mpNotifRepo)
+	mpNotifHandler := handler.NewMarketplaceNotificationHandler(mpNotifSvc)
 
 	api := router.Group("/api/v1")
 	authMiddleware := marketplaceAuthMiddleware(jwtSecret)
 	authHandler.RegisterRoutes(api, authMiddleware)
 	cartHandler.RegisterRoutes(api, authMiddleware)
+	localShopCartHandler.RegisterRoutes(api, authMiddleware)
 	orderHandler.RegisterRoutes(api, authMiddleware)
+	localShopOrderHandler.RegisterRoutes(api, authMiddleware)
 	deliveryHandler.RegisterRoutes(api, authMiddleware)
+	partnerReqHandler.RegisterRoutes(api, authMiddleware)
+	ratingHandler.RegisterRoutes(api, authMiddleware)
+	mpNotifHandler.RegisterRoutes(api, authMiddleware)
 	return nil
 }
 
 func marketplaceAuthMiddleware(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
+		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
+		if authHeader == "" {
+			if q := strings.TrimSpace(c.Query("token")); q != "" {
+				authHeader = "Bearer " + q
+			}
+		}
 		if authHeader == "" {
 			c.JSON(401, gin.H{"message": "Authorization header topilmadi"})
 			c.Abort()

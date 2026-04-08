@@ -260,6 +260,16 @@ func (s *Service) SendAgentPasswordSetupCode(ctx context.Context, phone, code st
 	return s.SendSMS(ctx, phone, message)
 }
 
+func (s *Service) SendManagerPasswordSetupCode(ctx context.Context, phone, code string) (*SendResult, error) {
+	message := fmt.Sprintf("%s - Menejer hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.", code)
+	return s.SendSMS(ctx, phone, message)
+}
+
+func (s *Service) SendLocalShopPasswordSetupCode(ctx context.Context, phone, code string) (*SendResult, error) {
+	message := fmt.Sprintf("%s - Maxalla do'koni hisobi uchun parol o'rnatish kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.", code)
+	return s.SendSMS(ctx, phone, message)
+}
+
 func (s *Service) SendDeviceVerificationCode(ctx context.Context, phone, code string) (*SendResult, error) {
 	message := fmt.Sprintf("%s - Yangi qurilmani tasdiqlash uchun tasdiqlash kodi. Kod 5 daqiqa amal qiladi. Talab va Taklif Agency.", code)
 	return s.SendSMS(ctx, phone, message)

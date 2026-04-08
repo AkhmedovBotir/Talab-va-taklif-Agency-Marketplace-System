@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiService, KpiBalanceResponse } from '../services/api';
+import { apiService, PunktKpiTodayResponse } from '../services/api';
 
-interface KpiBalance {
+export interface KpiBalance {
   date: string;
   totalTransactions: number;
   totalAmount: number;
@@ -9,23 +9,37 @@ interface KpiBalance {
   unpaidAmount: number;
   paidTransactions: number;
   unpaidTransactions: number;
+  totalKpiPool?: number;
 }
 
-export function useKpiBalance(date?: string) {
+/**
+ * Bugungi punkt KPI (`GET /punkts/me/kpi/today`).
+ * `date` parametri API da yo‘q — har doim joriy UTC kun hisobi.
+ */
+export function useKpiBalance(_date?: string) {
   const [balance, setBalance] = useState<KpiBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBalance = useCallback(async (targetDate?: string) => {
+  const fetchBalance = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response: KpiBalanceResponse = await apiService.getKpiBalance(targetDate);
-      if (response.success && response.data) {
+      const response: PunktKpiTodayResponse = await apiService.getPunktKpiToday();
+      const d = response.data;
+      if (d) {
         setBalance({
-          date: response.data.date,
-          ...response.data.totals,
+          date: d.date_utc,
+          totalTransactions: d.delivered_orders,
+          totalAmount: d.punkt_kpi_total,
+          paidAmount: d.paid_total_today,
+          unpaidAmount: d.unpaid_today,
+          paidTransactions: d.payout_entries_today,
+          unpaidTransactions: 0,
+          totalKpiPool: d.total_kpi_pool,
         });
+      } else {
+        setBalance(null);
       }
     } catch (err: unknown) {
       const e = err as { status?: number; message?: string };
@@ -34,9 +48,9 @@ export function useKpiBalance(date?: string) {
         e?.status === 404 ||
         /topilmadi|not found|endpoint/i.test(msg);
       if (!missing) {
-        console.error('Error fetching KPI balance:', err);
+        console.error('Error fetching punkt KPI today:', err);
       }
-      setError(missing ? null : msg || 'Balansni yuklashda xatolik');
+      setError(missing ? null : msg || 'KPI ma’lumotini yuklashda xatolik');
       setBalance(null);
     } finally {
       setLoading(false);
@@ -44,12 +58,12 @@ export function useKpiBalance(date?: string) {
   }, []);
 
   useEffect(() => {
-    fetchBalance(date);
-  }, [date, fetchBalance]);
+    fetchBalance();
+  }, [fetchBalance]);
 
   const refresh = useCallback(() => {
-    fetchBalance(date);
-  }, [date, fetchBalance]);
+    fetchBalance();
+  }, [fetchBalance]);
 
   return {
     balance,
@@ -58,4 +72,3 @@ export function useKpiBalance(date?: string) {
     refresh,
   };
 }
-

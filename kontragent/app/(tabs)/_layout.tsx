@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../contexts/AuthContext';
+import { useContragentNotificationSocket } from '../../hooks/useContragentNotificationSocket';
 import { BREAKPOINT_DESKTOP } from '../../hooks/useResponsive';
 import { apiService } from '../../services/api';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function BadgeIcon({ name, color, size, badgeCount }: { name: any; color: string; size: number; badgeCount: number }) {
   return (
@@ -21,26 +23,29 @@ function BadgeIcon({ name, color, size, badgeCount }: { name: any; color: string
 
 export default function TabLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
+  const { token } = useAuth();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isWebDesktop = Platform.OS === 'web' && windowWidth >= BREAKPOINT_DESKTOP;
 
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        const response = await apiService.getUnreadCount();
-        if (response.success) {
-          setUnreadCount(response.data.unreadCount);
-        }
-      } catch (error) {
-        // Ignore unread count errors
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const response = await apiService.getUnreadCount();
+      if (response.success) {
+        setUnreadCount(response.data.unreadCount);
       }
-    };
-
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 1000); // Refresh every 1 second
-    return () => clearInterval(interval);
+    } catch {
+      // Ignore unread count errors
+    }
   }, []);
+
+  useContragentNotificationSocket(token, fetchUnreadCount);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   const webBottomInset = Math.max(insets.bottom, 14);
   const nativeBottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 10 : 6);

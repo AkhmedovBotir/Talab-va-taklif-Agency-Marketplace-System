@@ -31,6 +31,7 @@ type ContragentPunktLineListRow struct {
 	Quantity          float64
 	Unit              string
 	UnitPrice         float64
+	PayoutPercent     *float64 `gorm:"column:punkt_contragent_payout_percent"`
 }
 
 type ContragentPunktLineDetail struct {
@@ -42,6 +43,7 @@ type ContragentPunktLineDetail struct {
 type ContragentPunktLineRequestRepository interface {
 	ListByContragent(contragentID uint, page, limit int, status string) ([]ContragentPunktLineListRow, int64, error)
 	GetDetail(contragentID, id uint) (*ContragentPunktLineDetail, error)
+	SumOrderTotalForContragent(orderID, contragentID uint) (float64, error)
 	Transition(contragentID, id uint, allowedFrom []string, to string) error
 }
 
@@ -67,7 +69,7 @@ func (r *contragentPunktLineRequestPostgresRepository) ListByContragent(contrage
 	var rows []ContragentPunktLineListRow
 	q := r.db.Table("punkt_contragent_line_requests AS r").
 		Select(`r.id, r.order_id, r.order_item_id, r.punkt_id, r.routing_district_id, r.status, r.created_at, r.updated_at,
-			o.status AS order_status, o.assigned_agent_id AS assigned_agent_id, i.product_name, i.quantity, i.unit, i.unit_price`).
+			o.status AS order_status, o.assigned_agent_id AS assigned_agent_id, i.product_name, i.quantity, i.unit, i.unit_price, i.punkt_contragent_payout_percent`).
 		Joins("JOIN marketplace_orders o ON o.id = r.order_id").
 		Joins("JOIN marketplace_order_items i ON i.id = r.order_item_id").
 		Where("r.contragent_id = ?", contragentID)
@@ -97,6 +99,15 @@ func (r *contragentPunktLineRequestPostgresRepository) GetDetail(contragentID, i
 		return nil, err
 	}
 	return &ContragentPunktLineDetail{Request: req, Order: order, Item: item}, nil
+}
+
+func (r *contragentPunktLineRequestPostgresRepository) SumOrderTotalForContragent(orderID, contragentID uint) (float64, error) {
+	var total float64
+	err := r.db.Table("marketplace_order_items").
+		Where("order_id = ? AND contragent_id = ?", orderID, contragentID).
+		Select("COALESCE(SUM(unit_price * quantity * COALESCE(punkt_contragent_payout_percent, 100) / 100), 0)").
+		Scan(&total).Error
+	return total, err
 }
 
 func (r *contragentPunktLineRequestPostgresRepository) Transition(contragentID, id uint, allowedFrom []string, to string) error {
