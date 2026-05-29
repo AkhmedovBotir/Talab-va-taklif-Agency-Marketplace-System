@@ -1,0 +1,16 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/(tabs)/:path*",
+      "destination": "/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/(tabs)",
+      "destination": "/",
+      "permanent": true
+    }
+  ]
+}

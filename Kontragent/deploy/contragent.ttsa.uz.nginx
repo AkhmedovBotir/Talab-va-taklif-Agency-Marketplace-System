@@ -1,0 +1,26 @@
+# Serverga qo'yish: /etc/nginx/sites-available/contragent.ttsa.uz
+# Keyin: sudo nginx -t && sudo systemctl reload nginx
+#
+# root yo'lini serverdagi haqiqiy dist papkaga moslashtiring.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name contragent.ttsa.uz;
+
+    root /var/www/kontragent/dist;
+    index index.html;
+
+    rewrite ^(.+)/$ $1 permanent;
+    rewrite ^/\(tabs\)/?(.*)$ /$1 permanent;
+
+    location /_expo/ {
+        try_files $uri =404;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location / {
+        try_files $uri $uri.html /index.html;
+    }
+}

@@ -18,7 +18,7 @@ Shablon maydonlari:
 
 - `name`
 - `description` (delta format JSON string)
-- `images` (base64, 1..5 ta)
+- `images` (base64, 1..5 ta; har qanday rasm MIME; base64 qismi ≤ 100 GB; piksel/hajm cheklovi yo‘q)
 - `category_id` (parent category ID)
 - `subcategory_id` (tanlangan category ichidagi subcategory ID)
 - `unit` (`dona | litr | kg`)
@@ -99,6 +99,8 @@ Body create bilan bir xil formatda.
 ## Xatolar
 
 - `400` - validatsiya xatolari (`category/subcategory`, `unit`, `status`, `images`, `description` va h.k.)
+  - `image base64 formati noto'g'ri`
+  - `image base64 hajmi 100 GB dan oshmasligi kerak`
 - `401/403` - auth yoki role mos emas
 - `404` - shablon topilmadi
 - `500` - server xatosi

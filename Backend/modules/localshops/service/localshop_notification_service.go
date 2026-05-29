@@ -97,7 +97,7 @@ func (s *localShopNotificationService) UnreadCount(localShopID uint) (int64, err
 }
 
 func (s *localShopNotificationService) MarkRead(localShopID, notificationID uint) error {
-	row, err := s.repo.GetVisibleByID(notificationID)
+	row, err := s.repo.GetVisibleByID(notificationID, localShopID)
 	if err != nil {
 		return err
 	}

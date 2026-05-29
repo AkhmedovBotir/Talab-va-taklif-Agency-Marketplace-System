@@ -1,6 +1,8 @@
 /**
  * Maxalla API Service
  */
+import { notifyServiceAccessUpdate } from './serviceAccessBridge';
+
 /** REST va WebSocket (wss) uchun yagona host — endpointlar `/api/v1/...` bilan qo‘shiladi */
 const API_BASE_URL = 'https://api.ttsa.uz';
 /** Viloyat/tuman/MFY ro‘yxatlari (noauth regions) */
@@ -479,6 +481,36 @@ export interface LocalShopProfileResponse {
   shop: LocalShop;
 }
 
+export type ServiceAccessReason =
+  | 'active'
+  | 'shop_inactive'
+  | 'no_subscription'
+  | 'period_not_started'
+  | 'period_expired'
+  | string;
+
+export type ServiceBillingType = 'free' | 'monthly' | string;
+
+export interface ServiceAccessData {
+  can_operate: boolean;
+  message: string;
+  reason: ServiceAccessReason;
+  billing_type?: ServiceBillingType;
+  free_months?: number;
+  period_start_at?: string;
+  period_end_at?: string;
+  is_in_free_period?: boolean;
+}
+
+export function isServiceAccessData(value: unknown): value is ServiceAccessData {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    typeof (value as ServiceAccessData).can_operate === 'boolean' &&
+    typeof (value as ServiceAccessData).reason === 'string'
+  );
+}
+
 export type LocalShopNotificationType =
   | 'info'
   | 'warning'
@@ -596,6 +628,9 @@ async function fetchApiWithAuth<T>(
 
     const data = await response.json();
     if (!response.ok) {
+      if (response.status === 403 && isServiceAccessData(data?.data)) {
+        notifyServiceAccessUpdate(data.data);
+      }
       throw new ApiError(
         data.message || 'API xatosi yuz berdi',
         response.status,
@@ -2031,5 +2066,31 @@ export const apiService = {
     } catch (error: any) {
       throw error;
     }
+  },
+
+  /**
+   * GET /api/v1/local-shops/me/service-access
+   * 200 yoki 403 — ikkalasida ham `data` ichida holat qaytadi.
+   */
+  async getServiceAccess(token: string): Promise<ServiceAccessData> {
+    const url = `${API_BASE_URL}${LOCAL_SHOPS_ME_BASE_PATH}/service-access`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const body = await response.json();
+    const access = body?.data;
+    if (!isServiceAccessData(access)) {
+      throw new ApiError(
+        body?.message || 'Xizmat holatini olishda xatolik',
+        response.status,
+        body
+      );
+    }
+    notifyServiceAccessUpdate(access);
+    return access;
   },
 };

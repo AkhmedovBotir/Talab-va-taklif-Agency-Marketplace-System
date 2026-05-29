@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Add, ArrowDownward, ArrowUpward, CheckCircle, Close, Delete, Edit, Phone, Visibility } from '@mui/icons-material';
 import { commentTemplateAPI, productCommentsAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import usePermissions from '../../hooks/usePermissions';
+import ContentStatusPanel from '../../components/common/ContentStatusPanel';
+import { resolvePageError } from '../../utils/apiError';
 
 const tabBase = 'px-4 py-2 rounded-md text-sm font-medium transition-colors';
 
@@ -17,9 +20,56 @@ const fmtDate = (x) => {
   return d.toLocaleString('uz-UZ', { dateStyle: 'medium', timeStyle: 'short' });
 };
 
+const asDisplayText = (value) => {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+};
+
+const caseRatingId = (c) => {
+  const raw = c?.ratingId ?? c?.rating_id ?? c?.id;
+  const id = raw != null && typeof raw === 'object' ? (raw.rating_id ?? raw.ratingId ?? raw.id ?? raw._id) : raw;
+  if (id == null || id === '') return null;
+  return id;
+};
+
+const caseUserLabel = (c) => {
+  const user = c?.user || c?.marketplace_user;
+  if (user && typeof user === 'object') {
+    const fromUser =
+      user.full_name ||
+      user.name ||
+      user.username ||
+      [user.first_name, user.last_name].filter(Boolean).join(' ');
+    if (fromUser) return fromUser;
+  }
+  const flat = [c?.user_first_name, c?.user_last_name].filter(Boolean).join(' ');
+  return flat || '—';
+};
+
+const caseUserPhone = (c) => {
+  const user = c?.user || c?.marketplace_user;
+  if (user && typeof user === 'object' && user.phone) return user.phone;
+  return c?.user_phone || '—';
+};
+
+const caseStatusLabel = (c) => c?.status ?? c?.case_status ?? 'open';
+
+const caseScoreLabel = (c) => {
+  const score = c?.score ?? c?.rating_score;
+  if (score == null || score === '' || typeof score === 'object') return '—';
+  return String(score);
+};
+
+const caseNoteLabel = (c) =>
+  asDisplayText(c?.note) || asDisplayText(c?.comment) || asDisplayText(c?.template_comment) || '—';
+
 const CommentaryPage = () => {
   const { showError, showSuccess } = useSnackbar();
-  const [activeTab, setActiveTab] = useState('settings');
+  const { can } = usePermissions();
+  const showSettings = can('kommentariya shablonlari');
+  const showComments = can('kommentariyalar');
+  const [activeTab, setActiveTab] = useState(() => (showSettings ? 'settings' : 'comments'));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState(null);
@@ -34,16 +84,18 @@ const CommentaryPage = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [commentCases, setCommentCases] = useState([]);
   const [casesLoading, setCasesLoading] = useState(false);
-  const [caseFilters, setCaseFilters] = useState({ status: 'open', escalated: '' });
+  const [caseFilters, setCaseFilters] = useState({ status: '', escalated: '' });
   const [casesPagination, setCasesPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
   const [activeCase, setActiveCase] = useState(null);
   const [caseDetailOpen, setCaseDetailOpen] = useState(false);
   const [caseDetailLoading, setCaseDetailLoading] = useState(false);
   const [actionNote, setActionNote] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [pageError, setPageError] = useState(null);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
+    setPageError(null);
     try {
       const res = await commentTemplateAPI.getAll({ page: pagination.page, limit: pagination.limit });
       const payload = res.data || {};
@@ -60,18 +112,22 @@ const CommentaryPage = () => {
           Math.max(1, Math.ceil((Number(payload.total) || sorted.length) / (Number(payload.limit) || prev.limit || 1))),
       }));
     } catch (e) {
-      showError(e.message || "Kommentariya shablonlarini yuklab bo'lmadi");
+      const pe = resolvePageError(e);
+      if (pe) setPageError(pe);
+      else showError(e.message || "Kommentariya shablonlarini yuklab bo'lmadi");
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, showError]);
+  }, [pagination.page, pagination.limit]);
 
   useEffect(() => {
-    if (activeTab === 'settings') fetchList();
-  }, [activeTab, fetchList]);
+    if (activeTab === 'settings' && showSettings) fetchList();
+  }, [activeTab, showSettings, fetchList]);
 
   const fetchCommentCases = useCallback(async () => {
+    if (!showComments) return;
     setCasesLoading(true);
+    setPageError(null);
     try {
       const res = await productCommentsAPI.getAll({
         page: casesPagination.page,
@@ -92,15 +148,17 @@ const CommentaryPage = () => {
           Math.max(1, Math.ceil((Number(payload.total) || items.length) / (Number(payload.limit) || prev.limit || 1))),
       }));
     } catch (e) {
-      showError(e.message || "Kommentariyalar ro'yxatini yuklab bo'lmadi");
+      const pe = resolvePageError(e);
+      if (pe) setPageError(pe);
+      else showError(e.message || "Kommentariyalar ro'yxatini yuklab bo'lmadi");
     } finally {
       setCasesLoading(false);
     }
-  }, [casesPagination.page, casesPagination.limit, caseFilters.status, caseFilters.escalated, showError]);
+  }, [showComments, casesPagination.page, casesPagination.limit, caseFilters.status, caseFilters.escalated]);
 
   useEffect(() => {
-    if (activeTab === 'comments') fetchCommentCases();
-  }, [activeTab, fetchCommentCases]);
+    if (activeTab === 'comments' && showComments) fetchCommentCases();
+  }, [activeTab, showComments, fetchCommentCases]);
 
   const openCreate = () => {
     setEditing(null);
@@ -196,7 +254,7 @@ const CommentaryPage = () => {
     setCaseDetailLoading(true);
     setActionNote('');
     try {
-      const res = await productCommentsAPI.getById(row.ratingId || row.id);
+      const res = await productCommentsAPI.getById(caseRatingId(row));
       setActiveCase(res.data || row);
     } catch (e) {
       showError(e.message || "Kommentariya case ochilmadi");
@@ -208,7 +266,7 @@ const CommentaryPage = () => {
 
   const runCaseAction = async (actionType) => {
     if (!activeCase) return;
-    const ratingId = activeCase.ratingId || activeCase.id;
+    const ratingId = caseRatingId(activeCase);
     if (!ratingId) return;
     setActionLoading(true);
     try {
@@ -232,28 +290,47 @@ const CommentaryPage = () => {
     }
   };
 
+  useEffect(() => {
+    if (!showSettings && showComments) setActiveTab('comments');
+    else if (showSettings && !showComments) setActiveTab('settings');
+  }, [showSettings, showComments]);
+
+  useEffect(() => {
+    setPageError(null);
+  }, [activeTab]);
+
+  if (pageError) {
+    return <ContentStatusPanel status={pageError.status} message={pageError.message} />;
+  }
+
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setActiveTab('settings')}
-            className={`${tabBase} ${activeTab === 'settings' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-          >
-            Kommentariya sozlamalari
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('comments')}
-            className={`${tabBase} ${activeTab === 'comments' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-          >
-            Kommentariyalar
-          </button>
+      {showSettings && showComments && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            {showSettings && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('settings')}
+                className={`${tabBase} ${activeTab === 'settings' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                Kommentariya shablonlari
+              </button>
+            )}
+            {showComments && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('comments')}
+                className={`${tabBase} ${activeTab === 'comments' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                Kommentariyalar
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {activeTab === 'comments' && (
+      {activeTab === 'comments' && showComments && (
         <>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <select
@@ -314,35 +391,35 @@ const CommentaryPage = () => {
                   <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-500">Case topilmadi</td></tr>
                 ) : (
                   commentCases.map((c) => {
-                    const user = c.user || c.marketplace_user || {};
                     const product = c.product || {};
                     const contragent = c.contragent || {};
-                    const score = c.score ?? c.rating_score ?? '—';
-                    const note = c.note || c.comment || c.template_comment || '';
+                    const status = caseStatusLabel(c);
+                    const note = caseNoteLabel(c);
+                    const rowId = caseRatingId(c);
                     return (
-                      <tr key={c.ratingId || c.id} className="border-b border-gray-100 hover:bg-gray-50/70 align-top">
-                        <td className="px-4 py-3 text-gray-800 font-medium">{c.ratingId || c.id || '—'}</td>
+                      <tr key={rowId ?? `${c.product_id}-${c.user_id}-${c.created_at}`} className="border-b border-gray-100 hover:bg-gray-50/70 align-top">
+                        <td className="px-4 py-3 text-gray-800 font-medium">{rowId ?? '—'}</td>
                         <td className="px-4 py-3">
-                          <p className="text-gray-900 font-medium">{user.full_name || user.name || user.username || '—'}</p>
-                          <p className="text-xs text-gray-500">{user.phone || '—'}</p>
+                          <p className="text-gray-900 font-medium">{caseUserLabel(c)}</p>
+                          <p className="text-xs text-gray-500">{caseUserPhone(c)}</p>
                         </td>
                         <td className="px-4 py-3">
                           <p className="text-gray-900 font-medium">{product.name || c.product_name || '—'}</p>
                           <p className="text-xs text-gray-500">{contragent.name || contragent.company_name || c.contragent_name || '—'}</p>
                         </td>
                         <td className="px-4 py-3 text-gray-700">
-                          <p className="font-semibold">{score}</p>
-                          <p className="text-xs text-gray-500 max-w-[280px] truncate" title={note}>{note || '—'}</p>
+                          <p className="font-semibold">{caseScoreLabel(c)}</p>
+                          <p className="text-xs text-gray-500 max-w-[280px] truncate" title={note === '—' ? '' : note}>{note}</p>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                            c.status === 'resolved'
+                            status === 'resolved'
                               ? 'bg-green-100 text-green-800'
-                              : c.status === 'escalated_to_admin'
+                              : status === 'escalated_to_admin'
                                 ? 'bg-amber-100 text-amber-800'
                                 : 'bg-indigo-100 text-indigo-800'
                           }`}>
-                            {c.status || 'open'}
+                            {status}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-gray-600">{fmtDate(c.updatedAt || c.updated_at)}</td>
@@ -389,7 +466,7 @@ const CommentaryPage = () => {
         </>
       )}
 
-      {activeTab === 'settings' && (
+      {activeTab === 'settings' && showSettings && (
         <>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center justify-between">
             <h3 className="text-base font-semibold text-gray-800">Kommentariya shablonlari</h3>
@@ -521,18 +598,18 @@ const CommentaryPage = () => {
               ) : activeCase ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <p><span className="text-gray-500">Case ID:</span> <span className="font-medium">{activeCase.ratingId || activeCase.id || '—'}</span></p>
-                    <p><span className="text-gray-500">Status:</span> <span className="font-medium">{activeCase.status || 'open'}</span></p>
-                    <p><span className="text-gray-500">Foydalanuvchi:</span> <span className="font-medium">{activeCase.user?.full_name || activeCase.user?.name || activeCase.user?.username || '—'}</span></p>
-                    <p><span className="text-gray-500">Telefon:</span> <span className="font-medium">{activeCase.user?.phone || '—'}</span></p>
-                    <p><span className="text-gray-500">Region:</span> <span className="font-medium">{activeCase.user?.region?.name || activeCase.region_name || '—'}</span></p>
-                    <p><span className="text-gray-500">Reyting:</span> <span className="font-medium">{activeCase.score ?? activeCase.rating_score ?? '—'}</span></p>
+                    <p><span className="text-gray-500">Case ID:</span> <span className="font-medium">{caseRatingId(activeCase) ?? '—'}</span></p>
+                    <p><span className="text-gray-500">Status:</span> <span className="font-medium">{caseStatusLabel(activeCase)}</span></p>
+                    <p><span className="text-gray-500">Foydalanuvchi:</span> <span className="font-medium">{caseUserLabel(activeCase)}</span></p>
+                    <p><span className="text-gray-500">Telefon:</span> <span className="font-medium">{caseUserPhone(activeCase)}</span></p>
+                    <p><span className="text-gray-500">Region:</span> <span className="font-medium">{activeCase.user?.region?.name || activeCase.region_name || activeCase.user?.region_id || activeCase.user_region_id || '—'}</span></p>
+                    <p><span className="text-gray-500">Reyting:</span> <span className="font-medium">{caseScoreLabel(activeCase)}</span></p>
                     <p><span className="text-gray-500">Mahsulot:</span> <span className="font-medium">{activeCase.product?.name || activeCase.product_name || '—'}</span></p>
                     <p><span className="text-gray-500">Kontragent:</span> <span className="font-medium">{activeCase.contragent?.name || activeCase.contragent?.company_name || activeCase.contragent_name || '—'}</span></p>
                   </div>
                   <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
                     <p className="text-xs text-gray-500 mb-1">Mijoz izohi</p>
-                    <p className="text-gray-800 whitespace-pre-wrap">{activeCase.note || activeCase.comment || activeCase.template_comment || '—'}</p>
+                    <p className="text-gray-800 whitespace-pre-wrap">{caseNoteLabel(activeCase)}</p>
                   </div>
 
                   <div className="border border-gray-200 rounded-md p-3">
@@ -588,7 +665,7 @@ const CommentaryPage = () => {
                               {' · '}
                               <span className="text-gray-500">{fmtDate(entry.created_at || entry.createdAt)}</span>
                             </p>
-                            <p className="text-gray-600 whitespace-pre-wrap">{entry.note || entry.message || '—'}</p>
+                            <p className="text-gray-600 whitespace-pre-wrap">{asDisplayText(entry.note) || asDisplayText(entry.message) || '—'}</p>
                           </div>
                         ))
                       )}

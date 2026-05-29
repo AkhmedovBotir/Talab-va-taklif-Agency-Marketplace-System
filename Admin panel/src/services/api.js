@@ -1,4 +1,8 @@
-const API_BASE_URL = 'https://api.ttsa.uz/api/v1';
+import { API_BASE_URL } from '../config/api';
+import { parseAdminPermissions, sanitizePermissionsPayload } from '../utils/permissions';
+import { ApiHttpError } from '../utils/apiError';
+
+export { API_BASE_URL };
 
 const getToken = () => localStorage.getItem('adminToken');
 
@@ -15,14 +19,18 @@ const normalizeCommonSuccess = (data) => {
   return data;
 };
 
+const isAuthEndpoint = (endpoint) =>
+  endpoint.includes('/admins/login') || endpoint.includes('/admins/auth/check');
+
 const apiRequest = async (endpoint, options = {}, requiresAuth = true) => {
+  const { noAuthRedirect = false, ...fetchOptions } = options;
   const token = getToken();
   const config = {
-    ...options,
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
       ...(requiresAuth && token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
+      ...fetchOptions.headers,
     },
   };
 
@@ -33,23 +41,27 @@ const apiRequest = async (endpoint, options = {}, requiresAuth = true) => {
     data = await response.json();
   } catch {
     if (!response.ok) {
-      if (response.status === 401 && !endpoint.includes('/login')) clearAuthAndRedirect();
+      if (response.status === 401 && !isAuthEndpoint(endpoint) && !noAuthRedirect) clearAuthAndRedirect();
       throw new Error(`Server xatolik: ${response.status}`);
     }
   }
 
   if (!response.ok) {
+    const msg = data.message || data.error || "So'rovda xatolik yuz berdi";
     if (response.status === 401) {
-      if (!endpoint.includes('/login')) clearAuthAndRedirect();
-      throw new Error(data.message || "Sessiya tugadi. Qayta kiring.");
+      if (!isAuthEndpoint(endpoint) && !noAuthRedirect) clearAuthAndRedirect();
+      throw new ApiHttpError(data.message || "Sessiya tugadi. Qayta kiring.", 401, data);
     }
     if (response.status === 403) {
-      throw new Error(data.message || "Ruxsat yo'q");
+      throw new ApiHttpError(data.message || "Ruxsat berilmagan", 403, data);
+    }
+    if (response.status === 404) {
+      throw new ApiHttpError(data.message || 'Topilmadi', 404, data);
     }
     if (response.status === 409) {
-      throw new Error(data.message || 'Bu maʼlumot allaqachon mavjud');
+      throw new ApiHttpError(data.message || 'Bu maʼlumot allaqachon mavjud', 409, data);
     }
-    throw new Error(data.message || "So'rovda xatolik yuz berdi");
+    throw new ApiHttpError(msg, response.status, data);
   }
 
   return normalizeCommonSuccess(data);
@@ -61,8 +73,11 @@ const normalizeAdmin = (admin) => {
     ...admin,
     _id: admin._id ?? admin.id,
     id: admin.id ?? admin._id,
+    name: admin.name ?? admin.fullname,
+    fullname: admin.fullname ?? admin.name,
     phone: admin.phone ?? admin.telefonRaqam,
     telefonRaqam: admin.telefonRaqam ?? admin.phone,
+    permissions: parseAdminPermissions(admin),
     createdAt: admin.createdAt ?? admin.created_at,
     updatedAt: admin.updatedAt ?? admin.updated_at,
   };
@@ -88,6 +103,15 @@ const normalizeAdminResponse = (response) => {
       return {
         ...response,
         data: { ...response.data, admin: normalizeAdmin(response.data.admin) },
+      };
+    }
+    if (response.data.token) {
+      return {
+        ...response,
+        data: {
+          ...response.data,
+          ...(response.data.admin ? { admin: normalizeAdmin(response.data.admin) } : {}),
+        },
       };
     }
     return { ...response, data: normalizeAdmin(response.data) };
@@ -117,6 +141,21 @@ const normalizeGeoResponse = (response) => {
   return response;
 };
 
+/** GET /admins/auth/check — token yaroqliligi (ruxsatlar qaytarmaydi) */
+export const checkAuthToken = async (tokenOverride) => {
+  const token = tokenOverride ?? getToken();
+  if (!token) {
+    throw new ApiHttpError('Token yaroqsiz', 401, null);
+  }
+  const query = tokenOverride ? `?token=${encodeURIComponent(token)}` : '';
+  const response = await apiRequest(
+    `/admins/auth/check${query}`,
+    { method: 'GET', noAuthRedirect: true },
+    !tokenOverride
+  );
+  return normalizeCommonSuccess(response);
+};
+
 export const adminAPI = {
   login: async (username, password) => {
     const response = await apiRequest(
@@ -130,24 +169,42 @@ export const adminAPI = {
     return normalizeAdminResponse(response);
   },
 
+  checkAuth: checkAuthToken,
+
+  getMe: async () =>
+    normalizeAdminResponse(
+      await apiRequest('/admins/me', { noAuthRedirect: true })
+    ),
+
+  getPermissionNames: async () => {
+    const res = await apiRequest('/admins/permission-names');
+    const items = res?.data?.items;
+    return Array.isArray(items) ? items : [];
+  },
+
   getAllAdmins: async ({ page = 1, limit = 10 } = {}) =>
     normalizeAdminResponse(await apiRequest(`/admins?page=${page}&limit=${limit}`)),
   getAdminById: async (id) => normalizeAdminResponse(await apiRequest(`/admins/${id}`)),
 
-  createAdmin: async (adminData) =>
-    normalizeAdminResponse(
+  createAdmin: async (adminData) => {
+    const payload = {
+      name: adminData.name || adminData.fullname,
+      role: adminData.role || 'admin',
+      phone: adminData.phone || adminData.telefonRaqam,
+      username: (adminData.username || '').toLowerCase(),
+      password: adminData.password || adminData.parol,
+      status: adminData.status || 'active',
+    };
+    if (Array.isArray(adminData.permissions)) {
+      payload.permissions = sanitizePermissionsPayload(adminData.permissions);
+    }
+    return normalizeAdminResponse(
       await apiRequest('/admins', {
         method: 'POST',
-        body: JSON.stringify({
-          name: adminData.name || adminData.fullname,
-          role: adminData.role || 'admin',
-          phone: adminData.phone || adminData.telefonRaqam,
-          username: (adminData.username || '').toLowerCase(),
-          password: adminData.password || adminData.parol,
-          status: adminData.status || 'active',
-        }),
+        body: JSON.stringify(payload),
       })
-    ),
+    );
+  },
 
   updateAdmin: async (id, adminData) => {
     const payload = {};
@@ -160,6 +217,9 @@ export const adminAPI = {
     if (adminData.password !== undefined && String(adminData.password).trim() !== '') payload.password = adminData.password;
     if (adminData.parol !== undefined && String(adminData.parol).trim() !== '') payload.password = adminData.parol;
     if (adminData.status !== undefined) payload.status = adminData.status;
+    if (Object.prototype.hasOwnProperty.call(adminData, 'permissions') && Array.isArray(adminData.permissions)) {
+      payload.permissions = sanitizePermissionsPayload(adminData.permissions);
+    }
 
     return normalizeAdminResponse(
       await apiRequest(`/admins/${id}`, {
@@ -474,6 +534,94 @@ export const neighborhoodShopAPI = {
     apiRequest(`/neighborhood_shops/${id}`, {
       method: 'DELETE',
     }),
+};
+
+const normalizeNeighborhoodShopMonthlyConfig = (item) => {
+  if (!item || typeof item !== 'object') return item;
+  return {
+    ...item,
+    id: item.id ?? 1,
+    monthlyPriceUzs: item.monthly_price_uzs ?? item.monthlyPriceUzs,
+    monthly_price_uzs: item.monthly_price_uzs ?? item.monthlyPriceUzs,
+    currency: item.currency ?? 'UZS',
+    createdAt: item.createdAt ?? item.created_at,
+    updatedAt: item.updatedAt ?? item.updated_at,
+  };
+};
+
+const normalizeNeighborhoodShopMonthlyConfigResponse = (response) => {
+  if (!response || typeof response !== 'object') return response;
+  if (response.data && typeof response.data === 'object') {
+    return { ...response, data: normalizeNeighborhoodShopMonthlyConfig(response.data) };
+  }
+  return response;
+};
+
+const normalizeNeighborhoodShopSubscription = (item) => {
+  if (!item || typeof item !== 'object') return item;
+  return {
+    ...item,
+    id: item.id,
+    neighborhoodShopId: item.neighborhood_shop_id ?? item.neighborhoodShopId,
+    billingType: item.billing_type ?? item.billingType,
+    billing_type: item.billing_type ?? item.billingType,
+    monthlyPriceUzs: item.monthly_price_uzs ?? item.monthlyPriceUzs,
+    monthly_price_uzs: item.monthly_price_uzs ?? item.monthlyPriceUzs,
+    freeMonths: item.free_months ?? item.freeMonths,
+    free_months: item.free_months ?? item.freeMonths,
+    periodStartAt: item.period_start_at ?? item.periodStartAt,
+    period_start_at: item.period_start_at ?? item.periodStartAt,
+    periodEndAt: item.period_end_at ?? item.periodEndAt,
+    period_end_at: item.period_end_at ?? item.periodEndAt,
+    configMonthlyPriceUzs: item.config_monthly_price_uzs ?? item.configMonthlyPriceUzs,
+    config_monthly_price_uzs: item.config_monthly_price_uzs ?? item.configMonthlyPriceUzs,
+    effectiveMonthlyPriceUzs: item.effective_monthly_price_uzs ?? item.effectiveMonthlyPriceUzs,
+    effective_monthly_price_uzs: item.effective_monthly_price_uzs ?? item.effectiveMonthlyPriceUzs,
+    isInFreePeriod: Boolean(item.is_in_free_period ?? item.isInFreePeriod),
+    is_in_free_period: Boolean(item.is_in_free_period ?? item.isInFreePeriod),
+    isPeriodActive: Boolean(item.is_period_active ?? item.isPeriodActive),
+    is_period_active: Boolean(item.is_period_active ?? item.isPeriodActive),
+    createdAt: item.createdAt ?? item.created_at,
+    updatedAt: item.updatedAt ?? item.updated_at,
+  };
+};
+
+const normalizeNeighborhoodShopSubscriptionResponse = (response) => {
+  if (!response || typeof response !== 'object') return response;
+  if (response.data && typeof response.data === 'object') {
+    return { ...response, data: normalizeNeighborhoodShopSubscription(response.data) };
+  }
+  return response;
+};
+
+/** Maxalla do'koni — standart oylik narx (singleton) */
+export const neighborhoodShopMonthlyConfigAPI = {
+  get: async () =>
+    normalizeNeighborhoodShopMonthlyConfigResponse(
+      await apiRequest('/neighborhood-shop-monthly-config')
+    ),
+  update: async ({ monthly_price_uzs, currency }) =>
+    normalizeNeighborhoodShopMonthlyConfigResponse(
+      await apiRequest('/neighborhood-shop-monthly-config', {
+        method: 'PUT',
+        body: JSON.stringify({ monthly_price_uzs, currency }),
+      })
+    ),
+};
+
+/** Maxalla do'koni — obuna */
+export const neighborhoodShopSubscriptionAPI = {
+  get: async (shopId) =>
+    normalizeNeighborhoodShopSubscriptionResponse(
+      await apiRequest(`/neighborhood_shops/${shopId}/subscription`)
+    ),
+  upsert: async (shopId, payload) =>
+    normalizeNeighborhoodShopSubscriptionResponse(
+      await apiRequest(`/neighborhood_shops/${shopId}/subscription`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      })
+    ),
 };
 
 const normalizeAgent = (item) => {
@@ -1110,6 +1258,85 @@ const normalizeLocalShopTemplateResponse = (response) => {
   return response;
 };
 
+const buildLocalShopProductsQuery = ({
+  page = 1,
+  limit = 10,
+  q,
+  local_shop_id,
+  template_id,
+  region_id,
+  district_id,
+  mfy_id,
+  shop_status,
+  template_status,
+} = {}) => {
+  const sp = new URLSearchParams();
+  sp.set('page', String(Math.max(1, Number(page) || 1)));
+  sp.set('limit', String(Math.min(100, Math.max(1, Number(limit) || 10))));
+  if (q != null && String(q).trim()) sp.set('q', String(q).trim());
+  if (local_shop_id != null && local_shop_id !== '') sp.set('local_shop_id', String(local_shop_id));
+  if (template_id != null && template_id !== '') sp.set('template_id', String(template_id));
+  if (region_id != null && region_id !== '') sp.set('region_id', String(region_id));
+  if (district_id != null && district_id !== '') sp.set('district_id', String(district_id));
+  if (mfy_id != null && mfy_id !== '') sp.set('mfy_id', String(mfy_id));
+  if (shop_status) sp.set('shop_status', shop_status);
+  if (template_status) sp.set('template_status', template_status);
+  return sp.toString();
+};
+
+const normalizeLocalShopProduct = (item) => {
+  if (!item || typeof item !== 'object') return item;
+  return {
+    ...item,
+    id: item.id ?? item._id,
+    local_shop_id: item.local_shop_id ?? item.localShopId,
+    template_id: item.template_id ?? item.templateId,
+    createdAt: item.createdAt ?? item.created_at,
+    updatedAt: item.updatedAt ?? item.updated_at,
+    template: item.template ? normalizeLocalShopProductTemplate(item.template) : item.template,
+    shop: item.shop
+      ? {
+          ...item.shop,
+          id: item.shop.id ?? item.shop._id,
+          region_id: item.shop.region_id ?? item.shop.region?.id,
+          district_id: item.shop.district_id ?? item.shop.district?.id,
+          mfy_id: item.shop.mfy_id ?? item.shop.mfy?.id,
+        }
+      : item.shop,
+    delivery_areas: Array.isArray(item.delivery_areas) ? item.delivery_areas : [],
+  };
+};
+
+const normalizeLocalShopProductResponse = (response) => {
+  if (!response || typeof response !== 'object') return response;
+  if (Array.isArray(response.data)) {
+    return { ...response, data: response.data.map(normalizeLocalShopProduct) };
+  }
+  if (response.data && typeof response.data === 'object') {
+    if (Array.isArray(response.data.items)) {
+      return {
+        ...response,
+        data: {
+          ...response.data,
+          items: response.data.items.map(normalizeLocalShopProduct),
+        },
+      };
+    }
+    return { ...response, data: normalizeLocalShopProduct(response.data) };
+  }
+  return response;
+};
+
+/** Maxalla do'koni mahsulotlari (read-only) — `local_shop_products` */
+export const localShopProductAPI = {
+  getAll: async (params = {}) =>
+    normalizeLocalShopProductResponse(
+      await apiRequest(`/local-shop-products?${buildLocalShopProductsQuery(params)}`)
+    ),
+  getById: async (id) =>
+    normalizeLocalShopProductResponse(await apiRequest(`/local-shop-products/${id}`)),
+};
+
 export const localShopProductTemplateAPI = {
   getAll: async ({ page = 1, limit = 10 } = {}) => {
     const p = Math.max(1, Number(page) || 1);
@@ -1276,16 +1503,118 @@ export const commentTemplateAPI = {
     ),
 };
 
+const extractProductCommentId = (value) => {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'object') {
+    const nested = value.rating_id ?? value.ratingId ?? value.id ?? value._id;
+    return nested != null && typeof nested === 'object' ? extractProductCommentId(nested) : nested;
+  }
+  return value;
+};
+
+const extractProductCommentText = (value) => {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+};
+
+const isProductCommentCasePayload = (value) =>
+  value &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  (value.rating_id != null || value.ratingId != null);
+
+const normalizeProductCommentActivities = (activities) =>
+  (Array.isArray(activities) ? activities : []).map((entry) =>
+    entry && typeof entry === 'object'
+      ? {
+          ...entry,
+          note: extractProductCommentText(entry.note) || extractProductCommentText(entry.message),
+          message: extractProductCommentText(entry.message),
+          createdAt: entry.createdAt ?? entry.created_at,
+        }
+      : entry
+  );
+
+/** GET /product-comments/:id — { comment: { case fields }, activities: [...] } */
+const normalizeProductCommentDetail = (data) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+
+  const casePayload = isProductCommentCasePayload(data.comment)
+    ? data.comment
+    : isProductCommentCasePayload(data.case)
+      ? data.case
+      : isProductCommentCasePayload(data.rating)
+        ? data.rating
+        : isProductCommentCasePayload(data)
+          ? data
+          : null;
+
+  if (!casePayload) return normalizeProductCommentCase(data);
+
+  const activities = data.activities ?? data.activity_log ?? data.activityLog ?? [];
+  const normalized = normalizeProductCommentCase(casePayload);
+  const activityLog = normalizeProductCommentActivities(activities);
+  return { ...normalized, activities: activityLog, activityLog };
+};
+
 const normalizeProductCommentCase = (item) => {
-  if (!item || typeof item !== 'object') return item;
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+
+  const ratingId = extractProductCommentId(item.ratingId ?? item.rating_id ?? item.id ?? item._id);
+  const nestedUser = item.user && typeof item.user === 'object' && !Array.isArray(item.user) ? item.user : null;
+  const user = nestedUser
+    ? nestedUser
+    : {
+        id: item.user_id,
+        phone: item.user_phone,
+        first_name: item.user_first_name,
+        last_name: item.user_last_name,
+        full_name: [item.user_first_name, item.user_last_name].filter(Boolean).join(' ') || undefined,
+        region_id: item.user_region_id,
+      };
+
+  const nestedProduct = item.product && typeof item.product === 'object' && !Array.isArray(item.product) ? item.product : null;
+  const product = nestedProduct || { id: item.product_id, name: item.product_name };
+
+  const nestedContragent =
+    item.contragent && typeof item.contragent === 'object' && !Array.isArray(item.contragent) ? item.contragent : null;
+  const contragent = nestedContragent || { id: item.contragent_id, name: item.contragent_name };
+
+  const rawScore = item.score ?? item.rating_score;
+  const score = typeof rawScore === 'object' ? undefined : rawScore;
+  const commentText = isProductCommentCasePayload(item.comment) ? '' : extractProductCommentText(item.comment);
+
   return {
     ...item,
-    id: item.id ?? item.rating_id ?? item._id,
-    ratingId: item.ratingId ?? item.rating_id ?? item.id,
+    id: ratingId,
+    ratingId,
+    status: item.status ?? item.case_status,
+    caseStatus: item.case_status ?? item.status,
+    score,
+    user,
+    product,
+    contragent,
+    note:
+      extractProductCommentText(item.note) ||
+      extractProductCommentText(item.customer_comment) ||
+      extractProductCommentText(item.template_comment) ||
+      commentText ||
+      '',
+    comment: commentText,
+    template_comment: extractProductCommentText(item.template_comment),
+    product_name: item.product_name ?? product?.name,
+    contragent_name: item.contragent_name ?? contragent?.name ?? contragent?.company_name,
+    user_phone: item.user_phone ?? user?.phone,
+    user_first_name: item.user_first_name ?? user?.first_name,
+    user_last_name: item.user_last_name ?? user?.last_name,
+    escalatedToAdmin: item.escalatedToAdmin ?? item.escalated_to_admin,
     createdAt: item.createdAt ?? item.created_at,
-    updatedAt: item.updatedAt ?? item.updated_at,
+    updatedAt: item.updatedAt ?? item.updated_at ?? item.last_contact_at,
     scanCount: item.scanCount ?? item.scan_count,
-    activityLog: item.activityLog ?? item.activity_log ?? item.activities ?? [],
+    activityLog: normalizeProductCommentActivities(
+      item.activityLog ?? item.activity_log ?? item.activities
+    ),
   };
 };
 
@@ -1303,6 +1632,18 @@ const normalizeProductCommentResponse = (response) => {
           items: response.data.items.map(normalizeProductCommentCase),
         },
       };
+    }
+    if (Array.isArray(response.data.cases)) {
+      return {
+        ...response,
+        data: {
+          ...response.data,
+          items: response.data.cases.map(normalizeProductCommentCase),
+        },
+      };
+    }
+    if (isProductCommentCasePayload(response.data.comment)) {
+      return { ...response, data: normalizeProductCommentDetail(response.data) };
     }
     return { ...response, data: normalizeProductCommentCase(response.data) };
   }

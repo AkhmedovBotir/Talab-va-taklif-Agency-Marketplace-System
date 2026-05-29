@@ -4,14 +4,16 @@ import { Close } from '@mui/icons-material';
 import { productAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import GeoSearchableSelect from '../DistrictContragents/GeoSearchableSelect';
-import { buildProductPayload, descriptionToPlainText, readFileAsDataUrl } from './productFormUtils';
+import { buildProductPayload, DEFAULT_DESCRIPTION_JSON } from './productFormUtils';
+import QuillDescriptionEditor from './QuillDescriptionEditor';
+import ImageUploaderGrid from './ImageUploaderGrid';
 
 const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [], categories = [], subcategories = [] }) => {
   const { showSuccess, showError } = useSnackbar();
   const [form, setForm] = useState({
     contragent_id: '',
     name: '',
-    description_text: '',
+    description: DEFAULT_DESCRIPTION_JSON,
     price: '',
     original_price: '',
     category_id: '',
@@ -22,8 +24,7 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
     status: 'active',
     kpi_bonus_percent: 0,
   });
-  const [remoteImages, setRemoteImages] = useState([]);
-  const [localFiles, setLocalFiles] = useState([]);
+  const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
@@ -39,17 +40,21 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
     (async () => {
       setFetching(true);
       setError('');
-      setLocalFiles([]);
       try {
         const res = await productAPI.getById(productId);
         if (!res.success || cancelled) return;
         const d = res.data || {};
         const imgs = Array.isArray(d.images) ? d.images.filter(Boolean) : [];
-        setRemoteImages(imgs);
+        setImages(imgs);
         setForm({
           contragent_id: String(d.contragent_id ?? d.contragent?.id ?? d.contragent?._id ?? ''),
           name: d.name || '',
-          description_text: descriptionToPlainText(d.description),
+          description:
+            typeof d.description === 'string'
+              ? d.description
+              : d.description
+                ? JSON.stringify(d.description)
+                : DEFAULT_DESCRIPTION_JSON,
           price: d.price != null ? String(d.price) : '',
           original_price: d.original_price != null ? String(d.original_price) : '',
           category_id: String(d.category_id ?? d.category?.id ?? d.category?._id ?? ''),
@@ -75,30 +80,6 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
     };
   }, [open, productId, showError]);
 
-  const totalImages = remoteImages.length + localFiles.length;
-
-  const onPickImages = (e) => {
-    const files = Array.from(e.target.files || []);
-    e.target.value = '';
-    if (!files.length) return;
-    setLocalFiles((prev) => {
-      const next = [...prev];
-      for (const f of files) {
-        if (remoteImages.length + next.length >= 5) break;
-        next.push(f);
-      }
-      return next;
-    });
-  };
-
-  const removeRemote = (idx) => {
-    setRemoteImages((p) => p.filter((_, i) => i !== idx));
-  };
-
-  const removeLocal = (idx) => {
-    setLocalFiles((p) => p.filter((_, i) => i !== idx));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -106,7 +87,7 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
       setError('Kontragent, kategoriya va subkategoriyani tanlang');
       return;
     }
-    if (totalImages < 1 || totalImages > 5) {
+    if (images.length < 1 || images.length > 5) {
       setError('Rasmlar: kamida 1, ko‘pi bilan 5 ta');
       return;
     }
@@ -133,10 +114,6 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
 
     setLoading(true);
     try {
-      const images = [...remoteImages];
-      for (const f of localFiles) {
-        images.push(await readFileAsDataUrl(f));
-      }
       const payload = buildProductPayload(form, images);
       const res = await productAPI.update(productId, payload);
       if (res.success) {
@@ -191,8 +168,13 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
                       <input required value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tavsif (matn)</label>
-                      <textarea rows={3} value={form.description_text} onChange={(e) => setForm((p) => ({ ...p, description_text: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tavsif</label>
+                      <QuillDescriptionEditor
+                        active={open && !fetching}
+                        value={form.description}
+                        onChange={(description) => setForm((p) => ({ ...p, description }))}
+                        resetKey={productId}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Narx *</label>
@@ -258,27 +240,12 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
                       <input type="number" min="0" max="100" step="1" value={form.kpi_bonus_percent} onChange={(e) => setForm((p) => ({ ...p, kpi_bonus_percent: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Rasmlar (1–5) *</label>
-                      <input type="file" accept="image/*" multiple onChange={onPickImages} disabled={totalImages >= 5} className="w-full text-sm text-gray-600" />
-                      <p className="text-xs text-gray-500 mt-1">Jami: {totalImages} / 5 (serverdagi + yangi)</p>
-                      <ul className="mt-2 space-y-1">
-                        {remoteImages.map((src, idx) => (
-                          <li key={`r-${idx}`} className="flex items-center justify-between text-sm bg-gray-50 px-3 py-1.5 rounded gap-2">
-                            <span className="truncate text-gray-600">Rasm {idx + 1} (server)</span>
-                            <button type="button" onClick={() => removeRemote(idx)} className="text-red-600 hover:underline shrink-0">
-                              Olib tashlash
-                            </button>
-                          </li>
-                        ))}
-                        {localFiles.map((f, idx) => (
-                          <li key={`l-${f.name}-${idx}`} className="flex items-center justify-between text-sm bg-indigo-50 px-3 py-1.5 rounded">
-                            <span className="truncate">{f.name}</span>
-                            <button type="button" onClick={() => removeLocal(idx)} className="text-red-600 hover:underline shrink-0">
-                              Olib tashlash
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                      <ImageUploaderGrid
+                        required
+                        images={images}
+                        onChange={setImages}
+                        disabled={loading}
+                      />
                     </div>
                   </div>
 

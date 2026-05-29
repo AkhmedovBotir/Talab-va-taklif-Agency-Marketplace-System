@@ -3,7 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BriefcaseBusiness, ChevronRight, Plus, X } from 'lucide-react';
 import { api } from '../services/api';
 import { ActivityType, PartnerRequest, PartnerRequestPayload, Region, User } from '../types';
-import { digitsOnly, normalizePartnerRequestPayload, sanitizePhoneInput, validatePartnerRequestPayload } from '../lib/partnerRequestForm';
+import {
+  digitsOnly,
+  normalizePartnerRequestPayload,
+  sanitizePhoneInput,
+  validatePartnerRequestPayload,
+  PARTNER_FORM_INPUT_CLASS_PY3,
+} from '../lib/partnerRequestForm';
+import { PARTNER_REQUEST_SUCCESS_MSG, showUserMessage } from '../lib/userMessage';
 
 export function PartnerRequestsPage() {
   const navigate = useNavigate();
@@ -87,15 +94,22 @@ export function PartnerRequestsPage() {
   const submitRequest = async () => {
     const normalized = normalizePartnerRequestPayload(form);
     const validationError = validatePartnerRequestPayload(normalized);
-    if (validationError) return window.alert(validationError);
+    if (validationError) {
+      showUserMessage({ type: 'error', message: validationError });
+      return;
+    }
     setSubmitting(true);
     try {
       await api.partnerRequests.create(normalized);
       const requestList = await api.partnerRequests.list();
       setRequests(requestList);
       setCreateModalOpen(false);
+      showUserMessage({ type: 'success', message: PARTNER_REQUEST_SUCCESS_MSG });
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "So'rov yuborilmadi");
+      showUserMessage({
+        type: 'error',
+        message: e instanceof Error ? e.message : "So'rov yuborilmadi",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -151,10 +165,10 @@ export function PartnerRequestsPage() {
               </button>
             </div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <input value={form.company_name} onChange={(e) => setForm((p) => ({ ...p, company_name: e.target.value }))} placeholder="Kompaniya nomi" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold md:col-span-2" />
-              <input value={form.inn} onChange={(e) => setForm((p) => ({ ...p, inn: digitsOnly(e.target.value, 9) }))} inputMode="numeric" maxLength={9} placeholder="INN (9 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold" />
-              <input value={form.mfo} onChange={(e) => setForm((p) => ({ ...p, mfo: digitsOnly(e.target.value, 5) }))} inputMode="numeric" maxLength={5} placeholder="MFO (5 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold" />
-              <input value={form.account_number} onChange={(e) => setForm((p) => ({ ...p, account_number: digitsOnly(e.target.value, 20) }))} inputMode="numeric" maxLength={20} placeholder="Hisob raqam (20 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold md:col-span-2" />
+              <input value={form.company_name} onChange={(e) => setForm((p) => ({ ...p, company_name: e.target.value }))} placeholder="Kompaniya nomi" className={`${PARTNER_FORM_INPUT_CLASS_PY3} md:col-span-2`} />
+              <input value={form.inn} onChange={(e) => setForm((p) => ({ ...p, inn: digitsOnly(e.target.value, 9) }))} inputMode="numeric" maxLength={9} placeholder="INN (9 raqam)" className={PARTNER_FORM_INPUT_CLASS_PY3} />
+              <input value={form.mfo} onChange={(e) => setForm((p) => ({ ...p, mfo: digitsOnly(e.target.value, 5) }))} inputMode="numeric" maxLength={5} placeholder="MFO (5 raqam)" className={PARTNER_FORM_INPUT_CLASS_PY3} />
+              <input value={form.account_number} onChange={(e) => setForm((p) => ({ ...p, account_number: digitsOnly(e.target.value, 20) }))} inputMode="numeric" maxLength={20} placeholder="Hisob raqam (20 raqam)" className={`${PARTNER_FORM_INPUT_CLASS_PY3} md:col-span-2`} />
               <button onClick={() => setPicker('activity')} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold md:col-span-2">
                 <span>{activityTypes.find((it) => it.id === form.activity_type_id)?.name || 'Faoliyat turi'}</span>
                 <ChevronRight size={16} className="text-slate-400" />
@@ -171,7 +185,7 @@ export function PartnerRequestsPage() {
                 <span>{mfys.find((it) => it.id === form.mfy_id)?.name || 'MFY'}</span>
                 <ChevronRight size={16} className="text-slate-400" />
               </button>
-              <input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: sanitizePhoneInput(e.target.value) }))} inputMode="tel" maxLength={13} placeholder="+998901234567" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold md:col-span-2" />
+              <input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: sanitizePhoneInput(e.target.value) }))} inputMode="tel" maxLength={13} placeholder="+998901234567" className={`${PARTNER_FORM_INPUT_CLASS_PY3} md:col-span-2`} />
             </div>
             <div className="mt-3 flex gap-2">
               <button onClick={() => setCreateModalOpen(false)} className="flex-1 rounded-xl border border-slate-200 bg-white py-3 font-bold text-slate-600">Yopish</button>

@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { adminAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import usePermissions from '../../hooks/usePermissions';
+import ContentStatusPanel from '../../components/common/ContentStatusPanel';
+import { resolvePageError } from '../../utils/apiError';
 import AdminTable from '../../components/Admins/AdminTable';
 import CreateAdminModal from '../../components/Admins/CreateAdminModal';
 import EditAdminModal from '../../components/Admins/EditAdminModal';
@@ -11,9 +14,11 @@ import { Add, Search, Clear } from '@mui/icons-material';
 
 const Admins = () => {
   const { showError } = useSnackbar();
+  const { can } = usePermissions();
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pageError, setPageError] = useState(null);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -35,10 +40,11 @@ const Admins = () => {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
 
-  // Fetch admins
-  const fetchAdmins = async (page = pagination.page, limit = pagination.limit) => {
+  const fetchAdmins = useCallback(async (page = pagination.page, limit = pagination.limit) => {
+    if (!can('adminlar')) return;
     setLoading(true);
     setError('');
+    setPageError(null);
     try {
       const response = await adminAPI.getAllAdmins({ page, limit });
 
@@ -60,17 +66,21 @@ const Admins = () => {
         }));
       }
     } catch (err) {
-      const errorMsg = err.message || 'Adminlarni yuklashda xatolik yuz berdi';
-      setError(errorMsg);
-      showError(errorMsg);
+      const pe = resolvePageError(err);
+      if (pe) setPageError(pe);
+      else {
+        const errorMsg = err.message || 'Adminlarni yuklashda xatolik yuz berdi';
+        setError(errorMsg);
+        showError(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [can, pagination.page, pagination.limit]);
 
   useEffect(() => {
     fetchAdmins();
-  }, [pagination.page, pagination.limit]);
+  }, [fetchAdmins]);
 
   const handleCreateSuccess = () => {
     setCreateModalOpen(false);
@@ -132,6 +142,20 @@ const Admins = () => {
     });
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
+
+  if (!can('adminlar')) {
+    return (
+      <ContentStatusPanel
+        status={403}
+        title="Sahifaga ruxsat yo‘q"
+        message="Adminlar bo‘limi uchun profilingizda «adminlar» ruxsati kerak."
+      />
+    );
+  }
+
+  if (pageError) {
+    return <ContentStatusPanel status={pageError.status} message={pageError.message} />;
+  }
 
   return (
     <div>

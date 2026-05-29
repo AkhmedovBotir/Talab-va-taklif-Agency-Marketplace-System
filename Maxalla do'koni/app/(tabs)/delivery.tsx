@@ -15,8 +15,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppSnackbar, { SnackbarType } from '../../components/AppSnackbar';
+import PhoneInputGroup from '../../components/PhoneInputGroup';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiService, DeliveryProvider } from '../../services/api';
+import {
+  formatUzPhoneDisplay,
+  formatUzPhoneLocal,
+  isValidUzPhoneLocal,
+  parsePhoneToLocalDigits,
+  toFullUzPhone,
+} from '../../utils/phone';
 
 export default function DeliveryScreen() {
   const { token } = useAuth();
@@ -88,13 +96,18 @@ export default function DeliveryScreen() {
       return;
     }
 
+    if (!isValidUzPhoneLocal(phone)) {
+      showSnackbar('Telefon raqami 9 ta raqamdan iborat bo\'lishi kerak (masalan: 90 123 45 67)');
+      return;
+    }
+
     if (!token) return;
     setLoading(true);
     try {
       const response = await apiService.createDeliveryProvider(token, {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        phone: phone.trim(),
+        phone: toFullUzPhone(phone),
         note: note.trim() || undefined,
         password_setup_allowed: true,
       });
@@ -114,6 +127,10 @@ export default function DeliveryScreen() {
 
   const handleUpdate = async () => {
     if (!selectedProvider || !firstName.trim() || !lastName.trim() || !phone.trim()) return;
+    if (!isValidUzPhoneLocal(phone)) {
+      showSnackbar('Telefon raqami 9 ta raqamdan iborat bo\'lishi kerak (masalan: 90 123 45 67)');
+      return;
+    }
     if (!token) return;
 
     setLoading(true);
@@ -125,7 +142,7 @@ export default function DeliveryScreen() {
         {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          phone: phone.trim(),
+          phone: toFullUzPhone(phone),
           note: note.trim() || undefined,
           password_setup_allowed: true,
         }
@@ -173,7 +190,7 @@ export default function DeliveryScreen() {
     setSelectedProvider(provider);
     setFirstName(provider.first_name || '');
     setLastName(provider.last_name || '');
-    setPhone(provider.phone);
+    setPhone(formatUzPhoneLocal(parsePhoneToLocalDigits(provider.phone)));
     setNote(provider.note || provider.notes || '');
     setShowEditModal(true);
   };
@@ -191,7 +208,7 @@ export default function DeliveryScreen() {
       <View style={styles.providerHeader}>
         <View style={styles.providerInfo}>
           <Text style={styles.providerName}>{item.name}</Text>
-          <Text style={styles.providerPhone}>{item.phone}</Text>
+          <Text style={styles.providerPhone}>{formatUzPhoneDisplay(item.phone)}</Text>
           {(item.note || item.notes) && <Text style={styles.providerNotes}>{item.note || item.notes}</Text>}
         </View>
         <View style={[styles.statusBadge, item.status !== 'inactive' && styles.statusActive]}>
@@ -318,12 +335,9 @@ export default function DeliveryScreen() {
 
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Telefon (majburiy)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="+998901234567"
+                <PhoneInputGroup
                   value={phone}
                   onChangeText={setPhone}
-                  keyboardType="phone-pad"
                   editable={!loading}
                 />
               </View>
@@ -407,12 +421,9 @@ export default function DeliveryScreen() {
 
               <View style={styles.inputContainer}>
                 <Text style={styles.label}>Telefon (majburiy)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="+998901234567"
+                <PhoneInputGroup
                   value={phone}
                   onChangeText={setPhone}
-                  keyboardType="phone-pad"
                   editable={!loading}
                 />
               </View>

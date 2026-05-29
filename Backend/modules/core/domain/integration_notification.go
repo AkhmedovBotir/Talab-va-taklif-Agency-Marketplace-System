@@ -24,13 +24,14 @@ const (
 )
 
 type IntegrationNotification struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
-	Title      string    `gorm:"size:255;not null" json:"title"`
-	Message    string    `gorm:"type:text;not null" json:"message"`
-	Type       string    `gorm:"size:24;not null;index" json:"type"`
-	TargetType string    `gorm:"size:32;not null;index" json:"target_type"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID                 uint      `gorm:"primaryKey" json:"id"`
+	Title              string    `gorm:"size:255;not null" json:"title"`
+	Message            string    `gorm:"type:text;not null" json:"message"`
+	Type               string    `gorm:"size:24;not null;index" json:"type"`
+	TargetType         string    `gorm:"size:32;not null;index" json:"target_type"`
+	NeighborhoodShopID *uint     `gorm:"index" json:"neighborhood_shop_id,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 func (IntegrationNotification) TableName() string {

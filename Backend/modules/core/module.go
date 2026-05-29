@@ -14,7 +14,7 @@ import (
 // RegisterRoutes — integratsiya: ochiq login + admin kalitlar CRUD.
 // jwtSecret — JWT imzo va integratsiya kalitini AES-GCM da saqlash uchun.
 // jwtExpireHours — integratsiya JWT muddati (admin JWT bilan bir xil sozlamadan).
-func RegisterRoutes(api *gin.RouterGroup, db *gorm.DB, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc, jwtSecret string, jwtExpireHours int) error {
+func RegisterRoutes(api *gin.RouterGroup, db *gorm.DB, auth gin.HandlerFunc, jwtSecret string, jwtExpireHours int) error {
 	if err := db.AutoMigrate(&domain.IntegrationAPIKey{}, &domain.IntegrationKPIAllocation{}, &domain.IntegrationKPIPayout{}, &domain.IntegrationKPIPayoutTarget{}, &domain.IntegrationContragentBanner{}, &domain.IntegrationNotification{}); err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func RegisterRoutes(api *gin.RouterGroup, db *gorm.DB, auth gin.HandlerFunc, onl
 	notificationH.RegisterRoutes(notifGrp)
 
 	keyH := handler.NewIntegrationAPIKeyHandler(svc)
-	keyH.RegisterRoutes(api, auth, onlyGeneral)
+	keyH.RegisterRoutes(api, auth)
 	return nil
 }
 

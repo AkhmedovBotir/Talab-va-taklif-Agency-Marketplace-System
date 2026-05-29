@@ -99,7 +99,12 @@ func (h *LocalShopNotificationHandler) MarkAllRead(c *gin.Context) {
 }
 
 func (h *LocalShopNotificationHandler) Socket(c *gin.Context) {
-	h.hub.HandleWSForTarget(c, "localshops")
+	shopID, ok := localShopIDFromContext(c)
+	if !ok {
+		response.JSON(c, http.StatusUnauthorized, "Mahalla do'kon topilmadi", nil, nil)
+		return
+	}
+	h.hub.HandleWSForLocalShop(c, shopID)
 }
 
 func localShopIDFromContext(c *gin.Context) (uint, bool) {

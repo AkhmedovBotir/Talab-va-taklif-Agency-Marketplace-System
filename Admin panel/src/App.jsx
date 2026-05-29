@@ -23,11 +23,13 @@ import NeighborhoodProducts from './pages/Warehouse/NeighborhoodProducts';
 import MarketplaceUsers from './pages/Marketplace/MarketplaceUsers';
 import OrderPipelineMonitor from './pages/Orders/OrderPipelineMonitor';
 import TransactionsByArea from './pages/Statistics/TransactionsByArea';
-import GeneralAdminRoute from './components/GeneralAdminRoute';
+import PermissionRoute from './components/Permissions/PermissionRoute';
 import IntegrationApiKeys from './pages/Integration/IntegrationApiKeys';
 import CommentaryPage from './pages/Commentary/CommentaryPage';
 import ArchivePage from './pages/Archive/ArchivePage';
 import QRSystemPage from './pages/QR/QRSystemPage';
+import NeighborhoodShopSubscriptionsPage from './pages/NeighborhoodShops/NeighborhoodShopSubscriptionsPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
   return (
@@ -46,54 +48,211 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Dashboard />} />
-              <Route path="admins" element={<Admins />} />
-              <Route path="regions" element={<Regions />} />
-              <Route path="agents" element={<Agents />} />
-              <Route path="managers" element={<Managers />} />
-              <Route path="punkts" element={<Punkts />} />
-              <Route path="warehouse" element={<WarehouseLayout />}>
+              <Route
+                index
+                element={
+                  <PermissionRoute permission="dashboard">
+                    <Dashboard />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="admins"
+                element={
+                  <PermissionRoute permission="adminlar">
+                    <Admins />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="regions"
+                element={
+                  <PermissionRoute permission="hududlar">
+                    <Regions />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="agents"
+                element={
+                  <PermissionRoute permission="agentlar">
+                    <Agents />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="managers"
+                element={
+                  <PermissionRoute permission="menejerlar">
+                    <Managers />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="punkts"
+                element={
+                  <PermissionRoute permission="punktlar">
+                    <Punkts />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="warehouse"
+                element={
+                  <PermissionRoute
+                    anyOf={[
+                      'kategoriyalar',
+                      'mahsulotlar',
+                      'maxalla maxsulotlari shablonlari',
+                      'maxalla maxsulotlari',
+                    ]}
+                  >
+                    <WarehouseLayout />
+                  </PermissionRoute>
+                }
+              >
                 <Route index element={<Navigate to="categories" replace />} />
-                <Route path="categories" element={<Categories hideHeader />} />
-                <Route path="products" element={<WarehouseProducts />} />
-                <Route path="neighborhood-products" element={<NeighborhoodProducts />} />
+                <Route
+                  path="categories"
+                  element={
+                    <PermissionRoute permission="kategoriyalar">
+                      <Categories hideHeader />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="products"
+                  element={
+                    <PermissionRoute permission="mahsulotlar">
+                      <WarehouseProducts />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="neighborhood-products"
+                  element={
+                    <PermissionRoute
+                      anyOf={['maxalla maxsulotlari shablonlari', 'maxalla maxsulotlari']}
+                    >
+                      <NeighborhoodProducts />
+                    </PermissionRoute>
+                  }
+                />
               </Route>
-              <Route path="marketplace-users" element={<MarketplaceUsers />} />
-              <Route path="commentary" element={<CommentaryPage />} />
+              <Route
+                path="marketplace-users"
+                element={
+                  <PermissionRoute permission="marketplace foydalanuvchilari">
+                    <MarketplaceUsers />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="commentary"
+                element={
+                  <PermissionRoute anyOf={['kommentariya shablonlari', 'kommentariyalar']}>
+                    <CommentaryPage />
+                  </PermissionRoute>
+                }
+              />
               <Route
                 path="qr-system"
                 element={
-                  <GeneralAdminRoute>
+                  <PermissionRoute permission="qr tizimi">
                     <QRSystemPage />
-                  </GeneralAdminRoute>
+                  </PermissionRoute>
                 }
               />
               <Route
                 path="archive"
                 element={
-                  <GeneralAdminRoute>
+                  <PermissionRoute permission="arxiv">
                     <ArchivePage />
-                  </GeneralAdminRoute>
+                  </PermissionRoute>
                 }
               />
-              <Route path="order-pipeline-monitor" element={<OrderPipelineMonitor />} />
-              <Route path="statistics/transactions-by-area" element={<TransactionsByArea />} />
+              <Route
+                path="order-pipeline-monitor"
+                element={
+                  <PermissionRoute anyOf={['buyurtmalar monitoringgi', 'barcha buyurtmalar']}>
+                    <OrderPipelineMonitor />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="statistics/transactions-by-area"
+                element={
+                  <PermissionRoute permission="trankzasiyalar">
+                    <TransactionsByArea />
+                  </PermissionRoute>
+                }
+              />
               <Route
                 path="integration-api-keys"
                 element={
-                  <GeneralAdminRoute>
+                  <PermissionRoute permission="integratsiya kalitlari">
                     <IntegrationApiKeys />
-                  </GeneralAdminRoute>
+                  </PermissionRoute>
                 }
               />
-              <Route path="contragents" element={<ContragentsLayout />}>
+              <Route
+                path="neighborhood-shop-subscriptions"
+                element={
+                  <PermissionRoute permission="do'kon obunasi">
+                    <NeighborhoodShopSubscriptionsPage />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="contragents"
+                element={
+                  <PermissionRoute
+                    anyOf={[
+                      'kontragent turlari',
+                      'kontragentlar',
+                      "maxalla do'konlari",
+                      "hamkorlik so'rovi",
+                    ]}
+                  >
+                    <ContragentsLayout />
+                  </PermissionRoute>
+                }
+              >
                 <Route index element={<Navigate to="types" replace />} />
-                <Route path="types" element={<ContragentTypes />} />
-                <Route path="tuman" element={<DistrictContragents />} />
-                <Route path="maxalla-dokonlar" element={<NeighborhoodShops />} />
-                <Route path="hamkorlik-sorovlari" element={<PartnerRequests />} />
+                <Route
+                  path="types"
+                  element={
+                    <PermissionRoute permission="kontragent turlari">
+                      <ContragentTypes />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="tuman"
+                  element={
+                    <PermissionRoute permission="kontragentlar">
+                      <DistrictContragents />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="maxalla-dokonlar"
+                  element={
+                    <PermissionRoute permission="maxalla do'konlari">
+                      <NeighborhoodShops />
+                    </PermissionRoute>
+                  }
+                />
+                <Route
+                  path="hamkorlik-sorovlari"
+                  element={
+                    <PermissionRoute permission="hamkorlik so'rovi">
+                      <PartnerRequests />
+                    </PermissionRoute>
+                  }
+                />
               </Route>
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />

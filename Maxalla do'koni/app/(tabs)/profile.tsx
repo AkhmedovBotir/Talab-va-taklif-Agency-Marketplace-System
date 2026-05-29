@@ -15,8 +15,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppSnackbar, { SnackbarType } from '../../components/AppSnackbar';
+import ServicePeriodCard from '../../components/ServicePeriodCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationsContext';
+import { useServiceAccess } from '../../contexts/ServiceAccessContext';
 import { apiService, ServiceAreaMfy, WorkingHourDay } from '../../services/api';
 
 const DateTimePicker = Platform.OS !== 'web'
@@ -26,6 +28,7 @@ const DateTimePicker = Platform.OS !== 'web'
 export default function ProfileScreen() {
   const { user, token, refreshUser, logout } = useAuth();
   const { unreadCount } = useNotifications();
+  const { refreshServiceAccess } = useServiceAccess();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -233,7 +236,7 @@ export default function ProfileScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshUser();
+      await Promise.all([refreshUser(), refreshServiceAccess()]);
     } finally {
       setRefreshing(false);
     }
@@ -342,6 +345,8 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        <ServicePeriodCard />
 
         {/* Ish Vaqti Card */}
         <View style={styles.card}>

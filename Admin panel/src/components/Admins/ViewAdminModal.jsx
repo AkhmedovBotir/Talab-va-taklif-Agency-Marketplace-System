@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
 import { adminAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { PERMISSION_LABELS } from '../../utils/permissions';
 
 const ViewAdminModal = ({ open, onClose, admin }) => {
   const { showError } = useSnackbar();
@@ -149,6 +150,24 @@ const ViewAdminModal = ({ open, onClose, admin }) => {
                             {adminData.status === 'active' ? 'Faol' : 'Nofaol'}
                           </span>
                         </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Ruxsatlar</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {(Array.isArray(adminData.permissions) ? adminData.permissions : []).length === 0 ? (
+                          <span className="text-sm text-gray-500">Ruxsatlar belgilanmagan</span>
+                        ) : (
+                          adminData.permissions.map((key) => (
+                            <span
+                              key={key}
+                              className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-800 border border-gray-200"
+                            >
+                              {PERMISSION_LABELS[key] || key}
+                            </span>
+                          ))
+                        )}
                       </div>
                     </div>
 

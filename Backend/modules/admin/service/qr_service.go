@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 
 	"backend/modules/admin/domain"
@@ -44,11 +43,16 @@ type QRService interface {
 }
 
 type qrService struct {
-	repo repository.QRRepository
+	repo    repository.QRRepository
+	baseURL string
 }
 
-func NewQRService(repo repository.QRRepository) QRService {
-	return &qrService{repo: repo}
+func NewQRService(repo repository.QRRepository, appBaseURL string) QRService {
+	baseURL := strings.TrimSpace(appBaseURL)
+	if baseURL == "" {
+		baseURL = "http://localhost:8081"
+	}
+	return &qrService{repo: repo, baseURL: strings.TrimRight(baseURL, "/")}
 }
 
 func (s *qrService) Create(input QRInput) (*domain.QR, error) {
@@ -64,7 +68,7 @@ func (s *qrService) Create(input QRInput) (*domain.QR, error) {
 	if err != nil {
 		return nil, err
 	}
-	scanURL := fmt.Sprintf("%s/api/v1/qr/%s/scan", strings.TrimRight(baseURL(), "/"), code)
+	scanURL := fmt.Sprintf("%s/api/v1/qr/%s/scan", s.baseURL, code)
 	pngBytes, err := qrcode.Encode(scanURL, qrcode.Medium, 1000)
 	if err != nil {
 		return nil, err
@@ -193,14 +197,6 @@ func generateCode() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
-}
-
-func baseURL() string {
-	v := strings.TrimSpace(os.Getenv("APP_BASE_URL"))
-	if v == "" {
-		return "http://localhost:8081"
-	}
-	return v
 }
 
 func (i *QRInput) normalize() {

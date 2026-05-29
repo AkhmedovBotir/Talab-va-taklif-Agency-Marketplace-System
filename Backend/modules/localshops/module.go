@@ -1,11 +1,13 @@
 package localshops
 
 import (
+	adminRepo "backend/modules/admin/repository"
+	adminService "backend/modules/admin/service"
+	"backend/modules/eskiz"
 	"backend/modules/localshops/domain"
 	"backend/modules/localshops/handler"
 	"backend/modules/localshops/repository"
 	"backend/modules/localshops/service"
-	"backend/modules/eskiz"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -45,10 +47,16 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 	lsNotifSvc := service.NewLocalShopNotificationService(lsNotifRepo)
 	lsNotifHandler := handler.NewLocalShopNotificationHandler(lsNotifSvc)
 
+	billingRepo := adminRepo.NewNeighborhoodShopBillingRepository(db)
+	billingSvc := adminService.NewNeighborhoodShopBillingService(billingRepo)
+	serviceAccessHandler := handler.NewServiceAccessHandler(billingSvc)
+
 	api := router.Group("/api/v1")
 	authHandler.RegisterPublicAuthRoutes(api)
 	me := api.Group("/local-shops/me")
 	me.Use(authHandler.AuthMiddleware())
+	serviceAccessHandler.RegisterRoutes(me)
+	me.Use(serviceAccessHandler.ServiceAccessMiddleware())
 	authHandler.RegisterMeRoutes(me)
 	courierHandler.RegisterMeRoutes(me)
 	templateHandler.RegisterMeRoutes(me)

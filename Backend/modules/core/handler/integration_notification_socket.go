@@ -18,8 +18,9 @@ type notificationSocketMessage struct {
 }
 
 type notificationSocketClient struct {
-	conn   *websocket.Conn
-	target string
+	conn         *websocket.Conn
+	target       string
+	localShopID  *uint
 }
 
 type IntegrationNotificationSocketHub struct {
@@ -55,7 +56,7 @@ func (h *IntegrationNotificationSocketHub) HandleWS(c *gin.Context) {
 	}
 
 	target := normalizeSocketTarget(c.Query("target_type"))
-	h.handleWSWithConn(conn, target)
+	h.handleWSWithConn(conn, target, nil)
 }
 
 func (h *IntegrationNotificationSocketHub) HandleWSForTarget(c *gin.Context, target string) {
@@ -63,13 +64,24 @@ func (h *IntegrationNotificationSocketHub) HandleWSForTarget(c *gin.Context, tar
 	if err != nil {
 		return
 	}
-	h.handleWSWithConn(conn, normalizeSocketTarget(target))
+	h.handleWSWithConn(conn, normalizeSocketTarget(target), nil)
 }
 
-func (h *IntegrationNotificationSocketHub) handleWSWithConn(conn *websocket.Conn, target string) {
+// HandleWSForLocalShop — mahalla do'koni WS; faqat shu do'konga yuborilgan xabarlar yetadi.
+func (h *IntegrationNotificationSocketHub) HandleWSForLocalShop(c *gin.Context, localShopID uint) {
+	conn, err := notificationUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	id := localShopID
+	h.handleWSWithConn(conn, domain.NotificationTargetLocalShops, &id)
+}
+
+func (h *IntegrationNotificationSocketHub) handleWSWithConn(conn *websocket.Conn, target string, localShopID *uint) {
 	client := &notificationSocketClient{
-		conn:   conn,
-		target: target,
+		conn:        conn,
+		target:      target,
+		localShopID: localShopID,
 	}
 	h.addClient(client)
 	defer h.removeClient(client)
@@ -122,13 +134,26 @@ func (h *IntegrationNotificationSocketHub) BroadcastCreated(n *domain.Integratio
 	h.mu.RUnlock()
 
 	for _, cl := range clients {
-		if !shouldSendToTarget(cl.target, n.TargetType) {
+		if !shouldSendNotificationToClient(cl, n) {
 			continue
 		}
 		if err := cl.conn.WriteJSON(msg); err != nil {
 			h.removeClient(cl)
 		}
 	}
+}
+
+func shouldSendNotificationToClient(cl *notificationSocketClient, n *domain.IntegrationNotification) bool {
+	if !shouldSendToTarget(cl.target, n.TargetType) {
+		return false
+	}
+	if n.NeighborhoodShopID == nil {
+		return true
+	}
+	if cl.localShopID == nil {
+		return false
+	}
+	return *cl.localShopID == *n.NeighborhoodShopID
 }
 
 func (h *IntegrationNotificationSocketHub) addClient(c *notificationSocketClient) {

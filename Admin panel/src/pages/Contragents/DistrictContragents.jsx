@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Clear } from '@mui/icons-material';
-import { regionAPI, districtAPI, mfyAPI, contragentAPI, contragentTypeAPI } from '../../services/api';
+import { contragentAPI, contragentTypeAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import useGeoCatalog from '../../hooks/useGeoCatalog';
+import ContentStatusPanel from '../../components/common/ContentStatusPanel';
+import { resolvePageError } from '../../utils/apiError';
 import DistrictContragentTable from '../../components/DistrictContragents/DistrictContragentTable';
 import CreateDistrictContragentModal from '../../components/DistrictContragents/CreateDistrictContragentModal';
 import EditDistrictContragentModal from '../../components/DistrictContragents/EditDistrictContragentModal';
@@ -14,13 +17,11 @@ const DistrictContragents = () => {
   const { showError } = useSnackbar();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [regions, setRegions] = useState([]);
-  const [districts, setDistricts] = useState([]);
-  const [mfys, setMfys] = useState([]);
+  const { regions, districts, mfys, geoLoading, geoEnabled } = useGeoCatalog();
   const [contragentTypes, setContragentTypes] = useState([]);
-  const [geoLoading, setGeoLoading] = useState(false);
 
   const [items, setItems] = useState([]);
+  const [pageError, setPageError] = useState(null);
   const [listLoading, setListLoading] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -44,18 +45,9 @@ const DistrictContragents = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
-  const fetchGeo = useCallback(async () => {
-    setGeoLoading(true);
+  const fetchTypes = useCallback(async () => {
     try {
-      const [r, d, m, t] = await Promise.all([
-        regionAPI.getAllRegions(),
-        districtAPI.getAllDistricts(),
-        mfyAPI.getAllMFYs(),
-        contragentTypeAPI.getAllTypes({ page: 1, limit: 500 }),
-      ]);
-      if (r.success) setRegions(r.data || []);
-      if (d.success) setDistricts(d.data || []);
-      if (m.success) setMfys(m.data || []);
+      const t = await contragentTypeAPI.getAllTypes({ page: 1, limit: 500 });
       if (t.success) {
         const payload = t.data || {};
         const typeList = Array.isArray(payload.items)
@@ -65,17 +57,16 @@ const DistrictContragents = () => {
             : [];
         setContragentTypes(typeList);
       }
-    } catch (e) {
-      showError(e.message || 'Region maʼlumotlari yuklanmadi');
-    } finally {
-      setGeoLoading(false);
+    } catch {
+      setContragentTypes([]);
     }
-  }, [showError]);
+  }, []);
 
   const fetchList = useCallback(async () => {
     const page = pagination.page;
     const limit = pagination.limit;
     setListLoading(true);
+    setPageError(null);
     try {
       const res = await contragentAPI.getAll({ page, limit });
       if (res.success) {
@@ -97,15 +88,17 @@ const DistrictContragents = () => {
         }));
       }
     } catch (e) {
-      showError(e.message || 'Ro‘yxatni yuklashda xatolik');
+      const pe = resolvePageError(e);
+      if (pe) setPageError(pe);
+      else showError(e.message || 'Ro‘yxatni yuklashda xatolik');
     } finally {
       setListLoading(false);
     }
-  }, [pagination.page, pagination.limit, showError]);
+  }, [pagination.page, pagination.limit]);
 
   useEffect(() => {
-    fetchGeo();
-  }, [fetchGeo]);
+    fetchTypes();
+  }, [fetchTypes]);
 
   useEffect(() => {
     fetchList();
@@ -183,6 +176,10 @@ const DistrictContragents = () => {
     setDeleteOpen(true);
   };
 
+  if (pageError) {
+    return <ContentStatusPanel status={pageError.status} message={pageError.message} />;
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -229,24 +226,26 @@ const DistrictContragents = () => {
               <option value="100">100 ta</option>
             </select>
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Hudud bo‘yicha (joriy sahifa)</p>
-            <GeoCascadeSearchableFields
-              required={false}
-              allowClear
-              geoLoading={geoLoading}
-              regions={regions}
-              districts={districts}
-              mfys={mfys}
-              values={{
-                region_id: filters.region_id,
-                district_id: filters.district_id,
-                mfy_id: filters.mfy_id,
-              }}
-              onChange={setGeoFilter}
-              disabled={false}
-            />
-          </div>
+          {geoEnabled && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Hudud bo‘yicha (joriy sahifa)</p>
+              <GeoCascadeSearchableFields
+                required={false}
+                allowClear
+                geoLoading={geoLoading}
+                regions={regions}
+                districts={districts}
+                mfys={mfys}
+                values={{
+                  region_id: filters.region_id,
+                  district_id: filters.district_id,
+                  mfy_id: filters.mfy_id,
+                }}
+                onChange={setGeoFilter}
+                disabled={false}
+              />
+            </div>
+          )}
         </div>
       </div>
 

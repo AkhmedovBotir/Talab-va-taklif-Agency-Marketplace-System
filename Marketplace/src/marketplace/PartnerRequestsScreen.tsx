@@ -1,10 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ArrowLeft, BriefcaseBusiness, ChevronRight, Plus, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { api } from '../services/api';
 import { ActivityType, PartnerRequest, PartnerRequestPayload, Region, User } from '../types';
-import { digitsOnly, normalizePartnerRequestPayload, sanitizePhoneInput, validatePartnerRequestPayload } from '../lib/partnerRequestForm';
+import {
+  digitsOnly,
+  normalizePartnerRequestPayload,
+  sanitizePhoneInput,
+  validatePartnerRequestPayload,
+  PARTNER_FORM_PLACEHOLDER_COLOR,
+  PARTNER_FORM_TEXT_INPUT_CLASS,
+} from '../lib/partnerRequestForm';
+import { PARTNER_REQUEST_SUCCESS_MSG, showUserMessage } from '../lib/userMessage';
 
 export function PartnerRequestsScreen() {
   const [loading, setLoading] = useState(true);
@@ -89,15 +97,22 @@ export function PartnerRequestsScreen() {
   const submitRequest = async () => {
     const normalized = normalizePartnerRequestPayload(form);
     const validationError = validatePartnerRequestPayload(normalized);
-    if (validationError) return Alert.alert('Xatolik', validationError);
+    if (validationError) {
+      showUserMessage({ type: 'error', message: validationError });
+      return;
+    }
     setSubmitting(true);
     try {
       await api.partnerRequests.create(normalized);
       const requestList = await api.partnerRequests.list();
       setRequests(requestList);
       setCreateModalOpen(false);
+      showUserMessage({ type: 'success', message: PARTNER_REQUEST_SUCCESS_MSG });
     } catch (e) {
-      Alert.alert('Xatolik', e instanceof Error ? e.message : "So'rov yuborilmadi");
+      showUserMessage({
+        type: 'error',
+        message: e instanceof Error ? e.message : "So'rov yuborilmadi",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -173,10 +188,10 @@ export function PartnerRequestsScreen() {
             </View>
             <ScrollView>
               <View className="gap-2">
-                <TextInput value={form.company_name} onChangeText={(v) => setForm((p) => ({ ...p, company_name: v }))} placeholder="Kompaniya nomi" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
-                <TextInput value={form.inn} onChangeText={(v) => setForm((p) => ({ ...p, inn: digitsOnly(v, 9) }))} keyboardType="number-pad" maxLength={9} placeholder="INN (9 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
-                <TextInput value={form.mfo} onChangeText={(v) => setForm((p) => ({ ...p, mfo: digitsOnly(v, 5) }))} keyboardType="number-pad" maxLength={5} placeholder="MFO (5 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
-                <TextInput value={form.account_number} onChangeText={(v) => setForm((p) => ({ ...p, account_number: digitsOnly(v, 20) }))} keyboardType="number-pad" maxLength={20} placeholder="Hisob raqam (20 raqam)" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
+                <TextInput value={form.company_name} onChangeText={(v) => setForm((p) => ({ ...p, company_name: v }))} placeholder="Kompaniya nomi" placeholderTextColor={PARTNER_FORM_PLACEHOLDER_COLOR} className={PARTNER_FORM_TEXT_INPUT_CLASS} />
+                <TextInput value={form.inn} onChangeText={(v) => setForm((p) => ({ ...p, inn: digitsOnly(v, 9) }))} keyboardType="number-pad" maxLength={9} placeholder="INN (9 raqam)" placeholderTextColor={PARTNER_FORM_PLACEHOLDER_COLOR} className={PARTNER_FORM_TEXT_INPUT_CLASS} />
+                <TextInput value={form.mfo} onChangeText={(v) => setForm((p) => ({ ...p, mfo: digitsOnly(v, 5) }))} keyboardType="number-pad" maxLength={5} placeholder="MFO (5 raqam)" placeholderTextColor={PARTNER_FORM_PLACEHOLDER_COLOR} className={PARTNER_FORM_TEXT_INPUT_CLASS} />
+                <TextInput value={form.account_number} onChangeText={(v) => setForm((p) => ({ ...p, account_number: digitsOnly(v, 20) }))} keyboardType="number-pad" maxLength={20} placeholder="Hisob raqam (20 raqam)" placeholderTextColor={PARTNER_FORM_PLACEHOLDER_COLOR} className={PARTNER_FORM_TEXT_INPUT_CLASS} />
 
                 <Text className="mt-1 text-xs font-black uppercase tracking-widest text-slate-500">Faoliyat turi</Text>
                 <Pressable onPress={() => setPicker('activity')} className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
@@ -198,7 +213,7 @@ export function PartnerRequestsScreen() {
                   <ChevronRight size={16} color="#94a3b8" />
                 </Pressable>
 
-                <TextInput value={form.phone} onChangeText={(v) => setForm((p) => ({ ...p, phone: sanitizePhoneInput(v) }))} keyboardType="phone-pad" maxLength={13} placeholder="+998901234567" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 font-semibold text-slate-800" />
+                <TextInput value={form.phone} onChangeText={(v) => setForm((p) => ({ ...p, phone: sanitizePhoneInput(v) }))} keyboardType="phone-pad" maxLength={13} placeholder="+998901234567" placeholderTextColor={PARTNER_FORM_PLACEHOLDER_COLOR} className={PARTNER_FORM_TEXT_INPUT_CLASS} />
               </View>
             </ScrollView>
             <View className="mt-3 flex-row gap-2">

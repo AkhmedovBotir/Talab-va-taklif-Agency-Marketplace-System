@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/base64"
 	"errors"
 	"strings"
 	"time"
@@ -22,6 +21,7 @@ var (
 	ErrLocalShopTemplateUnitSizeRequired    = errors.New("unit_size majburiy")
 	ErrLocalShopTemplateImagesInvalid       = errors.New("images 1 tadan 5 tagacha bo'lishi kerak")
 	ErrLocalShopTemplateImageBase64Invalid  = errors.New("image base64 formati noto'g'ri")
+	ErrLocalShopTemplateImageTooLarge       = errors.New("image base64 hajmi 100 GB dan oshmasligi kerak")
 	ErrLocalShopTemplateStatusInvalid       = errors.New("status noto'g'ri")
 )
 
@@ -233,7 +233,10 @@ func (s *localShopProductTemplateService) validateInput(input LocalShopProductTe
 		return ErrLocalShopTemplateImagesInvalid
 	}
 	for _, img := range input.Images {
-		if !isValidLocalShopTemplateImage(img) {
+		switch validateImageBase64(img) {
+		case imageBase64TooLarge:
+			return ErrLocalShopTemplateImageTooLarge
+		case imageBase64Invalid:
 			return ErrLocalShopTemplateImageBase64Invalid
 		}
 	}
@@ -283,22 +286,6 @@ func normalizeLocalShopTemplateStatus(status string) (string, error) {
 		return "", ErrLocalShopTemplateStatusInvalid
 	}
 	return status, nil
-}
-
-func isValidLocalShopTemplateImage(raw string) bool {
-	payload := strings.TrimSpace(raw)
-	if strings.HasPrefix(payload, "data:") {
-		parts := strings.SplitN(payload, ",", 2)
-		if len(parts) != 2 {
-			return false
-		}
-		payload = parts[1]
-	}
-	if payload == "" {
-		return false
-	}
-	_, err := base64.StdEncoding.DecodeString(payload)
-	return err == nil
 }
 
 func (i *LocalShopProductTemplateInput) normalize() {

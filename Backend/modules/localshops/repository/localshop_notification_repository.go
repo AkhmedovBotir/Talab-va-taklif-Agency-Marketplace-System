@@ -16,7 +16,7 @@ type LocalShopNotificationListRow struct {
 type LocalShopNotificationRepository interface {
 	List(page, limit int, localShopID uint) ([]LocalShopNotificationListRow, int64, error)
 	CountUnread(localShopID uint) (int64, error)
-	GetVisibleByID(id uint) (*coreDomain.IntegrationNotification, error)
+	GetVisibleByID(id, localShopID uint) (*coreDomain.IntegrationNotification, error)
 	MarkRead(localShopID, notificationID uint) error
 	MarkAllRead(localShopID uint) error
 }
@@ -32,13 +32,13 @@ func NewLocalShopNotificationRepository(db *gorm.DB) LocalShopNotificationReposi
 func (r *localShopNotificationPostgresRepository) List(page, limit int, localShopID uint) ([]LocalShopNotificationListRow, int64, error) {
 	offset := (page - 1) * limit
 	var total int64
-	if err := r.visibleBaseQuery(r.db.Model(&coreDomain.IntegrationNotification{})).Count(&total).Error; err != nil {
+	if err := r.visibleBaseQuery(r.db.Model(&coreDomain.IntegrationNotification{}), localShopID).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var rows []LocalShopNotificationListRow
-	err := r.visibleBaseQuery(r.db.Table("integration_notifications AS n")).
-		Select("n.id, n.title, n.message, n.type, n.target_type, n.created_at, n.updated_at, r.read_at").
+	err := r.visibleBaseQuery(r.db.Table("integration_notifications AS n"), localShopID).
+		Select("n.id, n.title, n.message, n.type, n.target_type, n.neighborhood_shop_id, n.created_at, n.updated_at, r.read_at").
 		Joins("LEFT JOIN local_shop_notification_reads r ON r.notification_id = n.id AND r.local_shop_id = ?", localShopID).
 		Order("n.id DESC").
 		Offset(offset).
@@ -53,16 +53,16 @@ func (r *localShopNotificationPostgresRepository) List(page, limit int, localSho
 
 func (r *localShopNotificationPostgresRepository) CountUnread(localShopID uint) (int64, error) {
 	var n int64
-	err := r.visibleBaseQuery(r.db.Table("integration_notifications AS n")).
+	err := r.visibleBaseQuery(r.db.Table("integration_notifications AS n"), localShopID).
 		Joins("LEFT JOIN local_shop_notification_reads r ON r.notification_id = n.id AND r.local_shop_id = ?", localShopID).
 		Where("r.id IS NULL").
 		Count(&n).Error
 	return n, err
 }
 
-func (r *localShopNotificationPostgresRepository) GetVisibleByID(id uint) (*coreDomain.IntegrationNotification, error) {
+func (r *localShopNotificationPostgresRepository) GetVisibleByID(id, localShopID uint) (*coreDomain.IntegrationNotification, error) {
 	var row coreDomain.IntegrationNotification
-	err := r.visibleBaseQuery(r.db).Where("id = ?", id).First(&row).Error
+	err := r.visibleBaseQuery(r.db, localShopID).Where("id = ?", id).First(&row).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
@@ -92,14 +92,15 @@ func (r *localShopNotificationPostgresRepository) MarkAllRead(localShopID uint) 
 		SELECT ?, n.id, ?, NOW(), NOW()
 		FROM integration_notifications n
 		WHERE n.target_type IN (?, ?)
+		  AND (n.neighborhood_shop_id IS NULL OR n.neighborhood_shop_id = ?)
 		ON CONFLICT (local_shop_id, notification_id)
 		DO UPDATE SET read_at = EXCLUDED.read_at, updated_at = NOW()
-	`, localShopID, now, coreDomain.NotificationTargetAll, coreDomain.NotificationTargetLocalShops).Error
+	`, localShopID, now, coreDomain.NotificationTargetAll, coreDomain.NotificationTargetLocalShops, localShopID).Error
 }
 
-func (r *localShopNotificationPostgresRepository) visibleBaseQuery(q *gorm.DB) *gorm.DB {
+func (r *localShopNotificationPostgresRepository) visibleBaseQuery(q *gorm.DB, localShopID uint) *gorm.DB {
 	return q.Where("target_type IN ?", []string{
 		coreDomain.NotificationTargetAll,
 		coreDomain.NotificationTargetLocalShops,
-	})
+	}).Where("(neighborhood_shop_id IS NULL OR neighborhood_shop_id = ?)", localShopID)
 }

@@ -17,9 +17,9 @@ func NewPartnerRequestHandler(svc service.PartnerRequestService) *PartnerRequest
 	return &PartnerRequestHandler{svc: svc}
 }
 
-func (h *PartnerRequestHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
+func (h *PartnerRequestHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc) {
 	grp := api.Group("/admin-partner-requests")
-	grp.Use(auth, onlyGeneral)
+	grp.Use(auth)
 	{
 		grp.GET("", h.List)
 		grp.GET("/:id", h.GetByID)

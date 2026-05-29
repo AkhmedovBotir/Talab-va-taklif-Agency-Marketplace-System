@@ -17,9 +17,9 @@ func NewCommentTemplateHandler(s service.CommentTemplateService) *CommentTemplat
 	return &CommentTemplateHandler{service: s}
 }
 
-func (h *CommentTemplateHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
+func (h *CommentTemplateHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc) {
 	grp := api.Group("/comment-templates")
-	grp.Use(auth, onlyGeneral)
+	grp.Use(auth)
 	{
 		grp.POST("", h.Create)
 		grp.GET("", h.GetAll)

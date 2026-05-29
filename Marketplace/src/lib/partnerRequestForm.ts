@@ -5,6 +5,22 @@ export const PARTNER_INN_RE = /^\d{9}$/;
 export const PARTNER_MFO_RE = /^\d{5}$/;
 export const PARTNER_ACCOUNT_RE = /^\d{20}$/;
 
+/** Placeholder: och kulrang (slate-400); kiritilgan matn: qorong‘u */
+export const PARTNER_FORM_PLACEHOLDER_COLOR = '#94a3b8';
+
+export const PARTNER_FORM_INPUT_CLASS =
+  'rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400';
+
+export const PARTNER_FORM_INPUT_CLASS_PY3 =
+  'rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400';
+
+export const PARTNER_FORM_SELECT_CLASS =
+  'rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900';
+
+/** React Native TextInput (mobil + Expo web) */
+export const PARTNER_FORM_TEXT_INPUT_CLASS =
+  'rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-900';
+
 export function digitsOnly(value: string, maxLen?: number) {
   const cleaned = value.replace(/\D+/g, '');
   return typeof maxLen === 'number' ? cleaned.slice(0, maxLen) : cleaned;

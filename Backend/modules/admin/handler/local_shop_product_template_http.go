@@ -21,9 +21,9 @@ func NewLocalShopProductTemplateHandler(s service.LocalShopProductTemplateServic
 	return &LocalShopProductTemplateHandler{service: s}
 }
 
-func (h *LocalShopProductTemplateHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
+func (h *LocalShopProductTemplateHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc) {
 	grp := api.Group("/local-shop-product-templates")
-	grp.Use(auth, onlyGeneral)
+	grp.Use(auth)
 	{
 		grp.POST("", h.Create)
 		grp.GET("", h.GetAll)
@@ -142,7 +142,8 @@ func (h *LocalShopProductTemplateHandler) handleError(c *gin.Context, err error)
 		service.ErrLocalShopTemplateCategoryInvalid, service.ErrLocalShopTemplateSubcategoryInvalid,
 		service.ErrLocalShopTemplateCategoryRelation, service.ErrLocalShopTemplateUnitInvalid,
 		service.ErrLocalShopTemplateUnitSizeRequired, service.ErrLocalShopTemplateImagesInvalid,
-		service.ErrLocalShopTemplateImageBase64Invalid, service.ErrLocalShopTemplateStatusInvalid:
+		service.ErrLocalShopTemplateImageBase64Invalid, service.ErrLocalShopTemplateImageTooLarge,
+		service.ErrLocalShopTemplateStatusInvalid:
 		response.JSON(c, http.StatusBadRequest, err.Error(), nil, nil)
 	default:
 		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())

@@ -17,9 +17,9 @@ func NewIntegrationAPIKeyHandler(svc service.IntegrationAPIKeyService) *Integrat
 	return &IntegrationAPIKeyHandler{svc: svc}
 }
 
-func (h *IntegrationAPIKeyHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
+func (h *IntegrationAPIKeyHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc) {
 	grp := api.Group("/integration-api-keys")
-	grp.Use(auth, onlyGeneral)
+	grp.Use(auth)
 	{
 		grp.POST("", h.Create)
 		grp.GET("", h.List)

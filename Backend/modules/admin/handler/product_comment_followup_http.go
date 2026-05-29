@@ -18,9 +18,9 @@ func NewProductCommentFollowupHandler(s service.AdminProductCommentFollowupServi
 	return &ProductCommentFollowupHandler{service: s}
 }
 
-func (h *ProductCommentFollowupHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
+func (h *ProductCommentFollowupHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc) {
 	grp := api.Group("/product-comments")
-	grp.Use(auth, onlyGeneral)
+	grp.Use(auth)
 	{
 		grp.GET("", h.List)
 		grp.GET("/:rating_id", h.Get)

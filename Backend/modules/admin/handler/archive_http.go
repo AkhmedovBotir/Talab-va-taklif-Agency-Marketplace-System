@@ -14,9 +14,9 @@ type ArchiveHandler struct{ service service.ArchiveService }
 
 func NewArchiveHandler(s service.ArchiveService) *ArchiveHandler { return &ArchiveHandler{service: s} }
 
-func (h *ArchiveHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
+func (h *ArchiveHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFunc) {
 	base := api.Group("/arxiv")
-	base.Use(auth, onlyGeneral)
+	base.Use(auth)
 	h.registerType(base, domain.ArchiveTypeAgent)
 	h.registerType(base, domain.ArchiveTypeContragent)
 	h.registerType(base, domain.ArchiveTypeLocalShop)

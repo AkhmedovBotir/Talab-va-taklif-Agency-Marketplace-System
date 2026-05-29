@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
+import { getFirstAllowedPath } from '../utils/permissions';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import {
   Person,
@@ -19,14 +20,19 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated, loading: authLoading } = useAuth();
+  const { login, isAuthenticated, loading: authLoading, admin, authError } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      navigate('/dashboard');
+    if (authError) setError(authError);
+  }, [authError]);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && admin) {
+      const target = getFirstAllowedPath(admin) || '/dashboard';
+      navigate(target);
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, authLoading, admin, navigate]);
 
   if (authLoading) {
     return (
@@ -49,7 +55,14 @@ const Login = () => {
     
     if (result.success) {
       showSuccess('Muvaffaqiyatli kirildi');
-      navigate('/dashboard');
+      const stored = localStorage.getItem('adminData');
+      let target = '/dashboard';
+      try {
+        if (stored) target = getFirstAllowedPath(JSON.parse(stored)) || '/dashboard';
+      } catch {
+        /* ignore */
+      }
+      navigate(target);
     } else {
       const errorMsg = result.error || "Username yoki parol noto'g'ri";
       setError(errorMsg);

@@ -1,0 +1,15 @@
+[build]
+  publish = "dist"
+  command = "npm run build:web"
+
+[[redirects]]
+  from = "/(tabs)/*"
+  to = "/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/(tabs)"
+  to = "/"
+  status = 301
+  force = true

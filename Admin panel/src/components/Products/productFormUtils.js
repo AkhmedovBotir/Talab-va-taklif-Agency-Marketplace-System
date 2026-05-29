@@ -1,7 +1,33 @@
 /** Quill-delta JSON qatori — API `description` maydoni */
+export const DEFAULT_DESCRIPTION_JSON = JSON.stringify({ ops: [{ insert: '\n' }] });
+
 export const plainTextToDescription = (text) => {
   const t = String(text || '').replace(/\r\n/g, '\n');
   return JSON.stringify({ ops: [{ insert: t || ' ' }] });
+};
+
+export const parseDescriptionDelta = (raw) => {
+  const input = String(raw ?? '');
+  try {
+    const parsed = JSON.parse(input || '{}');
+    if (parsed && Array.isArray(parsed.ops)) return parsed;
+  } catch {
+    /* ignore */
+  }
+  if (input.trim()) return { ops: [{ insert: input }, { insert: '\n' }] };
+  return { ops: [{ insert: '\n' }] };
+};
+
+export const normalizeDescriptionJson = (desc) => {
+  const s = String(desc ?? '').trim();
+  if (!s) return DEFAULT_DESCRIPTION_JSON;
+  try {
+    const o = JSON.parse(s);
+    if (o?.ops && Array.isArray(o.ops)) return JSON.stringify(o);
+  } catch {
+    /* ignore */
+  }
+  return plainTextToDescription(s);
 };
 
 export const descriptionToPlainText = (desc) => {
@@ -28,7 +54,7 @@ export const readFileAsDataUrl = (file) =>
 export const buildProductPayload = (form, imageDataUrls) => ({
   contragent_id: Number(form.contragent_id),
   name: String(form.name || '').trim(),
-  description: plainTextToDescription(form.description_text),
+  description: normalizeDescriptionJson(form.description),
   price: Number(form.price),
   original_price: Number(form.original_price),
   images: imageDataUrls,

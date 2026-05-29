@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Clear, Add } from '@mui/icons-material';
-import { regionAPI, districtAPI, punktAPI } from '../../services/api';
+import { punktAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import useGeoCatalog from '../../hooks/useGeoCatalog';
+import ContentStatusPanel from '../../components/common/ContentStatusPanel';
+import { resolvePageError } from '../../utils/apiError';
 import PunktTable from '../../components/Punkts/PunktTable';
 import CreatePunktModal from '../../components/Punkts/CreatePunktModal';
 import EditPunktModal from '../../components/Punkts/EditPunktModal';
@@ -14,11 +17,10 @@ const Punkts = () => {
   const { showError } = useSnackbar();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [regions, setRegions] = useState([]);
-  const [districts, setDistricts] = useState([]);
-  const [geoLoading, setGeoLoading] = useState(false);
+  const { regions, districts, geoLoading, geoEnabled } = useGeoCatalog();
 
   const [items, setItems] = useState([]);
+  const [pageError, setPageError] = useState(null);
   const [listLoading, setListLoading] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -41,23 +43,11 @@ const Punkts = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
 
-  const fetchGeo = useCallback(async () => {
-    setGeoLoading(true);
-    try {
-      const [r, d] = await Promise.all([regionAPI.getAllRegions(), districtAPI.getAllDistricts()]);
-      if (r.success) setRegions(r.data || []);
-      if (d.success) setDistricts(d.data || []);
-    } catch (e) {
-      showError(e.message || 'Region maʼlumotlari yuklanmadi');
-    } finally {
-      setGeoLoading(false);
-    }
-  }, [showError]);
-
   const fetchList = useCallback(async () => {
     const page = pagination.page;
     const limit = pagination.limit;
     setListLoading(true);
+    setPageError(null);
     try {
       const res = await punktAPI.getAll({ page, limit });
       if (res.success) {
@@ -79,15 +69,13 @@ const Punkts = () => {
         }));
       }
     } catch (e) {
-      showError(e.message || 'Ro‘yxatni yuklashda xatolik');
+      const pe = resolvePageError(e);
+      if (pe) setPageError(pe);
+      else showError(e.message || 'Ro‘yxatni yuklashda xatolik');
     } finally {
       setListLoading(false);
     }
-  }, [pagination.page, pagination.limit, showError]);
-
-  useEffect(() => {
-    fetchGeo();
-  }, [fetchGeo]);
+  }, [pagination.page, pagination.limit]);
 
   useEffect(() => {
     fetchList();
@@ -155,6 +143,10 @@ const Punkts = () => {
     setDeleteOpen(true);
   };
 
+  if (pageError) {
+    return <ContentStatusPanel status={pageError.status} message={pageError.message} />;
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -211,22 +203,24 @@ const Punkts = () => {
               <option value="100">100 ta</option>
             </select>
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Hudud bo‘yicha (viloyat, tuman)</p>
-            <GeoViloyatTumanFields
-              required={false}
-              allowClear
-              geoLoading={geoLoading}
-              regions={regions}
-              districts={districts}
-              values={{
-                region_id: filters.region_id,
-                district_id: filters.district_id,
-              }}
-              onChange={setGeoFilter}
-              disabled={false}
-            />
-          </div>
+          {geoEnabled && (
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Hudud bo‘yicha (viloyat, tuman)</p>
+              <GeoViloyatTumanFields
+                required={false}
+                allowClear
+                geoLoading={geoLoading}
+                regions={regions}
+                districts={districts}
+                values={{
+                  region_id: filters.region_id,
+                  district_id: filters.district_id,
+                }}
+                onChange={setGeoFilter}
+                disabled={false}
+              />
+            </div>
+          )}
         </div>
       </div>
 

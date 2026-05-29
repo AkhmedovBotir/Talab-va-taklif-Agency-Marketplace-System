@@ -3,24 +3,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Close, Visibility, VisibilityOff } from '@mui/icons-material';
 import { adminAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import AdminPermissionsPicker from '../Permissions/AdminPermissionsPicker';
+
+const emptyForm = () => ({
+  name: '',
+  phone: '',
+  role: 'admin',
+  status: 'active',
+  username: '',
+  password: '',
+  permissions: ['dashboard'],
+});
 
 const CreateAdminModal = ({ open, onClose, onSuccess }) => {
   const { showSuccess, showError } = useSnackbar();
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    role: 'general',
-    status: 'active',
-    username: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Convert username to lowercase automatically
     const processedValue = name === 'username' ? value.toLowerCase() : value;
     setFormData((prev) => ({ ...prev, [name]: processedValue }));
   };
@@ -34,14 +37,7 @@ const CreateAdminModal = ({ open, onClose, onSuccess }) => {
       const response = await adminAPI.createAdmin(formData);
       if (response.success) {
         showSuccess(response.message || 'Admin muvaffaqiyatli yaratildi');
-        setFormData({
-          name: '',
-          phone: '',
-          role: 'general',
-          status: 'active',
-          username: '',
-          password: '',
-        });
+        setFormData(emptyForm());
         onSuccess();
       }
     } catch (err) {
@@ -55,14 +51,7 @@ const CreateAdminModal = ({ open, onClose, onSuccess }) => {
 
   const handleClose = () => {
     setError('');
-    setFormData({
-      name: '',
-      phone: '',
-      role: 'general',
-      status: 'active',
-      username: '',
-      password: '',
-    });
+    setFormData(emptyForm());
     onClose();
   };
 
@@ -84,132 +73,140 @@ const CreateAdminModal = ({ open, onClose, onSuccess }) => {
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
-              className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800">Yangi Admin Yaratish</h2>
-                <button
-                  onClick={handleClose}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 shrink-0">
+                <h2 className="text-2xl font-bold text-gray-800">Yangi admin</h2>
+                <button type="button" onClick={handleClose} className="text-gray-400 hover:text-gray-600">
                   <Close />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6">
-                {error && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{error}</p>
-                  </div>
-                )}
+              <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                <div className="flex-1 overflow-y-auto p-6">
+                  {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-sm text-red-600">{error}</p>
+                    </div>
+                  )}
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
-                    Admin ma'lumotlari
-                  </h3>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">To'liq ism *</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        required
-                        minLength={2}
-                        maxLength={100}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
-                      <input
-                        type="text"
-                        name="username"
-                        value={formData.username}
-                        onChange={handleChange}
-                        required
-                        minLength={3}
-                        maxLength={30}
-                        pattern="[a-zA-Z0-9]+"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Faqat harf va raqamlar</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Telefon raqami *</label>
-                      <input
-                        type="text"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        required
-                        placeholder="+998901234567"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Parol *</label>
-                      <div className="relative">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
+                        Ma&apos;lumotlar
+                      </h3>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">To&apos;liq ism *</label>
                         <input
-                          type={showPassword ? 'text' : 'password'}
-                          name="password"
-                          value={formData.password}
+                          type="text"
+                          name="name"
+                          value={formData.name}
                           onChange={handleChange}
                           required
-                          minLength={6}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          minLength={2}
+                          maxLength={100}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
-                          style={{ transform: 'translateY(-50%)' }}
-                        >
-                          {showPassword ? <VisibilityOff className="w-5 h-5" /> : <Visibility className="w-5 h-5" />}
-                        </button>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                        <input
+                          type="text"
+                          name="username"
+                          value={formData.username}
+                          onChange={handleChange}
+                          required
+                          minLength={3}
+                          maxLength={30}
+                          pattern="[a-zA-Z0-9]+"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Faqat harf va raqamlar</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Telefon *</label>
+                        <input
+                          type="text"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleChange}
+                          required
+                          placeholder="+998901234567"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Parol *</label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                            minLength={6}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+                          <select
+                            name="role"
+                            value={formData.role}
+                            onChange={handleChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="admin">Admin</option>
+                            <option value="general">General</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                          <select
+                            name="status"
+                            value={formData.status}
+                            onChange={handleChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value="active">Faol</option>
+                            <option value="inactive">Nofaol</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                      <select
-                        name="role"
-                        value={formData.role}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="general">General</option>
-                        <option value="admin">Admin</option>
-                      </select>
+
+                    <div className="lg:border-l lg:border-gray-200 lg:pl-8">
+                      <AdminPermissionsPicker
+                        value={formData.permissions}
+                        onChange={(permissions) => setFormData((p) => ({ ...p, permissions }))}
+                        disabled={loading}
+                      />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                      <select
-                        name="status"
-                        value={formData.status}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="active">Faol</option>
-                        <option value="inactive">Nofaol</option>
-                      </select>
-                    </div>
+                  </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
+                <div className="flex gap-3 p-6 border-t border-gray-200 shrink-0 bg-gray-50/80">
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-white"
                   >
                     Bekor qilish
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors"
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
                   >
                     {loading ? 'Yaratilmoqda...' : 'Yaratish'}
                   </button>
@@ -224,4 +221,3 @@ const CreateAdminModal = ({ open, onClose, onSuccess }) => {
 };
 
 export default CreateAdminModal;
-

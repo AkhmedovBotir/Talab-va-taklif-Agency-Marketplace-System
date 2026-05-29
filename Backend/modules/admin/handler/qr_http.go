@@ -17,9 +17,9 @@ func NewQRHandler(s service.QRService) *QRHandler {
 	return &QRHandler{service: s}
 }
 
-func (h *QRHandler) RegisterAdminRoutes(api *gin.RouterGroup, auth gin.HandlerFunc, onlyGeneral gin.HandlerFunc) {
+func (h *QRHandler) RegisterAdminRoutes(api *gin.RouterGroup, auth gin.HandlerFunc) {
 	grp := api.Group("/qrs")
-	grp.Use(auth, onlyGeneral)
+	grp.Use(auth)
 	{
 		grp.POST("", h.Create)
 		grp.GET("", h.GetAll)

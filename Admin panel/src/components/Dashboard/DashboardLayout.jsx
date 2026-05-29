@@ -30,6 +30,9 @@ const DashboardLayout = () => {
     if (location.pathname.startsWith('/dashboard/order-pipeline-monitor')) return 'Marketplace buyurtmalar';
     if (location.pathname.startsWith('/dashboard/statistics/transactions-by-area')) return 'Tranzaksiyalar statistikasi';
     if (location.pathname.startsWith('/dashboard/integration-api-keys')) return 'Integratsiya API kalitlari';
+    if (location.pathname.startsWith('/dashboard/neighborhood-shop-subscriptions')) {
+      return "Maxalla do'koni obunasi";
+    }
     if (location.pathname.startsWith('/dashboard/punkts')) return 'Punktlar';
     if (location.pathname.startsWith('/dashboard/contragents/types')) return 'Kontragent turlari';
     if (location.pathname.startsWith('/dashboard/contragents/tuman')) return 'Kontragentlar';

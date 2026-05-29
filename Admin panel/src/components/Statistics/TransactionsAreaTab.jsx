@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clear, Search } from '@mui/icons-material';
-import { districtAPI, mfyAPI, regionAPI, transactionsStatsAPI } from '../../services/api';
+import { transactionsStatsAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import useGeoCatalog from '../../hooks/useGeoCatalog';
+import ContentStatusPanel from '../../components/common/ContentStatusPanel';
+import { resolvePageError } from '../../utils/apiError';
 import TransactionsByAreaTable from './TransactionsByAreaTable';
 import HorizontalBarChart from './HorizontalBarChart';
 
@@ -25,10 +28,31 @@ const TransactionsAreaTab = ({ level = 'region', accent = 'indigo', regionId, di
   const [to, setTo] = useState('');
   const [rows, setRows] = useState([]);
   const [responseLevel, setResponseLevel] = useState(level);
-  const [geoNameMaps, setGeoNameMaps] = useState({ regions: {}, districts: {}, mfys: {} });
+  const { regions, districts, mfys, geoEnabled } = useGeoCatalog();
+  const [pageError, setPageError] = useState(null);
+
+  const geoNameMaps = useMemo(() => {
+    if (!geoEnabled) return { regions: {}, districts: {}, mfys: {} };
+    return {
+      regions: Object.fromEntries(
+        regions
+          .map((item) => [toKey(item?.id ?? item?._id), getGeoName(item)])
+          .filter(([id, name]) => id && name)
+      ),
+      districts: Object.fromEntries(
+        districts
+          .map((item) => [toKey(item?.id ?? item?._id), getGeoName(item)])
+          .filter(([id, name]) => id && name)
+      ),
+      mfys: Object.fromEntries(
+        mfys.map((item) => [toKey(item?.id ?? item?._id), getGeoName(item)]).filter(([id, name]) => id && name)
+      ),
+    };
+  }, [geoEnabled, regions, districts, mfys]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setPageError(null);
     try {
       const res = await transactionsStatsAPI.getByArea({
         level,
@@ -41,59 +65,17 @@ const TransactionsAreaTab = ({ level = 'region', accent = 'indigo', regionId, di
         setResponseLevel(res.data?.level || level);
       }
     } catch (e) {
-      showError(e.message || "Tranzaksiya statistikalarini olishda xatolik");
+      const pe = resolvePageError(e);
+      if (pe) setPageError(pe);
+      else showError(e.message || "Tranzaksiya statistikalarini olishda xatolik");
     } finally {
       setLoading(false);
     }
-  }, [level, status, from, to, showError]);
+  }, [level, status, from, to]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  useEffect(() => {
-    let active = true;
-    const fetchGeoMaps = async () => {
-      try {
-        const [regionsRes, districtsRes, mfysRes] = await Promise.all([
-          regionAPI.getAllRegions(),
-          districtAPI.getAllDistricts(),
-          mfyAPI.getAllMFYs(),
-        ]);
-
-        const regions = Array.isArray(regionsRes?.data) ? regionsRes.data : [];
-        const districts = Array.isArray(districtsRes?.data) ? districtsRes.data : [];
-        const mfys = Array.isArray(mfysRes?.data) ? mfysRes.data : [];
-
-        if (!active) return;
-
-        setGeoNameMaps({
-          regions: Object.fromEntries(
-            regions
-              .map((item) => [toKey(item?.id ?? item?._id), getGeoName(item)])
-              .filter(([id, name]) => id && name)
-          ),
-          districts: Object.fromEntries(
-            districts
-              .map((item) => [toKey(item?.id ?? item?._id), getGeoName(item)])
-              .filter(([id, name]) => id && name)
-          ),
-          mfys: Object.fromEntries(
-            mfys
-              .map((item) => [toKey(item?.id ?? item?._id), getGeoName(item)])
-              .filter(([id, name]) => id && name)
-          ),
-        });
-      } catch {
-        // keep fallback display from API row names/ids
-      }
-    };
-
-    fetchGeoMaps();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const filteredRows = useMemo(() => {
     if (level === 'district' && regionId) {
@@ -143,6 +125,10 @@ const TransactionsAreaTab = ({ level = 'region', accent = 'indigo', regionId, di
       : responseLevel === 'district'
       ? "Tumanlar bo'yicha summa (Top 20)"
       : "Viloyatlar bo'yicha summa";
+
+  if (pageError) {
+    return <ContentStatusPanel status={pageError.status} message={pageError.message} />;
+  }
 
   return (
     <div className="space-y-6">

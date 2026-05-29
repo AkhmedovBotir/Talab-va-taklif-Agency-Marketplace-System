@@ -51,9 +51,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    bottom: 24,
+    bottom: Platform.OS === 'web' ? 32 : 24,
     zIndex: 999,
     alignItems: 'center',
+    ...(Platform.OS === 'web'
+      ? ({
+          width: '100%',
+          maxWidth: 560,
+          alignSelf: 'center',
+        } as object)
+      : null),
   },
   container: {
     width: '100%',

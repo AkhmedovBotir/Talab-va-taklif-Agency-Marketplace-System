@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Add, Close, ContentCopy, Delete, Edit, Visibility } from '@mui/icons-material';
+import { Add, Close, Delete, Edit, Visibility } from '@mui/icons-material';
+import ImageUploaderGrid from '../../components/Products/ImageUploaderGrid';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import { categoryAPI, localShopProductTemplateAPI, subcategoryAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import GeoSearchableSelect from '../../components/DistrictContragents/GeoSearchableSelect';
+import LocalShopProductsTab from './LocalShopProductsTab';
+import usePermissions from '../../hooks/usePermissions';
 
 const tabBase = 'px-4 py-2 rounded-md text-sm font-medium transition-colors';
 
@@ -22,14 +25,6 @@ const defaultForm = {
   unit_size: '',
   status: 'active',
 };
-
-const fileToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error("Rasmni o'qib bo'lmadi"));
-    reader.readAsDataURL(file);
-  });
 
 const normalizeDescPreview = (raw) => {
   try {
@@ -55,7 +50,14 @@ const parseDescriptionDelta = (raw) => {
 
 const NeighborhoodProducts = () => {
   const { showError, showSuccess } = useSnackbar();
-  const [activeTab, setActiveTab] = useState('templates');
+  const { can } = usePermissions();
+  const showTemplates = can('maxalla maxsulotlari shablonlari');
+  const showProductsTab = can('maxalla maxsulotlari');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (showTemplates) return 'templates';
+    if (showProductsTab) return 'products';
+    return 'templates';
+  });
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
@@ -116,8 +118,13 @@ const NeighborhoodProducts = () => {
   }, [showError]);
 
   useEffect(() => {
-    if (activeTab === 'templates') fetchTemplates();
-  }, [activeTab, fetchTemplates]);
+    if (!showTemplates && showProductsTab) setActiveTab('products');
+    else if (showTemplates && !showProductsTab) setActiveTab('templates');
+  }, [showTemplates, showProductsTab]);
+
+  useEffect(() => {
+    if (activeTab === 'templates' && showTemplates) fetchTemplates();
+  }, [activeTab, fetchTemplates, showTemplates]);
 
   useEffect(() => {
     if (activeTab === 'templates') fetchCategories();
@@ -201,29 +208,6 @@ const NeighborhoodProducts = () => {
     }
   }, [modalOpen]);
 
-  const handlePickImages = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    const remain = 5 - form.images.length;
-    if (remain <= 0) {
-      showError('Maksimum 5 ta rasm');
-      return;
-    }
-    const chosen = files.slice(0, remain);
-    try {
-      const converted = await Promise.all(chosen.map(fileToBase64));
-      setForm((prev) => ({ ...prev, images: [...prev.images, ...converted] }));
-    } catch (err) {
-      showError(err.message || "Rasmni o'qishda xatolik");
-    } finally {
-      e.target.value = '';
-    }
-  };
-
-  const removeImage = (idx) => {
-    setForm((prev) => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
-  };
-
   const validateForm = () => {
     if (!form.name.trim()) return "Nom bo'sh bo'lmasin";
     if (!form.category_id || !form.subcategory_id) return 'Kategoriya va subkategoriya tanlang';
@@ -294,32 +278,34 @@ const NeighborhoodProducts = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setActiveTab('templates')}
-            className={`${tabBase} ${activeTab === 'templates' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-          >
-            Shablonlar
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('products')}
-            className={`${tabBase} ${activeTab === 'products' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-          >
-            Mahsulotlar
-          </button>
-        </div>
-      </div>
-
-      {activeTab === 'products' && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-          Maxalla mahsulotlari sahifasi ishlab chiqilmoqda.
+      {(showTemplates || showProductsTab) && (showTemplates && showProductsTab) && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            {showTemplates && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('templates')}
+                className={`${tabBase} ${activeTab === 'templates' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                Shablonlar
+              </button>
+            )}
+            {showProductsTab && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('products')}
+                className={`${tabBase} ${activeTab === 'products' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+              >
+                Mahsulotlar
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {activeTab === 'templates' && (
+      {activeTab === 'products' && showProductsTab && <LocalShopProductsTab />}
+
+      {activeTab === 'templates' && showTemplates && (
         <>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center justify-between">
             <h3 className="text-base font-semibold text-gray-800">Maxalla do'konlari mahsulot shablonlari</h3>
@@ -544,36 +530,13 @@ const NeighborhoodProducts = () => {
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Rasmlar (1..5)</label>
-                  <label className="inline-flex items-center gap-2 text-sm text-indigo-600 cursor-pointer hover:text-indigo-700">
-                    <ContentCopy fontSize="small" />
-                    <span>Rasm tanlash</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handlePickImages}
-                    />
-                  </label>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {form.images.map((img, idx) => (
-                    <div key={`${idx}-${img.slice(0, 20)}`} className="relative border border-gray-200 rounded-md p-1">
-                      <img src={img} alt={`img-${idx}`} className="w-full h-24 object-cover rounded" />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(idx)}
-                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 text-xs"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <ImageUploaderGrid
+                required
+                label="Rasmlar"
+                images={form.images}
+                onChange={(images) => setForm((prev) => ({ ...prev, images }))}
+                disabled={submitting}
+              />
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button

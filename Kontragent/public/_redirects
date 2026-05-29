@@ -1,0 +1,3 @@
+# Netlify: route group URLlarini tozalash (birinchi qoida ustun)
+/(tabs)/*  /:splat  301
+/(tabs)    /        301

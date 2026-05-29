@@ -3,20 +3,19 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppSnackbar, { SnackbarType } from '../../components/AppSnackbar';
+import AuthScreenLayout from '../../components/AuthScreenLayout';
 import { apiService } from '../../services/api';
+import { authScreenStyles } from '../../utils/authLayout';
+import { useAuthResponsiveStyles } from '../../utils/useAuthResponsiveStyles';
 
 export default function PasswordSetupStep3Screen() {
+  const responsive = useAuthResponsiveStyles();
   const params = useLocalSearchParams<{ phone: string }>();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,7 +26,6 @@ export default function PasswordSetupStep3Screen() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarType, setSnackbarType] = useState<SnackbarType>('error');
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const phone = params.phone || '';
 
@@ -82,290 +80,121 @@ export default function PasswordSetupStep3Screen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.content}>
-          {/* Header Section */}
-          <View style={styles.header}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.backButton}
-            >
-              <Ionicons name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-            <View style={styles.iconContainer}>
-              <Ionicons name="lock-closed" size={64} color="#007AFF" />
-            </View>
-            <Text style={styles.title}>Parol o'rnatish</Text>
-            <Text style={styles.subtitle}>Yangi parolni kiriting</Text>
+    <>
+      <AuthScreenLayout>
+        <View style={authScreenStyles.headerWithBack}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={authScreenStyles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <View style={[authScreenStyles.iconContainer, authScreenStyles.iconContainerCompact]}>
+            <Ionicons name="lock-closed" size={64} color="#007AFF" />
           </View>
+          <Text style={authScreenStyles.title}>Parol o'rnatish</Text>
+          <Text style={authScreenStyles.subtitle}>Yangi parolni kiriting</Text>
+        </View>
 
-          {/* Card Form */}
-          <View style={styles.card}>
-            <View style={styles.form}>
-              {/* Phone Display */}
-              <View style={styles.phoneDisplayContainer}>
-                <Ionicons name="call" size={16} color="#007AFF" />
-                <Text style={styles.phoneDisplay}>{phone}</Text>
-              </View>
-
-              {/* Password Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Yangi parol</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons 
-                    name="lock-closed-outline" 
-                    size={20} 
-                    color="#666" 
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    style={[styles.input, styles.passwordInput]}
-                    placeholder="Kamida 6 ta belgi"
-                    placeholderTextColor="#999"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    editable={!loading}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIcon}
-                    disabled={loading}
-                  >
-                    <Ionicons
-                      name={showPassword ? "eye-outline" : "eye-off-outline"}
-                      size={20}
-                      color="#666"
-                    />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.hintText}>Kamida 6 ta belgi</Text>
-              </View>
-
-              {/* Confirm Password Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Parolni tasdiqlash</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons 
-                    name="lock-closed-outline" 
-                    size={20} 
-                    color="#666" 
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    style={[styles.input, styles.passwordInput]}
-                    placeholder="Parolni qayta kiriting"
-                    placeholderTextColor="#999"
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    secureTextEntry={!showConfirmPassword}
-                    autoCapitalize="none"
-                    editable={!loading}
-                    onSubmitEditing={handleSubmit}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                    style={styles.eyeIcon}
-                    disabled={loading}
-                  >
-                    <Ionicons
-                      name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
-                      size={20}
-                      color="#666"
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleSubmit}
-                disabled={loading}
-                activeOpacity={0.8}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Text style={styles.buttonText}>Parolni o'rnatish</Text>
-                    <Ionicons name="checkmark-circle" size={20} color="#fff" style={styles.buttonIcon} />
-                  </>
-                )}
-              </TouchableOpacity>
+        <View style={[authScreenStyles.card, responsive.cardExtra]}>
+          <View style={authScreenStyles.form}>
+            <View style={authScreenStyles.phoneDisplayAlt}>
+              <Ionicons name="call" size={16} color="#007AFF" />
+              <Text style={authScreenStyles.phoneTextAccent}>{phone}</Text>
             </View>
+
+            <View style={authScreenStyles.inputContainer}>
+              <Text style={authScreenStyles.label}>Yangi parol</Text>
+              <View style={[authScreenStyles.inputWrapper, responsive.inputWrapperExtra]}>
+                <Ionicons 
+                  name="lock-closed-outline" 
+                  size={20} 
+                  color="#666" 
+                  style={[authScreenStyles.inputIcon, responsive.inputIconExtra]}
+                />
+                <TextInput
+                  style={[authScreenStyles.input, authScreenStyles.passwordInput, responsive.inputExtra]}
+                  placeholder="Kamida 6 ta belgi"
+                  placeholderTextColor="#999"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={[authScreenStyles.eyeIcon, responsive.eyeIconExtra]}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-outline" : "eye-off-outline"}
+                    size={20}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              </View>
+              <Text style={authScreenStyles.hintTextLeft}>Kamida 6 ta belgi</Text>
+            </View>
+
+            <View style={authScreenStyles.inputContainer}>
+              <Text style={authScreenStyles.label}>Parolni tasdiqlash</Text>
+              <View style={[authScreenStyles.inputWrapper, responsive.inputWrapperExtra]}>
+                <Ionicons 
+                  name="lock-closed-outline" 
+                  size={20} 
+                  color="#666" 
+                  style={[authScreenStyles.inputIcon, responsive.inputIconExtra]}
+                />
+                <TextInput
+                  style={[authScreenStyles.input, authScreenStyles.passwordInput, responsive.inputExtra]}
+                  placeholder="Parolni qayta kiriting"
+                  placeholderTextColor="#999"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  editable={!loading}
+                  onSubmitEditing={handleSubmit}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={[authScreenStyles.eyeIcon, responsive.eyeIconExtra]}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
+                    size={20}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[authScreenStyles.button, loading && authScreenStyles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={authScreenStyles.buttonText}>Parolni o'rnatish</Text>
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" style={authScreenStyles.buttonIcon} />
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </AuthScreenLayout>
       <AppSnackbar
         visible={snackbarVisible}
         message={snackbarMessage}
         type={snackbarType}
         onHide={() => setSnackbarVisible(false)}
       />
-    </KeyboardAvoidingView>
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f7fa',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-    paddingVertical: 40,
-  },
-  content: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    padding: 8,
-    zIndex: 1,
-  },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 40,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 8,
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  form: {
-    width: '100%',
-  },
-  phoneDisplayContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E3F2FD',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 24,
-  },
-  phoneDisplay: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginLeft: 8,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
-    marginLeft: 4,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    backgroundColor: '#fafafa',
-    paddingHorizontal: 16,
-    minHeight: 56,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    paddingVertical: 0,
-  },
-  passwordInput: {
-    paddingRight: 8,
-  },
-  eyeIcon: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  hintText: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 6,
-    marginLeft: 4,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    flexDirection: 'row',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  buttonIcon: {
-    marginLeft: 8,
-  },
-});
-

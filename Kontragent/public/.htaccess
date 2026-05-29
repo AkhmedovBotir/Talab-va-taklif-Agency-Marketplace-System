@@ -1,0 +1,18 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  RewriteRule ^\(tabs\)/?(.*)$ /$1 [R=301,L,QSA]
+
+  # /ombor/ -> /ombor (papka o'rniga ombor.html ishlashi uchun)
+  RewriteRule ^(.+)/$ $1 [R=301,L]
+
+  # Papka bo'lsa ham .html mavjud bo'lsa — html ustun (ombor.html vs ombor/)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI}.html -f
+  RewriteRule ^(.+?)/?$ $1.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>

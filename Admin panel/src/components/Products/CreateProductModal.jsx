@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
 import { productAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import GeoSearchableSelect from '../DistrictContragents/GeoSearchableSelect';
-import { buildProductPayload, readFileAsDataUrl } from './productFormUtils';
+import { buildProductPayload, DEFAULT_DESCRIPTION_JSON } from './productFormUtils';
+import QuillDescriptionEditor from './QuillDescriptionEditor';
+import ImageUploaderGrid from './ImageUploaderGrid';
 
 const emptyForm = () => ({
   contragent_id: '',
   name: '',
-  description_text: '',
+  description: DEFAULT_DESCRIPTION_JSON,
   price: '',
   original_price: '',
   category_id: '',
@@ -24,30 +26,19 @@ const emptyForm = () => ({
 const CreateProductModal = ({ open, onClose, onSuccess, contragents = [], categories = [], subcategories = [] }) => {
   const { showSuccess, showError } = useSnackbar();
   const [form, setForm] = useState(emptyForm);
-  const [imageFiles, setImageFiles] = useState([]);
+  const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [editorReset, setEditorReset] = useState(0);
+
+  useEffect(() => {
+    if (open) setEditorReset((n) => n + 1);
+  }, [open]);
 
   const subsForCategory = subcategories.filter((s) => {
     const pid = s.parent_id ?? s.parent?.id ?? s.parent?._id;
     return pid != null && String(pid) === String(form.category_id);
   });
-
-  const onPickImages = async (e) => {
-    const files = Array.from(e.target.files || []);
-    e.target.value = '';
-    if (!files.length) return;
-    const next = [...imageFiles];
-    for (const f of files) {
-      if (next.length >= 5) break;
-      next.push(f);
-    }
-    setImageFiles(next);
-  };
-
-  const removeImageAt = (idx) => {
-    setImageFiles((p) => p.filter((_, i) => i !== idx));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,7 +47,7 @@ const CreateProductModal = ({ open, onClose, onSuccess, contragents = [], catego
       setError('Kontragent, kategoriya va subkategoriyani tanlang');
       return;
     }
-    if (imageFiles.length < 1 || imageFiles.length > 5) {
+    if (images.length < 1 || images.length > 5) {
       setError('Rasmlar: kamida 1, ko‘pi bilan 5 ta');
       return;
     }
@@ -83,16 +74,13 @@ const CreateProductModal = ({ open, onClose, onSuccess, contragents = [], catego
 
     setLoading(true);
     try {
-      const images = [];
-      for (const f of imageFiles) {
-        images.push(await readFileAsDataUrl(f));
-      }
       const payload = buildProductPayload(form, images);
       const res = await productAPI.create(payload);
       if (res.success) {
         showSuccess(res.message || 'Mahsulot yaratildi');
         setForm(emptyForm());
-        setImageFiles([]);
+        setImages([]);
+        setEditorReset((n) => n + 1);
         onSuccess?.();
       }
     } catch (err) {
@@ -107,7 +95,8 @@ const CreateProductModal = ({ open, onClose, onSuccess, contragents = [], catego
   const handleClose = () => {
     setError('');
     setForm(emptyForm());
-    setImageFiles([]);
+    setImages([]);
+    setEditorReset((n) => n + 1);
     onClose?.();
   };
 
@@ -144,8 +133,13 @@ const CreateProductModal = ({ open, onClose, onSuccess, contragents = [], catego
                     <input required value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tavsif (matn)</label>
-                    <textarea rows={3} value={form.description_text} onChange={(e) => setForm((p) => ({ ...p, description_text: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tavsif</label>
+                    <QuillDescriptionEditor
+                      active={open}
+                      value={form.description}
+                      onChange={(description) => setForm((p) => ({ ...p, description }))}
+                      resetKey={open ? `create-${editorReset}` : null}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Narx *</label>
@@ -211,19 +205,12 @@ const CreateProductModal = ({ open, onClose, onSuccess, contragents = [], catego
                     <input type="number" min="0" max="100" step="1" value={form.kpi_bonus_percent} onChange={(e) => setForm((p) => ({ ...p, kpi_bonus_percent: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rasmlar (1–5, base64) *</label>
-                    <input type="file" accept="image/*" multiple onChange={onPickImages} className="w-full text-sm text-gray-600" />
-                    <p className="text-xs text-gray-500 mt-1">Tanlangan: {imageFiles.length} / 5</p>
-                    <ul className="mt-2 space-y-1">
-                      {imageFiles.map((f, idx) => (
-                        <li key={`${f.name}-${idx}`} className="flex items-center justify-between text-sm bg-gray-50 px-3 py-1.5 rounded">
-                          <span className="truncate">{f.name}</span>
-                          <button type="button" onClick={() => removeImageAt(idx)} className="text-red-600 hover:underline shrink-0">
-                            Olib tashlash
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <ImageUploaderGrid
+                      required
+                      images={images}
+                      onChange={setImages}
+                      disabled={loading}
+                    />
                   </div>
                 </div>
 

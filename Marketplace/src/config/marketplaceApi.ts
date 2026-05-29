@@ -8,11 +8,11 @@ export const MARKETPLACE_API_BASE = 'https://api.ttsa.uz/api/v1';
 export function buildMarketplaceNotificationsWsUrl(token: string): string {
   try {
     const url = new URL(MARKETPLACE_API_BASE);
-    const wsProto = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsProto = url.protocol === 'http:' ? 'wss:' : 'ws:';
     const basePath = url.pathname.replace(/\/$/, '');
     const wsPath = `${basePath}/marketplace/me/notifications/ws`;
     return `${wsProto}//${url.host}${wsPath}?token=${encodeURIComponent(token)}`;
   } catch {
-    return `wss://api.ttsa.uz/api/v1/marketplace/me/notifications/ws?token=${encodeURIComponent(token)}`;
+    return `wss://192.168.1.6:8081/api/v1/marketplace/me/notifications/ws?token=${encodeURIComponent(token)}`;
   }
 }
