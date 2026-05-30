@@ -30,6 +30,7 @@ func (h *ProductHandler) RegisterRoutes(api *gin.RouterGroup, auth gin.HandlerFu
 	grp := api.Group("/products")
 	grp.Use(auth)
 	{
+		h.registerMultipartRoutes(grp)
 		grp.POST("", h.Create)
 		grp.GET("", h.GetAll)
 		grp.GET("/:id", h.GetByID)
@@ -194,13 +195,15 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 
 func (h *ProductHandler) handleError(c *gin.Context, err error) {
 	switch err {
-	case service.ErrAdminProductNotFound:
+	case service.ErrAdminProductNotFound, service.ErrAdminProductImageNotFound:
 		response.JSON(c, http.StatusNotFound, err.Error(), nil, nil)
 	case service.ErrAdminProductNameRequired, service.ErrAdminProductDescriptionRequired,
 		service.ErrAdminProductPriceInvalid, service.ErrAdminProductOriginalInvalid, service.ErrAdminProductCategoryInvalid,
 		service.ErrAdminProductSubcategoryInvalid, service.ErrAdminProductCategoryRelation, service.ErrAdminProductQuantityInvalid,
 		service.ErrAdminProductUnitInvalid, service.ErrAdminProductUnitSizeRequired, service.ErrAdminProductImagesInvalid,
-		service.ErrAdminProductImageBase64Invalid, service.ErrAdminProductImageTooLarge, service.ErrAdminProductKPIInvalid, service.ErrAdminProductStatusInvalid,
+		service.ErrAdminProductImageBase64Invalid, service.ErrAdminProductImageTooLarge,
+		service.ErrAdminProductImageFileInvalid, service.ErrAdminProductImageFileTooLarge,
+		service.ErrAdminProductKPIInvalid, service.ErrAdminProductStatusInvalid,
 		service.ErrAdminProductContragentInvalid, service.ErrAdminProductModerationInvalid, service.ErrAdminRejectReasonRequired:
 		response.JSON(c, http.StatusBadRequest, err.Error(), nil, nil)
 	default:

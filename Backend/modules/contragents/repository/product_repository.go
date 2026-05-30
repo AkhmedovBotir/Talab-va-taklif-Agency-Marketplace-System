@@ -10,10 +10,18 @@ import (
 
 type ContragentProductRepository interface {
 	NextProductCode() (uint64, error)
-	Create(row *domain.Product, images []string) error
+	Create(row *domain.Product) error
+	SetImages(productID uint, images []string) error
+	GetImagesByProductIDs(productIDs []uint) (map[uint][]string, error)
 	GetPaginatedByContragent(contragentID uint, page, limit int) ([]domain.Product, int64, error)
 	GetByIDAndContragent(id, contragentID uint) (*domain.Product, error)
 	GetImages(productID uint) ([]string, error)
+	ListImageRows(productID uint) ([]domain.ProductImage, error)
+	GetImageRow(productID, imageID uint) (*domain.ProductImage, error)
+	CountImages(productID uint) (int64, error)
+	CreateImageRow(row *domain.ProductImage) error
+	UpdateImageRow(row *domain.ProductImage) error
+	DeleteImageRow(imageID uint) error
 	Update(row *domain.Product, images []string) error
 	Delete(id uint) error
 
@@ -40,14 +48,21 @@ func (r *contragentProductPostgresRepository) NextProductCode() (uint64, error) 
 	return res.Max, nil
 }
 
-func (r *contragentProductPostgresRepository) Create(row *domain.Product, images []string) error {
+func (r *contragentProductPostgresRepository) Create(row *domain.Product) error {
+	return r.db.Create(row).Error
+}
+
+func (r *contragentProductPostgresRepository) SetImages(productID uint, images []string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(row).Error; err != nil {
+		if err := tx.Where("product_id = ?", productID).Delete(&domain.ProductImage{}).Error; err != nil {
 			return err
 		}
-		for i, image := range images {
-			img := domain.ProductImage{ProductID: row.ID, Image: image, SortOrder: i}
-			if err := tx.Create(&img).Error; err != nil {
+		if len(images) > 0 {
+			rows := make([]domain.ProductImage, len(images))
+			for i, image := range images {
+				rows[i] = domain.ProductImage{ProductID: productID, Image: image, SortOrder: i}
+			}
+			if err := tx.Create(&rows).Error; err != nil {
 				return err
 			}
 		}
@@ -83,35 +98,72 @@ func (r *contragentProductPostgresRepository) GetByIDAndContragent(id, contragen
 }
 
 func (r *contragentProductPostgresRepository) GetImages(productID uint) ([]string, error) {
-	var rows []domain.ProductImage
-	if err := r.db.Where("product_id = ?", productID).Order("sort_order asc, id asc").Find(&rows).Error; err != nil {
+	m, err := r.GetImagesByProductIDs([]uint{productID})
+	if err != nil {
 		return nil, err
 	}
-	out := make([]string, 0, len(rows))
+	return m[productID], nil
+}
+
+func (r *contragentProductPostgresRepository) GetImagesByProductIDs(productIDs []uint) (map[uint][]string, error) {
+	out := make(map[uint][]string)
+	if len(productIDs) == 0 {
+		return out, nil
+	}
+	var rows []domain.ProductImage
+	if err := r.db.Where("product_id IN ?", productIDs).Order("product_id asc, sort_order asc, id asc").Find(&rows).Error; err != nil {
+		return nil, err
+	}
 	for _, row := range rows {
-		out = append(out, row.Image)
+		out[row.ProductID] = append(out[row.ProductID], row.Image)
 	}
 	return out, nil
 }
 
+func (r *contragentProductPostgresRepository) ListImageRows(productID uint) ([]domain.ProductImage, error) {
+	var rows []domain.ProductImage
+	err := r.db.Where("product_id = ?", productID).Order("sort_order asc, id asc").Find(&rows).Error
+	return rows, err
+}
+
+func (r *contragentProductPostgresRepository) GetImageRow(productID, imageID uint) (*domain.ProductImage, error) {
+	var row domain.ProductImage
+	err := r.db.Where("id = ? AND product_id = ?", imageID, productID).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *contragentProductPostgresRepository) CountImages(productID uint) (int64, error) {
+	var n int64
+	err := r.db.Model(&domain.ProductImage{}).Where("product_id = ?", productID).Count(&n).Error
+	return n, err
+}
+
+func (r *contragentProductPostgresRepository) CreateImageRow(row *domain.ProductImage) error {
+	return r.db.Create(row).Error
+}
+
+func (r *contragentProductPostgresRepository) UpdateImageRow(row *domain.ProductImage) error {
+	return r.db.Save(row).Error
+}
+
+func (r *contragentProductPostgresRepository) DeleteImageRow(imageID uint) error {
+	return r.db.Delete(&domain.ProductImage{}, imageID).Error
+}
+
 func (r *contragentProductPostgresRepository) Update(row *domain.Product, images []string) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(row).Error; err != nil {
-			return err
-		}
-		if images != nil {
-			if err := tx.Where("product_id = ?", row.ID).Delete(&domain.ProductImage{}).Error; err != nil {
-				return err
-			}
-			for i, image := range images {
-				img := domain.ProductImage{ProductID: row.ID, Image: image, SortOrder: i}
-				if err := tx.Create(&img).Error; err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
+	if err := r.db.Save(row).Error; err != nil {
+		return err
+	}
+	if images != nil {
+		return r.SetImages(row.ID, images)
+	}
+	return nil
 }
 
 func (r *contragentProductPostgresRepository) Delete(id uint) error {

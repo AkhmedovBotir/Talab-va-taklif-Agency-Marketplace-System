@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Add, Close, Delete, Edit, Visibility } from '@mui/icons-material';
-import ImageUploaderGrid from '../../components/Products/ImageUploaderGrid';
+import ProductImageUploader from '../../components/Products/ProductImageUploader';
+import {
+  buildTemplateJsonPayload,
+  buildTemplateMultipartFields,
+  collectNewImageFiles,
+  getActiveImageSlots,
+  parseTemplateImageSlots,
+  syncTemplateImageChanges,
+  templateImagesChanged,
+  validateTemplateForm,
+} from '../../components/Products/templateFormUtils';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import { categoryAPI, localShopProductTemplateAPI, subcategoryAPI } from '../../services/api';
@@ -18,7 +28,6 @@ const statuses = ['active', 'inactive'];
 const defaultForm = {
   name: '',
   description: '{"ops":[{"insert":"Mahsulot tavsifi"}]}',
-  images: [],
   category_id: '',
   subcategory_id: '',
   unit: 'dona',
@@ -72,6 +81,8 @@ const NeighborhoodProducts = () => {
   const [previewImage, setPreviewImage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(defaultForm);
+  const [imageSlots, setImageSlots] = useState([]);
+  const initialImageSlotsRef = useRef([]);
   const quillHostRef = useRef(null);
   const quillRef = useRef(null);
   const initialDescriptionRef = useRef(defaultForm.description);
@@ -147,6 +158,8 @@ const NeighborhoodProducts = () => {
   const openCreate = () => {
     setEditingRow(null);
     setForm(defaultForm);
+    setImageSlots([]);
+    initialImageSlotsRef.current = [];
     initialDescriptionRef.current = defaultForm.description;
     setModalOpen(true);
   };
@@ -155,11 +168,13 @@ const NeighborhoodProducts = () => {
     try {
       const res = await localShopProductTemplateAPI.getById(row.id);
       const item = res.data || row;
+      const slots = parseTemplateImageSlots(item);
+      initialImageSlotsRef.current = slots.map((s) => ({ ...s }));
+      setImageSlots(slots);
       setEditingRow(item);
       setForm({
         name: item.name || '',
         description: item.description || defaultForm.description,
-        images: Array.isArray(item.images) ? item.images : [],
         category_id: item.category_id ?? '',
         subcategory_id: item.subcategory_id ?? '',
         unit: item.unit || 'dona',
@@ -208,44 +223,54 @@ const NeighborhoodProducts = () => {
     }
   }, [modalOpen]);
 
-  const validateForm = () => {
-    if (!form.name.trim()) return "Nom bo'sh bo'lmasin";
-    if (!form.category_id || !form.subcategory_id) return 'Kategoriya va subkategoriya tanlang';
-    if (!units.includes(form.unit)) return "Unit noto'g'ri";
-    if (!statuses.includes(form.status)) return "Status noto'g'ri";
-    if (form.images.length < 1 || form.images.length > 5) return 'Rasmlar soni 1..5 bo‘lishi kerak';
-    try {
-      JSON.parse(form.description || '{}');
-    } catch {
-      return 'Description JSON yaroqsiz';
-    }
-    return '';
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const error = validateForm();
+    const error = validateTemplateForm(form, imageSlots, {
+      subcategories,
+      requireAllFiles: !editingRow?.id,
+    });
     if (error) {
       showError(error);
       return;
     }
     setSubmitting(true);
-    const payload = {
-      ...form,
-      category_id: Number(form.category_id),
-      subcategory_id: Number(form.subcategory_id),
-    };
     try {
       if (editingRow?.id) {
-        await localShopProductTemplateAPI.update(editingRow.id, payload);
+        const payload = buildTemplateJsonPayload(form);
+        const changedImages = templateImagesChanged(initialImageSlotsRef.current, imageSlots);
+
+        if (changedImages) {
+          const active = getActiveImageSlots(imageSlots);
+          const allNewFiles = active.every((s) => s.file instanceof File);
+          if (allNewFiles && active.length >= 1) {
+            await localShopProductTemplateAPI.updateWithImages(
+              editingRow.id,
+              buildTemplateMultipartFields(form),
+              active.map((s) => s.file)
+            );
+          } else {
+            await localShopProductTemplateAPI.update(editingRow.id, payload);
+            await syncTemplateImageChanges(
+              editingRow.id,
+              initialImageSlotsRef.current,
+              imageSlots,
+              localShopProductTemplateAPI
+            );
+          }
+        } else {
+          await localShopProductTemplateAPI.update(editingRow.id, payload);
+        }
         showSuccess('Shablon yangilandi');
       } else {
-        await localShopProductTemplateAPI.create(payload);
+        const files = collectNewImageFiles(imageSlots);
+        await localShopProductTemplateAPI.createWithImages(buildTemplateMultipartFields(form), files);
         showSuccess('Shablon yaratildi');
       }
       setModalOpen(false);
       setEditingRow(null);
       setForm(defaultForm);
+      setImageSlots([]);
+      initialImageSlotsRef.current = [];
       fetchTemplates();
     } catch (err) {
       showError(err.message || "Saqlashda xatolik");
@@ -530,11 +555,12 @@ const NeighborhoodProducts = () => {
                 </div>
               </div>
 
-              <ImageUploaderGrid
+              <ProductImageUploader
                 required
                 label="Rasmlar"
-                images={form.images}
-                onChange={(images) => setForm((prev) => ({ ...prev, images }))}
+                hint="1–5 ta rasm (JPEG, PNG, WebP, GIF; har biri ≤ 4 MB)"
+                slots={imageSlots}
+                onChange={setImageSlots}
                 disabled={submitting}
               />
 

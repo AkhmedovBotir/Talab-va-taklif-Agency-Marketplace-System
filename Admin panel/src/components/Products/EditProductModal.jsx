@@ -1,12 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Close } from '@mui/icons-material';
 import { productAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import GeoSearchableSelect from '../DistrictContragents/GeoSearchableSelect';
-import { buildProductPayload, DEFAULT_DESCRIPTION_JSON } from './productFormUtils';
+import {
+  buildProductJsonPayload,
+  DEFAULT_DESCRIPTION_JSON,
+  getActiveImageSlots,
+  parseProductImageSlots,
+  syncProductImageChanges,
+  validateProductFormMultipart,
+} from './productFormUtils';
 import QuillDescriptionEditor from './QuillDescriptionEditor';
-import ImageUploaderGrid from './ImageUploaderGrid';
+import ProductImageUploader from './ProductImageUploader';
 
 const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [], categories = [], subcategories = [] }) => {
   const { showSuccess, showError } = useSnackbar();
@@ -24,7 +31,8 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
     status: 'active',
     kpi_bonus_percent: 0,
   });
-  const [images, setImages] = useState([]);
+  const [imageSlots, setImageSlots] = useState([]);
+  const initialImageSlotsRef = useRef([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState('');
@@ -44,8 +52,9 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
         const res = await productAPI.getById(productId);
         if (!res.success || cancelled) return;
         const d = res.data || {};
-        const imgs = Array.isArray(d.images) ? d.images.filter(Boolean) : [];
-        setImages(imgs);
+        const slots = parseProductImageSlots(d);
+        initialImageSlotsRef.current = slots.map((s) => ({ ...s }));
+        setImageSlots(slots);
         setForm({
           contragent_id: String(d.contragent_id ?? d.contragent?.id ?? d.contragent?._id ?? ''),
           name: d.name || '',
@@ -80,46 +89,53 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
     };
   }, [open, productId, showError]);
 
+  const imagesChanged = () => {
+    const initial = initialImageSlotsRef.current;
+    const active = getActiveImageSlots(imageSlots);
+    const initialActive = getActiveImageSlots(initial);
+
+    if (active.length !== initialActive.length) return true;
+    if (active.some((s) => s.file instanceof File)) return true;
+
+    const initialIds = initialActive.filter((s) => s.id != null).map((s) => String(s.id)).sort();
+    const activeIds = active.filter((s) => s.id != null).map((s) => String(s.id)).sort();
+    if (initialIds.length !== activeIds.length) return true;
+    return initialIds.some((id, i) => id !== activeIds[i]);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.contragent_id || !form.category_id || !form.subcategory_id) {
-      setError('Kontragent, kategoriya va subkategoriyani tanlang');
-      return;
-    }
-    if (images.length < 1 || images.length > 5) {
-      setError('Rasmlar: kamida 1, ko‘pi bilan 5 ta');
-      return;
-    }
-    const price = Number(form.price);
-    const orig = Number(form.original_price);
-    const qty = Number(form.quantity);
-    const kpi = Number(form.kpi_bonus_percent);
-    if (Number.isNaN(price) || price < 0) {
-      setError('Narx noto‘g‘ri');
-      return;
-    }
-    if (Number.isNaN(orig) || orig < 0) {
-      setError('Asl narx noto‘g‘ri');
-      return;
-    }
-    if (Number.isNaN(qty) || qty < 0) {
-      setError('Miqdor noto‘g‘ri');
-      return;
-    }
-    if (Number.isNaN(kpi) || kpi < 0 || kpi > 100) {
-      setError('KPI bonus 0–100 oralig‘ida bo‘lishi kerak');
+    const validationError = validateProductFormMultipart(form, imageSlots, { subcategories });
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setLoading(true);
     try {
-      const payload = buildProductPayload(form, images);
-      const res = await productAPI.update(productId, payload);
-      if (res.success) {
-        showSuccess(res.message || 'Yangilandi');
-        onSuccess?.();
+      const payload = buildProductJsonPayload(form);
+      const changedImages = imagesChanged();
+
+      if (changedImages) {
+        const active = getActiveImageSlots(imageSlots);
+        const allNewFiles = active.every((s) => s.file instanceof File);
+        if (allNewFiles && active.length >= 1) {
+          await productAPI.updateWithImages(
+            productId,
+            { ...payload, descriptionNormalized: payload.description },
+            active.map((s) => s.file)
+          );
+        } else {
+          await productAPI.update(productId, payload);
+          await syncProductImageChanges(productId, initialImageSlotsRef.current, imageSlots, productAPI);
+        }
+      } else {
+        await productAPI.update(productId, payload);
       }
+
+      showSuccess('Yangilandi');
+      onSuccess?.();
     } catch (err) {
       const msg = err.message || 'Yangilashda xatolik';
       setError(msg);
@@ -150,6 +166,9 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
               ) : (
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                   {error && <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">{error}</div>}
+                  <p className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-md px-3 py-2">
+                    Matn maydonlari JSON orqali saqlanadi. Rasmlar alohida fayl sifatida yuboriladi (o‘chirish, almashtirish, qo‘shish).
+                  </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
@@ -240,10 +259,10 @@ const EditProductModal = ({ open, onClose, onSuccess, productId, contragents = [
                       <input type="number" min="0" max="100" step="1" value={form.kpi_bonus_percent} onChange={(e) => setForm((p) => ({ ...p, kpi_bonus_percent: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500" />
                     </div>
                     <div className="md:col-span-2">
-                      <ImageUploaderGrid
+                      <ProductImageUploader
                         required
-                        images={images}
-                        onChange={setImages}
+                        slots={imageSlots}
+                        onChange={setImageSlots}
                         disabled={loading}
                       />
                     </div>

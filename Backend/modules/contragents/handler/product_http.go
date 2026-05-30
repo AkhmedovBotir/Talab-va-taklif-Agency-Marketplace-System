@@ -24,6 +24,7 @@ func NewContragentProductHandler(s service.ContragentProductService) *Contragent
 func (h *ContragentProductHandler) RegisterMeRoutes(me *gin.RouterGroup) {
 	p := me.Group("/products")
 	{
+		h.registerMultipartRoutes(p)
 		p.POST("", h.Create)
 		p.GET("", h.GetAll)
 		p.GET("/:id", h.GetByID)
@@ -165,13 +166,15 @@ func (h *ContragentProductHandler) Delete(c *gin.Context) {
 
 func (h *ContragentProductHandler) handleError(c *gin.Context, err error) {
 	switch err {
-	case service.ErrProductNotFound:
+	case service.ErrProductNotFound, service.ErrProductImageNotFound:
 		response.JSON(c, http.StatusNotFound, err.Error(), nil, nil)
 	case service.ErrProductStatusInvalid, service.ErrProductNameRequired, service.ErrProductDescriptionRequired,
 		service.ErrProductPriceInvalid, service.ErrProductOriginalInvalid, service.ErrProductCategoryInvalid,
 		service.ErrProductSubcategoryInvalid, service.ErrProductCategoryRelation, service.ErrProductQuantityInvalid,
 		service.ErrProductUnitInvalid, service.ErrProductUnitSizeRequired, service.ErrProductImagesInvalid,
-		service.ErrProductImageBase64Invalid, service.ErrProductKPIInvalid:
+		service.ErrProductImageBase64Invalid, service.ErrProductImageTooLarge,
+		service.ErrProductImageFileInvalid, service.ErrProductImageFileTooLarge,
+		service.ErrProductKPIInvalid:
 		response.JSON(c, http.StatusBadRequest, err.Error(), nil, nil)
 	default:
 		response.JSON(c, http.StatusInternalServerError, "Serverda xatolik yuz berdi", nil, err.Error())

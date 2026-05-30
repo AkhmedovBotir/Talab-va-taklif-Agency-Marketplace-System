@@ -3,6 +3,7 @@ package marketplace
 import (
 	"strings"
 
+	"backend/internal/pkg/productmedia"
 	"backend/internal/pkg/security"
 	"backend/modules/eskiz"
 	"backend/modules/marketplace/domain"
@@ -13,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int) error {
+func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int, appBaseURL, uploadDir string) error {
 	if err := db.AutoMigrate(&domain.User{}, &domain.VerificationCode{}, &domain.DeliveryArea{}, &domain.CartItem{}, &domain.LocalShopCartItem{}, &domain.Order{}, &domain.OrderItem{}, &domain.LocalShopOrder{}, &domain.LocalShopOrderItem{}, &domain.PartnerRequest{}, &domain.ProductRating{}, &domain.MarketplaceNotificationRead{}); err != nil {
 		return err
 	}
@@ -33,8 +34,9 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 	deliverySvc := service.NewDeliveryAreaService(deliveryRepo)
 	deliveryHandler := handler.NewDeliveryAreaHandler(deliverySvc)
 	productRepo := repository.NewMarketplaceProductRepository(db)
+	productMedia := productmedia.NewStore(uploadDir, appBaseURL)
 	cartRepo := repository.NewMarketplaceCartRepository(db)
-	cartSvc := service.NewMarketplaceCartService(cartRepo, productRepo)
+	cartSvc := service.NewMarketplaceCartService(cartRepo, productRepo, productMedia)
 	cartHandler := handler.NewCartHandler(cartSvc)
 	localShopCartRepo := repository.NewLocalShopCartRepository(db)
 	localShopCartSvc := service.NewLocalShopCartService(localShopCartRepo)

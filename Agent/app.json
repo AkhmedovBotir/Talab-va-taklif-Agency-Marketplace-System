@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Agent",
-    "slug": "agent",
+    "name": "Agent Dasturi",
+    "slug": "agent-dasturi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "agent",
+    "scheme": "agent-dasturi",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -20,7 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.agent.dasturi"
+      "package": "com.agentdasturi.app"
     },
     "web": {
       "output": "static",
@@ -44,6 +44,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }  
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a350ac77-6deb-429b-8154-877853893eb1"
+      }
+    }
   }
 }

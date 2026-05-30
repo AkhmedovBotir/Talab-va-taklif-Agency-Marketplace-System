@@ -20,6 +20,7 @@ import { WebView } from 'react-native-webview';
 import ImageViewer from '../../../../components/ImageViewer';
 import { apiService, Product, DeltaFormat } from '../../../../services/api';
 import { formatNumberDisplay } from '../../../../utils/formatNumber';
+import { resolveProductImageUrl } from '../../../../utils/productImages';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -214,7 +215,10 @@ export default function ProductViewScreen() {
     );
   }
 
-  const images = product.images || [];
+  const images =
+    product.imageItems?.length > 0
+      ? product.imageItems.map((i) => resolveProductImageUrl(i.url))
+      : (product.images || []).map((u) => resolveProductImageUrl(u));
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -20,24 +21,24 @@ func New() *gin.Engine {
 				return true
 			}
 			allowed := map[string]struct{}{
-				"https://market.ttsa.uz":       {},
-				"https://www.ttsa.uz":   {},
-				"https://admin.ttsa.uz": {},
+				"https://market.ttsa.uz":     {},
+				"https://www.ttsa.uz":        {},
+				"https://admin.ttsa.uz":      {},
 				"https://delivery.ttsa.uz":   {},
 				"https://contragent.ttsa.uz": {},
 				"https://agent.ttsa.uz":      {},
 				"https://punkt.ttsa.uz":      {},
 				"https://store.ttsa.uz":      {},
 				"https://manager.ttsa.uz":    {},
-				"http://localhost:5173": {},
-				"http://localhost:5174": {},
-				"http://localhost:5175": {},
-				"http://localhost:8082": {},
-				"http://localhost:8083": {},
-				"http://localhost:8084": {},
-				"http://localhost:8085": {},
-				"http://localhost:8086": {},
-				"http://localhost:8087": {},
+				"http://localhost:5173":      {},
+				"http://localhost:5174":      {},
+				"http://localhost:5175":      {},
+				"http://localhost:8082":      {},
+				"http://localhost:8083":      {},
+				"http://localhost:8084":      {},
+				"http://localhost:8085":      {},
+				"http://localhost:8086":      {},
+				"http://localhost:8087":      {},
 			}
 			_, ok := allowed[o]
 			return ok
@@ -62,4 +63,14 @@ func New() *gin.Engine {
 	})
 
 	return router
+}
+
+// MountUploads — mahsulot rasmlari (products/...) uchun statik fayllar.
+func MountUploads(router *gin.Engine, uploadDir string) {
+	dir := strings.TrimSpace(uploadDir)
+	if dir == "" {
+		dir = "uploads"
+	}
+	_ = os.MkdirAll(dir, 0o755)
+	router.Static("/uploads", dir)
 }

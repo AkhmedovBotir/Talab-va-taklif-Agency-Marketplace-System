@@ -222,6 +222,21 @@ export interface DeltaFormat {
   }>;
 }
 
+export interface ProductImageItem {
+  id: number;
+  url: string;
+  sortOrder: number;
+}
+
+/** Multipart yuborish uchun rasm (web: File, native: uri) */
+export interface ProductImageUpload {
+  uri: string;
+  name: string;
+  mimeType: string;
+  size?: number;
+  file?: File;
+}
+
 export interface Product {
   _id: string;
   name: string;
@@ -229,6 +244,7 @@ export interface Product {
   price: number;
   originalPrice: number;
   images: string[];
+  imageItems: ProductImageItem[];
   category: Category;
   subcategory: Category | null;
   quantity: number;
@@ -289,40 +305,32 @@ export interface ProductResponse {
   data: Product;
 }
 
-export interface ProductCreateRequest {
+export interface ProductFormFields {
   name: string;
   description?: DeltaFormat | null;
   price: number;
   originalPrice: number;
-  images?: string[];
   category: string;
   subcategory?: string | null;
   quantity: number;
   unit: 'dona' | 'litr' | 'kg';
   unitSize?: number | null;
-  length?: number | null;
-  width?: number | null;
-  weight?: number | null;
   status?: 'active' | 'inactive' | 'archived';
   kpiBonusPercent: number;
 }
 
-export interface ProductUpdateRequest {
-  name?: string;
-  description?: DeltaFormat | null;
-  price?: number;
-  originalPrice?: number;
+export interface ProductCreateRequest extends ProductFormFields {
   images?: string[];
-  category?: string;
-  subcategory?: string | null;
-  quantity?: number;
-  unit?: 'dona' | 'litr' | 'kg';
-  unitSize?: number | null;
   length?: number | null;
   width?: number | null;
   weight?: number | null;
-  status?: 'active' | 'inactive' | 'archived';
-  kpiBonusPercent?: number;
+}
+
+export interface ProductUpdateRequest extends Partial<ProductFormFields> {
+  images?: string[];
+  length?: number | null;
+  width?: number | null;
+  weight?: number | null;
 }
 
 export interface ProductStatusRequest {
@@ -814,6 +822,19 @@ function normalizeV1ProductRow(row: Record<string, unknown>): Product {
     ? (imagesRaw as unknown[]).map((x) => String(x))
     : [];
 
+  const imageItemsRaw = row.image_items ?? row.imageItems;
+  const imageItems: ProductImageItem[] = Array.isArray(imageItemsRaw)
+    ? (imageItemsRaw as Record<string, unknown>[]).map((item) => ({
+        id: pickNumCat(item, 'id'),
+        url: String(item.url ?? ''),
+        sortOrder: pickNumCat(item, 'sort_order', 'sortOrder'),
+      }))
+    : images.map((url, index) => ({
+        id: index + 1,
+        url,
+        sortOrder: index,
+      }));
+
   const mod = row.moderation_status ?? row.moderationStatus;
   const moderationStatus =
     mod === 'approved' || mod === 'rejected' || mod === 'pending' ? mod : undefined;
@@ -840,7 +861,8 @@ function normalizeV1ProductRow(row: Record<string, unknown>): Product {
     description: parseV1Description(row.description),
     price: pickNumCat(row, 'price'),
     originalPrice: pickNumCat(row, 'original_price', 'originalPrice'),
-    images,
+    images: imageItems.length > 0 ? imageItems.map((x) => x.url) : images,
+    imageItems,
     category,
     subcategory,
     quantity: pickNumCat(row, 'quantity'),
@@ -867,6 +889,89 @@ function normalizeV1ProductRow(row: Record<string, unknown>): Product {
 function descriptionToV1JsonString(desc: DeltaFormat | null | undefined): string {
   if (desc == null) return JSON.stringify({ ops: [{ insert: '' }] });
   return JSON.stringify(desc);
+}
+
+function appendProductFormFieldsToFormData(
+  formData: FormData,
+  data: {
+    name: string;
+    description: DeltaFormat | null | undefined;
+    price: number;
+    originalPrice: number;
+    categoryId: number;
+    subcategoryId: number | null;
+    quantity: number;
+    unit: 'dona' | 'litr' | 'kg';
+    unitSize: string | null;
+    status: 'active' | 'inactive' | 'archived';
+    kpiBonusPercent: number;
+  }
+): void {
+  const apiStatus = data.status === 'archived' ? 'inactive' : data.status;
+  formData.append('name', data.name);
+  formData.append('description', descriptionToV1JsonString(data.description));
+  formData.append('price', String(data.price));
+  formData.append('original_price', String(data.originalPrice));
+  formData.append('category_id', String(data.categoryId));
+  if (data.subcategoryId != null && data.subcategoryId > 0) {
+    formData.append('subcategory_id', String(data.subcategoryId));
+  }
+  formData.append('quantity', String(data.quantity));
+  formData.append('unit', data.unit);
+  formData.append(
+    'unit_size',
+    data.unitSize && data.unitSize.trim().length > 0 ? data.unitSize.trim() : data.unit
+  );
+  formData.append('status', apiStatus);
+  formData.append('kpi_bonus_percent', String(data.kpiBonusPercent));
+}
+
+function appendImageUploadToFormData(
+  formData: FormData,
+  fieldName: 'images' | 'image',
+  upload: ProductImageUpload
+): void {
+  if (typeof upload.file !== 'undefined' && upload.file) {
+    formData.append(fieldName, upload.file, upload.name);
+    return;
+  }
+  formData.append(
+    fieldName,
+    {
+      uri: upload.uri,
+      name: upload.name,
+      type: upload.mimeType,
+    } as unknown as Blob
+  );
+}
+
+function productFormFieldsFromRequest(data: ProductFormFields): {
+  name: string;
+  description: DeltaFormat | null | undefined;
+  price: number;
+  originalPrice: number;
+  categoryId: number;
+  subcategoryId: number | null;
+  quantity: number;
+  unit: 'dona' | 'litr' | 'kg';
+  unitSize: string | null;
+  status: 'active' | 'inactive' | 'archived';
+  kpiBonusPercent: number;
+} {
+  return {
+    name: data.name,
+    description: data.description ?? null,
+    price: data.price,
+    originalPrice: data.originalPrice,
+    categoryId: Number(data.category),
+    subcategoryId:
+      data.subcategory != null && data.subcategory !== '' ? Number(data.subcategory) : null,
+    quantity: data.quantity,
+    unit: data.unit,
+    unitSize: data.unitSize != null ? String(data.unitSize) : null,
+    status: data.status ?? 'active',
+    kpiBonusPercent: data.kpiBonusPercent,
+  };
 }
 
 function buildV1ProductWriteBody(data: {
@@ -1068,6 +1173,59 @@ class ApiService {
           status: 408,
           message:
             'So‘rov vaqti tugadi. Internet aloqasi va api.ttsa.uz ni tekshiring.',
+        };
+      }
+      const err = error as { status?: number };
+      if (err.status) {
+        throw error;
+      }
+      throw {
+        status: 500,
+        message: 'Network error. Please check your connection.',
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  private async contragentV1MultipartRequest<T>(
+    endpoint: string,
+    formData: FormData,
+    method: 'POST' | 'PUT' | 'PATCH' = 'POST'
+  ): Promise<T> {
+    const url = `${this.contragentV1Base}${endpoint}`;
+    const controller = new AbortController();
+    const timeoutMs = 120_000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const headers: Record<string, string> = {};
+    let hadAuth = false;
+    const token = await this.getToken();
+    if (token) {
+      hadAuth = true;
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method,
+        body: formData,
+        headers,
+        signal: controller.signal,
+      });
+      const text = await response.text();
+      const data = text ? (JSON.parse(text) as Record<string, unknown>) : ({} as Record<string, unknown>);
+
+      if (!response.ok) {
+        this.throwApiError(response, data, { hadAuth });
+      }
+
+      return data as T;
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw {
+          status: 408,
+          message: 'Rasm yuklash vaqti tugadi. Internet aloqasini tekshiring.',
         };
       }
       const err = error as { status?: number };
@@ -1513,21 +1671,45 @@ class ApiService {
   }
 
   // Product methods (Contragent v1)
+  async createProductWithImages(
+    data: ProductFormFields,
+    imageUploads: ProductImageUpload[]
+  ): Promise<ProductResponse> {
+    if (imageUploads.length < 1 || imageUploads.length > 5) {
+      throw {
+        status: 400,
+        message: 'Kamida 1 ta, maksimal 5 ta rasm yuborilishi kerak.',
+      };
+    }
+
+    const formData = new FormData();
+    appendProductFormFieldsToFormData(formData, productFormFieldsFromRequest(data));
+    for (const upload of imageUploads) {
+      appendImageUploadToFormData(formData, 'images', upload);
+    }
+
+    const raw = await this.contragentV1MultipartRequest<Record<string, unknown>>(
+      '/contragents/me/products/with-images',
+      formData,
+      'POST'
+    );
+    return {
+      success: true,
+      message: (raw.message as string) || 'Maxsulot yaratildi',
+      data: normalizeV1ProductRow(extractV1SingleRecord(raw)),
+    };
+  }
+
   async createProduct(data: ProductCreateRequest): Promise<ProductResponse> {
-    const images = data.images ?? [];
+    if (data.images?.length) {
+      throw {
+        status: 400,
+        message: 'Rasm yuborish uchun createProductWithImages ishlating.',
+      };
+    }
     const body = buildV1ProductWriteBody({
-      name: data.name,
-      description: data.description ?? null,
-      price: data.price,
-      originalPrice: data.originalPrice,
-      images,
-      categoryId: Number(data.category),
-      subcategoryId: data.subcategory != null && data.subcategory !== '' ? Number(data.subcategory) : null,
-      quantity: data.quantity,
-      unit: data.unit,
-      unitSize: data.unitSize != null ? String(data.unitSize) : null,
-      status: data.status ?? 'active',
-      kpiBonusPercent: data.kpiBonusPercent,
+      ...productFormFieldsFromRequest(data),
+      images: [],
     });
     const raw = await this.contragentV1Request<Record<string, unknown>>('/contragents/me/products', {
       method: 'POST',
@@ -1538,6 +1720,167 @@ class ApiService {
       message: (raw.message as string) || '',
       data: normalizeV1ProductRow(extractV1SingleRecord(raw)),
     };
+  }
+
+  async updateProductWithImages(
+    id: string,
+    data: Partial<ProductFormFields>,
+    imageUploads?: ProductImageUpload[]
+  ): Promise<ProductResponse> {
+    if (imageUploads != null && (imageUploads.length < 1 || imageUploads.length > 5)) {
+      throw {
+        status: 400,
+        message: 'Rasmlarni almashtirish uchun 1 dan 5 tagacha fayl yuboring.',
+      };
+    }
+
+    const formData = new FormData();
+    const fields = productFormFieldsFromRequest({
+      name: data.name ?? '',
+      description: data.description,
+      price: data.price ?? 0,
+      originalPrice: data.originalPrice ?? 0,
+      category: data.category ?? '0',
+      subcategory: data.subcategory,
+      quantity: data.quantity ?? 0,
+      unit: data.unit ?? 'dona',
+      unitSize: data.unitSize,
+      status: data.status,
+      kpiBonusPercent: data.kpiBonusPercent ?? 0,
+    });
+    appendProductFormFieldsToFormData(formData, fields);
+
+    if (imageUploads?.length) {
+      for (const upload of imageUploads) {
+        appendImageUploadToFormData(formData, 'images', upload);
+      }
+    }
+
+    const raw = await this.contragentV1MultipartRequest<Record<string, unknown>>(
+      `/contragents/me/products/${encodeURIComponent(String(Number(id)))}/with-images`,
+      formData,
+      'PUT'
+    );
+    return {
+      success: true,
+      message: (raw.message as string) || 'Maxsulot yangilandi',
+      data: normalizeV1ProductRow(extractV1SingleRecord(raw)),
+    };
+  }
+
+  async addProductImages(id: string, imageUploads: ProductImageUpload[]): Promise<ProductResponse> {
+    if (imageUploads.length < 1) {
+      throw { status: 400, message: 'Kamida 1 ta rasm tanlang.' };
+    }
+    const formData = new FormData();
+    for (const upload of imageUploads) {
+      appendImageUploadToFormData(formData, 'images', upload);
+    }
+    const raw = await this.contragentV1MultipartRequest<Record<string, unknown>>(
+      `/contragents/me/products/${encodeURIComponent(String(Number(id)))}/images`,
+      formData,
+      'POST'
+    );
+    return {
+      success: true,
+      message: (raw.message as string) || 'Rasm qo‘shildi',
+      data: normalizeV1ProductRow(extractV1SingleRecord(raw)),
+    };
+  }
+
+  async replaceAllProductImages(
+    id: string,
+    imageUploads: ProductImageUpload[]
+  ): Promise<ProductResponse> {
+    if (imageUploads.length < 1 || imageUploads.length > 5) {
+      throw {
+        status: 400,
+        message: 'Barcha rasmlarni almashtirish uchun 1–5 ta fayl kerak.',
+      };
+    }
+    const formData = new FormData();
+    for (const upload of imageUploads) {
+      appendImageUploadToFormData(formData, 'images', upload);
+    }
+    const raw = await this.contragentV1MultipartRequest<Record<string, unknown>>(
+      `/contragents/me/products/${encodeURIComponent(String(Number(id)))}/images`,
+      formData,
+      'PUT'
+    );
+    return {
+      success: true,
+      message: (raw.message as string) || 'Rasmlar yangilandi',
+      data: normalizeV1ProductRow(extractV1SingleRecord(raw)),
+    };
+  }
+
+  async replaceProductImage(
+    productId: string,
+    imageId: number,
+    upload: ProductImageUpload
+  ): Promise<ProductResponse> {
+    const formData = new FormData();
+    appendImageUploadToFormData(formData, 'image', upload);
+    const raw = await this.contragentV1MultipartRequest<Record<string, unknown>>(
+      `/contragents/me/products/${encodeURIComponent(String(Number(productId)))}/images/${encodeURIComponent(String(imageId))}`,
+      formData,
+      'PUT'
+    );
+    return {
+      success: true,
+      message: (raw.message as string) || 'Rasm almashtirildi',
+      data: normalizeV1ProductRow(extractV1SingleRecord(raw)),
+    };
+  }
+
+  async deleteProductImage(productId: string, imageId: number): Promise<ProductResponse> {
+    const raw = await this.contragentV1Request<Record<string, unknown>>(
+      `/contragents/me/products/${encodeURIComponent(String(Number(productId)))}/images/${encodeURIComponent(String(imageId))}`,
+      { method: 'DELETE' }
+    );
+    return {
+      success: true,
+      message: (raw.message as string) || 'Rasm o‘chirildi',
+      data: normalizeV1ProductRow(extractV1SingleRecord(raw)),
+    };
+  }
+
+  /**
+   * Tahrir: matn va rasmlar o‘zgarishini API qoidalariga mos sinxronlaydi.
+   */
+  async syncProductImagesAfterEdit(
+    productId: string,
+    before: ProductImageItem[],
+    afterDrafts: Array<{ upload?: ProductImageUpload; remote?: { id: number; url: string } }>
+  ): Promise<void> {
+    if (afterDrafts.length < 1) {
+      throw { status: 400, message: 'Kamida 1 ta rasm qolishi kerak.' };
+    }
+    if (afterDrafts.length > 5) {
+      throw { status: 400, message: 'Maksimal 5 ta rasm bo‘lishi mumkin.' };
+    }
+
+    const newUploads = afterDrafts.filter((d) => d.upload).map((d) => d.upload!);
+    const allReplacedWithNew =
+      before.length > 0 && afterDrafts.length >= 1 && afterDrafts.every((d) => d.upload);
+
+    if (allReplacedWithNew) {
+      await this.replaceAllProductImages(productId, newUploads);
+      return;
+    }
+
+    const afterRemoteIds = new Set(
+      afterDrafts.filter((d) => d.remote).map((d) => d.remote!.id)
+    );
+    const removedIds = before.filter((item) => !afterRemoteIds.has(item.id)).map((item) => item.id);
+
+    if (newUploads.length > 0) {
+      await this.addProductImages(productId, newUploads);
+    }
+
+    for (const imageId of removedIds) {
+      await this.deleteProductImage(productId, imageId);
+    }
   }
 
   async getMyProducts(params?: {
@@ -1650,21 +1993,27 @@ class ApiService {
   }
 
   async updateProduct(id: string, data: ProductUpdateRequest): Promise<ProductResponse> {
-    const images = data.images ?? [];
+    if (data.images?.length) {
+      throw {
+        status: 400,
+        message: 'Rasm yangilash uchun updateProductWithImages ishlating.',
+      };
+    }
     const body = buildV1ProductWriteBody({
-      name: data.name ?? '',
-      description: data.description ?? null,
-      price: data.price ?? 0,
-      originalPrice: data.originalPrice ?? 0,
-      images,
-      categoryId: Number(data.category ?? 0),
-      subcategoryId:
-        data.subcategory != null && data.subcategory !== '' ? Number(data.subcategory) : null,
-      quantity: data.quantity ?? 0,
-      unit: (data.unit ?? 'dona') as 'dona' | 'litr' | 'kg',
-      unitSize: data.unitSize != null ? String(data.unitSize) : null,
-      status: data.status ?? 'active',
-      kpiBonusPercent: data.kpiBonusPercent ?? 0,
+      ...productFormFieldsFromRequest({
+        name: data.name ?? '',
+        description: data.description,
+        price: data.price ?? 0,
+        originalPrice: data.originalPrice ?? 0,
+        category: data.category ?? '0',
+        subcategory: data.subcategory,
+        quantity: data.quantity ?? 0,
+        unit: data.unit ?? 'dona',
+        unitSize: data.unitSize,
+        status: data.status,
+        kpiBonusPercent: data.kpiBonusPercent ?? 0,
+      }),
+      images: [],
     });
     const raw = await this.contragentV1Request<Record<string, unknown>>(
       `/contragents/me/products/${encodeURIComponent(String(Number(id)))}`,

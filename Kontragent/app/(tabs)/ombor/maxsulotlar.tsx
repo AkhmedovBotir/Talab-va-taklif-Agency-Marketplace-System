@@ -20,6 +20,7 @@ import {
 import { useResponsive } from '../../../hooks/useResponsive';
 import { apiService, Product, Category } from '../../../services/api';
 import { formatNumberDisplay } from '../../../utils/formatNumber';
+import { resolveProductImageUrl } from '../../../utils/productImages';
 
 export default function MaxsulotlarScreen() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -236,7 +237,11 @@ export default function MaxsulotlarScreen() {
             {/* Product Image */}
             {item.images && item.images.length > 0 ? (
               <Image
-                source={{ uri: item.images[0] }}
+                source={{
+                  uri: resolveProductImageUrl(
+                    item.imageItems?.[0]?.url ?? item.images[0]
+                  ),
+                }}
                 style={styles.productImage}
                 resizeMode="cover"
               />

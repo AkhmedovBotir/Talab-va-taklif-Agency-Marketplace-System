@@ -18,7 +18,7 @@ Shablon maydonlari:
 
 - `name`
 - `description` (delta format JSON string)
-- `images` (base64, 1..5 ta; har qanday rasm MIME; base64 qismi ≤ 100 GB; piksel/hajm cheklovi yo‘q)
+- `images` (yuborish: base64 yoki multipart fayl; javob: URL `.../uploads/templates/{id}/...`)
 - `category_id` (parent category ID)
 - `subcategory_id` (tanlangan category ichidagi subcategory ID)
 - `unit` (`dona | litr | kg`)
@@ -74,7 +74,9 @@ Javob:
 
 **PUT** `/local-shop-product-templates/{id}`
 
-Body create bilan bir xil formatda.
+Body create bilan bir xil formatda. **`images` ixtiyoriy** — yuborilmasa faqat matn yangilanadi.
+
+**Fayl bilan:** `docs/admin-local-shop-product-templates-multipart-api.md`
 
 ---
 
@@ -100,7 +102,7 @@ Body create bilan bir xil formatda.
 
 - `400` - validatsiya xatolari (`category/subcategory`, `unit`, `status`, `images`, `description` va h.k.)
   - `image base64 formati noto'g'ri`
-  - `image base64 hajmi 100 GB dan oshmasligi kerak`
+  - `bitta rasm base64 hajmi 4 MB dan oshmasligi kerak`
 - `401/403` - auth yoki role mos emas
 - `404` - shablon topilmadi
 - `500` - server xatosi

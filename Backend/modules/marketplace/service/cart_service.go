@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 
+	"backend/internal/pkg/productmedia"
 	contrDomain "backend/modules/contragents/domain"
 	"backend/modules/marketplace/domain"
 	"backend/modules/marketplace/repository"
@@ -26,13 +27,15 @@ type MarketplaceCartService interface {
 type marketplaceCartService struct {
 	cartRepo    repository.MarketplaceCartRepository
 	productRepo repository.MarketplaceProductRepository
+	media       *productmedia.Store
 }
 
 func NewMarketplaceCartService(
 	cartRepo repository.MarketplaceCartRepository,
 	productRepo repository.MarketplaceProductRepository,
+	media *productmedia.Store,
 ) MarketplaceCartService {
-	return &marketplaceCartService{cartRepo: cartRepo, productRepo: productRepo}
+	return &marketplaceCartService{cartRepo: cartRepo, productRepo: productRepo, media: media}
 }
 
 func (s *marketplaceCartService) GetCart(userID uint) (*domain.CartOutput, error) {
@@ -87,7 +90,7 @@ func (s *marketplaceCartService) buildCart(userID uint) (*domain.CartOutput, err
 		return &domain.CartOutput{Items: []domain.CartLineOutput{}, TotalLines: 0}, nil
 	}
 
-	outs, err := ProductOutputsFromRows(s.productRepo, productOrder)
+	outs, err := ProductOutputsFromRows(s.productRepo, s.media, productOrder)
 	if err != nil {
 		return nil, err
 	}

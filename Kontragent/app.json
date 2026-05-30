@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Kontragent",
-    "slug": "kontragent",
+    "name": "Kontragent Dasturi",
+    "slug": "kontragent-dasturi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "kontragent",
+    "scheme": "kontragent-dasturi",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -20,7 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.kontragent.dasturi",
+      "package": "com.kontragentdasturi.app",
       "permissions": [
         "CAMERA",
         "READ_MEDIA_IMAGES"

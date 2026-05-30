@@ -1,6 +1,7 @@
 package noauth
 
 import (
+	"backend/internal/pkg/productmedia"
 	"backend/modules/marketplace/repository"
 	mpsvc "backend/modules/marketplace/service"
 	"backend/modules/noauth/handler"
@@ -9,15 +10,16 @@ import (
 	"gorm.io/gorm"
 )
 
-func RegisterRoutes(router *gin.Engine, db *gorm.DB) error {
+func RegisterRoutes(router *gin.Engine, db *gorm.DB, appBaseURL, uploadDir string) error {
 	productRepo := repository.NewMarketplaceProductRepository(db)
-	productSvc := mpsvc.NewMarketplaceProductService(productRepo)
+	productMedia := productmedia.NewStore(uploadDir, appBaseURL)
+	productSvc := mpsvc.NewMarketplaceProductService(productRepo, productMedia)
 
 	categoryRepo := repository.NewMarketplaceCategoryRepository(db)
 	categorySvc := mpsvc.NewMarketplaceCategoryService(categoryRepo)
 
 	contragentBrowseRepo := repository.NewMarketplaceContragentBrowseRepository(db)
-	contragentSvc := mpsvc.NewMarketplaceContragentBrowseService(contragentBrowseRepo, productRepo)
+	contragentSvc := mpsvc.NewMarketplaceContragentBrowseService(contragentBrowseRepo, productRepo, productMedia)
 
 	regionRepo := repository.NewRegionRepository(db)
 	regionSvc := mpsvc.NewRegionService(regionRepo)

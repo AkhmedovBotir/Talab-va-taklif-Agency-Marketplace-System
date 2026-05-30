@@ -67,6 +67,76 @@ const apiRequest = async (endpoint, options = {}, requiresAuth = true) => {
   return normalizeCommonSuccess(data);
 };
 
+/** JSON body yubormaydi — brauzer multipart boundary ni o‘zi qo‘yadi */
+const apiMultipartRequest = async (endpoint, formData, { method = 'POST', noAuthRedirect = false } = {}) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+  let data = {};
+
+  try {
+    data = await response.json();
+  } catch {
+    if (!response.ok) {
+      if (response.status === 401 && !noAuthRedirect) clearAuthAndRedirect();
+      throw new Error(`Server xatolik: ${response.status}`);
+    }
+  }
+
+  if (!response.ok) {
+    const msg = data.message || data.error || "So'rovda xatolik yuz berdi";
+    if (response.status === 401) {
+      if (!noAuthRedirect) clearAuthAndRedirect();
+      throw new ApiHttpError(data.message || "Sessiya tugadi. Qayta kiring.", 401, data);
+    }
+    if (response.status === 403) {
+      throw new ApiHttpError(data.message || 'Ruxsat berilmagan', 403, data);
+    }
+    if (response.status === 404) {
+      throw new ApiHttpError(data.message || 'Topilmadi', 404, data);
+    }
+    throw new ApiHttpError(msg, response.status, data);
+  }
+
+  return normalizeCommonSuccess(data);
+};
+
+const appendProductFormFields = (formData, form) => {
+  formData.append('contragent_id', String(form.contragent_id));
+  formData.append('name', String(form.name || '').trim());
+  formData.append('description', form.descriptionNormalized ?? form.description ?? '');
+  formData.append('price', String(form.price));
+  formData.append('original_price', String(form.original_price));
+  formData.append('category_id', String(form.category_id));
+  formData.append('subcategory_id', String(form.subcategory_id));
+  formData.append('quantity', String(form.quantity));
+  formData.append('unit', form.unit);
+  formData.append('unit_size', String(form.unit_size || '').trim());
+  formData.append('status', form.status === 'inactive' ? 'inactive' : 'active');
+  formData.append('kpi_bonus_percent', String(form.kpi_bonus_percent));
+};
+
+const appendImageFiles = (formData, files, fieldName = 'images') => {
+  for (const file of files) {
+    if (file instanceof File) formData.append(fieldName, file);
+  }
+};
+
+const appendTemplateFormFields = (formData, form) => {
+  formData.append('name', String(form.name || '').trim());
+  formData.append('description', String(form.description ?? ''));
+  formData.append('category_id', String(form.category_id));
+  formData.append('subcategory_id', String(form.subcategory_id));
+  formData.append('unit', form.unit || 'dona');
+  formData.append('unit_size', String(form.unit_size || '').trim());
+  formData.append('status', form.status === 'inactive' ? 'inactive' : 'active');
+};
+
 const normalizeAdmin = (admin) => {
   if (!admin || typeof admin !== 'object') return admin;
   return {
@@ -944,13 +1014,27 @@ export const punktAPI = {
 
 const normalizeProduct = (item) => {
   if (!item || typeof item !== 'object') return item;
+  const imageItems = Array.isArray(item.image_items)
+    ? item.image_items.map((img) => ({
+        id: img.id ?? img._id,
+        url: img.url ?? '',
+        sort_order: img.sort_order ?? img.sortOrder ?? 0,
+      }))
+    : [];
   return {
     ...item,
     _id: item._id ?? item.id,
     id: item.id ?? item._id,
+    product_code: item.product_code ?? item.productCode ?? '',
     contragent_id: item.contragent_id ?? item.contragent?.id ?? item.contragent?._id,
     category_id: item.category_id ?? item.category?.id ?? item.category?._id,
     subcategory_id: item.subcategory_id ?? item.subcategory?.id ?? item.subcategory?._id,
+    moderation_status: item.moderation_status ?? item.moderationStatus ?? '',
+    rejection_reason: item.rejection_reason ?? item.rejectionReason ?? '',
+    images: Array.isArray(item.images)
+      ? item.images.filter(Boolean)
+      : imageItems.map((img) => img.url).filter(Boolean),
+    image_items: imageItems,
     createdAt: item.createdAt ?? item.created_at,
     updatedAt: item.updatedAt ?? item.updated_at,
   };
@@ -1016,7 +1100,6 @@ export const productAPI = {
     normalizeProductResponse(
       await apiRequest(`/products/${id}/approve`, {
         method: 'PATCH',
-        body: JSON.stringify({}),
       })
     ),
   reject: async (id, rejection_reason) =>
@@ -1030,6 +1113,51 @@ export const productAPI = {
     apiRequest(`/products/${id}`, {
       method: 'DELETE',
     }),
+  /** Multipart: matn + 1–5 rasm fayl */
+  createWithImages: async (form, files) => {
+    const formData = new FormData();
+    appendProductFormFields(formData, form);
+    appendImageFiles(formData, files);
+    return normalizeProductResponse(
+      await apiMultipartRequest('/products/with-images', formData, { method: 'POST' })
+    );
+  },
+  /** Multipart: matn; ixtiyoriy 1–5 fayl (yuborilsa barcha rasmlar almashtiriladi) */
+  updateWithImages: async (id, form, files = []) => {
+    const formData = new FormData();
+    appendProductFormFields(formData, form);
+    if (files.length) appendImageFiles(formData, files);
+    return normalizeProductResponse(
+      await apiMultipartRequest(`/products/${id}/with-images`, formData, { method: 'PUT' })
+    );
+  },
+  addImages: async (id, files) => {
+    const formData = new FormData();
+    appendImageFiles(formData, files);
+    return normalizeProductResponse(
+      await apiMultipartRequest(`/products/${id}/images`, formData, { method: 'POST' })
+    );
+  },
+  replaceAllImages: async (id, files) => {
+    const formData = new FormData();
+    appendImageFiles(formData, files);
+    return normalizeProductResponse(
+      await apiMultipartRequest(`/products/${id}/images`, formData, { method: 'PUT' })
+    );
+  },
+  replaceImage: async (id, imageId, file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return normalizeProductResponse(
+      await apiMultipartRequest(`/products/${id}/images/${imageId}`, formData, { method: 'PUT' })
+    );
+  },
+  deleteImage: async (id, imageId) =>
+    normalizeProductResponse(
+      await apiRequest(`/products/${id}/images/${imageId}`, {
+        method: 'DELETE',
+      })
+    ),
 };
 
 const normalizeMarketplaceUser = (item) => {
@@ -1228,11 +1356,22 @@ export const integrationApiKeysAPI = {
 
 const normalizeLocalShopProductTemplate = (item) => {
   if (!item || typeof item !== 'object') return item;
+  const imageItems = Array.isArray(item.image_items)
+    ? item.image_items.map((img) => ({
+        id: img.id ?? img._id,
+        url: img.url ?? '',
+        sort_order: img.sort_order ?? img.sortOrder ?? 0,
+      }))
+    : [];
   return {
     ...item,
     id: item.id ?? item._id,
     category_id: item.category_id ?? item.category?.id ?? item.category?._id,
     subcategory_id: item.subcategory_id ?? item.subcategory?.id ?? item.subcategory?._id,
+    images: Array.isArray(item.images)
+      ? item.images.filter(Boolean)
+      : imageItems.map((img) => img.url).filter(Boolean),
+    image_items: imageItems,
     createdAt: item.createdAt ?? item.created_at,
     updatedAt: item.updatedAt ?? item.updated_at,
   };
@@ -1372,6 +1511,51 @@ export const localShopProductTemplateAPI = {
     apiRequest(`/local-shop-product-templates/${id}`, {
       method: 'DELETE',
     }),
+  createWithImages: async (form, files) => {
+    const formData = new FormData();
+    appendTemplateFormFields(formData, form);
+    appendImageFiles(formData, files);
+    return normalizeLocalShopTemplateResponse(
+      await apiMultipartRequest('/local-shop-product-templates/with-images', formData, { method: 'POST' })
+    );
+  },
+  updateWithImages: async (id, form, files = []) => {
+    const formData = new FormData();
+    appendTemplateFormFields(formData, form);
+    if (files.length) appendImageFiles(formData, files);
+    return normalizeLocalShopTemplateResponse(
+      await apiMultipartRequest(`/local-shop-product-templates/${id}/with-images`, formData, { method: 'PUT' })
+    );
+  },
+  addImages: async (id, files) => {
+    const formData = new FormData();
+    appendImageFiles(formData, files);
+    return normalizeLocalShopTemplateResponse(
+      await apiMultipartRequest(`/local-shop-product-templates/${id}/images`, formData, { method: 'POST' })
+    );
+  },
+  replaceAllImages: async (id, files) => {
+    const formData = new FormData();
+    appendImageFiles(formData, files);
+    return normalizeLocalShopTemplateResponse(
+      await apiMultipartRequest(`/local-shop-product-templates/${id}/images`, formData, { method: 'PUT' })
+    );
+  },
+  replaceImage: async (id, imageId, file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return normalizeLocalShopTemplateResponse(
+      await apiMultipartRequest(`/local-shop-product-templates/${id}/images/${imageId}`, formData, {
+        method: 'PUT',
+      })
+    );
+  },
+  deleteImage: async (id, imageId) =>
+    normalizeLocalShopTemplateResponse(
+      await apiRequest(`/local-shop-product-templates/${id}/images/${imageId}`, {
+        method: 'DELETE',
+      })
+    ),
 };
 
 const normalizeAdminPartnerRequest = (item) => {

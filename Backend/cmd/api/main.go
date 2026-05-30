@@ -30,10 +30,11 @@ func main() {
 	}
 
 	router := httpserver.New()
-	if err = admin.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours, cfg.AppBaseURL); err != nil {
+	httpserver.MountUploads(router, cfg.UploadDir)
+	if err = admin.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours, cfg.AppBaseURL, cfg.UploadDir); err != nil {
 		log.Fatalf("Router ulashda xatolik: %v", err)
 	}
-	if err = contragents.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
+	if err = contragents.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours, cfg.AppBaseURL, cfg.UploadDir); err != nil {
 		log.Fatalf("Contragent auth router ulashda xatolik: %v", err)
 	}
 	if err = localshops.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
@@ -42,7 +43,7 @@ func main() {
 	if err = deliveryproviders.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
 		log.Fatalf("Delivery provider auth router ulashda xatolik: %v", err)
 	}
-	if err = marketplace.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
+	if err = marketplace.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours, cfg.AppBaseURL, cfg.UploadDir); err != nil {
 		log.Fatalf("Marketplace auth router ulashda xatolik: %v", err)
 	}
 	if err = punkts.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
@@ -54,7 +55,7 @@ func main() {
 	if err = managers.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
 		log.Fatalf("Manager auth router ulashda xatolik: %v", err)
 	}
-	if err = noauth.RegisterRoutes(router, db); err != nil {
+	if err = noauth.RegisterRoutes(router, db, cfg.AppBaseURL, cfg.UploadDir); err != nil {
 		log.Fatalf("NoAuth router ulashda xatolik: %v", err)
 	}
 

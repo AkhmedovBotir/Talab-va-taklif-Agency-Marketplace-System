@@ -25,6 +25,7 @@ func (h *LocalShopProductTemplateHandler) RegisterRoutes(api *gin.RouterGroup, a
 	grp := api.Group("/local-shop-product-templates")
 	grp.Use(auth)
 	{
+		h.registerMultipartRoutes(grp)
 		grp.POST("", h.Create)
 		grp.GET("", h.GetAll)
 		grp.GET("/:id", h.GetByID)
@@ -136,13 +137,14 @@ func (h *LocalShopProductTemplateHandler) Delete(c *gin.Context) {
 
 func (h *LocalShopProductTemplateHandler) handleError(c *gin.Context, err error) {
 	switch err {
-	case service.ErrLocalShopTemplateNotFound:
+	case service.ErrLocalShopTemplateNotFound, service.ErrLocalShopTemplateImageNotFound:
 		response.JSON(c, http.StatusNotFound, err.Error(), nil, nil)
 	case service.ErrLocalShopTemplateNameRequired, service.ErrLocalShopTemplateDescriptionRequired,
 		service.ErrLocalShopTemplateCategoryInvalid, service.ErrLocalShopTemplateSubcategoryInvalid,
 		service.ErrLocalShopTemplateCategoryRelation, service.ErrLocalShopTemplateUnitInvalid,
 		service.ErrLocalShopTemplateUnitSizeRequired, service.ErrLocalShopTemplateImagesInvalid,
 		service.ErrLocalShopTemplateImageBase64Invalid, service.ErrLocalShopTemplateImageTooLarge,
+		service.ErrLocalShopTemplateImageFileInvalid, service.ErrLocalShopTemplateImageFileTooLarge,
 		service.ErrLocalShopTemplateStatusInvalid:
 		response.JSON(c, http.StatusBadRequest, err.Error(), nil, nil)
 	default:

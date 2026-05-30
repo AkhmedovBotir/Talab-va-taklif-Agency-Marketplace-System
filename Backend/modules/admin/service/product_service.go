@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"backend/internal/pkg/productmedia"
 	adminDomain "backend/modules/admin/domain"
 	"backend/modules/admin/repository"
 	contrDomain "backend/modules/contragents/domain"
@@ -24,13 +25,24 @@ var (
 	ErrAdminProductUnitSizeRequired    = errors.New("unit_size majburiy")
 	ErrAdminProductImagesInvalid       = errors.New("images 1 tadan 5 tagacha bo'lishi kerak")
 	ErrAdminProductImageBase64Invalid  = errors.New("image base64 formati noto'g'ri")
-	ErrAdminProductImageTooLarge       = errors.New("image base64 hajmi 100 GB dan oshmasligi kerak")
+	ErrAdminProductImageTooLarge       = errors.New("bitta rasm base64 hajmi 4 MB dan oshmasligi kerak")
 	ErrAdminProductKPIInvalid          = errors.New("kpi_bonus_percent 0 dan 100 gacha bo'lishi kerak")
 	ErrAdminProductStatusInvalid       = errors.New("status noto'g'ri")
 	ErrAdminProductContragentInvalid   = errors.New("contragent_id noto'g'ri")
 	ErrAdminProductModerationInvalid   = errors.New("moderation_status noto'g'ri")
 	ErrAdminRejectReasonRequired       = errors.New("rejection_reason majburiy")
+	ErrAdminProductImageNotFound       = errors.New("rasm topilmadi")
+	ErrAdminProductImageFileInvalid    = errors.New("rasm fayli noto'g'ri yoki qo'llab-quvvatlanmaydi")
+	ErrAdminProductImageFileTooLarge   = errors.New("bitta rasm 4 MB dan oshmasligi kerak")
 )
+
+const adminProductMaxImages = 5
+
+type AdminProductImageItem struct {
+	ID        uint   `json:"id"`
+	URL       string `json:"url"`
+	SortOrder int    `json:"sort_order"`
+}
 
 type AdminProductInput struct {
 	ContragentID    uint     `json:"contragent_id"`
@@ -56,7 +68,8 @@ type AdminProductOutput struct {
 	Description      string    `json:"description"`
 	Price            float64   `json:"price"`
 	OriginalPrice    float64   `json:"original_price"`
-	Images           []string  `json:"images"`
+	Images           []string                `json:"images"`
+	ImageItems       []AdminProductImageItem `json:"image_items,omitempty"`
 	CategoryID       uint      `json:"category_id"`
 	SubcategoryID    uint      `json:"subcategory_id"`
 	Quantity         float64   `json:"quantity"`
@@ -88,14 +101,21 @@ type AdminProductService interface {
 	Delete(id uint) error
 	Approve(id uint) (*AdminProductOutput, error)
 	Reject(id uint, reason string) (*AdminProductOutput, error)
+	CreateWithFiles(input AdminProductInput, files []productmedia.FileInput) (*AdminProductOutput, error)
+	UpdateWithFiles(id uint, input AdminProductInput, files []productmedia.FileInput) (*AdminProductOutput, error)
+	AddImages(id uint, files []productmedia.FileInput) (*AdminProductOutput, error)
+	ReplaceImage(id, imageID uint, file productmedia.FileInput) (*AdminProductOutput, error)
+	DeleteImage(id, imageID uint) (*AdminProductOutput, error)
+	ReplaceAllImages(id uint, files []productmedia.FileInput) (*AdminProductOutput, error)
 }
 
 type adminProductService struct {
-	repo repository.AdminProductRepository
+	repo  repository.AdminProductRepository
+	media *productmedia.Store
 }
 
-func NewAdminProductService(repo repository.AdminProductRepository) AdminProductService {
-	return &adminProductService{repo: repo}
+func NewAdminProductService(repo repository.AdminProductRepository, media *productmedia.Store) AdminProductService {
+	return &adminProductService{repo: repo, media: media}
 }
 
 func (s *adminProductService) Create(input AdminProductInput) (*AdminProductOutput, error) {
@@ -127,7 +147,16 @@ func (s *adminProductService) Create(input AdminProductInput) (*AdminProductOutp
 		ModerationStatus: contrDomain.ProductModerationPending,
 		RejectionReason:  "",
 	}
-	if err = s.repo.Create(row, input.Images); err != nil {
+	if err = s.repo.Create(row); err != nil {
+		return nil, err
+	}
+	stored, err := s.media.PrepareProductImages(row.ID, input.Images)
+	if err != nil {
+		_ = s.repo.Delete(row.ID)
+		return nil, ErrAdminProductImageBase64Invalid
+	}
+	if err = s.repo.SetImages(row.ID, stored); err != nil {
+		_ = s.repo.Delete(row.ID)
 		return nil, err
 	}
 	return s.GetByID(row.ID)
@@ -147,13 +176,17 @@ func (s *adminProductService) GetPaginated(page, limit int, contragentID *uint, 
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]uint, len(rows))
+	for i := range rows {
+		ids[i] = rows[i].ID
+	}
+	imagesMap, err := s.repo.GetImagesByProductIDs(ids)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]AdminProductOutput, 0, len(rows))
-	for _, row := range rows {
-		images, err := s.repo.GetImages(row.ID)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, mapAdminProductOutput(&row, images))
+	for i := range rows {
+		items = append(items, mapAdminProductOutput(&rows[i], s.media.PublicURLs(imagesMap[rows[i].ID])))
 	}
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 	if totalPages == 0 {
@@ -180,13 +213,16 @@ func (s *adminProductService) GetByID(id uint) (*AdminProductOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := mapAdminProductOutput(row, images)
+	out := mapAdminProductOutput(row, s.media.PublicURLs(images))
+	if err = s.attachImageItems(&out, row.ID); err != nil {
+		return nil, err
+	}
 	return &out, nil
 }
 
 func (s *adminProductService) Update(id uint, input AdminProductInput) (*AdminProductOutput, error) {
 	input.normalize()
-	if err := s.validateInput(input, true); err != nil {
+	if err := s.validateInput(input, false); err != nil {
 		return nil, err
 	}
 	if err := s.validateRelations(input.ContragentID, input.CategoryID, input.SubcategoryID); err != nil {
@@ -211,7 +247,26 @@ func (s *adminProductService) Update(id uint, input AdminProductInput) (*AdminPr
 	row.UnitSize = input.UnitSize
 	row.Status = input.Status
 	row.KpiBonusPercent = input.KpiBonusPercent
-	if err = s.repo.Update(row, input.Images); err != nil {
+	var stored []string
+	if len(input.Images) > 0 {
+		if len(input.Images) < 1 || len(input.Images) > adminProductMaxImages {
+			return nil, ErrAdminProductImagesInvalid
+		}
+		for _, img := range input.Images {
+			invalid, tooLarge := s.media.ValidateImageInput(img)
+			if tooLarge {
+				return nil, ErrAdminProductImageTooLarge
+			}
+			if invalid {
+				return nil, ErrAdminProductImageBase64Invalid
+			}
+		}
+		stored, err = s.media.PrepareProductImages(row.ID, input.Images)
+		if err != nil {
+			return nil, ErrAdminProductImageBase64Invalid
+		}
+	}
+	if err = s.repo.Update(row, stored); err != nil {
 		return nil, err
 	}
 	return s.GetByID(row.ID)
@@ -244,7 +299,11 @@ func (s *adminProductService) Delete(id uint) error {
 	if row == nil {
 		return ErrAdminProductNotFound
 	}
-	return s.repo.Delete(row.ID)
+	if err := s.repo.Delete(row.ID); err != nil {
+		return err
+	}
+	s.media.RemoveProductDir(row.ID)
+	return nil
 }
 
 func (s *adminProductService) Approve(id uint) (*AdminProductOutput, error) {
@@ -325,10 +384,11 @@ func (s *adminProductService) validateInput(input AdminProductInput, withImages 
 			return ErrAdminProductImagesInvalid
 		}
 		for _, img := range input.Images {
-			switch validateImageBase64(img) {
-			case imageBase64TooLarge:
+			invalid, tooLarge := s.media.ValidateImageInput(img)
+			if tooLarge {
 				return ErrAdminProductImageTooLarge
-			case imageBase64Invalid:
+			}
+			if invalid {
 				return ErrAdminProductImageBase64Invalid
 			}
 		}
@@ -362,6 +422,35 @@ func (s *adminProductService) validateRelations(contragentID, categoryID, subcat
 		return ErrAdminProductCategoryRelation
 	}
 	return nil
+}
+
+func (s *adminProductService) attachImageItems(out *AdminProductOutput, productID uint) error {
+	rows, err := s.repo.ListImageRows(productID)
+	if err != nil {
+		return err
+	}
+	out.ImageItems = s.imageItemsFromRows(rows)
+	return nil
+}
+
+func (s *adminProductService) imageItemsFromRows(rows []contrDomain.ProductImage) []AdminProductImageItem {
+	if len(rows) == 0 {
+		return nil
+	}
+	items := make([]AdminProductImageItem, 0, len(rows))
+	for _, r := range rows {
+		urls := s.media.PublicURLs([]string{r.Image})
+		url := ""
+		if len(urls) > 0 {
+			url = urls[0]
+		}
+		items = append(items, AdminProductImageItem{
+			ID:        r.ID,
+			URL:       url,
+			SortOrder: r.SortOrder,
+		})
+	}
+	return items
 }
 
 func mapAdminProductOutput(row *contrDomain.Product, images []string) AdminProductOutput {

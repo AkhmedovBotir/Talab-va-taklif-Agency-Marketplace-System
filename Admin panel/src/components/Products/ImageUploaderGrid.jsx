@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
 import { AddPhotoAlternate, Close } from '@mui/icons-material';
-import { readFileAsDataUrl } from './productFormUtils';
+import { readFileAsDataUrl, getImageBase64PayloadSize, MAX_IMAGE_BASE64_BYTES } from './productFormUtils';
 
 const ImageUploaderGrid = ({
   label = 'Rasmlar',
-  hint = 'Kamida 1 ta, ko‘pi bilan 5 ta rasm (JPEG, PNG, WebP va boshqalar)',
+  hint = 'Kamida 1 ta, ko‘pi bilan 5 ta rasm (har biri base64 ≤ 4 MB)',
   images = [],
   onChange,
   max = 5,
@@ -32,12 +32,26 @@ const ImageUploaderGrid = ({
 
     setUploadError('');
     setUploading(true);
+
+    const baseImages = images;
+    const previewUrls = chosen.map((file) => URL.createObjectURL(file));
+    onChange?.([...baseImages, ...previewUrls]);
+
     try {
-      const converted = await Promise.all(chosen.map(readFileAsDataUrl));
-      onChange?.([...images, ...converted]);
-    } catch {
-      setUploadError('Rasmni o‘qib bo‘lmadi');
+      const converted = [];
+      for (let i = 0; i < chosen.length; i += 1) {
+        const dataUrl = await readFileAsDataUrl(chosen[i]);
+        if (getImageBase64PayloadSize(dataUrl) > MAX_IMAGE_BASE64_BYTES) {
+          throw new Error(`Rasm #${baseImages.length + i + 1} 4 MB dan katta — boshqa rasm tanlang`);
+        }
+        converted.push(dataUrl);
+      }
+      onChange?.([...baseImages, ...converted]);
+    } catch (err) {
+      onChange?.(baseImages);
+      setUploadError(err?.message || 'Rasmni o‘qib bo‘lmadi');
     } finally {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
       setUploading(false);
     }
   };

@@ -40,7 +40,7 @@ func (Product) TableName() string {
 type ProductImage struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	ProductID uint      `gorm:"index;not null" json:"product_id"`
-	Image     string    `gorm:"type:text;not null" json:"image"`
+	Image     string    `gorm:"size:2048;not null" json:"image"` // URL yoki products/... relative yo‘l
 	SortOrder int       `gorm:"not null;default:0" json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

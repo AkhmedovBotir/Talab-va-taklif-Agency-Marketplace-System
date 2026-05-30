@@ -1,11 +1,11 @@
 package service
 
 import (
-	"encoding/base64"
 	"errors"
 	"strings"
 	"time"
 
+	"backend/internal/pkg/productmedia"
 	adminDomain "backend/modules/admin/domain"
 	"backend/modules/contragents/domain"
 	"backend/modules/contragents/repository"
@@ -25,9 +25,21 @@ var (
 	ErrProductUnitSizeRequired    = errors.New("unit_size majburiy")
 	ErrProductImagesInvalid       = errors.New("images 1 tadan 5 tagacha bo'lishi kerak")
 	ErrProductImageBase64Invalid  = errors.New("image base64 formati noto'g'ri")
+	ErrProductImageTooLarge       = errors.New("bitta rasm base64 hajmi 4 MB dan oshmasligi kerak")
 	ErrProductKPIInvalid          = errors.New("kpi_bonus_percent 0 dan 100 gacha bo'lishi kerak")
 	ErrProductStatusInvalid       = errors.New("status noto'g'ri")
+	ErrProductImageNotFound       = errors.New("rasm topilmadi")
+	ErrProductImageFileInvalid    = errors.New("rasm fayli noto'g'ri yoki qo'llab-quvvatlanmaydi")
+	ErrProductImageFileTooLarge   = errors.New("bitta rasm 4 MB dan oshmasligi kerak")
 )
+
+const productMaxImages = 5
+
+type ProductImageItem struct {
+	ID        uint   `json:"id"`
+	URL       string `json:"url"`
+	SortOrder int    `json:"sort_order"`
+}
 
 type ProductInput struct {
 	Name            string   `json:"name"`
@@ -60,7 +72,8 @@ type ProductOutput struct {
 	Description      string    `json:"description"`
 	Price            float64   `json:"price"`
 	OriginalPrice    float64   `json:"original_price"`
-	Images           []string  `json:"images"`
+	Images           []string           `json:"images"`
+	ImageItems       []ProductImageItem `json:"image_items,omitempty"`
 	CategoryID       uint      `json:"category_id"`
 	SubcategoryID    uint      `json:"subcategory_id"`
 	Quantity         float64   `json:"quantity"`
@@ -82,14 +95,21 @@ type ContragentProductService interface {
 	Update(contragentID, id uint, input ProductInput) (*ProductOutput, error)
 	UpdateStatus(contragentID, id uint, status string) (*ProductOutput, error)
 	Delete(contragentID, id uint) error
+	CreateWithFiles(contragentID uint, input ProductInput, files []productmedia.FileInput) (*ProductOutput, error)
+	UpdateWithFiles(contragentID, id uint, input ProductInput, files []productmedia.FileInput) (*ProductOutput, error)
+	AddImages(contragentID, id uint, files []productmedia.FileInput) (*ProductOutput, error)
+	ReplaceImage(contragentID, id, imageID uint, file productmedia.FileInput) (*ProductOutput, error)
+	DeleteImage(contragentID, id, imageID uint) (*ProductOutput, error)
+	ReplaceAllImages(contragentID, id uint, files []productmedia.FileInput) (*ProductOutput, error)
 }
 
 type contragentProductService struct {
-	repo repository.ContragentProductRepository
+	repo  repository.ContragentProductRepository
+	media *productmedia.Store
 }
 
-func NewContragentProductService(repo repository.ContragentProductRepository) ContragentProductService {
-	return &contragentProductService{repo: repo}
+func NewContragentProductService(repo repository.ContragentProductRepository, media *productmedia.Store) ContragentProductService {
+	return &contragentProductService{repo: repo, media: media}
 }
 
 func (s *contragentProductService) Create(contragentID uint, input ProductInput) (*ProductOutput, error) {
@@ -121,7 +141,16 @@ func (s *contragentProductService) Create(contragentID uint, input ProductInput)
 		ModerationStatus: domain.ProductModerationPending,
 		RejectionReason:  "",
 	}
-	if err = s.repo.Create(row, input.Images); err != nil {
+	if err = s.repo.Create(row); err != nil {
+		return nil, err
+	}
+	stored, err := s.media.PrepareProductImages(row.ID, input.Images)
+	if err != nil {
+		_ = s.repo.Delete(row.ID)
+		return nil, ErrProductImageBase64Invalid
+	}
+	if err = s.repo.SetImages(row.ID, stored); err != nil {
+		_ = s.repo.Delete(row.ID)
 		return nil, err
 	}
 	return s.GetByID(contragentID, row.ID)
@@ -141,13 +170,17 @@ func (s *contragentProductService) GetPaginated(contragentID uint, page, limit i
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]uint, len(rows))
+	for i := range rows {
+		ids[i] = rows[i].ID
+	}
+	imagesMap, err := s.repo.GetImagesByProductIDs(ids)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]ProductOutput, 0, len(rows))
-	for _, row := range rows {
-		images, err := s.repo.GetImages(row.ID)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, mapProductOutput(&row, images))
+	for i := range rows {
+		items = append(items, mapProductOutput(&rows[i], s.media.PublicURLs(imagesMap[rows[i].ID])))
 	}
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 	if totalPages == 0 {
@@ -174,13 +207,16 @@ func (s *contragentProductService) GetByID(contragentID, id uint) (*ProductOutpu
 	if err != nil {
 		return nil, err
 	}
-	out := mapProductOutput(row, images)
+	out := mapProductOutput(row, s.media.PublicURLs(images))
+	if err = s.attachImageItems(&out, row.ID); err != nil {
+		return nil, err
+	}
 	return &out, nil
 }
 
 func (s *contragentProductService) Update(contragentID, id uint, input ProductInput) (*ProductOutput, error) {
 	input.normalize()
-	if err := s.validateInput(input, true); err != nil {
+	if err := s.validateInput(input, false); err != nil {
 		return nil, err
 	}
 	if err := s.validateCategoryRelation(input.CategoryID, input.SubcategoryID); err != nil {
@@ -207,7 +243,26 @@ func (s *contragentProductService) Update(contragentID, id uint, input ProductIn
 	// Kontragent update qilganda qayta moderatsiya jarayoniga tushadi.
 	row.ModerationStatus = domain.ProductModerationPending
 	row.RejectionReason = ""
-	if err = s.repo.Update(row, input.Images); err != nil {
+	var stored []string
+	if len(input.Images) > 0 {
+		if len(input.Images) < 1 || len(input.Images) > productMaxImages {
+			return nil, ErrProductImagesInvalid
+		}
+		for _, img := range input.Images {
+			invalid, tooLarge := s.media.ValidateImageInput(img)
+			if tooLarge {
+				return nil, ErrProductImageTooLarge
+			}
+			if invalid {
+				return nil, ErrProductImageBase64Invalid
+			}
+		}
+		stored, err = s.media.PrepareProductImages(row.ID, input.Images)
+		if err != nil {
+			return nil, ErrProductImageBase64Invalid
+		}
+	}
+	if err = s.repo.Update(row, stored); err != nil {
 		return nil, err
 	}
 	return s.GetByID(contragentID, row.ID)
@@ -240,7 +295,11 @@ func (s *contragentProductService) Delete(contragentID, id uint) error {
 	if row == nil {
 		return ErrProductNotFound
 	}
-	return s.repo.Delete(row.ID)
+	if err := s.repo.Delete(row.ID); err != nil {
+		return err
+	}
+	s.media.RemoveProductDir(row.ID)
+	return nil
 }
 
 func (s *contragentProductService) validateInput(input ProductInput, withImages bool) error {
@@ -282,7 +341,11 @@ func (s *contragentProductService) validateInput(input ProductInput, withImages 
 			return ErrProductImagesInvalid
 		}
 		for _, img := range input.Images {
-			if !isValidBase64ProductImage(img) {
+			invalid, tooLarge := s.media.ValidateImageInput(img)
+			if tooLarge {
+				return ErrProductImageTooLarge
+			}
+			if invalid {
 				return ErrProductImageBase64Invalid
 			}
 		}
@@ -309,6 +372,35 @@ func (s *contragentProductService) validateCategoryRelation(categoryID, subcateg
 		return ErrProductCategoryRelation
 	}
 	return nil
+}
+
+func (s *contragentProductService) attachImageItems(out *ProductOutput, productID uint) error {
+	rows, err := s.repo.ListImageRows(productID)
+	if err != nil {
+		return err
+	}
+	out.ImageItems = s.imageItemsFromRows(rows)
+	return nil
+}
+
+func (s *contragentProductService) imageItemsFromRows(rows []domain.ProductImage) []ProductImageItem {
+	if len(rows) == 0 {
+		return nil
+	}
+	items := make([]ProductImageItem, 0, len(rows))
+	for _, r := range rows {
+		urls := s.media.PublicURLs([]string{r.Image})
+		url := ""
+		if len(urls) > 0 {
+			url = urls[0]
+		}
+		items = append(items, ProductImageItem{
+			ID:        r.ID,
+			URL:       url,
+			SortOrder: r.SortOrder,
+		})
+	}
+	return items
 }
 
 func mapProductOutput(row *domain.Product, images []string) ProductOutput {
@@ -349,22 +441,6 @@ func (i *ProductInput) normalize() {
 	for idx := range i.Images {
 		i.Images[idx] = strings.TrimSpace(i.Images[idx])
 	}
-}
-
-func isValidBase64ProductImage(raw string) bool {
-	payload := raw
-	if strings.HasPrefix(raw, "data:") {
-		parts := strings.SplitN(raw, ",", 2)
-		if len(parts) != 2 {
-			return false
-		}
-		payload = parts[1]
-	}
-	if payload == "" {
-		return false
-	}
-	_, err := base64.StdEncoding.DecodeString(payload)
-	return err == nil
 }
 
 func normalizeProductStatus(status string) (string, error) {

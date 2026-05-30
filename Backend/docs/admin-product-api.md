@@ -42,7 +42,9 @@ Ixtiyoriy filter:
 ### Update
 `PUT /products/{id}`
 
-Create payload bilan bir xil format.
+Create payload bilan bir xil format. **`images` ixtiyoriy** — yuborilmasa faqat matn maydonlari yangilanadi, rasmlar o‘zgarmaydi.
+
+**Fayl bilan ishlash:** `docs/admin-product-multipart-api.md` (`POST /products/with-images`, `PUT /products/{id}/with-images`, rasm CRUD).
 
 ### Status update
 `PATCH /products/{id}/status`
@@ -76,7 +78,7 @@ Natija: `moderation_status = rejected`
 
 ## 3) Qoidalar
 
-- `images`: min `1`, max `5`, base64 (har qanday rasm MIME; base64 qismi ≤ 100 GB; piksel/hajm cheklovi yo‘q).
+- `images`: min `1`, max `5`. **Yuborish:** hali ham base64 (`data:image/...;base64,...`) — frontend o‘zgarmaydi. **Javob:** `https://api.ttsa.uz/uploads/products/{id}/0.jpg` kabi URL. Editda shu URL larni qayta yuborsangiz, server faylni qayta yozmaydi (tez).
 - `unit`: `dona`, `litr`, `kg`.
 - `kpi_bonus_percent`: `0..100`.
 - `subcategory_id` tanlangan `category_id`ga tegishli bo'lishi shart.

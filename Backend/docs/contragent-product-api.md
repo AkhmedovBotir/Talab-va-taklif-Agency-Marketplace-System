@@ -7,7 +7,7 @@ Base URL: `http://localhost:8081/api/v1`
 ## Muhim qoidalar
 
 - `description` delta format string qabul qiladi.
-- `images` minimum `1`, maksimum `5`, base64 format.
+- `images` minimum `1`, maksimum `5`. **Yuborish:** base64 (avvalgidek). **Javob:** to‘liq rasm URL. Tahrirdagi URL larni qayta yuborish tez (qayta saqlanmaydi).
 - `unit` faqat: `dona`, `litr`, `kg`.
 - `kpi_bonus_percent`: `0..100`.
 - `product_code` tizim tomonidan global ketma-ketlikda avtomatik beriladi.
@@ -51,7 +51,9 @@ Base URL: `http://localhost:8081/api/v1`
 
 `PUT /contragents/me/products/{id}`
 
-Yaratish payloadi bilan bir xil format.
+Yaratish payloadi bilan bir xil format. **`images` ixtiyoriy** — yuborilmasa faqat matn yangilanadi.
+
+**Fayl bilan:** `docs/contragent-product-multipart-api.md` (`POST .../with-images`, rasm CRUD).
 
 Eslatma: update qilinganda mahsulot qayta moderatsiyaga tushadi (`moderation_status = pending`).
 

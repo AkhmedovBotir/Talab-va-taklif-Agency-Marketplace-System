@@ -20,9 +20,10 @@
             }
         },
         "production-apk": {
-            "distribution": "store",
+            "distribution": "internal",
             "android": {
-                "buildType": "apk"
+                "buildType": "apk",
+                "credentialsSource": "local"
             }
         }
     },

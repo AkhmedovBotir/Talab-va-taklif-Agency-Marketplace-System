@@ -22,7 +22,7 @@ func (LocalShopProductTemplate) TableName() string {
 type LocalShopProductTemplateImage struct {
 	ID         uint      `gorm:"primaryKey" json:"id"`
 	TemplateID uint      `gorm:"index;not null" json:"template_id"`
-	Image      string    `gorm:"type:text;not null" json:"image"`
+	Image      string    `gorm:"size:2048;not null" json:"image"` // URL yoki templates/... nisbiy yo‘l
 	SortOrder  int       `gorm:"not null;default:0" json:"sort_order"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`

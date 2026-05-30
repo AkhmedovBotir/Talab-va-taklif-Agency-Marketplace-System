@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"backend/internal/pkg/response"
+	"backend/internal/pkg/productmedia"
 	"backend/modules/admin/domain"
 	"backend/modules/admin/handler"
 	"backend/modules/admin/repository"
@@ -19,7 +20,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int, appBaseURL string) error {
+func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int, appBaseURL, uploadDir string) error {
 	if err := db.AutoMigrate(&domain.Admin{}, &domain.Region{}, &domain.District{}, &domain.MFY{}, &domain.ContragentType{}, &domain.Contragent{}, &domain.NeighborhoodShop{}, &domain.NeighborhoodShopMonthlyConfig{}, &domain.NeighborhoodShopSubscription{}, &domain.NeighborhoodShopSubscriptionReminder{}, &domain.Agent{}, &domain.Punkt{}, &domain.Manager{}, &domain.Category{}, &contrDomain.Product{}, &contrDomain.ProductImage{}, &domain.LocalShopProductTemplate{}, &domain.LocalShopProductTemplateImage{}, &mpDomain.PartnerRequest{}, &domain.CommentTemplate{}, &domain.ArchiveLog{}, &domain.QR{}, &domain.ProductCommentCase{}, &domain.ProductCommentActivity{}, &domain.AdminNotificationRead{}); err != nil {
 		return err
 	}
@@ -94,11 +95,12 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 	categorySvc := service.NewCategoryService(categoryRepo)
 	categoryHandler := handler.NewCategoryHandler(categorySvc)
 	subcategoryHandler := handler.NewSubcategoryHandler(categorySvc)
+	productMedia := productmedia.NewStore(uploadDir, appBaseURL)
 	productRepo := repository.NewAdminProductRepository(db)
-	productSvc := service.NewAdminProductService(productRepo)
+	productSvc := service.NewAdminProductService(productRepo, productMedia)
 	productHandler := handler.NewProductHandler(productSvc)
 	localShopTemplateRepo := repository.NewLocalShopProductTemplateRepository(db)
-	localShopTemplateSvc := service.NewLocalShopProductTemplateService(localShopTemplateRepo)
+	localShopTemplateSvc := service.NewLocalShopProductTemplateService(localShopTemplateRepo, productMedia)
 	localShopTemplateHandler := handler.NewLocalShopProductTemplateHandler(localShopTemplateSvc)
 	localShopProductRepo := repository.NewLocalShopProductRepository(db)
 	localShopProductSvc := service.NewLocalShopProductService(localShopProductRepo)
@@ -128,6 +130,10 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 				"auth_check_route":        true,
 				"permissions_enforced":    false,
 				"admin_permissions_scope": "frontend_only",
+				"product_images":          "url_on_disk",
+				"admin_product_multipart":      true,
+				"contragent_product_multipart":        true,
+				"local_shop_template_multipart": true,
 			}, nil)
 		})
 

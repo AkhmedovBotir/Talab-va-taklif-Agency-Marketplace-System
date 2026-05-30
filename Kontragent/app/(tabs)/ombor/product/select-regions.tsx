@@ -42,14 +42,15 @@ export default function SelectRegionsScreen() {
   const [districts, setDistricts] = useState<Region[]>([]);
   const [selectedRegions, setSelectedRegions] = useState<SelectedRegion[]>([]);
   const [selectedViloyat, setSelectedViloyat] = useState<Region | null>(null);
-  const [selectedTuman, setSelectedTuman] = useState<Region | null>(null);
   const [v1Regions, setV1Regions] = useState<ContragentAreaRegion[]>([]);
   const [v1Districts, setV1Districts] = useState<ContragentAreaDistrict[]>([]);
   const [v1Selected, setV1Selected] = useState<
     Array<{ region: ContragentAreaRegion; district: ContragentAreaDistrict }>
   >([]);
   const [selV1Region, setSelV1Region] = useState<ContragentAreaRegion | null>(null);
-  const [selV1District, setSelV1District] = useState<ContragentAreaDistrict | null>(null);
+  const [pendingV1DistrictIds, setPendingV1DistrictIds] = useState<Set<number>>(new Set());
+  const [pendingTumanIds, setPendingTumanIds] = useState<Set<string>>(new Set());
+  const [selectWholeViloyat, setSelectWholeViloyat] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -221,7 +222,8 @@ export default function SelectRegionsScreen() {
     if (useV1Delivery) return;
     if (selectedViloyat) {
       loadDistricts(selectedViloyat._id);
-      setSelectedTuman(null);
+      setPendingTumanIds(new Set());
+      setSelectWholeViloyat(false);
     } else {
       setDistricts([]);
     }
@@ -231,7 +233,7 @@ export default function SelectRegionsScreen() {
     if (!useV1Delivery) return;
     if (selV1Region) {
       loadV1DistrictsList(selV1Region.id);
-      setSelV1District(null);
+      setPendingV1DistrictIds(new Set());
     } else {
       setV1Districts([]);
     }
@@ -242,9 +244,24 @@ export default function SelectRegionsScreen() {
     setSearchQuery('');
   };
 
-  const handleTumanSelect = (tuman: Region | null) => {
-    setSelectedTuman(tuman);
-    setSearchQuery('');
+  const toggleLegacyTuman = (tuman: Region) => {
+    if (!selectedViloyat || isLegacyDistrictPairTaken(selectedViloyat, tuman)) return;
+    setSelectWholeViloyat(false);
+    setPendingTumanIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tuman._id)) next.delete(tuman._id);
+      else next.add(tuman._id);
+      return next;
+    });
+  };
+
+  const toggleWholeViloyat = () => {
+    if (!selectedViloyat || isLegacyDistrictPairTaken(selectedViloyat, null)) return;
+    setSelectWholeViloyat((prev) => {
+      const next = !prev;
+      if (next) setPendingTumanIds(new Set());
+      return next;
+    });
   };
 
   const handleV1RegionSelect = (r: ContragentAreaRegion) => {
@@ -252,9 +269,38 @@ export default function SelectRegionsScreen() {
     setSearchQuery('');
   };
 
-  const handleV1DistrictSelect = (d: ContragentAreaDistrict) => {
-    setSelV1District(d);
-    setSearchQuery('');
+  const toggleV1District = (d: ContragentAreaDistrict) => {
+    if (!selV1Region || isV1DistrictAlreadyPicked(selV1Region.id, d.id)) return;
+    setPendingV1DistrictIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(d.id)) next.delete(d.id);
+      else next.add(d.id);
+      return next;
+    });
+  };
+
+  const selectAllVisibleV1Districts = () => {
+    if (!selV1Region) return;
+    const available = filteredV1Districts.filter(
+      (d) => !isV1DistrictAlreadyPicked(selV1Region.id, d.id)
+    );
+    setPendingV1DistrictIds(new Set(available.map((d) => d.id)));
+  };
+
+  const clearPendingV1Districts = () => setPendingV1DistrictIds(new Set());
+
+  const selectAllVisibleLegacyTumans = () => {
+    if (!selectedViloyat) return;
+    const available = filteredDistricts.filter(
+      (d) => !isLegacyDistrictPairTaken(selectedViloyat, d)
+    );
+    setSelectWholeViloyat(false);
+    setPendingTumanIds(new Set(available.map((d) => d._id)));
+  };
+
+  const clearPendingLegacyTumans = () => {
+    setPendingTumanIds(new Set());
+    setSelectWholeViloyat(false);
   };
 
   const handleAddRegion = () => {
@@ -263,26 +309,34 @@ export default function SelectRegionsScreen() {
       return;
     }
 
-    const newRegion: SelectedRegion = {
-      viloyat: selectedViloyat,
-      tuman: selectedTuman,
-    };
-
-    const exists = selectedRegions.some(
-      (r) =>
-        r.viloyat._id === newRegion.viloyat._id &&
-        (r.tuman?._id === newRegion.tuman?._id || (!r.tuman && !newRegion.tuman))
-    );
-
-    if (exists) {
-      Alert.alert('Xatolik', 'Bu hudud allaqachon qo\'shilgan');
+    if (!selectWholeViloyat && pendingTumanIds.size === 0) {
+      Alert.alert('Xatolik', 'Kamida bitta tuman tanlang yoki butun viloyatni belgilang');
       return;
     }
 
-    setSelectedRegions([...selectedRegions, newRegion]);
-    setSelectedViloyat(null);
-    setSelectedTuman(null);
-    setDistricts([]);
+    const toAdd: SelectedRegion[] = selectWholeViloyat
+      ? [{ viloyat: selectedViloyat, tuman: null }]
+      : districts
+          .filter((d) => pendingTumanIds.has(d._id))
+          .map((tuman) => ({ viloyat: selectedViloyat, tuman }));
+
+    const fresh = toAdd.filter(
+      (newRegion) =>
+        !selectedRegions.some(
+          (r) =>
+            r.viloyat._id === newRegion.viloyat._id &&
+            (r.tuman?._id === newRegion.tuman?._id || (!r.tuman && !newRegion.tuman))
+        )
+    );
+
+    if (fresh.length === 0) {
+      Alert.alert('Xatolik', 'Tanlangan hududlar allaqachon ro\'yxatda');
+      return;
+    }
+
+    setSelectedRegions([...selectedRegions, ...fresh]);
+    setPendingTumanIds(new Set());
+    setSelectWholeViloyat(false);
     setActiveTab('selected');
   };
 
@@ -291,24 +345,25 @@ export default function SelectRegionsScreen() {
       Alert.alert('Xatolik', 'Viloyat tanlang');
       return;
     }
-    if (!selV1District) {
-      Alert.alert('Xatolik', 'Tuman tanlash majburiy');
+    if (pendingV1DistrictIds.size === 0) {
+      Alert.alert('Xatolik', 'Kamida bitta tuman tanlang');
       return;
     }
-    const exists = v1Selected.some(
-      (p) => p.region.id === selV1Region.id && p.district.id === selV1District.id
-    );
-    if (exists) {
-      Alert.alert('Xatolik', 'Bu hudud allaqachon qo\'shilgan');
+
+    const toAdd = v1Districts
+      .filter((d) => pendingV1DistrictIds.has(d.id))
+      .filter(
+        (d) => !v1Selected.some((p) => p.region.id === selV1Region.id && p.district.id === d.id)
+      )
+      .map((d) => ({ region: selV1Region, district: d }));
+
+    if (toAdd.length === 0) {
+      Alert.alert('Xatolik', 'Tanlangan tumanlar allaqachon ro\'yxatda');
       return;
     }
-    setV1Selected([
-      ...v1Selected,
-      { region: selV1Region, district: selV1District },
-    ]);
-    setSelV1Region(null);
-    setSelV1District(null);
-    setV1Districts([]);
+
+    setV1Selected([...v1Selected, ...toAdd]);
+    setPendingV1DistrictIds(new Set());
     setActiveTab('selected');
   };
 
@@ -605,19 +660,21 @@ export default function SelectRegionsScreen() {
                 <View style={styles.previewCard}>
                   <View style={styles.previewCardHeader}>
                     <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                    <Text style={styles.previewCardTitle}>Tanlangan hudud</Text>
+                    <Text style={styles.previewCardTitle}>Tanlangan viloyat</Text>
                   </View>
                   <View style={styles.previewCardContent}>
                     <View style={styles.previewItem}>
                       <Ionicons name="location" size={20} color="#007AFF" />
                       <Text style={styles.previewText}>{selV1Region.name}</Text>
                     </View>
-                    {selV1District && (
+                    {pendingV1DistrictIds.size > 0 ? (
                       <View style={styles.previewItem}>
-                        <Ionicons name="location-outline" size={20} color="#8E8E93" />
-                        <Text style={styles.previewText}>{selV1District.name}</Text>
+                        <Ionicons name="checkbox-outline" size={20} color="#8E8E93" />
+                        <Text style={styles.previewText}>
+                          {pendingV1DistrictIds.size} ta tuman tanlandi
+                        </Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 </View>
               )}
@@ -672,9 +729,23 @@ export default function SelectRegionsScreen() {
 
               {selV1Region && (
                 <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="location-outline" size={22} color="#1A1A1A" />
-                    <Text style={styles.sectionTitle}>Tuman tanlash (majburiy)</Text>
+                  <View style={styles.sectionHeaderRow}>
+                    <View style={[styles.sectionHeader, styles.sectionHeaderInRow]}>
+                      <Ionicons name="location-outline" size={22} color="#1A1A1A" />
+                      <Text style={styles.sectionTitle}>Tuman tanlash (bir nechta)</Text>
+                    </View>
+                    {v1Districts.length > 0 && !loadingDistricts ? (
+                      <View style={styles.bulkActions}>
+                        <TouchableOpacity onPress={selectAllVisibleV1Districts} style={styles.bulkBtn}>
+                          <Text style={styles.bulkBtnText}>Hammasi</Text>
+                        </TouchableOpacity>
+                        {pendingV1DistrictIds.size > 0 ? (
+                          <TouchableOpacity onPress={clearPendingV1Districts} style={styles.bulkBtn}>
+                            <Text style={styles.bulkBtnTextMuted}>Tozalash</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    ) : null}
                   </View>
                   {loadingDistricts ? (
                     <View style={styles.loaderContainer}>
@@ -686,7 +757,7 @@ export default function SelectRegionsScreen() {
                         const picked =
                           !!selV1Region &&
                           isV1DistrictAlreadyPicked(selV1Region.id, item.id);
-                        const activePick = !picked && selV1District?.id === item.id;
+                        const activePick = !picked && pendingV1DistrictIds.has(item.id);
                         return (
                           <TouchableOpacity
                             key={String(item.id)}
@@ -698,7 +769,7 @@ export default function SelectRegionsScreen() {
                             ]}
                             onPress={() => {
                               if (picked) return;
-                              handleV1DistrictSelect(item);
+                              toggleV1District(item);
                             }}
                           >
                             <Ionicons
@@ -706,8 +777,8 @@ export default function SelectRegionsScreen() {
                                 picked
                                   ? 'checkmark-done'
                                   : activePick
-                                    ? 'checkmark-circle'
-                                    : 'radio-button-off-outline'
+                                    ? 'checkbox'
+                                    : 'square-outline'
                               }
                               size={22}
                               color={
@@ -744,9 +815,20 @@ export default function SelectRegionsScreen() {
               )}
 
               {selV1Region && (
-                <TouchableOpacity style={styles.addButton} onPress={handleAddV1Region}>
+                <TouchableOpacity
+                  style={[
+                    styles.addButton,
+                    pendingV1DistrictIds.size === 0 && styles.addButtonDisabled,
+                  ]}
+                  onPress={handleAddV1Region}
+                  disabled={pendingV1DistrictIds.size === 0}
+                >
                   <Ionicons name="add-circle" size={24} color="#fff" />
-                  <Text style={styles.addButtonText}>Qo'shish</Text>
+                  <Text style={styles.addButtonText}>
+                    {pendingV1DistrictIds.size > 0
+                      ? `Qo'shish (${pendingV1DistrictIds.size} ta)`
+                      : "Qo'shish"}
+                  </Text>
                 </TouchableOpacity>
               )}
             </>
@@ -757,25 +839,26 @@ export default function SelectRegionsScreen() {
                 <View style={styles.previewCard}>
                   <View style={styles.previewCardHeader}>
                     <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                    <Text style={styles.previewCardTitle}>Tanlangan hudud</Text>
+                    <Text style={styles.previewCardTitle}>Tanlangan viloyat</Text>
                   </View>
                   <View style={styles.previewCardContent}>
                     <View style={styles.previewItem}>
                       <Ionicons name="location" size={20} color="#007AFF" />
                       <Text style={styles.previewText}>{selectedViloyat.name}</Text>
                     </View>
-                    {selectedTuman && (
-                      <View style={styles.previewItem}>
-                        <Ionicons name="location-outline" size={20} color="#8E8E93" />
-                        <Text style={styles.previewText}>{selectedTuman.name}</Text>
-                      </View>
-                    )}
-                    {!selectedTuman && districts.length > 0 && (
+                    {selectWholeViloyat ? (
                       <View style={styles.previewItem}>
                         <Ionicons name="location-outline" size={20} color="#8E8E93" />
                         <Text style={styles.previewText}>Butun viloyat</Text>
                       </View>
-                    )}
+                    ) : pendingTumanIds.size > 0 ? (
+                      <View style={styles.previewItem}>
+                        <Ionicons name="checkbox-outline" size={20} color="#8E8E93" />
+                        <Text style={styles.previewText}>
+                          {pendingTumanIds.size} ta tuman tanlandi
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
               )}
@@ -832,9 +915,23 @@ export default function SelectRegionsScreen() {
               {/* Tuman Selection */}
               {selectedViloyat && (
                 <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="location-outline" size={22} color="#1A1A1A" />
-                    <Text style={styles.sectionTitle}>Tuman tanlash (ixtiyoriy)</Text>
+                  <View style={styles.sectionHeaderRow}>
+                    <View style={[styles.sectionHeader, styles.sectionHeaderInRow]}>
+                      <Ionicons name="location-outline" size={22} color="#1A1A1A" />
+                      <Text style={styles.sectionTitle}>Tuman tanlash (bir nechta)</Text>
+                    </View>
+                    {districts.length > 0 && !loadingDistricts ? (
+                      <View style={styles.bulkActions}>
+                        <TouchableOpacity onPress={selectAllVisibleLegacyTumans} style={styles.bulkBtn}>
+                          <Text style={styles.bulkBtnText}>Hammasi</Text>
+                        </TouchableOpacity>
+                        {(pendingTumanIds.size > 0 || selectWholeViloyat) ? (
+                          <TouchableOpacity onPress={clearPendingLegacyTumans} style={styles.bulkBtn}>
+                            <Text style={styles.bulkBtnTextMuted}>Tozalash</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    ) : null}
                   </View>
                   {loadingDistricts ? (
                     <View style={styles.loaderContainer}>
@@ -846,8 +943,7 @@ export default function SelectRegionsScreen() {
                         const wholeTaken = selectedViloyat
                           ? isLegacyDistrictPairTaken(selectedViloyat, null)
                           : false;
-                        const wholeActive =
-                          !wholeTaken && selectedTuman === null;
+                        const wholeActive = !wholeTaken && selectWholeViloyat;
                         return (
                           <TouchableOpacity
                             disabled={wholeTaken}
@@ -858,7 +954,7 @@ export default function SelectRegionsScreen() {
                             ]}
                             onPress={() => {
                               if (wholeTaken) return;
-                              handleTumanSelect(null);
+                              toggleWholeViloyat();
                             }}
                           >
                             <Ionicons
@@ -866,8 +962,8 @@ export default function SelectRegionsScreen() {
                                 wholeTaken
                                   ? 'checkmark-done'
                                   : wholeActive
-                                    ? 'checkmark-circle'
-                                    : 'radio-button-off-outline'
+                                    ? 'checkbox'
+                                    : 'square-outline'
                               }
                               size={22}
                               color={
@@ -896,8 +992,7 @@ export default function SelectRegionsScreen() {
                           const taken = selectedViloyat
                             ? isLegacyDistrictPairTaken(selectedViloyat, item)
                             : false;
-                          const activePick =
-                            !taken && selectedTuman?._id === item._id;
+                          const activePick = !taken && pendingTumanIds.has(item._id);
                           return (
                             <TouchableOpacity
                               key={item._id}
@@ -909,7 +1004,7 @@ export default function SelectRegionsScreen() {
                               ]}
                               onPress={() => {
                                 if (taken) return;
-                                handleTumanSelect(item);
+                                toggleLegacyTuman(item);
                               }}
                             >
                               <Ionicons
@@ -917,8 +1012,8 @@ export default function SelectRegionsScreen() {
                                   taken
                                     ? 'checkmark-done'
                                     : activePick
-                                      ? 'checkmark-circle'
-                                      : 'radio-button-off-outline'
+                                      ? 'checkbox'
+                                      : 'square-outline'
                                 }
                                 size={22}
                                 color={
@@ -955,11 +1050,23 @@ export default function SelectRegionsScreen() {
                 </View>
               )}
 
-              {/* Add Button */}
               {selectedViloyat && (
-                <TouchableOpacity style={styles.addButton} onPress={handleAddRegion}>
+                <TouchableOpacity
+                  style={[
+                    styles.addButton,
+                    !selectWholeViloyat && pendingTumanIds.size === 0 && styles.addButtonDisabled,
+                  ]}
+                  onPress={handleAddRegion}
+                  disabled={!selectWholeViloyat && pendingTumanIds.size === 0}
+                >
                   <Ionicons name="add-circle" size={24} color="#fff" />
-                  <Text style={styles.addButtonText}>Qo'shish</Text>
+                  <Text style={styles.addButtonText}>
+                    {selectWholeViloyat
+                      ? "Qo'shish (butun viloyat)"
+                      : pendingTumanIds.size > 0
+                        ? `Qo'shish (${pendingTumanIds.size} ta)`
+                        : "Qo'shish"}
+                  </Text>
                 </TouchableOpacity>
               )}
             </>
@@ -1143,6 +1250,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     gap: 8,
+    flex: 1,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 8,
+  },
+  sectionHeaderInRow: {
+    marginBottom: 0,
+  },
+  bulkActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bulkBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#E3F2FD',
+  },
+  bulkBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  bulkBtnTextMuted: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93',
   },
   sectionTitle: {
     fontSize: 18,
@@ -1252,6 +1391,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  addButtonDisabled: {
+    backgroundColor: '#C7C7CC',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   addButtonText: {
     fontSize: 17,

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"backend/internal/pkg/productmedia"
 	adminDomain "backend/modules/admin/domain"
 	"backend/modules/admin/repository"
 	contrDomain "backend/modules/contragents/domain"
@@ -21,9 +22,20 @@ var (
 	ErrLocalShopTemplateUnitSizeRequired    = errors.New("unit_size majburiy")
 	ErrLocalShopTemplateImagesInvalid       = errors.New("images 1 tadan 5 tagacha bo'lishi kerak")
 	ErrLocalShopTemplateImageBase64Invalid  = errors.New("image base64 formati noto'g'ri")
-	ErrLocalShopTemplateImageTooLarge       = errors.New("image base64 hajmi 100 GB dan oshmasligi kerak")
+	ErrLocalShopTemplateImageTooLarge       = errors.New("bitta rasm base64 hajmi 4 MB dan oshmasligi kerak")
 	ErrLocalShopTemplateStatusInvalid       = errors.New("status noto'g'ri")
+	ErrLocalShopTemplateImageNotFound       = errors.New("rasm topilmadi")
+	ErrLocalShopTemplateImageFileInvalid    = errors.New("rasm fayli noto'g'ri yoki qo'llab-quvvatlanmaydi")
+	ErrLocalShopTemplateImageFileTooLarge   = errors.New("bitta rasm 4 MB dan oshmasligi kerak")
 )
+
+const localShopTemplateMaxImages = 5
+
+type LocalShopTemplateImageItem struct {
+	ID        uint   `json:"id"`
+	URL       string `json:"url"`
+	SortOrder int    `json:"sort_order"`
+}
 
 type LocalShopProductTemplateInput struct {
 	Name          string   `json:"name"`
@@ -40,7 +52,8 @@ type LocalShopProductTemplateOutput struct {
 	ID            uint      `json:"id"`
 	Name          string    `json:"name"`
 	Description   string    `json:"description"`
-	Images        []string  `json:"images"`
+	Images        []string                     `json:"images"`
+	ImageItems    []LocalShopTemplateImageItem `json:"image_items,omitempty"`
 	CategoryID    uint      `json:"category_id"`
 	SubcategoryID uint      `json:"subcategory_id"`
 	Unit          string    `json:"unit"`
@@ -65,19 +78,26 @@ type LocalShopProductTemplateService interface {
 	Update(id uint, input LocalShopProductTemplateInput) (*LocalShopProductTemplateOutput, error)
 	UpdateStatus(id uint, status string) (*LocalShopProductTemplateOutput, error)
 	Delete(id uint) error
+	CreateWithFiles(input LocalShopProductTemplateInput, files []productmedia.FileInput) (*LocalShopProductTemplateOutput, error)
+	UpdateWithFiles(id uint, input LocalShopProductTemplateInput, files []productmedia.FileInput) (*LocalShopProductTemplateOutput, error)
+	AddImages(id uint, files []productmedia.FileInput) (*LocalShopProductTemplateOutput, error)
+	ReplaceImage(id, imageID uint, file productmedia.FileInput) (*LocalShopProductTemplateOutput, error)
+	DeleteImage(id, imageID uint) (*LocalShopProductTemplateOutput, error)
+	ReplaceAllImages(id uint, files []productmedia.FileInput) (*LocalShopProductTemplateOutput, error)
 }
 
 type localShopProductTemplateService struct {
-	repo repository.LocalShopProductTemplateRepository
+	repo  repository.LocalShopProductTemplateRepository
+	media *productmedia.Store
 }
 
-func NewLocalShopProductTemplateService(repo repository.LocalShopProductTemplateRepository) LocalShopProductTemplateService {
-	return &localShopProductTemplateService{repo: repo}
+func NewLocalShopProductTemplateService(repo repository.LocalShopProductTemplateRepository, media *productmedia.Store) LocalShopProductTemplateService {
+	return &localShopProductTemplateService{repo: repo, media: media}
 }
 
 func (s *localShopProductTemplateService) Create(input LocalShopProductTemplateInput) (*LocalShopProductTemplateOutput, error) {
 	input.normalize()
-	if err := s.validateInput(input); err != nil {
+	if err := s.validateInput(input, true); err != nil {
 		return nil, err
 	}
 	if err := s.validateCategoryRelation(input.CategoryID, input.SubcategoryID); err != nil {
@@ -92,7 +112,16 @@ func (s *localShopProductTemplateService) Create(input LocalShopProductTemplateI
 		UnitSize:      input.UnitSize,
 		Status:        input.Status,
 	}
-	if err := s.repo.Create(row, input.Images); err != nil {
+	if err := s.repo.Create(row); err != nil {
+		return nil, err
+	}
+	stored, err := s.media.PrepareTemplateImages(row.ID, input.Images)
+	if err != nil {
+		_ = s.repo.Delete(row.ID)
+		return nil, ErrLocalShopTemplateImageBase64Invalid
+	}
+	if err = s.repo.SetImages(row.ID, stored); err != nil {
+		_ = s.repo.Delete(row.ID)
 		return nil, err
 	}
 	return s.GetByID(row.ID)
@@ -118,7 +147,7 @@ func (s *localShopProductTemplateService) GetPaginated(page, limit int) (*Pagina
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, mapLocalShopTemplateOutput(&row, images))
+		items = append(items, mapLocalShopTemplateOutput(&row, s.media.PublicURLs(images)))
 	}
 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 	if totalPages == 0 {
@@ -145,13 +174,16 @@ func (s *localShopProductTemplateService) GetByID(id uint) (*LocalShopProductTem
 	if err != nil {
 		return nil, err
 	}
-	out := mapLocalShopTemplateOutput(row, images)
+	out := mapLocalShopTemplateOutput(row, s.media.PublicURLs(images))
+	if err = s.attachImageItems(&out, id); err != nil {
+		return nil, err
+	}
 	return &out, nil
 }
 
 func (s *localShopProductTemplateService) Update(id uint, input LocalShopProductTemplateInput) (*LocalShopProductTemplateOutput, error) {
 	input.normalize()
-	if err := s.validateInput(input); err != nil {
+	if err := s.validateInput(input, false); err != nil {
 		return nil, err
 	}
 	if err := s.validateCategoryRelation(input.CategoryID, input.SubcategoryID); err != nil {
@@ -171,7 +203,26 @@ func (s *localShopProductTemplateService) Update(id uint, input LocalShopProduct
 	row.Unit = input.Unit
 	row.UnitSize = input.UnitSize
 	row.Status = input.Status
-	if err := s.repo.Update(row, input.Images); err != nil {
+	var stored []string
+	if len(input.Images) > 0 {
+		if len(input.Images) < 1 || len(input.Images) > localShopTemplateMaxImages {
+			return nil, ErrLocalShopTemplateImagesInvalid
+		}
+		for _, img := range input.Images {
+			invalid, tooLarge := s.media.ValidateImageInput(img)
+			if tooLarge {
+				return nil, ErrLocalShopTemplateImageTooLarge
+			}
+			if invalid {
+				return nil, ErrLocalShopTemplateImageBase64Invalid
+			}
+		}
+		stored, err = s.media.PrepareTemplateImages(row.ID, input.Images)
+		if err != nil {
+			return nil, ErrLocalShopTemplateImageBase64Invalid
+		}
+	}
+	if err = s.repo.Update(row, stored); err != nil {
 		return nil, err
 	}
 	return s.GetByID(id)
@@ -204,10 +255,43 @@ func (s *localShopProductTemplateService) Delete(id uint) error {
 	if row == nil {
 		return ErrLocalShopTemplateNotFound
 	}
-	return s.repo.Delete(id)
+	if err := s.repo.Delete(id); err != nil {
+		return err
+	}
+	s.media.RemoveTemplateDir(id)
+	return nil
 }
 
-func (s *localShopProductTemplateService) validateInput(input LocalShopProductTemplateInput) error {
+func (s *localShopProductTemplateService) attachImageItems(out *LocalShopProductTemplateOutput, templateID uint) error {
+	rows, err := s.repo.ListImageRows(templateID)
+	if err != nil {
+		return err
+	}
+	out.ImageItems = s.imageItemsFromRows(rows)
+	return nil
+}
+
+func (s *localShopProductTemplateService) imageItemsFromRows(rows []adminDomain.LocalShopProductTemplateImage) []LocalShopTemplateImageItem {
+	if len(rows) == 0 {
+		return nil
+	}
+	items := make([]LocalShopTemplateImageItem, 0, len(rows))
+	for _, r := range rows {
+		urls := s.media.PublicURLs([]string{r.Image})
+		url := ""
+		if len(urls) > 0 {
+			url = urls[0]
+		}
+		items = append(items, LocalShopTemplateImageItem{
+			ID:        r.ID,
+			URL:       url,
+			SortOrder: r.SortOrder,
+		})
+	}
+	return items
+}
+
+func (s *localShopProductTemplateService) validateInput(input LocalShopProductTemplateInput, withImages bool) error {
 	if input.Name == "" {
 		return ErrLocalShopTemplateNameRequired
 	}
@@ -229,15 +313,18 @@ func (s *localShopProductTemplateService) validateInput(input LocalShopProductTe
 	if _, err := normalizeLocalShopTemplateStatus(input.Status); err != nil {
 		return err
 	}
-	if len(input.Images) < 1 || len(input.Images) > 5 {
-		return ErrLocalShopTemplateImagesInvalid
-	}
-	for _, img := range input.Images {
-		switch validateImageBase64(img) {
-		case imageBase64TooLarge:
-			return ErrLocalShopTemplateImageTooLarge
-		case imageBase64Invalid:
-			return ErrLocalShopTemplateImageBase64Invalid
+	if withImages {
+		if len(input.Images) < 1 || len(input.Images) > localShopTemplateMaxImages {
+			return ErrLocalShopTemplateImagesInvalid
+		}
+		for _, img := range input.Images {
+			invalid, tooLarge := s.media.ValidateImageInput(img)
+			if tooLarge {
+				return ErrLocalShopTemplateImageTooLarge
+			}
+			if invalid {
+				return ErrLocalShopTemplateImageBase64Invalid
+			}
 		}
 	}
 	return nil

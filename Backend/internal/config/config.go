@@ -11,6 +11,7 @@ import (
 type Config struct {
 	AppPort          string
 	AppBaseURL       string // QR va boshqa ochiq URL lar uchun (masalan https://api.ttsa.uz)
+	UploadDir        string // Mahsulot rasmlari: ./uploads
 	DBHost           string
 	DBPort           string
 	DBUser           string
@@ -39,6 +40,7 @@ func Load() Config {
 	return Config{
 		AppPort:             getEnv("APP_PORT", "8081"),
 		AppBaseURL:          getEnv("APP_BASE_URL", "https://api.ttsa.uz"),
+		UploadDir:           getEnv("UPLOAD_DIR", "uploads"),
 		DBHost:              getEnv("DB_HOST", "localhost"),
 		DBPort:              getEnv("DB_PORT", "5432"),
 		DBUser:              getEnv("DB_USER", "postgres"),

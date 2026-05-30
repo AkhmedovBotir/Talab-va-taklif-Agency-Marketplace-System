@@ -193,7 +193,6 @@ const WarehouseProducts = () => {
           <div className="w-full lg:w-[300px] shrink-0">
             <GeoSearchableSelect
               label="Kontragent"
-              required
               value={filters.contragent_id}
               onChange={(val) => {
                 setFilters((f) => ({ ...f, contragent_id: val }));

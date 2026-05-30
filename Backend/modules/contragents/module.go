@@ -2,6 +2,7 @@ package contragents
 
 import (
 	"backend/internal/pkg/orderembed"
+	"backend/internal/pkg/productmedia"
 	"backend/modules/contragents/domain"
 	"backend/modules/contragents/handler"
 	"backend/modules/contragents/repository"
@@ -11,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int) error {
+func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpireHours int, appBaseURL, uploadDir string) error {
 	if err := db.AutoMigrate(&domain.VerificationCode{}, &domain.ContragentDeliveryRegion{}, &domain.ContragentDeliveryDistrict{}, &domain.Product{}, &domain.ProductImage{}, &domain.ContragentNotificationRead{}); err != nil {
 		return err
 	}
@@ -27,7 +28,8 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, jwtSecret string, jwtExpire
 	authSvc := service.NewContragentAuthService(authRepo, eskizService, jwtSecret, jwtExpireHours)
 	categorySvc := service.NewContragentCategoryService(categoryRepo)
 	regionDeliverySvc := service.NewContragentRegionDeliveryService(regionDeliveryRepo)
-	productSvc := service.NewContragentProductService(productRepo)
+	productMedia := productmedia.NewStore(uploadDir, appBaseURL)
+	productSvc := service.NewContragentProductService(productRepo, productMedia)
 	punktLineRepo := repository.NewContragentPunktLineRequestRepository(db)
 	punktLineSvc := service.NewContragentPunktLineRequestService(punktLineRepo, orderembed.NewLoader(db))
 	analyticsRepo := repository.NewContragentAnalyticsRepository(db)

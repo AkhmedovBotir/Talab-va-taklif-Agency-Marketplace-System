@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"backend/internal/pkg/productmedia"
 	adminDomain "backend/modules/admin/domain"
 	"backend/modules/marketplace/domain"
 	"backend/modules/marketplace/repository"
@@ -34,13 +35,15 @@ type MarketplaceContragentBrowseService interface {
 type marketplaceContragentBrowseService struct {
 	browseRepo  repository.MarketplaceContragentBrowseRepository
 	productRepo repository.MarketplaceProductRepository
+	media       *productmedia.Store
 }
 
 func NewMarketplaceContragentBrowseService(
 	browseRepo repository.MarketplaceContragentBrowseRepository,
 	productRepo repository.MarketplaceProductRepository,
+	media *productmedia.Store,
 ) MarketplaceContragentBrowseService {
-	return &marketplaceContragentBrowseService{browseRepo: browseRepo, productRepo: productRepo}
+	return &marketplaceContragentBrowseService{browseRepo: browseRepo, productRepo: productRepo, media: media}
 }
 
 func (s *marketplaceContragentBrowseService) List(query *string, page, limit, nestedLimit int, inc ContragentBrowseInclude) (*domain.PaginatedContragents, error) {
@@ -106,7 +109,7 @@ func (s *marketplaceContragentBrowseService) List(query *string, page, limit, ne
 			if err != nil {
 				return nil, err
 			}
-			item.Products, err = ProductOutputsFromRows(s.productRepo, prows)
+			item.Products, err = ProductOutputsFromRows(s.productRepo, s.media, prows)
 			if err != nil {
 				return nil, err
 			}

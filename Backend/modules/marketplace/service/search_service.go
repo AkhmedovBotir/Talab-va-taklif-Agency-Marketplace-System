@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 
+	"backend/internal/pkg/productmedia"
 	adminDomain "backend/modules/admin/domain"
 	"backend/modules/marketplace/domain"
 	"backend/modules/marketplace/repository"
@@ -49,13 +50,15 @@ type MarketplaceSearchService interface {
 type marketplaceSearchService struct {
 	searchRepo  repository.MarketplaceSearchRepository
 	productRepo repository.MarketplaceProductRepository
+	media       *productmedia.Store
 }
 
 func NewMarketplaceSearchService(
 	searchRepo repository.MarketplaceSearchRepository,
 	productRepo repository.MarketplaceProductRepository,
+	media *productmedia.Store,
 ) MarketplaceSearchService {
-	return &marketplaceSearchService{searchRepo: searchRepo, productRepo: productRepo}
+	return &marketplaceSearchService{searchRepo: searchRepo, productRepo: productRepo, media: media}
 }
 
 func (s *marketplaceSearchService) UnifiedSearch(query string, limitPerType int, mask SearchIncludeMask) (*domain.UnifiedSearchResponse, error) {
@@ -84,7 +87,7 @@ func (s *marketplaceSearchService) UnifiedSearch(query string, limitPerType int,
 		if err != nil {
 			return nil, err
 		}
-		items, err := ProductOutputsFromRows(s.productRepo, prows)
+		items, err := ProductOutputsFromRows(s.productRepo, s.media, prows)
 		if err != nil {
 			return nil, err
 		}

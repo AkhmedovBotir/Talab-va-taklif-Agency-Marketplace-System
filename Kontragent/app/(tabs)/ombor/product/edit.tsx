@@ -1,11 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
-    Image,
     Modal,
     Platform,
     ScrollView,
@@ -15,13 +13,20 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QuillEditor, { QuillEditorRef } from '../../../../components/QuillEditor';
+import { ProductImagesField } from '../../../../components/ProductImagesField';
 import { useSnackbar } from '../../../../components/AppSnackbar';
 import { useResponsive } from '../../../../hooks/useResponsive';
-import { apiService, Category, DeltaFormat, Product } from '../../../../services/api';
+import { apiService, Category, DeltaFormat, Product, ProductImageItem } from '../../../../services/api';
+import { formatApiError } from '../../../../utils/apiFeedback';
 import { formatNumberInput, unformatNumber } from '../../../../utils/formatNumber';
+import {
+  ProductImageDraft,
+  remoteImagesToDrafts,
+  resolveProductImageUrl,
+  validateDraftsCount,
+} from '../../../../utils/productImages';
 
 export default function ProductEditScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>();
@@ -46,7 +51,8 @@ export default function ProductEditScreen() {
   const [description, setDescription] = useState<DeltaFormat | null>(null);
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
-  const [images, setImages] = useState<string[]>([]);
+  const [imageDrafts, setImageDrafts] = useState<ProductImageDraft[]>([]);
+  const [originalImageItems, setOriginalImageItems] = useState<ProductImageItem[]>([]);
   const [categoryId, setCategoryId] = useState('');
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState('');
@@ -59,6 +65,13 @@ export default function ProductEditScreen() {
   const isModalOpen = useRef(false);
   const quillRef = useRef<QuillEditorRef>(null);
 
+  const notifyError = useCallback(
+    (message: string, title = 'Xatolik') => {
+      showSnackbar(message, { title, variant: 'error', durationMs: 6000 });
+    },
+    [showSnackbar]
+  );
+
   const loadProduct = useCallback(async () => {
     if (!productId) return;
 
@@ -70,7 +83,24 @@ export default function ProductEditScreen() {
       setDescription(prod.description || null);
       setPrice(prod.price.toString());
       setOriginalPrice(prod.originalPrice.toString());
-      setImages(prod.images || []);
+      const items =
+        prod.imageItems?.length > 0
+          ? prod.imageItems
+          : (prod.images || []).map((url, index) => ({
+              id: index + 1,
+              url,
+              sortOrder: index,
+            }));
+
+      setOriginalImageItems(items);
+      setImageDrafts(
+        remoteImagesToDrafts(
+          items.map((item) => ({
+            id: item.id,
+            url: resolveProductImageUrl(item.url),
+          }))
+        )
+      );
       setCategoryId(prod.category._id);
       setSubcategoryId(prod.subcategory?._id || null);
       setQuantity(prod.quantity.toString());
@@ -80,13 +110,13 @@ export default function ProductEditScreen() {
       setWidth(prod.width?.toString() || '');
       setWeight(prod.weight?.toString() || '');
       setKpiBonusPercent(prod.kpiBonusPercent?.toString() || '0');
-    } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Maxsulotni yuklashda xatolik');
+    } catch (error: unknown) {
+      notifyError(formatApiError(error));
       router.push('/ombor' as any);
     } finally {
       setLoading(false);
     }
-  }, [productId, router]);
+  }, [productId, router, notifyError]);
 
   const loadCategories = useCallback(async () => {
     try {
@@ -101,25 +131,24 @@ export default function ProductEditScreen() {
             const activeCategories = allResponse.data.filter((cat) => cat.status === 'active');
             setCategories(activeCategories);
             if (activeCategories.length === 0) {
-              Alert.alert('Ogohlantirish', 'Faol kategoriyalar mavjud emas. Iltimos, admin bilan bog\'laning.');
+              notifyError('Faol kategoriyalar mavjud emas. Iltimos, admin bilan bog\'laning.', 'Ogohlantirish');
             }
           } else {
             setCategories([]);
-            Alert.alert('Ogohlantirish', 'Kategoriyalar mavjud emas. Iltimos, admin bilan bog\'laning.');
+            notifyError('Kategoriyalar mavjud emas.', 'Ogohlantirish');
           }
         } else {
           setCategories(response.data);
         }
       } else {
-        Alert.alert('Xatolik', 'Kategoriyalarni yuklashda xatolik yuz berdi');
+        notifyError('Kategoriyalarni yuklashda xatolik yuz berdi');
         setCategories([]);
       }
-    } catch (error: any) {
-      const errorMessage = error?.message || error?.status || 'Kategoriyalarni yuklashda xatolik yuz berdi';
-      Alert.alert('Xatolik', `Kategoriyalarni yuklashda xatolik: ${errorMessage}`);
+    } catch (error: unknown) {
+      notifyError(formatApiError(error));
       setCategories([]);
     }
-  }, []);
+  }, [notifyError]);
 
   const loadSubcategories = useCallback(async (categoryId: string) => {
     if (!categoryId) {
@@ -178,71 +207,34 @@ export default function ProductEditScreen() {
   }, [product]);
 
 
-  const pickImage = async () => {
-    if (images.length >= 5) {
-      Alert.alert('Xatolik', 'Maksimal 5 ta rasm qo\'shish mumkin');
-      return;
-    }
-
-    try {
-      // Request permission
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Ruxsat kerak', 'Rasmlarni tanlash uchun ruxsat berishingiz kerak');
-        return;
-      }
-
-      // Launch image picker
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: false,
-        quality: 0.6,
-        base64: true,
-        allowsEditing: false,
-      });
-
-      if (result.canceled) {
-        return;
-      }
-
-      if (result.assets && result.assets[0]) {
-        const asset = result.assets[0];
-        if (asset.base64) {
-          const mimeType = asset.type || 'image/jpeg';
-          const base64 = `data:${mimeType};base64,${asset.base64}`;
-          setImages([...images, base64]);
-        }
-      }
-    } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Rasm tanlashda xatolik yuz berdi');
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
+  const productImagesChanged = useCallback((): boolean => {
+    if (imageDrafts.some((d) => d.upload)) return true;
+    const afterRemoteIds = new Set(
+      imageDrafts.filter((d) => d.remote).map((d) => d.remote!.id)
+    );
+    return originalImageItems.some((item) => !afterRemoteIds.has(item.id));
+  }, [imageDrafts, originalImageItems]);
 
   const handleUpdate = async () => {
     if (!product || !name.trim() || !price || !originalPrice || !quantity || !kpiBonusPercent) {
-      Alert.alert('Xatolik', 'Barcha majburiy maydonlarni to\'ldiring');
+      notifyError('Barcha majburiy maydonlarni to\'ldiring');
       return;
     }
 
-    if (images.length < 1) {
-      Alert.alert('Xatolik', 'Kamida 1 ta rasm qolishi kerak (API talabi).');
+    const imageErr = validateDraftsCount(imageDrafts, { min: 1, max: 5 });
+    if (imageErr) {
+      notifyError(imageErr);
       return;
     }
 
     setSubmitting(true);
     try {
-      // Get Delta content from Quill editor
       let deltaContent: DeltaFormat | null = null;
       if (quillRef.current) {
         try {
           const delta = await quillRef.current.getContents();
           if (delta && delta.ops && delta.ops.length > 0) {
-            // Check if there's actual content (not just empty ops)
-            const hasContent = delta.ops.some((op: any) => {
+            const hasContent = delta.ops.some((op: { insert?: unknown }) => {
               const text = typeof op.insert === 'string' ? op.insert : '';
               return text && text.trim().length > 0;
             });
@@ -250,35 +242,53 @@ export default function ProductEditScreen() {
               deltaContent = delta;
             }
           }
-        } catch (error) {
+        } catch {
           // Ignore Quill content errors
         }
       }
 
-      await apiService.updateProduct(product._id, {
+      const fields = {
         name: name.trim(),
         description: deltaContent,
         price: parseFloat(price),
         originalPrice: parseFloat(originalPrice),
-        images: images.length > 0 ? images : undefined,
         category: categoryId,
         subcategory: subcategoryId || null,
         quantity: parseFloat(quantity),
         unit,
         unitSize: unitSize ? parseFloat(unitSize) : null,
-        length: length ? parseFloat(length) : null,
-        width: width ? parseFloat(width) : null,
-        weight: weight ? parseFloat(weight) : null,
         kpiBonusPercent: parseFloat(kpiBonusPercent),
-      });
-      showSnackbar('O‘zgarishlar saqlandi.', {
+      };
+
+      const newUploads = imageDrafts
+        .map((d) => d.upload)
+        .filter(Boolean) as NonNullable<ProductImageDraft['upload']>[];
+      const allReplacedWithNew =
+        originalImageItems.length > 0 &&
+        imageDrafts.length >= 1 &&
+        imageDrafts.every((d) => d.upload);
+
+      if (allReplacedWithNew) {
+        await apiService.updateProductWithImages(product._id, fields, newUploads);
+      } else {
+        await apiService.updateProductWithImages(product._id, fields);
+        if (productImagesChanged()) {
+          await apiService.syncProductImagesAfterEdit(
+            product._id,
+            originalImageItems,
+            imageDrafts
+          );
+        }
+      }
+
+      showSnackbar('O‘zgarishlar saqlandi. Moderatsiya holati yangilandi.', {
         title: 'Muvaffaqiyatli',
         variant: 'success',
         durationMs: 4000,
       });
       router.replace('/ombor' as any);
-    } catch (error: any) {
-      Alert.alert('Xatolik', error.message || 'Maxsulot yangilashda xatolik');
+    } catch (error: unknown) {
+      notifyError(formatApiError(error));
     } finally {
       setSubmitting(false);
     }
@@ -389,16 +399,8 @@ export default function ProductEditScreen() {
             style={styles.selectButton}
             onPress={() => {
               if (categories.length === 0) {
-                Alert.alert('Ogohlantirish', 'Kategoriyalar mavjud emas. Iltimos, admin bilan bog\'laning yoki kategoriyalarni yangilashni urinib ko\'ring.', [
-                  {
-                    text: 'Yenilash',
-                    onPress: () => loadCategories(),
-                  },
-                  {
-                    text: 'OK',
-                    style: 'cancel',
-                  },
-                ]);
+                notifyError('Kategoriyalar mavjud emas. Yangilashni urinib ko‘ring.', 'Ogohlantirish');
+                void loadCategories();
               } else {
                 isModalOpen.current = true;
                 setShowCategoryModal(true);
@@ -553,26 +555,14 @@ export default function ProductEditScreen() {
         {/* Rasmlar blok */}
         <View style={styles.block}>
           <Text style={styles.blockTitle}>Rasmlar</Text>
-          <Text style={styles.label}>Rasmlar (maksimal 5 ta)</Text>
-          <View style={styles.imagesContainer}>
-            {images.map((img, index) => (
-              <View key={index} style={styles.imageWrapper}>
-                <Image source={{ uri: img }} style={styles.previewImage} />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() => removeImage(index)}
-                >
-                  <Ionicons name="close-circle" size={24} color="#FF3B30" />
-                </TouchableOpacity>
-              </View>
-            ))}
-            {images.length < 5 && (
-              <TouchableOpacity style={styles.addImageButton} onPress={pickImage}>
-                <Ionicons name="add" size={32} color="#007AFF" />
-                <Text style={styles.addImageText}>Rasm qo'shish</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <ProductImagesField
+            drafts={imageDrafts}
+            onChange={setImageDrafts}
+            minImages={1}
+            maxImages={5}
+            onFeedback={showSnackbar}
+            hint="Yangi rasm qo‘shilsa yoki o‘chirilsa moderatsiya qayta tekshiriladi. JPEG/PNG/WebP/GIF, ≤ 4 MB."
+          />
         </View>
 
         {/* Save Button */}
