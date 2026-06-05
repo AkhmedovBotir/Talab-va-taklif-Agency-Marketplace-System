@@ -17,7 +17,7 @@ import { ChevronDown, ChevronLeft } from 'lucide-react-native';
 import { api, parsePositiveProductId } from '../services/api';
 import type { Address, Region, District, MFY } from '../types';
 import { useMarketplace } from './MarketplaceContext';
-import { TAB_BAR_BOTTOM_CLEARANCE } from './BottomTabBar';
+import { useTabBarLayout } from '../lib/tabBarLayout';
 import { formatAddressGeoSummary } from '../lib/addressLabels';
 import { cn } from '../lib/utils';
 
@@ -136,6 +136,7 @@ function DeliveryAreaSelectNative({
 export function CheckoutScreen() {
   const m = useMarketplace();
   const insets = useSafeAreaInsets();
+  const { clearance: tabBarClearance } = useTabBarLayout();
   const topPad = Math.max(insets.top, Platform.OS === 'web' ? 16 : 12);
 
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -276,7 +277,7 @@ export function CheckoutScreen() {
         className="flex-1"
         contentContainerStyle={{
           padding: 16,
-          paddingBottom: insets.bottom + TAB_BAR_BOTTOM_CLEARANCE + 140,
+          paddingBottom: tabBarClearance + 140,
         }}
         keyboardShouldPersistTaps="handled"
       >
@@ -406,7 +407,7 @@ export function CheckoutScreen() {
 
       <View
         className="absolute bottom-0 left-0 right-0 border-t border-slate-200/90 bg-white px-4 pt-4 shadow-lg"
-        style={{ paddingBottom: Math.max(insets.bottom, 16) + TAB_BAR_BOTTOM_CLEARANCE }}
+        style={{ paddingBottom: tabBarClearance + 16 }}
       >
         <View
           className="w-full"

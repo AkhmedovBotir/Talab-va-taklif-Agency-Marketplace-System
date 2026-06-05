@@ -48,6 +48,7 @@ import {
   filterProductsForDelivery,
 } from '../lib/deliveryFilter';
 import { formatSomDigits, parseSomDigitsFromInput } from '../lib/formatSom';
+import { useTabBarLayout } from '../lib/tabBarLayout';
 
 const EMPTY: UnifiedSearchResponse = {
   query: '',
@@ -81,6 +82,7 @@ const MOBILE_REFRESH_TINT = '#f97316';
 
 export function SearchMarketplaceView() {
   const m = useMarketplace();
+  const { clearance: tabBarClearance } = useTabBarLayout();
   const params = useLocalSearchParams<{
     focus?: string | string[];
     openFilter?: string | string[];
@@ -405,7 +407,7 @@ export function SearchMarketplaceView() {
       <ScrollView
         className="flex-1"
         stickyHeaderIndices={[0]}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: tabBarClearance + 20 }}
         refreshControl={
           Platform.OS !== 'web' ? (
             <RefreshControl

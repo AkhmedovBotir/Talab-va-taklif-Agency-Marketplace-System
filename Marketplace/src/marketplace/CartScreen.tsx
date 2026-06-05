@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Trash2, Plus, Minus, ChevronLeft, Package } from 'lucide-react-native';
 import { useMarketplace } from './MarketplaceContext';
-import { TAB_BAR_BOTTOM_CLEARANCE } from './BottomTabBar';
+import { useTabBarLayout } from '../lib/tabBarLayout';
 import { cn } from '../lib/utils';
 import { api } from '../services/api';
 import { useLocalShopsHoursMap } from '../hooks/useLocalShopsHoursMap';
@@ -15,6 +15,7 @@ const MOBILE_REFRESH_TINT = '#f97316';
 export function CartScreen() {
   const m = useMarketplace();
   const insets = useSafeAreaInsets();
+  const { clearance: tabBarClearance } = useTabBarLayout();
   const topPad = Math.max(insets.top, Platform.OS === 'web' ? 16 : 12);
   const [clearModalVisible, setClearModalVisible] = useState(false);
   const [shopPickerVisible, setShopPickerVisible] = useState(false);
@@ -175,7 +176,7 @@ export function CartScreen() {
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 16,
-          paddingBottom: activeItems.length > 0 ? 200 : 120,
+          paddingBottom: activeItems.length > 0 ? tabBarClearance + 140 : tabBarClearance + 40,
         }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -282,7 +283,7 @@ export function CartScreen() {
       {activeItems.length > 0 ? (
         <View
           className="absolute bottom-0 left-0 right-0 border-t border-slate-200/90 bg-white px-4 pt-4 shadow-lg"
-          style={{ paddingBottom: Math.max(insets.bottom, 16) + TAB_BAR_BOTTOM_CLEARANCE }}
+          style={{ paddingBottom: tabBarClearance + 16 }}
         >
           <View
             className="w-full"

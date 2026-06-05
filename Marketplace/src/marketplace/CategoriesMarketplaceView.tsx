@@ -7,6 +7,7 @@ import { useMarketplace } from './MarketplaceContext';
 import { ProductCard } from './ProductCard';
 import { cn } from '../lib/utils';
 import { deliverySelectionFromMarketplace, filterProductsForDelivery } from '../lib/deliveryFilter';
+import { useTabBarLayout } from '../lib/tabBarLayout';
 
 type BrowseStep = 'categories' | 'subcategories' | 'products';
 
@@ -15,6 +16,7 @@ const MOBILE_REFRESH_TINT = '#f97316';
 
 export function CategoriesMarketplaceView() {
   const m = useMarketplace();
+  const { clearance: tabBarClearance } = useTabBarLayout();
   const isDesktop = m.windowWidth >= DESKTOP_MIN_PX;
 
   const webContainerStyle =
@@ -347,7 +349,7 @@ export function CategoriesMarketplaceView() {
     <View className={cn('flex-1', Platform.OS === 'web' ? 'bg-slate-100' : 'bg-gray-50')}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: tabBarClearance + 24 }}
         refreshControl={
           Platform.OS !== 'web' ? (
             <RefreshControl

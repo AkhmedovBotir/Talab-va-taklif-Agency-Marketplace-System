@@ -29,6 +29,7 @@ import {
 } from '../lib/partnerRequestForm';
 import { PARTNER_REQUEST_SUCCESS_MSG, showUserMessage } from '../lib/userMessage';
 import { ProfileAvatarPicker } from '../components/ProfileAvatarPicker';
+import { useTabBarLayout } from '../lib/tabBarLayout';
 import {
   pickAvatarFileOnWeb,
   prepareAvatarFromFile,
@@ -55,6 +56,7 @@ function ProfileMenuItem({ icon, label, onPress }: { icon: React.ReactNode; labe
 
 export function ProfileMarketplaceScreen() {
   const { onLogout, setNotificationsInboxOpen, refreshNotificationsUnread } = useMarketplace();
+  const { clearance: tabBarClearance } = useTabBarLayout();
   const [user, setUser] = useState<AppUser | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -375,7 +377,7 @@ export function ProfileMarketplaceScreen() {
     <ScrollView
       className="flex-1 bg-slate-100"
       contentContainerStyle={{
-        paddingBottom: 100,
+        paddingBottom: tabBarClearance + 20,
         paddingHorizontal: 16,
         paddingTop: 30,
         alignItems: 'center',

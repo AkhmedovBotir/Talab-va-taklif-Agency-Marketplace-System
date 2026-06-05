@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -49,6 +49,9 @@ export default function BuyurtmalarScreen() {
   const insets = useSafeAreaInsets();
   const { dialog, alert: showAlert } = useAppDialog();
   const { isWideWeb } = useResponsive();
+  const punktNamesLoadedRef = useRef(false);
+  const productNameByProductIdRef = useRef(productNameByProductId);
+  productNameByProductIdRef.current = productNameByProductId;
 
   const loadLines = useCallback(async (pageNum: number = 1, status?: LineStatusFilter) => {
     try {
@@ -91,41 +94,46 @@ export default function BuyurtmalarScreen() {
     }
   }, []);
 
-  const loadProductNames = useCallback(async () => {
-    const ids = Array.from(
-      new Set(lines.map((l) => l.productId).filter((id): id is number => Number.isFinite(id as number)))
-    );
-    const missing = ids.filter((id) => !productNameByProductId[id]);
-    if (missing.length === 0) return;
-    const pairs = await Promise.all(
-      missing.map(async (id) => {
-        const name = await apiService.getNoAuthProductNameById(id);
-        return [id, name] as const;
-      })
-    );
-    setProductNameByProductId((prev) => {
-      const next = { ...prev };
-      for (const [id, name] of pairs) {
-        if (name) next[id] = name;
-      }
-      return next;
-    });
-  }, [lines, productNameByProductId]);
-
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       setPage(1);
       loadLines(1, selectedStatus);
-      if (Object.keys(punktNameById).length === 0) {
+      if (!punktNamesLoadedRef.current) {
+        punktNamesLoadedRef.current = true;
         loadPunktNames();
       }
-    }, [loadLines, selectedStatus, loadPunktNames, punktNameById])
+    }, [loadLines, selectedStatus, loadPunktNames])
   );
 
-  React.useEffect(() => {
-    loadProductNames();
-  }, [loadProductNames]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ids = Array.from(
+        new Set(lines.map((l) => l.productId).filter((id): id is number => Number.isFinite(id as number)))
+      );
+      const missing = ids.filter((id) => !productNameByProductIdRef.current[id]);
+      if (missing.length === 0) return;
+
+      const pairs = await Promise.all(
+        missing.map(async (id) => {
+          const name = await apiService.getNoAuthProductNameById(id);
+          return [id, name] as const;
+        })
+      );
+      if (cancelled) return;
+      setProductNameByProductId((prev) => {
+        const next = { ...prev };
+        for (const [id, name] of pairs) {
+          if (name) next[id] = name;
+        }
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lines]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

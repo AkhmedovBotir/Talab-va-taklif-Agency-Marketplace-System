@@ -34,7 +34,7 @@ import {
   formatOrderLineUnitPriceLabel,
 } from '../lib/orderLineMedia';
 import { useMarketplace } from './MarketplaceContext';
-import { TAB_BAR_BOTTOM_CLEARANCE } from './BottomTabBar';
+import { useTabBarLayout } from '../lib/tabBarLayout';
 import { cn } from '../lib/utils';
 
 function formatOrderDate(iso: string): string {
@@ -50,6 +50,7 @@ export function OrderDetailScreen() {
   const marketScope = (Array.isArray(market) ? market[0] : market) === 'mahalla' ? 'mahalla' : 'bozor';
   const m = useMarketplace();
   const insets = useSafeAreaInsets();
+  const { clearance: tabBarClearance } = useTabBarLayout();
   const topPad = Math.max(insets.top, Platform.OS === 'web' ? 16 : 12);
 
   const [order, setOrder] = useState<MarketplaceOrder | null>(null);
@@ -249,7 +250,7 @@ export function OrderDetailScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 + TAB_BAR_BOTTOM_CLEARANCE }}
+        contentContainerStyle={{ padding: 16, paddingBottom: tabBarClearance + 24 }}
       >
         <View
           className="w-full"

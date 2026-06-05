@@ -8,7 +8,7 @@ import { api } from '../services/api';
 import type { MarketplaceOrder } from '../types';
 import { orderStatusLabelUz, formatOrderAddressSummary } from '../lib/orders';
 import { useMarketplace } from './MarketplaceContext';
-import { TAB_BAR_BOTTOM_CLEARANCE } from './BottomTabBar';
+import { useTabBarLayout } from '../lib/tabBarLayout';
 import { cn } from '../lib/utils';
 
 const MOBILE_REFRESH_TINT = '#f97316';
@@ -23,6 +23,7 @@ function formatOrderDate(iso: string): string {
 export function OrdersScreen() {
   const m = useMarketplace();
   const insets = useSafeAreaInsets();
+  const { clearance: tabBarClearance } = useTabBarLayout();
   const topPad = Math.max(insets.top, Platform.OS === 'web' ? 16 : 12);
 
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
@@ -118,7 +119,7 @@ export function OrdersScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 + TAB_BAR_BOTTOM_CLEARANCE }}
+        contentContainerStyle={{ padding: 16, paddingBottom: tabBarClearance + 24 }}
         refreshControl={
           Platform.OS !== 'web' ? (
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={MOBILE_REFRESH_TINT} colors={[MOBILE_REFRESH_TINT]} />

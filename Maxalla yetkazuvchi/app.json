@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Yetkazuvchi",
-    "slug": "yetkazuvchi",
+    "name": "Maxalla Yetkazuvchi",
+    "slug": "maxalla-yetkazuvchi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "yetkazuvchi",
+    "scheme": "maxalla-yetkazuvchi",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -20,7 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.maxallayetkazuvchi"
+      "package": "com.maxalla.yetkazuvchi"
     },
     "web": {
       "output": "static",

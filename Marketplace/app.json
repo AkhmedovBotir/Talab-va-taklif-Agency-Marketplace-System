@@ -17,7 +17,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.botir123.talabvataklifmarket"
     },
     "web": {
       "bundler": "metro",

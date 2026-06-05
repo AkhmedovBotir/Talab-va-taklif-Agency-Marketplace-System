@@ -17,12 +17,14 @@ import {
 } from '../lib/partnerRequestForm';
 import { contragentDeliversTo, deliverySelectionFromMarketplace } from '../lib/deliveryFilter';
 import { PARTNER_REQUEST_SUCCESS_MSG, showUserMessage } from '../lib/userMessage';
+import { useTabBarLayout } from '../lib/tabBarLayout';
 
 const MOBILE_REFRESH_TINT = '#f97316';
 const PARTNER_REQUEST_FLAG_KEY = 'marketplace_partner_request_sent_v1';
 
 export function HomeMarketplaceView() {
   const m = useMarketplace();
+  const { clearance: tabBarClearance } = useTabBarLayout();
   const [refreshing, setRefreshing] = useState(false);
   const [activeBanner, setActiveBanner] = useState(0);
   const [banners, setBanners] = useState<Array<ContragentBanner & { activityType?: string }>>([]);
@@ -165,7 +167,7 @@ export function HomeMarketplaceView() {
       <ScrollView
         className="flex-1"
         stickyHeaderIndices={[0]}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: tabBarClearance + 20 }}
         refreshControl={
           Platform.OS !== 'web' ? (
             <RefreshControl
