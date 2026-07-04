@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { ShoppingCart, Minus, Plus, Star } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, Star, LogIn } from 'lucide-react';
 import { Product } from '../types';
 import { cn } from '../lib/utils';
-import { api } from '../services/api';
+import { api, requestAuthLogin } from '../services/api';
+import { useMarketplaceSession } from '../hooks/useMarketplaceSession';
+import { setPendingCartProduct, type PendingCartKind } from '../lib/pendingMarketplaceCart';
 
 export type WebProductCardProps = {
   product: Product;
@@ -12,6 +14,8 @@ export type WebProductCardProps = {
   onCartDelta: (productId: string, delta: number) => void;
   inCartQty: number;
   cartDisabled?: boolean;
+  /** Kirishdan keyin qaysi savatga qo'shilishi */
+  pendingCartKind?: PendingCartKind;
   className?: string;
 };
 
@@ -22,8 +26,10 @@ export function WebProductCard({
   onCartDelta,
   inCartQty,
   cartDisabled = false,
+  pendingCartKind = 'marketplace',
   className,
 }: WebProductCardProps) {
+  const isLoggedIn = useMarketplaceSession();
   const stock = Math.max(0, Math.floor(Number(product.quantity) || 0));
   const atMax = inCartQty >= stock;
   const outOfStock = stock <= 0;
@@ -136,6 +142,27 @@ export function WebProductCard({
           >
             Savat tez kunda
           </button>
+        ) : !isLoggedIn ? (
+          <div className="flex w-full gap-2">
+            <button
+              type="button"
+              onClick={() => requestAuthLogin()}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-white py-3 text-[10px] font-black uppercase tracking-wider text-gray-700 transition-all hover:border-orange-200 hover:bg-orange-50 active:scale-95"
+            >
+              <LogIn size={13} />
+              Kirish
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void setPendingCartProduct(String(product.id), pendingCartKind);
+                requestAuthLogin();
+              }}
+              className="flex flex-1 items-center justify-center rounded-2xl bg-orange-500 py-3 text-[10px] font-black uppercase tracking-wider text-white transition-all hover:bg-orange-600 active:scale-95"
+            >
+              Sotib olish
+            </button>
+          </div>
         ) : inCartQty <= 0 ? (
           <button
             type="button"

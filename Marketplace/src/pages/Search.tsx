@@ -573,6 +573,7 @@ export function SearchPage() {
                       onAddToCart={addLocalToCart}
                       onCartDelta={updateLocalQuantity}
                       inCartQty={localCartQtyByProductId.get(String(product.id)) ?? 0}
+                      pendingCartKind="local"
                     />
                   </div>
                 ))}

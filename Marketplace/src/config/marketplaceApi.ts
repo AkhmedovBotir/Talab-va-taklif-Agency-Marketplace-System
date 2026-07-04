@@ -4,6 +4,15 @@
  */
 export const MARKETPLACE_API_BASE = 'https://api.ttsa.uz/api/v1';
 
+/** Rasm/fayl uchun host (`/api/v1` siz). Masalan: `https://api.ttsa.uz`. */
+export const MARKETPLACE_MEDIA_BASE = (() => {
+  try {
+    return new URL(MARKETPLACE_API_BASE).origin;
+  } catch {
+    return 'https://api.ttsa.uz';
+  }
+})();
+
 /** `GET .../notifications/ws` — HTTPS bo‘lsa `wss://`. */
 export function buildMarketplaceNotificationsWsUrl(token: string): string {
   try {

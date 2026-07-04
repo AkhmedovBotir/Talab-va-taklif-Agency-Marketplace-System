@@ -1,14 +1,15 @@
 import { LocalShopProduct, Product } from '../types';
 import { normalizeLocalShopWorkingHours } from '../lib/localShopWorkingHours';
+import { resolveImageUrl } from '../lib/resolveImageUrl';
 
 const PLACEHOLDER_IMG = 'https://placehold.co/400x400/f3f4f6/94a3b8?text=No+image';
 
 /** API / qidiruvdan kelgan mahsulotni ichki `Product` ko‘rinishiga keltiradi. */
 export function normalizeMarketplaceProduct(row: any): Product {
   const imgs = Array.isArray(row?.images)
-    ? row.images.map((u: unknown) => String(u)).filter(Boolean)
+    ? row.images.map((u: unknown) => resolveImageUrl(u)).filter(Boolean)
     : row?.image
-      ? [String(row.image)]
+      ? [resolveImageUrl(row.image)].filter(Boolean)
       : [];
   const images = imgs.length ? imgs : [PLACEHOLDER_IMG];
   return {
@@ -47,15 +48,17 @@ export function normalizeMarketplaceProduct(row: any): Product {
 export function normalizeLocalShopProduct(row: any): LocalShopProduct {
   const template = row?.template ?? {};
   const templateImages = Array.isArray(template?.images)
-    ? template.images.map((u: unknown) => String(u)).filter(Boolean)
+    ? template.images.map((u: unknown) => resolveImageUrl(u)).filter(Boolean)
     : [];
-  const rowImages = Array.isArray(row?.images) ? row.images.map((u: unknown) => String(u)).filter(Boolean) : [];
+  const rowImages = Array.isArray(row?.images)
+    ? row.images.map((u: unknown) => resolveImageUrl(u)).filter(Boolean)
+    : [];
   const imgs = templateImages.length
     ? templateImages
     : rowImages.length
       ? rowImages
       : row?.image
-        ? [String(row.image)]
+        ? [resolveImageUrl(row.image)].filter(Boolean)
         : [];
   const images = imgs.length ? imgs : [PLACEHOLDER_IMG];
 

@@ -14,8 +14,7 @@ import {
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { MotiView } from 'moti';
 import { ArrowLeft, Calendar, ChevronRight, Phone, ShoppingBag, User as UserIcon } from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
+import { api, persistMarketplaceToken } from '../services/api';
 import { District, MFY, Region, User } from '../types';
 import { cn } from '../lib/utils';
 import { PARTNER_FORM_PLACEHOLDER_COLOR } from '../lib/partnerRequestForm';
@@ -29,13 +28,6 @@ const AUTH_SELECTOR_CLASS =
 
 function authFieldLabelClass(hasValue: boolean) {
   return cn('text-base', hasValue ? 'font-bold text-gray-900' : 'font-normal text-slate-400');
-}
-
-async function persistMarketplaceToken(token: string) {
-  await AsyncStorage.setItem('token', token);
-  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-    localStorage.setItem('token', token);
-  }
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

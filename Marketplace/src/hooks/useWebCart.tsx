@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { LocalShopCartItem, Product } from '../types';
-import { api, parsePositiveProductId, requestAuthLogin, hasMarketplaceSession } from '../services/api';
+import { api, parsePositiveProductId, requestAuthLogin, hasMarketplaceSession, subscribeMarketplaceSession } from '../services/api';
+import { takePendingCartProduct } from '../lib/pendingMarketplaceCart';
 
 export interface WebCartItem extends Omit<Product, 'quantity'> {
   quantity: number;
@@ -56,6 +57,17 @@ export function WebCartProvider({ children }: { children: React.ReactNode }) {
       const [rows, localRows] = await Promise.all([api.cart.get(), api.localShopCart.get()]);
       setCart(rows);
       setLocalCart(localRows);
+
+      const pending = await takePendingCartProduct();
+      const pid = pending ? parsePositiveProductId(pending.id) : null;
+      if (pid != null) {
+        const next =
+          pending?.kind === 'local'
+            ? await api.localShopCart.addItem(pid, 1)
+            : await api.cart.addItem(pid, 1);
+        if (pending?.kind === 'local') setLocalCart(next as LocalShopCartItem[]);
+        else setCart(next);
+      }
     } catch {
       setCart([]);
       setLocalCart([]);
@@ -64,6 +76,12 @@ export function WebCartProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     void refreshCart();
+  }, [refreshCart]);
+
+  useEffect(() => {
+    return subscribeMarketplaceSession(() => {
+      void refreshCart();
+    });
   }, [refreshCart]);
 
   const addToCart = useCallback((product: Product) => {

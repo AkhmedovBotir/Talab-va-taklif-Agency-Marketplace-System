@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, Image } from 'react-native';
-import { ShoppingCart, Minus, Plus, Star } from 'lucide-react-native';
+import { ShoppingCart, Minus, Plus, Star, LogIn } from 'lucide-react-native';
 import { Product } from '../types';
 import { cn } from '../lib/utils';
-import { api } from '../services/api';
+import { api, requestAuthLogin } from '../services/api';
+import { useMarketplaceSession } from '../hooks/useMarketplaceSession';
+import { setPendingCartProduct, type PendingCartKind } from '../lib/pendingMarketplaceCart';
 
 type ProductCardProps = {
   product: Product;
@@ -13,6 +15,7 @@ type ProductCardProps = {
   /** Savatdagi soni; 0 bo'lsa faqat "Savatga" */
   inCartQty: number;
   cartDisabled?: boolean;
+  pendingCartKind?: PendingCartKind;
   cardWidth: number;
   isSmallWeb: boolean;
 };
@@ -24,9 +27,11 @@ export function ProductCard({
   onCartDelta,
   inCartQty,
   cartDisabled = false,
+  pendingCartKind = 'marketplace',
   cardWidth,
   isSmallWeb,
 }: ProductCardProps) {
+  const isLoggedIn = useMarketplaceSession();
   const [avgScore, setAvgScore] = useState(0);
   const [totalRatings, setTotalRatings] = useState(0);
   useEffect(() => {
@@ -94,6 +99,25 @@ export function ProductCard({
         ) : cartDisabled ? (
           <View className="items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 py-3">
             <Text className="text-[10px] font-black uppercase tracking-wider text-gray-400">Savat tez kunda</Text>
+          </View>
+        ) : !isLoggedIn ? (
+          <View className="flex-row gap-2">
+            <Pressable
+              onPress={() => requestAuthLogin()}
+              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-white py-3"
+            >
+              <LogIn size={13} color="#374151" />
+              <Text className="text-[10px] font-black uppercase tracking-wider text-gray-700">Kirish</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                void setPendingCartProduct(String(product.id), pendingCartKind);
+                requestAuthLogin();
+              }}
+              className="flex-1 items-center justify-center rounded-2xl bg-orange-500 py-3"
+            >
+              <Text className="text-[10px] font-black uppercase tracking-wider text-white">Sotib olish</Text>
+            </Pressable>
           </View>
         ) : inCartQty <= 0 ? (
           <Pressable

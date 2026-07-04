@@ -82,6 +82,35 @@ export function requestAuthLogin() {
   authLoginPromptHandler?.();
 }
 
+const sessionChangeListeners = new Set<() => void>();
+
+export function subscribeMarketplaceSession(listener: () => void): () => void {
+  sessionChangeListeners.add(listener);
+  return () => {
+    sessionChangeListeners.delete(listener);
+  };
+}
+
+function notifyMarketplaceSessionChanged() {
+  sessionChangeListeners.forEach((listener) => listener());
+}
+
+export async function persistMarketplaceToken(token: string): Promise<void> {
+  await AsyncStorage.setItem('token', token);
+  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+    localStorage.setItem('token', token);
+  }
+  notifyMarketplaceSessionChanged();
+}
+
+export async function clearMarketplaceToken(): Promise<void> {
+  await AsyncStorage.removeItem('token');
+  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+    localStorage.removeItem('token');
+  }
+  notifyMarketplaceSessionChanged();
+}
+
 export async function getMarketplaceToken(): Promise<string | null> {
   /** Brauzerda AsyncStorage ba'zan localStorage bilan sinxron bo‘lmasligi mumkin — token yo‘qolmasligi uchun avvalo localStorage. */
   if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
@@ -94,13 +123,6 @@ export async function getMarketplaceToken(): Promise<string | null> {
 /** Guest rejimda auth endpointlarini chaqirmaslik uchun. */
 export async function hasMarketplaceSession(): Promise<boolean> {
   return !!(await getMarketplaceToken());
-}
-
-async function clearMarketplaceToken() {
-  await AsyncStorage.removeItem('token');
-  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-    localStorage.removeItem('token');
-  }
 }
 
 async function request<T>(path: string, method: HttpMethod = 'GET', body?: unknown, auth = false): Promise<T> {

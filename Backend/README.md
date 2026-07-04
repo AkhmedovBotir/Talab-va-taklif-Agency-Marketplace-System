@@ -17,6 +17,28 @@
 8. Category/Subcategory import:
    - `powershell -ExecutionPolicy Bypass -File ./scripts/import-categories.ps1`
 
+## Kunlik DB backup (API ga ta'sir qilmaydi)
+
+Backup alohida jarayon (`pg_dump`) — API server ishlayotganda ham xavfsiz.
+
+`.env` ga ixtiyoriy:
+- `BACKUP_DIR=backups` — backup fayllar papkasi
+- `BACKUP_RETENTION_DAYS=30` — necha kundan eski backup lar o'chiriladi
+
+**Qo'lda backup:**
+- `powershell -ExecutionPolicy Bypass -File ./scripts/backup-db.ps1`
+- yoki `go run ./cmd/backup-db`
+
+**Har kuni 00:00 avtomatik (Windows):**
+Administrator PowerShell da:
+- `powershell -ExecutionPolicy Bypass -File ./scripts/install-backup-schedule.ps1`
+
+**Har kuni 00:00 avtomatik (Linux server):**
+- `chmod +x ./scripts/install-backup-cron.sh && ./scripts/install-backup-cron.sh`
+
+Backup fayllar: `backups/<db_name>_YYYYMMDD_HHMMSS.dump`  
+Tiklash: `pg_restore -d <db_name> backups/<fayl>.dump`
+
 ## Modular monolit struktura
 
 - `cmd/api` - server entrypoint
@@ -24,6 +46,7 @@
 - `cmd/import-regions` - mongo formatdagi region JSON import script
 - `cmd/import-contragent-types` - mongo formatdagi contragent type JSON import script
 - `cmd/import-categories` - mongo formatdagi category/subcategory JSON import script
+- `cmd/backup-db` - PostgreSQL kunlik backup (pg_dump, API dan mustaqil)
 - `internal/config` - environment config
 - `internal/platform/database` - postgres ulanishi
 - `internal/platform/httpserver` - gin server setup

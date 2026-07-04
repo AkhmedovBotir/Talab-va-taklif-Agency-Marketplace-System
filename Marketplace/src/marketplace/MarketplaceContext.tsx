@@ -8,7 +8,9 @@ import {
   hasMarketplaceSession,
   getMarketplaceToken,
   buildMarketplaceNotificationsWsUrl,
+  subscribeMarketplaceSession,
 } from '../services/api';
+import { takePendingCartProduct } from '../lib/pendingMarketplaceCart';
 import { Product, Region, District, MFY, Address, LocalShopCartItem, MarketplaceNotification } from '../types';
 import { deliverySelectionFromIds, filterProductsForDelivery } from '../lib/deliveryFilter';
 import { writeWebDelivery } from '../lib/webDeliverySelection';
@@ -320,6 +322,17 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
     try {
       const rows = await api.cart.get();
       setCart(rows);
+
+      const pending = await takePendingCartProduct();
+      const pid = pending ? parsePositiveProductId(pending.id) : null;
+      if (pid != null) {
+        const next =
+          pending?.kind === 'local'
+            ? await api.localShopCart.addItem(pid, 1)
+            : await api.cart.addItem(pid, 1);
+        if (pending?.kind === 'local') setLocalCart(next);
+        else setCart(next);
+      }
     } catch {
       setCart([]);
     }
@@ -442,6 +455,17 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
     try {
       const rows = await api.cart.get();
       setCart(rows);
+
+      const pending = await takePendingCartProduct();
+      const pid = pending ? parsePositiveProductId(pending.id) : null;
+      if (pid != null) {
+        const next =
+          pending?.kind === 'local'
+            ? await api.localShopCart.addItem(pid, 1)
+            : await api.cart.addItem(pid, 1);
+        if (pending?.kind === 'local') setLocalCart(next);
+        else setCart(next);
+      }
     } catch {
       setCart([]);
     }
@@ -459,6 +483,13 @@ export function MarketplaceProvider({ children, onLogout }: { children: ReactNod
       setLocalCart([]);
     }
   }, []);
+
+  useEffect(() => {
+    return subscribeMarketplaceSession(() => {
+      void refreshCart();
+      void refreshLocalCart();
+    });
+  }, [refreshCart, refreshLocalCart]);
 
   const loadAddressesRef = useRef(loadAddresses);
   const loadRegionsRef = useRef(loadRegions);

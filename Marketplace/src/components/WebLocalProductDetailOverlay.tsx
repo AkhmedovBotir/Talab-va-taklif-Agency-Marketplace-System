@@ -124,6 +124,7 @@ export function WebLocalProductDetailOverlay({ product, onClose, onAddToCart, on
                     outOfStock={stock <= 0}
                     onAddToCart={onAddToCart}
                     onCartDelta={onCartDelta}
+                    pendingCartKind="local"
                   />
                 </div>
               </div>
@@ -137,6 +138,7 @@ export function WebLocalProductDetailOverlay({ product, onClose, onAddToCart, on
                   outOfStock={stock <= 0}
                   onAddToCart={onAddToCart}
                   onCartDelta={onCartDelta}
+                  pendingCartKind="local"
                 />
               </div>
             </div>

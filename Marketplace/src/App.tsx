@@ -13,7 +13,7 @@ import { BottomNav } from './components/BottomNav';
 import { WebCartProvider } from './hooks/useWebCart';
 import { WebNotificationsProvider } from './hooks/useWebNotifications';
 import { UserMessageToastHost } from './components/UserMessageToastHost';
-import { api, setAuthLoginPromptHandler, setSessionInvalidatedHandler } from './services/api';
+import { api, setAuthLoginPromptHandler, setSessionInvalidatedHandler, clearMarketplaceToken } from './services/api';
 import { isAuthProtectedPathname } from './lib/authGate';
 
 function BottomNavShell() {
@@ -149,7 +149,7 @@ export default function App() {
                 element={requireAuth(
                   <ProfilePage
                     onLogout={() => {
-                      localStorage.removeItem('token');
+                      void clearMarketplaceToken();
                       setIsAuthenticated(false);
                       setAuthPromptToLogin(false);
                     }}

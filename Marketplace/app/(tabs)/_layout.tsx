@@ -6,7 +6,7 @@ import { AuthPage } from '../../src/components/Auth';
 import { MarketplaceProvider } from '../../src/marketplace/MarketplaceContext';
 import { MarketplaceModals } from '../../src/marketplace/MarketplaceModals';
 import { UserMessageToastHost } from '../../src/components/UserMessageToastHost';
-import { api, getMarketplaceToken, setAuthLoginPromptHandler, setSessionInvalidatedHandler } from '../../src/services/api';
+import { api, getMarketplaceToken, setAuthLoginPromptHandler, setSessionInvalidatedHandler, clearMarketplaceToken } from '../../src/services/api';
 import { requiresAuthForRoute } from '../../src/lib/authGate';
 
 type LoginIntent = 'none' | 'route' | 'action';
@@ -32,8 +32,7 @@ export default function TabsLayout() {
         await api.auth.getProfile();
         if (!cancelled) setIsAuthenticated(true);
       } catch {
-        await AsyncStorage.removeItem('token');
-        if (typeof localStorage !== 'undefined') localStorage.removeItem('token');
+        await clearMarketplaceToken();
         if (!cancelled) setIsAuthenticated(false);
       }
     })();
@@ -69,10 +68,7 @@ export default function TabsLayout() {
   }, [requiresAuthRoute, isAuthenticated]);
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('token');
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('token');
-    }
+    await clearMarketplaceToken();
     setIsAuthenticated(false);
     setLoginIntent('none');
   };

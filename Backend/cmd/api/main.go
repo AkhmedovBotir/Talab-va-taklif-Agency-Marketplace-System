@@ -43,7 +43,7 @@ func main() {
 	if err = deliveryproviders.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {
 		log.Fatalf("Delivery provider auth router ulashda xatolik: %v", err)
 	}
-	if err = marketplace.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours, cfg.AppBaseURL, cfg.UploadDir); err != nil {
+	if err = marketplace.RegisterRoutes(router, db, cfg.JWTSecret, cfg.MarketplaceJWTExpireHours, cfg.AppBaseURL, cfg.UploadDir); err != nil {
 		log.Fatalf("Marketplace auth router ulashda xatolik: %v", err)
 	}
 	if err = punkts.RegisterRoutes(router, db, cfg.JWTSecret, cfg.JWTExpireHours); err != nil {

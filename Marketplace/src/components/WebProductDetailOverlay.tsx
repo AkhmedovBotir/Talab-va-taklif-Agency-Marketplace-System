@@ -11,11 +11,14 @@ import {
   Minus,
   Plus,
   Star,
+  LogIn,
 } from 'lucide-react';
 import { Product } from '../types';
 import { cn } from '../lib/utils';
 import { renderProductDescriptionWeb } from '../lib/renderProductDescriptionWeb';
-import { api } from '../services/api';
+import { api, requestAuthLogin } from '../services/api';
+import { useMarketplaceSession } from '../hooks/useMarketplaceSession';
+import { setPendingCartProduct, type PendingCartKind } from '../lib/pendingMarketplaceCart';
 
 type Props = {
   product: Product | null;
@@ -24,6 +27,7 @@ type Props = {
   onCartDelta: (productId: string, delta: number) => void;
   /** Savatdagi dona (shu mahsulot uchun) */
   inCartQty: number;
+  pendingCartKind?: PendingCartKind;
 };
 
 export function WebProductDetailCartPanel({
@@ -34,6 +38,7 @@ export function WebProductDetailCartPanel({
   outOfStock,
   onAddToCart,
   onCartDelta,
+  pendingCartKind = 'marketplace',
 }: {
   product: Product;
   inCartQty: number;
@@ -42,7 +47,10 @@ export function WebProductDetailCartPanel({
   outOfStock: boolean;
   onAddToCart: (p: Product) => void;
   onCartDelta: (productId: string, delta: number) => void;
+  pendingCartKind?: PendingCartKind;
 }) {
+  const isLoggedIn = useMarketplaceSession();
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-end justify-between">
@@ -64,6 +72,27 @@ export function WebProductDetailCartPanel({
       {outOfStock ? (
         <div className="flex w-full items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 py-4 text-sm font-black uppercase tracking-wider text-gray-400 md:py-5">
           Omborda yo&apos;q
+        </div>
+      ) : !isLoggedIn ? (
+        <div className="flex w-full flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => requestAuthLogin()}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-gray-200 bg-white py-4 font-bold text-gray-800 transition-all hover:border-orange-200 hover:bg-orange-50 active:scale-[0.98] md:py-5"
+          >
+            <LogIn size={20} />
+            Kirish
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void setPendingCartProduct(String(product.id), pendingCartKind);
+              requestAuthLogin();
+            }}
+            className="flex flex-1 items-center justify-center rounded-2xl border-2 border-transparent bg-orange-500 py-4 font-bold text-white shadow-2xl shadow-orange-200/40 transition-all hover:bg-orange-600 active:scale-[0.98] md:py-5"
+          >
+            Sotib olish
+          </button>
         </div>
       ) : inCartQty <= 0 ? (
         <button
@@ -108,7 +137,14 @@ export function WebProductDetailCartPanel({
   );
 }
 
-export function WebProductDetailOverlay({ product, onClose, onAddToCart, onCartDelta, inCartQty }: Props) {
+export function WebProductDetailOverlay({
+  product,
+  onClose,
+  onAddToCart,
+  onCartDelta,
+  inCartQty,
+  pendingCartKind = 'marketplace',
+}: Props) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [ratingSummary, setRatingSummary] = useState<{ average: number; total: number; items: Array<{ id: number; score: number; note?: string; comment_template?: string }> }>({
@@ -309,6 +345,7 @@ export function WebProductDetailOverlay({ product, onClose, onAddToCart, onCartD
                     outOfStock={outOfStock}
                     onAddToCart={onAddToCart}
                     onCartDelta={onCartDelta}
+                    pendingCartKind={pendingCartKind}
                   />
                 </div>
               </div>
@@ -322,6 +359,7 @@ export function WebProductDetailOverlay({ product, onClose, onAddToCart, onCartD
                   outOfStock={outOfStock}
                   onAddToCart={onAddToCart}
                   onCartDelta={onCartDelta}
+                  pendingCartKind={pendingCartKind}
                 />
               </div>
             </div>

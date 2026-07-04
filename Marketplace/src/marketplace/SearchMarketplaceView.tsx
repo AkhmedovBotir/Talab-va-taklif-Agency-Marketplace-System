@@ -580,6 +580,7 @@ export function SearchMarketplaceView() {
                       onAddToCart={m.addLocalToCart}
                       onCartDelta={m.updateLocalQuantity}
                       inCartQty={m.localCart.find((c) => String(c.id) === String(product.id))?.quantity ?? 0}
+                      pendingCartKind="local"
                       cardWidth={m.resolvedCardWidth}
                       isSmallWeb={m.isSmallWeb}
                     />

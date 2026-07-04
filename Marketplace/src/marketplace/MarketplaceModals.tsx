@@ -16,11 +16,14 @@ import {
   Bell,
   CheckCheck,
   Search,
+  LogIn,
 } from 'lucide-react-native';
 import { cn } from '../lib/utils';
 import { useMarketplace } from './MarketplaceContext';
 import { ProductImageLightbox } from './ProductImageLightbox';
-import { api } from '../services/api';
+import { api, requestAuthLogin } from '../services/api';
+import { useMarketplaceSession } from '../hooks/useMarketplaceSession';
+import { setPendingCartProduct, type PendingCartKind } from '../lib/pendingMarketplaceCart';
 import type { Product, ProductRatingItem, MarketplaceNotification, Address, Region, District, MFY } from '../types';
 import { isLocalShopProduct } from '../lib/isLocalShopProduct';
 
@@ -46,12 +49,15 @@ function ProductDetailCartActionsNative({
   inCartQty,
   onAdd,
   onDelta,
+  pendingCartKind = 'marketplace',
 }: {
   product: Product;
   inCartQty: number;
   onAdd: () => void;
   onDelta: (delta: number) => void;
+  pendingCartKind?: PendingCartKind;
 }) {
+  const isLoggedIn = useMarketplaceSession();
   const stock = Math.max(0, Math.floor(Number(product.quantity) || 0));
   const atMax = inCartQty >= stock;
   const out = stock <= 0;
@@ -59,6 +65,28 @@ function ProductDetailCartActionsNative({
     return (
       <View className="w-full items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 py-5">
         <Text className="text-xs font-black uppercase tracking-wider text-gray-400">Omborda yo&apos;q</Text>
+      </View>
+    );
+  }
+  if (!isLoggedIn) {
+    return (
+      <View className="w-full flex-row gap-3">
+        <Pressable
+          onPress={() => requestAuthLogin()}
+          className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-5"
+        >
+          <LogIn size={20} color="#374151" />
+          <Text className="text-base font-bold text-gray-800">Kirish</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            void setPendingCartProduct(String(product.id), pendingCartKind);
+            requestAuthLogin();
+          }}
+          className="flex-1 items-center justify-center rounded-2xl bg-orange-500 py-5"
+        >
+          <Text className="text-base font-bold text-white">Sotib olish</Text>
+        </Pressable>
       </View>
     );
   }
@@ -899,6 +927,7 @@ export function MarketplaceModals() {
                         inCartQty={selectedDetailCartQty}
                         onAdd={addSelectedToCart}
                         onDelta={updateSelectedCartQty}
+                        pendingCartKind={selectedIsLocalProduct ? 'local' : 'marketplace'}
                       />
                     </View>
                   </View>
@@ -1040,6 +1069,7 @@ export function MarketplaceModals() {
                     inCartQty={selectedDetailCartQty}
                     onAdd={addSelectedToCart}
                     onDelta={updateSelectedCartQty}
+                    pendingCartKind={selectedIsLocalProduct ? 'local' : 'marketplace'}
                   />
                 </View>
               )}
