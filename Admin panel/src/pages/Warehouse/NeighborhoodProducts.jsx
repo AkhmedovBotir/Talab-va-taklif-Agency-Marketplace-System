@@ -12,8 +12,7 @@ import {
   templateImagesChanged,
   validateTemplateForm,
 } from '../../components/Products/templateFormUtils';
-import Quill from 'quill';
-import 'quill/dist/quill.snow.css';
+import QuillDescriptionEditor from '../../components/Products/QuillDescriptionEditor';
 import { categoryAPI, localShopProductTemplateAPI, subcategoryAPI } from '../../services/api';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import GeoSearchableSelect from '../../components/DistrictContragents/GeoSearchableSelect';
@@ -45,18 +44,6 @@ const normalizeDescPreview = (raw) => {
   }
 };
 
-const parseDescriptionDelta = (raw) => {
-  const input = String(raw ?? '');
-  try {
-    const parsed = JSON.parse(input || '{}');
-    if (parsed && Array.isArray(parsed.ops)) return parsed;
-  } catch {
-    // ignore
-  }
-  if (input.trim()) return { ops: [{ insert: input }, { insert: '\n' }] };
-  return { ops: [{ insert: '\n' }] };
-};
-
 const NeighborhoodProducts = () => {
   const { showError, showSuccess } = useSnackbar();
   const { can } = usePermissions();
@@ -82,10 +69,8 @@ const NeighborhoodProducts = () => {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [imageSlots, setImageSlots] = useState([]);
+  const [editorReset, setEditorReset] = useState(0);
   const initialImageSlotsRef = useRef([]);
-  const quillHostRef = useRef(null);
-  const quillRef = useRef(null);
-  const initialDescriptionRef = useRef(defaultForm.description);
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
@@ -141,6 +126,10 @@ const NeighborhoodProducts = () => {
     if (activeTab === 'templates') fetchCategories();
   }, [activeTab, fetchCategories]);
 
+  useEffect(() => {
+    if (modalOpen) setEditorReset((n) => n + 1);
+  }, [modalOpen]);
+
   const visibleSubcategories = useMemo(
     () =>
       subcategories.filter((s) => String(s.parent_id ?? s.category_id ?? '') === String(form.category_id || '')),
@@ -160,7 +149,6 @@ const NeighborhoodProducts = () => {
     setForm(defaultForm);
     setImageSlots([]);
     initialImageSlotsRef.current = [];
-    initialDescriptionRef.current = defaultForm.description;
     setModalOpen(true);
   };
 
@@ -181,7 +169,6 @@ const NeighborhoodProducts = () => {
         unit_size: item.unit_size || '',
         status: item.status || 'active',
       });
-      initialDescriptionRef.current = item.description || defaultForm.description;
       setModalOpen(true);
     } catch (e) {
       showError(e.message || "Shablonni ochib bo'lmadi");
@@ -197,31 +184,6 @@ const NeighborhoodProducts = () => {
       showError(e.message || "Shablonni ko'rib bo'lmadi");
     }
   };
-
-  useEffect(() => {
-    if (!modalOpen) return;
-    if (!quillRef.current && quillHostRef.current) {
-      const editor = new Quill(quillHostRef.current, {
-        theme: 'snow',
-        modules: {
-          toolbar: [
-            [{ header: [1, 2, false] }],
-            ['bold', 'italic', 'underline'],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            ['link'],
-            ['clean'],
-          ],
-        },
-      });
-      editor.on('text-change', () => {
-        setForm((prev) => ({ ...prev, description: JSON.stringify(editor.getContents()) }));
-      });
-      quillRef.current = editor;
-    }
-    if (quillRef.current) {
-      quillRef.current.setContents(parseDescriptionDelta(initialDescriptionRef.current), 'silent');
-    }
-  }, [modalOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -549,10 +511,13 @@ const NeighborhoodProducts = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description (delta)</label>
-                <div className="border border-gray-300 rounded-md overflow-hidden">
-                  <div ref={quillHostRef} className="min-h-[180px]" />
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tavsif</label>
+                <QuillDescriptionEditor
+                  active={modalOpen}
+                  value={form.description}
+                  onChange={(description) => setForm((f) => ({ ...f, description }))}
+                  resetKey={editingRow?.id ?? `create-${editorReset}`}
+                />
               </div>
 
               <ProductImageUploader
